@@ -76,9 +76,13 @@ public class ScreenRenderer {
         ) {
             renderGpuTexture(stack, tessellator, screen.renderType);
         } else if (screen.renderType != null) {
-            float pulse = (float) Math.abs(Math.sin(System.nanoTime() / 1_500_000_000.0 * Math.PI));
-            int v = (int) (10 + pulse * 20);
-            renderColor(stack, tessellator, screen.renderType, v, v, v);
+            if (screen.errored) {
+                renderColor(stack, tessellator, screen.renderType, 35, 5, 5);
+            } else {
+                float pulse = (float) Math.abs(Math.sin(System.nanoTime() / 1_500_000_000.0 * Math.PI));
+                int v = (int) (10 + pulse * 20);
+                renderColor(stack, tessellator, screen.renderType, v, v, v);
+            }
         }
         stack.popPose();
     }
