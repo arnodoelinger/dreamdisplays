@@ -4,8 +4,7 @@
   "package": "com.dreamdisplays.mixins",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "Crosshair",
-    "GStreamer"
+    "Crosshair"
   ],
   "injectors": {
     "defaultRequire": 1
