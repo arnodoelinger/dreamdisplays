@@ -3,9 +3,10 @@ plugins {
 }
 
 dependencies {
-    api(libs.gst1)
     api(libs.utils)
     api(libs.jspecify)
+    api("org.apache.commons:commons-compress:1.27.1")
+    api("org.tukaani:xz:1.10")
 }
 
 neoForge {

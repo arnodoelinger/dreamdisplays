@@ -4,7 +4,6 @@
 # Common
 jspecify = "1.0.0"
 utils = "1.4.10"
-gst1 = "1.4.0"
 
 # Plugin versions
 loom = "1.16.0-alpha.13"
@@ -24,7 +23,6 @@ neoforge = "21.11.42"
 # Common
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 utils = { module = "me.inotsleep:utils", version.ref = "utils" }
-gst1 = { module = "org.freedesktop.gstreamer:gst1-java-core", version.ref = "gst1" }
 
 # Fabric
 fabricLoader = { module = "net.fabricmc:fabric-loader", version.ref = "fabricLoader" }

@@ -49,13 +49,15 @@ tasks.shadowJar {
     destinationDirectory.set(rootProject.layout.buildDirectory.dir("libs"))
     dependencies {
         include(project(":common"))
-        include(dependency("org.freedesktop.gstreamer:gst1-java-core"))
         include(dependency("me.inotsleep:utils"))
+        include(dependency("org.apache.commons:commons-compress"))
+        include(dependency("org.tukaani:xz"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
         "me.inotsleep.utils",
-        "org.freedesktop.gstreamer",
+        "org.apache.commons.compress",
+        "org.tukaani.xz",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
