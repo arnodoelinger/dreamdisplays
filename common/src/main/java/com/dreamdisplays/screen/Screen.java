@@ -238,7 +238,6 @@ public class Screen {
             if (!videoStarted) {
                 this.paused = desiredPaused;
                 startVideo();
-                setVolume((float) Initializer.config.syncDisplayVolume);
             }
 
             long lostTime = System.nanoTime() - nanos;
@@ -400,6 +399,8 @@ public class Screen {
     public void startVideo() {
         if (mediaPlayer != null) {
             videoStarted = true;
+            setVideoVolume(muted ? 0 : volume);
+            mediaPlayer.setBrightness(brightness);
             if (paused) {
                 mediaPlayer.pause();
             } else {
@@ -419,10 +420,7 @@ public class Screen {
     public void setPaused(boolean paused) {
         if (!videoStarted) {
             this.paused = paused;
-            waitForMFInit(() -> {
-                startVideo();
-                setVolume((float) Initializer.config.defaultDisplayVolume);
-            });
+            waitForMFInit(() -> startVideo());
             return;
         }
         if (this.paused == paused) return;
