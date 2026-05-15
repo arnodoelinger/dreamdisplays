@@ -732,7 +732,11 @@ object YtDlp {
                 return null
             }
 
-            val candidates = if (configured == "auto") BROWSER_CANDIDATES else arrayOf(configured)
+            // Try to avoid false message popup "Security wants to use your confidential information..." on macOS
+            val isMacOs = System.getProperty("os.name", "").lowercase(Locale.ENGLISH).contains("mac")
+            val candidates = if (configured == "auto") {
+                if (isMacOs) BROWSER_CANDIDATES_MACOS else BROWSER_CANDIDATES
+            } else arrayOf(configured)
             val binary: String? = try {
                 resolveBinary()
             } catch (_: IOException) {
