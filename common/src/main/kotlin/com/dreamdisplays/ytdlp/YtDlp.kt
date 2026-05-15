@@ -241,6 +241,11 @@ object YtDlp {
     }
 
     private fun addCookieArgs(args: MutableList<String>) {
+        val proxy = Initializer.config.ytdlpProxy.trim()
+        if (proxy.isNotEmpty()) {
+            args.add("--proxy")
+            args.add(proxy)
+        }
         val cookieFile = BUNDLED_DIR.resolve("cookies.txt")
         if (Files.exists(cookieFile)) {
             try {

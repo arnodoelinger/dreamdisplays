@@ -25,6 +25,9 @@ class Config(baseDir: File) : AbstractConfig(baseDir, "config.yml") {
     @Path("ytdlp-cookies-from-browser")
     var ytdlpCookiesFromBrowser: String = "auto"
 
+    @Path("ytdlp-proxy")
+    var ytdlpProxy: String = ""
+
     companion object {
         init {
             System.setProperty("file.encoding", "UTF-8")
