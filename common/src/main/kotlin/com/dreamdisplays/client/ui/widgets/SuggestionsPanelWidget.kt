@@ -252,6 +252,14 @@ class SuggestionsPanelWidget(
                 cy += vCardH + CARD_GAP
             }
             g.disableScissor()
+
+            if (contentH > viewportH) {
+                val barX = stripRight + 1
+                g.fill(barX, stripTop, barX + 2, stripBottom, 0xFF202020.toInt())
+                val barH = max(20, (viewportH.toFloat() / contentH * viewportH).toInt())
+                val barY = stripTop + (scrollOffset.toFloat() / maxOff * (viewportH - barH)).toInt()
+                g.fill(barX, barY, barX + 2, barY + barH, 0xFF808080.toInt())
+            }
             return
         }
 
