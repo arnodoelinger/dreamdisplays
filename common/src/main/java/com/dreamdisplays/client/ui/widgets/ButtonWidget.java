@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen.widgets;
+package com.dreamdisplays.client.ui.widgets;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
  * A button widget that we use in display configuration GUI.
  */
 @NullMarked
-public abstract class Button extends AbstractWidget {
+public abstract class ButtonWidget extends AbstractWidget {
 
     private static final WidgetSprites SPRITES = new WidgetSprites(
             Identifier.withDefaultNamespace("widget/button"),
@@ -30,7 +30,7 @@ public abstract class Button extends AbstractWidget {
     private Identifier iconTextureId;
     private @Nullable WidgetSprites setSprites = null;
 
-    public Button(
+    public ButtonWidget(
             int x,
             int y,
             int width,

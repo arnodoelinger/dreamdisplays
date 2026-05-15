@@ -4,16 +4,17 @@ Mod:
 
 - [x] Switch from `GStreamer` to `FFmpeg` which is more reliable and performant library for video playback
 - [x] Better error handling for expired YouTube URLs
-- [x] Some thumbnail optimizations
 - [x] Add `FFmpeg` automatic HTTP reconnection flags for resilient streaming over unstable networks
 - [x] Add watchdog timer that detects stalled `FFmpeg` processes and restarts streams automatically
 - [x] Retry on all transient errors (403, 404, 429, 5xx, connection resets, timeouts)
 - [x] Increase max fetch retries from 2 to 3
 - [x] Add audio line retry with backoff when multiple displays compete for audio resources
-- [x] Fix frame buffers preallocation to reduce GC pressure during playback
 - [x] Save brightness to display settings
+- [x] Some thumbnail optimizations
+- [x] Enhance project structure and code quality in some places
+- [x] Fix list of available qualities
+- [x] Fix frame buffers preallocation to reduce GC pressure during playback
 - [ ] Fix language selector ([#73](https://github.com/arsmotorin/dreamdisplays/issues/73))
-- [ ] Fix video loading with Content ID ([#74](https://github.com/arsmotorin/dreamdisplays/issues/74))
 - [x] Fix volume reset after leaving active display distance ([#76](https://github.com/arsmotorin/dreamdisplays/issues/76))
 - [ ] Discontinue to use INotSleep's utils library for safety and stability reasons
 

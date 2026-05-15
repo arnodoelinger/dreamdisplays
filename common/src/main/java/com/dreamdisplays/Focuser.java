@@ -1,7 +1,7 @@
 package com.dreamdisplays;
 
-import com.dreamdisplays.screen.Manager;
-import com.dreamdisplays.screen.Screen;
+import com.dreamdisplays.display.DisplayManager;
+import com.dreamdisplays.display.DisplayScreen;
 import net.minecraft.client.Minecraft;
 import org.jspecify.annotations.NullMarked;
 
@@ -27,8 +27,8 @@ public class Focuser extends Thread {
             boolean focused = client.isWindowActive();
 
             if (Initializer.getConfig().muteOnAltTab
-            ) for (Screen screen : Manager.getScreens()) {
-                screen.mute(!focused);
+            ) for (DisplayScreen displayScreen : DisplayManager.getScreens()) {
+                displayScreen.mute(!focused);
             }
 
             try {

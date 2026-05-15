@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen.widgets;
+package com.dreamdisplays.client.ui.widgets;
 
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
  * A button widget that we use in display configuration GUI.
  */
 @NullMarked
-public abstract class Toggle extends AbstractWidget {
+public abstract class ToggleWidget extends AbstractWidget {
 
     private static final Identifier TEXTURE_ID = Identifier.withDefaultNamespace(
             "widget/slider"
@@ -31,7 +31,7 @@ public abstract class Toggle extends AbstractWidget {
     private double dValue;
     private boolean sliderFocused;
 
-    public Toggle(
+    public ToggleWidget(
             int x,
             int y,
             int width,

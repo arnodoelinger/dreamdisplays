@@ -6,13 +6,13 @@ import org.jspecify.annotations.NullMarked;
  * Enum representing the four cardinal facings.
  */
 @NullMarked
-public enum Facing {
+public enum FacingUtil {
     NORTH,
     EAST,
     SOUTH,
     WEST;
 
-    public static Facing fromPacket(byte data) {
+    public static FacingUtil fromPacket(byte data) {
         if (
                 data < 0 || data >= values().length
         ) throw new IllegalArgumentException("Invalid facing ID: " + data);

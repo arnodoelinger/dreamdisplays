@@ -1,6 +1,8 @@
-package com.dreamdisplays.screen;
+package com.dreamdisplays.display;
 
 import com.dreamdisplays.Initializer;
+import com.dreamdisplays.client.ui.DisplayMenu;
+import com.dreamdisplays.media.MediaPlayer;
 import com.dreamdisplays.net.Packets.Info;
 import com.dreamdisplays.net.Packets.RequestSync;
 import com.dreamdisplays.net.Packets.SetVideo;
@@ -28,7 +30,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * Represents a video display screen in the game world.
  */
 @NullMarked
-public class Screen {
+public class DisplayScreen {
 
     private static final int DEFAULT_QUALITY = 720;
     private static final int INIT_WAIT_TIMEOUT_MS = 200_000;
@@ -66,7 +68,7 @@ public class Screen {
     private @Nullable String lang;
 
     // Constructor for the Screen class
-    public Screen(
+    public DisplayScreen(
             UUID uuid,
             UUID ownerUuid,
             int x,
@@ -92,7 +94,7 @@ public class Screen {
                         );
 
         // Load saved settings for this display
-        Settings.DisplaySettings savedSettings = Settings.getSettings(uuid);
+        DisplaySettings.ClientDisplaySettings savedSettings = DisplaySettings.getSettings(uuid);
         this.volume = savedSettings.volume;
         this.quality = savedSettings.quality;
         this.brightness = savedSettings.brightness;
@@ -120,7 +122,7 @@ public class Screen {
     // Loads a video from a given URL and language
     public void loadVideo(String videoUrl, String lang) {
         if (!clientUrlOverride) {
-            Settings.setUrlOverride(uuid, null, null);
+            DisplaySettings.setUrlOverride(uuid, null, null);
         }
         loadVideoInternal(videoUrl, lang, true);
     }
@@ -133,7 +135,7 @@ public class Screen {
 
     public void playSuggestedVideo(String videoUrl, String lang) {
         this.clientUrlOverride = true;
-        Settings.setUrlOverride(uuid, videoUrl, lang);
+        DisplaySettings.setUrlOverride(uuid, videoUrl, lang);
         Initializer.sendPacket(new SetVideo(uuid, videoUrl, lang));
         playVideoNow(videoUrl, lang);
     }
@@ -181,7 +183,7 @@ public class Screen {
         this.y = packet.pos().y;
         this.z = packet.pos().z;
 
-        this.facing = String.valueOf(packet.facing());
+        this.facing = String.valueOf(packet.facingUtil());
 
         this.width = packet.width();
         this.height = packet.height();
@@ -203,7 +205,7 @@ public class Screen {
             if (clientUrlOverride) return;
 
             // Check for a persisted URL override (survives rejoin)
-            Settings.DisplaySettings ds = Settings.getSettings(uuid);
+            DisplaySettings.ClientDisplaySettings ds = DisplaySettings.getSettings(uuid);
             if (ds.urlOverride != null && !ds.urlOverride.isEmpty()) {
                 this.clientUrlOverride = true;
                 String overrideUrl = ds.urlOverride;
@@ -371,7 +373,7 @@ public class Screen {
         }
         // reloadTexture();
         // Save settings
-        Settings.updateSettings(uuid, volume, quality, brightness, muted, paused);
+        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused);
     }
 
     // Returns list of available video qualities
@@ -392,7 +394,7 @@ public class Screen {
             mediaPlayer.setBrightness(this.brightness);
         }
         // Save settings
-        Settings.updateSettings(uuid, volume, quality, this.brightness, muted, paused);
+        DisplaySettings.updateSettings(uuid, volume, quality, this.brightness, muted, paused);
     }
 
     // Starts video playback
@@ -432,7 +434,7 @@ public class Screen {
                 mediaPlayer.play();
             }
         }
-        Settings.updateSettings(uuid, volume, quality, brightness, muted, paused);
+        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused);
         if (owner && isSync) sendSync();
     }
 
@@ -476,8 +478,8 @@ public class Screen {
         // Schedule texture cleanup on render thread to avoid "Rendersystem called from wrong thread" error
         Minecraft minecraft = getMinecraft();
 
-        if (minecraft.screen instanceof Configuration displayConfScreen) {
-            if (displayConfScreen.screen == this) displayConfScreen.onClose();
+        if (minecraft.screen instanceof DisplayMenu displayConfScreen) {
+            if (displayConfScreen.displayScreen == this) displayConfScreen.onClose();
         }
     }
 
@@ -506,7 +508,7 @@ public class Screen {
         muted = status;
 
         setVideoVolume(!status ? volume : 0);
-        Settings.updateSettings(uuid, volume, quality, brightness, muted, paused);
+        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused);
     }
 
     public double getVolume() {
@@ -517,7 +519,7 @@ public class Screen {
     public void setVolume(float volume) {
         this.volume = volume;
         setVideoVolume(volume);
-        Settings.updateSettings(uuid, volume, quality, brightness, muted, paused);
+        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused);
     }
 
     // Creates a new texture for the screen based on its dimensions and quality

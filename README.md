@@ -27,7 +27,7 @@ For this mod to work, players install the client mod, while server admins only n
 - Volume control from 0% to 200%
 - Brightness control from 0% to 200%
 - Multiple video languages support
-- Customizable screen sizes in blocks
+- Customizable displayScreen sizes in blocks
 - Integrated controls for play, pause, and seek
 
 ### Server

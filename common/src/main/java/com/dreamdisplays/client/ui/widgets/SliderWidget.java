@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen.widgets;
+package com.dreamdisplays.client.ui.widgets;
 
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
  * A button widget that we use in display configuration GUI.
  */
 @NullMarked
-public abstract class Slider extends AbstractWidget {
+public abstract class SliderWidget extends AbstractWidget {
 
     private static final Identifier TEXTURE_ID = Identifier.withDefaultNamespace(
             "widget/slider"
@@ -32,7 +32,7 @@ public abstract class Slider extends AbstractWidget {
     public double value;
     private boolean sliderFocused;
 
-    public Slider(
+    public SliderWidget(
             int x,
             int y,
             int width,

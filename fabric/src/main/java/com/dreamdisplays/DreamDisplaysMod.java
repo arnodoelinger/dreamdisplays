@@ -2,7 +2,7 @@ package com.dreamdisplays;
 
 import com.dreamdisplays.net.Packets.*;
 import com.dreamdisplays.render.ScreenRenderer;
-import com.dreamdisplays.screen.Manager;
+import com.dreamdisplays.display.DisplayManager;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -142,14 +142,14 @@ public class DreamDisplaysMod implements ClientModInitializer, Mod {
                         : (client.getCurrentServer() != null
                            ? client.getCurrentServer().ip
                            : "unknown");
-                Manager.loadScreensForServer(serverId);
+                DisplayManager.loadScreensForServer(serverId);
             }
         });
 
         // Save displays when disconnecting from a world
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            Manager.saveAllScreens();
-            Manager.unloadAll();
+            DisplayManager.saveAllScreens();
+            DisplayManager.unloadAll();
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(minecraftClient ->

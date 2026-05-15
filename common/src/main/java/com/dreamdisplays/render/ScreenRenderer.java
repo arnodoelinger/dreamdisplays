@@ -1,7 +1,7 @@
 package com.dreamdisplays.render;
 
-import com.dreamdisplays.screen.Manager;
-import com.dreamdisplays.screen.Screen;
+import com.dreamdisplays.display.DisplayManager;
+import com.dreamdisplays.display.DisplayScreen;
 import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.rendertype.RenderType;
@@ -20,13 +20,13 @@ public class ScreenRenderer {
     // Renders all screens in the world relative to the camera position
     public static void render(PoseStack stack, Camera camera) {
         Vec3 cameraPos = camera.position();
-        for (Screen screen : Manager.getScreens()) {
-            if (screen.texture == null) screen.createTexture();
+        for (DisplayScreen displayScreen : DisplayManager.getScreens()) {
+            if (displayScreen.texture == null) displayScreen.createTexture();
 
             stack.pushPose();
 
             // Translate the matrix stack to the player's screen position
-            BlockPos pos = screen.getPos();
+            BlockPos pos = displayScreen.getPos();
             Vec3 screenCenter = Vec3.atLowerCornerOf(pos);
             Vec3 relativePos = screenCenter.subtract(cameraPos);
             stack.translate(relativePos.x, relativePos.y, relativePos.z);
@@ -34,7 +34,7 @@ public class ScreenRenderer {
             // Move the matrix stack forward based on the screen's facing direction
             Tesselator tessellator = Tesselator.getInstance();
 
-            renderScreenTexture(screen, stack, tessellator);
+            renderScreenTexture(displayScreen, stack, tessellator);
 
             stack.popPose();
         }
@@ -42,16 +42,16 @@ public class ScreenRenderer {
 
     // Renders the texture of a single screen
     private static void renderScreenTexture(
-            Screen screen,
+            DisplayScreen displayScreen,
             PoseStack stack,
             Tesselator tessellator
     ) {
         stack.pushPose();
-        moveForward(stack, screen.getFacing(), 0.008f);
+        moveForward(stack, displayScreen.getFacing(), 0.008f);
 
-        switch (screen.getFacing()) {
+        switch (displayScreen.getFacing()) {
             case "NORTH":
-                moveHorizontal(stack, "NORTH", -(screen.getWidth()));
+                moveHorizontal(stack, "NORTH", -(displayScreen.getWidth()));
                 moveForward(stack, "NORTH", 1);
                 break;
             case "SOUTH":
@@ -59,29 +59,29 @@ public class ScreenRenderer {
                 moveForward(stack, "SOUTH", 1);
                 break;
             case "EAST":
-                moveHorizontal(stack, "EAST", -(screen.getWidth() - 1));
+                moveHorizontal(stack, "EAST", -(displayScreen.getWidth() - 1));
                 moveForward(stack, "EAST", 2);
                 break;
         }
 
         // Fix the rotation of the matrix stack based on the screen's facing direction
-        fixRotation(stack, screen.getFacing());
-        stack.scale(screen.getWidth(), screen.getHeight(), 0);
+        fixRotation(stack, displayScreen.getFacing());
+        stack.scale(displayScreen.getWidth(), displayScreen.getHeight(), 0);
 
         // Render the screen texture, a loading pulse, or black
         if (
-                screen.isVideoStarted() &&
-                        screen.texture != null &&
-                        screen.renderType != null
+                displayScreen.isVideoStarted() &&
+                        displayScreen.texture != null &&
+                        displayScreen.renderType != null
         ) {
-            renderGpuTexture(stack, tessellator, screen.renderType);
-        } else if (screen.renderType != null) {
-            if (screen.errored) {
-                renderColor(stack, tessellator, screen.renderType, 35, 5, 5);
+            renderGpuTexture(stack, tessellator, displayScreen.renderType);
+        } else if (displayScreen.renderType != null) {
+            if (displayScreen.errored) {
+                renderColor(stack, tessellator, displayScreen.renderType, 35, 5, 5);
             } else {
                 float pulse = (float) Math.abs(Math.sin(System.nanoTime() / 1_500_000_000.0 * Math.PI));
                 int v = (int) (10 + pulse * 20);
-                renderColor(stack, tessellator, screen.renderType, v, v, v);
+                renderColor(stack, tessellator, displayScreen.renderType, v, v, v);
             }
         }
         stack.popPose();

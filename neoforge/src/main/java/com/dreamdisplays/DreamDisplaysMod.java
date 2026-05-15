@@ -2,7 +2,7 @@ package com.dreamdisplays;
 
 import com.dreamdisplays.net.Packets.*;
 import com.dreamdisplays.render.ScreenRenderer;
-import com.dreamdisplays.screen.Manager;
+import com.dreamdisplays.display.DisplayManager;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -114,8 +114,8 @@ public class DreamDisplaysMod implements com.dreamdisplays.Mod {
 
     @SubscribeEvent
     public void onClientStop(ClientPlayerNetworkEvent.LoggingOut event) {
-        Manager.saveAllScreens();
-        Manager.unloadAll();
+        DisplayManager.saveAllScreens();
+        DisplayManager.unloadAll();
     }
 
     @SubscribeEvent
@@ -144,7 +144,7 @@ public class DreamDisplaysMod implements com.dreamdisplays.Mod {
                     : (mc.getCurrentServer() != null
                        ? mc.getCurrentServer().ip
                        : "unknown");
-            Manager.loadScreensForServer(serverId);
+            DisplayManager.loadScreensForServer(serverId);
         }
     }
 

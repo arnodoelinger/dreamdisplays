@@ -1,7 +1,7 @@
 package com.dreamdisplays.net;
 
 import com.dreamdisplays.Initializer;
-import com.dreamdisplays.util.Facing;
+import com.dreamdisplays.util.FacingUtil;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -60,7 +60,7 @@ public final class Packets {
             int width,
             int height,
             String url,
-            Facing facing,
+            FacingUtil facingUtil,
             boolean isSync,
             String lang
     ) implements CustomPacketPayload {
@@ -76,7 +76,7 @@ public final class Packets {
                             buf.writeVarInt(packet.width);
                             buf.writeVarInt(packet.height);
                             buf.writeUtf(packet.url);
-                            buf.writeByte((int) packet.facing.toPacket());
+                            buf.writeByte((int) packet.facingUtil.toPacket());
                             buf.writeBoolean(packet.isSync);
                             buf.writeUtf(packet.lang);
                         },
@@ -92,7 +92,7 @@ public final class Packets {
                                         buf.readVarInt(),
                                         buf.readVarInt(),
                                         buf.readUtf(),
-                                        Facing.fromPacket(buf.readByte()),
+                                        FacingUtil.fromPacket(buf.readByte()),
                                         buf.readBoolean(),
                                         buf.readUtf()
                                 )

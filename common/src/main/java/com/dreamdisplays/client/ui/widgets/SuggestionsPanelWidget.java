@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen.widgets;
+package com.dreamdisplays.client.ui.widgets;
 
 import com.dreamdisplays.Initializer;
 import com.dreamdisplays.ytdlp.Thumbnails;
@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 @NullMarked
-public final class SuggestionsPanel extends AbstractWidget {
+public final class SuggestionsPanelWidget extends AbstractWidget {
 
     private static final int RESULT_LIMIT = 12;
     private static final int HEADER_H = 14;
@@ -53,8 +53,8 @@ public final class SuggestionsPanel extends AbstractWidget {
     private static final int ACTION_W = SEARCH_H;
     private static final int ACTION_GAP = 4;
     private final EditBox searchBox;
-    private final Button clearButton;
-    private final Button searchActionButton;
+    private final ButtonWidget clearButtonWidget;
+    private final ButtonWidget searchActionButtonWidget;
     private final Consumer<YtVideoInfo> onPick;
     private final List<YtVideoInfo> cards = new ArrayList<>();
     private final AtomicInteger requestSeq = new AtomicInteger();
@@ -74,7 +74,7 @@ public final class SuggestionsPanel extends AbstractWidget {
         this.compactCards = c;
     }
 
-    public SuggestionsPanel(int x, int y, int width, int height, Consumer<YtVideoInfo> onPick) {
+    public SuggestionsPanelWidget(int x, int y, int width, int height, Consumer<YtVideoInfo> onPick) {
         super(x, y, width, height, Component.translatable("dreamdisplays.button.suggestions"));
         this.onPick = onPick;
         Font f = Minecraft.getInstance().font;
@@ -83,7 +83,7 @@ public final class SuggestionsPanel extends AbstractWidget {
                 Component.translatable("dreamdisplays.suggestions.search"));
         this.searchBox.setHint(Component.translatable("dreamdisplays.suggestions.search"));
         this.searchBox.setMaxLength(200);
-        this.clearButton = new Button(0, 0, ACTION_W, SEARCH_H, 64, 64,
+        this.clearButtonWidget = new ButtonWidget(0, 0, ACTION_W, SEARCH_H, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "cross"), 4) {
             @Override
             public void onPress() {
@@ -91,7 +91,7 @@ public final class SuggestionsPanel extends AbstractWidget {
                 searchBox.setFocused(true);
             }
         };
-        this.searchActionButton = new Button(0, 0, ACTION_W, SEARCH_H, 64, 64,
+        this.searchActionButtonWidget = new ButtonWidget(0, 0, ACTION_W, SEARCH_H, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "search"), 4) {
             @Override
             public void onPress() {
@@ -314,13 +314,13 @@ public final class SuggestionsPanel extends AbstractWidget {
 
         searchBox.render(g, mouseX, mouseY, dt);
 
-        clearButton.setX(clearButtonX());
-        clearButton.setY(actionRowY());
-        clearButton.render(g, mouseX, mouseY, dt);
+        clearButtonWidget.setX(clearButtonX());
+        clearButtonWidget.setY(actionRowY());
+        clearButtonWidget.render(g, mouseX, mouseY, dt);
 
-        searchActionButton.setX(searchButtonX());
-        searchActionButton.setY(actionRowY());
-        searchActionButton.render(g, mouseX, mouseY, dt);
+        searchActionButtonWidget.setX(searchButtonX());
+        searchActionButtonWidget.setY(actionRowY());
+        searchActionButtonWidget.render(g, mouseX, mouseY, dt);
 
         int stripTop = searchBox.getY() + SEARCH_H + 8;
         int stripBottom = getY() + getHeight() - 10;
@@ -530,11 +530,11 @@ public final class SuggestionsPanel extends AbstractWidget {
     public boolean mouseClicked(MouseButtonEvent event, boolean dbl) {
         double mouseX = event.x();
         double mouseY = event.y();
-        if (clearButton.isMouseOver(mouseX, mouseY)) {
-            return clearButton.mouseClicked(event, dbl);
+        if (clearButtonWidget.isMouseOver(mouseX, mouseY)) {
+            return clearButtonWidget.mouseClicked(event, dbl);
         }
-        if (searchActionButton.isMouseOver(mouseX, mouseY)) {
-            return searchActionButton.mouseClicked(event, dbl);
+        if (searchActionButtonWidget.isMouseOver(mouseX, mouseY)) {
+            return searchActionButtonWidget.mouseClicked(event, dbl);
         }
         if (searchBox.isMouseOver(mouseX, mouseY)) {
             boolean handled = searchBox.mouseClicked(event, dbl);

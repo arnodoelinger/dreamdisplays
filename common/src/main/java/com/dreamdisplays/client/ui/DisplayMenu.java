@@ -1,9 +1,14 @@
-package com.dreamdisplays.screen;
+package com.dreamdisplays.client.ui;
 
 import com.dreamdisplays.Initializer;
+import com.dreamdisplays.client.ui.widgets.*;
+import com.dreamdisplays.display.DisplayManager;
+import com.dreamdisplays.display.DisplayScreen;
+import com.dreamdisplays.display.DisplaySettings;
+import com.dreamdisplays.meta.UpdateCheck;
 import com.dreamdisplays.net.Packets.Delete;
 import com.dreamdisplays.net.Packets.Report;
-import com.dreamdisplays.screen.widgets.*;
+import com.dreamdisplays.util.GeneralUtil;
 import com.dreamdisplays.ytdlp.Thumbnails;
 import com.dreamdisplays.ytdlp.YtDlp;
 import com.dreamdisplays.ytdlp.YtVideoInfo;
@@ -27,7 +32,7 @@ import java.util.Objects;
  * Configuration of a display screen GUI.
  */
 @NullMarked
-public class Configuration extends Screen {
+public class DisplayMenu extends Screen {
 
     private static final int PADDING = 10;
     private static final int PANEL_GAP = 8;
@@ -43,37 +48,37 @@ public class Configuration extends Screen {
     private static final int ROW_BG = 0x40000000;
     private static final String GITHUB_URL = "https://github.com/arsmotorin/dreamdisplays";
     private static final String MODRINTH_URL = "https://modrinth.com/plugin/dreamdisplays/versions";
-    @Nullable Slider volume = null;
-    @Nullable Slider renderD = null;
-    @Nullable Slider quality = null;
-    @Nullable Slider brightness = null;
-    @Nullable Toggle sync = null;
-    @Nullable Button backButton = null;
-    @Nullable Button forwardButton = null;
-    @Nullable Button pauseButton = null;
-    @Nullable Button renderDReset = null;
-    @Nullable Button qualityReset = null;
-    @Nullable Button brightnessReset = null;
-    @Nullable Button volumeReset = null;
-    @Nullable Button syncReset = null;
-    @Nullable Button muteButton = null;
-    @Nullable Button deleteButton = null;
-    @Nullable Button reportButton = null;
-    @Nullable ProgressSlider progress = null;
-    @Nullable SuggestionsPanel suggestions = null;
+    @Nullable SliderWidget volume = null;
+    @Nullable SliderWidget renderD = null;
+    @Nullable SliderWidget quality = null;
+    @Nullable SliderWidget brightness = null;
+    @Nullable ToggleWidget sync = null;
+    @Nullable ButtonWidget backButtonWidget = null;
+    @Nullable ButtonWidget forwardButtonWidget = null;
+    @Nullable ButtonWidget pauseButtonWidget = null;
+    @Nullable ButtonWidget renderDReset = null;
+    @Nullable ButtonWidget qualityReset = null;
+    @Nullable ButtonWidget brightnessReset = null;
+    @Nullable ButtonWidget volumeReset = null;
+    @Nullable ButtonWidget syncReset = null;
+    @Nullable ButtonWidget muteButtonWidget = null;
+    @Nullable ButtonWidget deleteButtonWidget = null;
+    @Nullable ButtonWidget reportButtonWidget = null;
+    @Nullable ProgressSliderWidget progress = null;
+    @Nullable SuggestionsPanelWidget suggestions = null;
     @Nullable String lastSuggestedVideoId = null;
-    com.dreamdisplays.screen.@Nullable Screen screen = null;
+    public @Nullable DisplayScreen displayScreen = null;
     private @Nullable HoverArea volumeHover, renderDHover, qualityHover, brightnessHover, syncHover;
     private @Nullable HoverArea modLabelHover;
     private long modLabelOpenedAtMs = System.currentTimeMillis();
 
-    protected Configuration() {
+    protected DisplayMenu() {
         super(Component.translatable("dreamdisplays.ui.title"));
     }
 
-    public static void open(com.dreamdisplays.screen.Screen screen) {
-        Configuration s = new Configuration();
-        s.setScreen(screen);
+    public static void open(DisplayScreen displayScreen) {
+        DisplayMenu s = new DisplayMenu();
+        s.setScreen(displayScreen);
         Minecraft.getInstance().setScreen(s);
     }
 
@@ -82,17 +87,17 @@ public class Configuration extends Screen {
                 && my >= w.getY() && my < w.getY() + w.getHeight();
     }
 
-    private void setScreen(com.dreamdisplays.screen.Screen s) {
-        this.screen = s;
+    private void setScreen(DisplayScreen s) {
+        this.displayScreen = s;
     }
 
     @Override
     protected void init() {
-        if (screen == null) return;
+        if (displayScreen == null) return;
 
-        volume = new Slider(0, 0, 0, 0,
-                Component.literal((int) Math.floor(screen.getVolume() * 200) + "%"),
-                screen.getVolume()) {
+        volume = new SliderWidget(0, 0, 0, 0,
+                Component.literal((int) Math.floor(displayScreen.getVolume() * 200) + "%"),
+                displayScreen.getVolume()) {
             @Override
             protected void updateMessage() {
                 setMessage(Component.literal((int) Math.floor(value * 200) + "%"));
@@ -100,47 +105,47 @@ public class Configuration extends Screen {
 
             @Override
             protected void applyValue() {
-                screen.setVolume((float) value);
+                displayScreen.setVolume((float) value);
             }
         };
 
-        backButton = iconButton("left", () -> screen.seekBackward());
-        forwardButton = iconButton("right", () -> screen.seekForward());
-        pauseButton = new Button(0, 0, 0, 0, 64, 64,
+        backButtonWidget = iconButton("left", () -> displayScreen.seekBackward());
+        forwardButtonWidget = iconButton("right", () -> displayScreen.seekForward());
+        pauseButtonWidget = new ButtonWidget(0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pause"), 2) {
             @Override
             public void onPress() {
-                screen.setPaused(!screen.getPaused());
+                displayScreen.setPaused(!displayScreen.getPaused());
                 setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID,
-                        screen.getPaused() ? "play" : "pause"));
+                        displayScreen.getPaused() ? "play" : "pause"));
             }
         };
-        pauseButton.setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID,
-                screen.getPaused() ? "play" : "pause"));
+        pauseButtonWidget.setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID,
+                displayScreen.getPaused() ? "play" : "pause"));
 
-        muteButton = new Button(0, 0, 0, 0, 64, 64,
+        muteButtonWidget = new ButtonWidget(0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID,
-                        screen.muted ? "mute" : "sound"), 2) {
+                        displayScreen.muted ? "mute" : "sound"), 2) {
             @Override
             public void onPress() {
-                screen.mute(!screen.muted);
+                displayScreen.mute(!displayScreen.muted);
                 setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID,
-                        screen.muted ? "mute" : "sound"));
+                        displayScreen.muted ? "mute" : "sound"));
             }
         };
 
-        progress = new ProgressSlider(0, 0, 100, CTRL_BTN,
-                () -> screen != null ? screen.getCurrentTimeNanos() : 0,
-                () -> screen != null ? screen.getMediaPlayerDurationNanos() : 0,
+        progress = new ProgressSliderWidget(0, 0, 100, CTRL_BTN,
+                () -> displayScreen != null ? displayScreen.getCurrentTimeNanos() : 0,
+                () -> displayScreen != null ? displayScreen.getMediaPlayerDurationNanos() : 0,
                 nanos -> {
-                    if (screen != null && screen.canSeek() && !screen.isLive()) {
-                        screen.seekToMillis(nanos / 1_000_000L);
+                    if (displayScreen != null && displayScreen.canSeek() && !displayScreen.isLive()) {
+                        displayScreen.seekToMillis(nanos / 1_000_000L);
                     }
                 });
 
-        renderD = new Slider(0, 0, 0, 0,
-                Component.literal(screen.getRenderDistance() + " blocks"),
-                (screen.getRenderDistance() - 24) / (double) (128 - 24)) {
+        renderD = new SliderWidget(0, 0, 0, 0,
+                Component.literal(displayScreen.getRenderDistance() + " blocks"),
+                (displayScreen.getRenderDistance() - 24) / (double) (128 - 24)) {
             @Override
             protected void updateMessage() {
                 setMessage(Component.literal(((int) (value * (128 - 24)) + 24) + " blocks"));
@@ -148,14 +153,14 @@ public class Configuration extends Screen {
 
             @Override
             protected void applyValue() {
-                screen.setRenderDistance((int) (value * (128 - 24) + 24));
-                Manager.saveScreenData(screen);
+                displayScreen.setRenderDistance((int) (value * (128 - 24) + 24));
+                DisplayManager.saveScreenData(displayScreen);
             }
         };
 
-        quality = new Slider(0, 0, 0, 0,
-                Component.literal(screen.getQuality() + "p"),
-                qualityFraction(screen.getQuality())) {
+        quality = new SliderWidget(0, 0, 0, 0,
+                Component.literal(displayScreen.getQuality() + "p"),
+                qualityFraction(displayScreen.getQuality())) {
             @Override
             protected void updateMessage() {
                 setMessage(Component.literal(qualityFromFraction(value) + "p"));
@@ -163,13 +168,13 @@ public class Configuration extends Screen {
 
             @Override
             protected void applyValue() {
-                screen.setQuality(qualityFromFraction(value));
+                displayScreen.setQuality(qualityFromFraction(value));
             }
         };
 
-        brightness = new Slider(0, 0, 0, 0,
-                Component.literal((int) Math.floor(screen.getBrightness() * 100) + "%"),
-                screen.getBrightness() / 2.0) {
+        brightness = new SliderWidget(0, 0, 0, 0,
+                Component.literal((int) Math.floor(displayScreen.getBrightness() * 100) + "%"),
+                displayScreen.getBrightness() / 2.0) {
             @Override
             protected void updateMessage() {
                 setMessage(Component.literal((int) Math.floor(value * 200) + "%"));
@@ -177,38 +182,38 @@ public class Configuration extends Screen {
 
             @Override
             protected void applyValue() {
-                screen.setBrightness((float) (value * 2.0));
+                displayScreen.setBrightness((float) (value * 2.0));
             }
         };
 
         renderDReset = resetButton(() -> {
-            screen.setRenderDistance(Initializer.config.defaultDistance);
+            displayScreen.setRenderDistance(Initializer.config.defaultDistance);
             renderD.value = (Initializer.config.defaultDistance - 24) / (double) (128 - 24);
             renderD.setMessage(Component.literal(Initializer.config.defaultDistance + " blocks"));
-            Manager.saveScreenData(screen);
+            DisplayManager.saveScreenData(displayScreen);
         });
         qualityReset = resetButton(() -> {
-            screen.setQuality("720");
+            displayScreen.setQuality("720");
             quality.value = qualityFraction("720");
             quality.setMessage(Component.literal("720p"));
         });
         brightnessReset = resetButton(() -> {
-            screen.setBrightness(1.0f);
+            displayScreen.setBrightness(1.0f);
             if (brightness != null) {
                 brightness.value = 0.5;
                 brightness.setMessage(Component.literal("100%"));
             }
         });
         volumeReset = resetButton(() -> {
-            screen.setVolume(0.5f);
+            displayScreen.setVolume(0.5f);
             volume.value = 0.5;
             volume.setMessage(Component.literal("100%"));
         });
 
-        sync = new Toggle(0, 0, 0, 0,
-                Component.translatable(screen.isSync ? "dreamdisplays.button.enabled"
+        sync = new ToggleWidget(0, 0, 0, 0,
+                Component.translatable(displayScreen.isSync ? "dreamdisplays.button.enabled"
                         : "dreamdisplays.button.disabled"),
-                screen.isSync) {
+                displayScreen.isSync) {
             @Override
             protected void updateMessage() {
                 setMessage(Component.translatable(value ? "dreamdisplays.button.enabled"
@@ -217,60 +222,60 @@ public class Configuration extends Screen {
 
             @Override
             public void applyValue() {
-                if (screen.owner && syncReset != null) {
-                    screen.isSync = value;
+                if (displayScreen.owner && syncReset != null) {
+                    displayScreen.isSync = value;
                     syncReset.active = !value;
-                    screen.waitForMFInit(() -> screen.sendSync());
+                    displayScreen.waitForMFInit(() -> displayScreen.sendSync());
                 }
             }
         };
         syncReset = resetButton(() -> {
-            if (screen.owner && sync != null) {
+            if (displayScreen.owner && sync != null) {
                 sync.setValue(false);
-                screen.waitForMFInit(() -> screen.sendSync());
+                displayScreen.waitForMFInit(() -> displayScreen.sendSync());
             }
         });
-        sync.active = screen.owner;
-        if (brightness != null) brightness.active = !screen.isSync || screen.owner;
+        sync.active = displayScreen.owner;
+        if (brightness != null) brightness.active = !displayScreen.isSync || displayScreen.owner;
 
         WidgetSprites red = new WidgetSprites(
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button"),
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button_disabled"),
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button_highlighted"));
 
-        deleteButton = new Button(0, 0, 0, 0, 64, 64,
+        deleteButtonWidget = new ButtonWidget(0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "delete"), 2) {
             @Override
             public void onPress() {
-                Settings.removeDisplay(screen.getUUID());
-                Manager.unregisterScreen(screen);
-                Initializer.sendPacket(new Delete(screen.getUUID()));
+                DisplaySettings.removeDisplay(displayScreen.getUUID());
+                DisplayManager.unregisterScreen(displayScreen);
+                Initializer.sendPacket(new Delete(displayScreen.getUUID()));
                 onClose();
             }
         };
-        deleteButton.setSprites(red);
-        deleteButton.active = screen.owner;
+        deleteButtonWidget.setSprites(red);
+        deleteButtonWidget.active = displayScreen.owner;
 
         if (Initializer.isReportingEnabled) {
-            reportButton = new Button(0, 0, 0, 0, 64, 64,
+            reportButtonWidget = new ButtonWidget(0, 0, 0, 0, 64, 64,
                     Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "report"), 2) {
                 @Override
                 public void onPress() {
-                    Initializer.sendPacket(new Report(screen.getUUID()));
+                    Initializer.sendPacket(new Report(displayScreen.getUUID()));
                     onClose();
                 }
             };
-            reportButton.setSprites(red);
+            reportButtonWidget.setSprites(red);
         } else {
-            reportButton = null;
+            reportButtonWidget = null;
         }
 
         addRenderableWidget(volume);
-        addRenderableWidget(backButton);
-        addRenderableWidget(forwardButton);
-        addRenderableWidget(muteButton);
+        addRenderableWidget(backButtonWidget);
+        addRenderableWidget(forwardButtonWidget);
+        addRenderableWidget(muteButtonWidget);
         addRenderableWidget(progress);
-        addRenderableWidget(pauseButton);
+        addRenderableWidget(pauseButtonWidget);
         addRenderableWidget(renderD);
         addRenderableWidget(quality);
         addRenderableWidget(qualityReset);
@@ -280,15 +285,15 @@ public class Configuration extends Screen {
         addRenderableWidget(volumeReset);
         addRenderableWidget(sync);
         addRenderableWidget(syncReset);
-        addRenderableWidget(deleteButton);
-        if (reportButton != null) addRenderableWidget(reportButton);
+        addRenderableWidget(deleteButtonWidget);
+        if (reportButtonWidget != null) addRenderableWidget(reportButtonWidget);
 
-        suggestions = new SuggestionsPanel(0, 0, 100, 100, this::onPickSuggested);
+        suggestions = new SuggestionsPanelWidget(0, 0, 100, 100, this::onPickSuggested);
         addRenderableWidget(suggestions);
     }
 
-    private Button iconButton(String icon, Runnable action) {
-        return new Button(0, 0, 0, 0, 64, 64,
+    private ButtonWidget iconButton(String icon, Runnable action) {
+        return new ButtonWidget(0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, icon), 2) {
             @Override
             public void onPress() {
@@ -297,8 +302,8 @@ public class Configuration extends Screen {
         };
     }
 
-    private Button resetButton(Runnable action) {
-        return new Button(0, 0, 0, 0, 64, 64,
+    private ButtonWidget resetButton(Runnable action) {
+        return new ButtonWidget(0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "refresh"), 2) {
             @Override
             public void onPress() {
@@ -308,9 +313,9 @@ public class Configuration extends Screen {
     }
 
     private void onPickSuggested(YtVideoInfo info) {
-        if (screen == null) return;
-        screen.playSuggestedVideo(info.getWatchUrl(),
-                screen.getLang() == null ? "" : screen.getLang());
+        if (displayScreen == null) return;
+        displayScreen.playSuggestedVideo(info.getWatchUrl(),
+                displayScreen.getLang() == null ? "" : displayScreen.getLang());
         // Cache title + full metadata so the overlay shows them instantly
         com.dreamdisplays.ytdlp.VideoTitleCache.put(info.getId(), info.getTitle());
         com.dreamdisplays.ytdlp.VideoMetadataCache.put(info.getId(), info);
@@ -322,7 +327,7 @@ public class Configuration extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float delta) {
         renderTransparentBackground(g);
 
-        if (screen == null) {
+        if (displayScreen == null) {
             super.render(g, mouseX, mouseY, delta);
             return;
         }
@@ -330,11 +335,11 @@ public class Configuration extends Screen {
         int titleY = 6;
         renderModLabel(g, PADDING, titleY);
 
-        boolean videoReady = screen.isVideoStarted() && !screen.errored;
-        if (syncReset != null) syncReset.active = videoReady && screen.owner && screen.isSync;
+        boolean videoReady = displayScreen.isVideoStarted() && !displayScreen.errored;
+        if (syncReset != null) syncReset.active = videoReady && displayScreen.owner && displayScreen.isSync;
         if (renderDReset != null)
-            renderDReset.active = videoReady && screen.getRenderDistance() != Initializer.config.defaultDistance;
-        if (qualityReset != null) qualityReset.active = videoReady && !Objects.equals(screen.getQuality(), "720");
+            renderDReset.active = videoReady && displayScreen.getRenderDistance() != Initializer.config.defaultDistance;
+        if (qualityReset != null) qualityReset.active = videoReady && !Objects.equals(displayScreen.getQuality(), "720");
         if (brightnessReset != null && brightness != null)
             brightnessReset.active = videoReady && Math.abs(brightness.value - 0.5) > 0.01;
         if (volumeReset != null && volume != null)
@@ -344,12 +349,12 @@ public class Configuration extends Screen {
         if (volume != null) volume.active = enabled;
         if (renderD != null) renderD.active = enabled;
         if (quality != null) quality.active = enabled;
-        if (brightness != null) brightness.active = enabled && (!screen.isSync || screen.owner);
-        if (sync != null) sync.active = enabled && screen.owner;
-        if (deleteButton != null) deleteButton.active = screen.owner; // delete always available
-        if (progress != null) progress.active = enabled && screen.canSeek() && !screen.isLive();
+        if (brightness != null) brightness.active = enabled && (!displayScreen.isSync || displayScreen.owner);
+        if (sync != null) sync.active = enabled && displayScreen.owner;
+        if (deleteButtonWidget != null) deleteButtonWidget.active = displayScreen.owner; // delete always available
+        if (progress != null) progress.active = enabled && displayScreen.canSeek() && !displayScreen.isLive();
 
-        if (screen.errored) {
+        if (displayScreen.errored) {
             renderErroredOverlay(g, mouseX, mouseY, delta);
             return;
         }
@@ -445,7 +450,7 @@ public class Configuration extends Screen {
             suggestions.setWidth(suggestionsW);
             suggestions.setHeight(suggestionsH);
 
-            String currentId = YtDlp.extractVideoId(screen.getVideoUrl());
+            String currentId = YtDlp.extractVideoId(displayScreen.getVideoUrl());
             if (currentId != null && !Objects.equals(currentId, lastSuggestedVideoId)) {
                 lastSuggestedVideoId = currentId;
                 suggestions.setRelatedTo(currentId);
@@ -466,16 +471,16 @@ public class Configuration extends Screen {
         if (quality != null) { quality.active = false; quality.visible = false; }
         if (brightness != null) { brightness.active = false; brightness.visible = false; }
         if (sync != null) { sync.active = false; sync.visible = false; }
-        if (backButton != null) { backButton.active = false; backButton.visible = false; }
-        if (forwardButton != null) { forwardButton.active = false; forwardButton.visible = false; }
-        if (pauseButton != null) { pauseButton.active = false; pauseButton.visible = false; }
+        if (backButtonWidget != null) { backButtonWidget.active = false; backButtonWidget.visible = false; }
+        if (forwardButtonWidget != null) { forwardButtonWidget.active = false; forwardButtonWidget.visible = false; }
+        if (pauseButtonWidget != null) { pauseButtonWidget.active = false; pauseButtonWidget.visible = false; }
         if (renderDReset != null) { renderDReset.active = false; renderDReset.visible = false; }
         if (qualityReset != null) { qualityReset.active = false; qualityReset.visible = false; }
         if (brightnessReset != null) { brightnessReset.active = false; brightnessReset.visible = false; }
         if (volumeReset != null) { volumeReset.active = false; volumeReset.visible = false; }
         if (syncReset != null) { syncReset.active = false; syncReset.visible = false; }
         if (progress != null) { progress.active = false; progress.visible = false; }
-        if (muteButton != null) { muteButton.active = false; muteButton.visible = false; }
+        if (muteButtonWidget != null) { muteButtonWidget.active = false; muteButtonWidget.visible = false; }
 
         int panelW = Math.min(420, this.width - 40);
         int panelX = this.width / 2 - panelW / 2;
@@ -493,23 +498,23 @@ public class Configuration extends Screen {
             g.drawString(font, line, this.width / 2 - font.width(line) / 2, y, 0xFFFFFFFF, false);
             y += font.lineHeight + 4;
         }
-        if (deleteButton != null) {
-            deleteButton.setX(panelX + panelW / 2 - 22);
-            deleteButton.setY(panelY + 130 - 24);
-            deleteButton.setWidth(20);
-            deleteButton.setHeight(20);
+        if (deleteButtonWidget != null) {
+            deleteButtonWidget.setX(panelX + panelW / 2 - 22);
+            deleteButtonWidget.setY(panelY + 130 - 24);
+            deleteButtonWidget.setWidth(20);
+            deleteButtonWidget.setHeight(20);
         }
-        if (reportButton != null) {
-            reportButton.setX(panelX + panelW / 2 + 2);
-            reportButton.setY(panelY + 130 - 24);
-            reportButton.setWidth(20);
-            reportButton.setHeight(20);
+        if (reportButtonWidget != null) {
+            reportButtonWidget.setX(panelX + panelW / 2 + 2);
+            reportButtonWidget.setY(panelY + 130 - 24);
+            reportButtonWidget.setWidth(20);
+            reportButtonWidget.setHeight(20);
         }
         super.render(g, mouseX, mouseY, delta);
     }
 
     private void renderPreviewSection(GuiGraphics g, int px, int py, int pw, int ph) {
-        com.dreamdisplays.screen.Screen scr = Objects.requireNonNull(screen);
+        DisplayScreen scr = Objects.requireNonNull(displayScreen);
         int innerX = px + PANEL_PADDING_X;
         int innerY = py + headerHeight();
         int innerW = pw - PANEL_PADDING_X * 2;
@@ -559,36 +564,36 @@ public class Configuration extends Screen {
         renderTitleOverlay(g, scr, innerX, innerY + frameH, frameW);
 
         boolean canSeek = !(scr.isSync && !scr.owner) && scr.canSeek();
-        if (backButton != null) {
-            backButton.setX(controlsLeft);
-            backButton.setY(controlsRowY);
-            backButton.setWidth(CTRL_BTN);
-            backButton.setHeight(CTRL_BTN);
-            backButton.active = canSeek;
+        if (backButtonWidget != null) {
+            backButtonWidget.setX(controlsLeft);
+            backButtonWidget.setY(controlsRowY);
+            backButtonWidget.setWidth(CTRL_BTN);
+            backButtonWidget.setHeight(CTRL_BTN);
+            backButtonWidget.active = canSeek;
         }
-        if (forwardButton != null) {
-            forwardButton.setX(controlsLeft + CTRL_BTN + 4);
-            forwardButton.setY(controlsRowY);
-            forwardButton.setWidth(CTRL_BTN);
-            forwardButton.setHeight(CTRL_BTN);
-            forwardButton.active = canSeek;
+        if (forwardButtonWidget != null) {
+            forwardButtonWidget.setX(controlsLeft + CTRL_BTN + 4);
+            forwardButtonWidget.setY(controlsRowY);
+            forwardButtonWidget.setWidth(CTRL_BTN);
+            forwardButtonWidget.setHeight(CTRL_BTN);
+            forwardButtonWidget.active = canSeek;
         }
-        if (muteButton != null) {
-            muteButton.setX(controlsLeft + CTRL_BTN * 2 + 8);
-            muteButton.setY(controlsRowY);
-            muteButton.setWidth(CTRL_BTN);
-            muteButton.setHeight(CTRL_BTN);
-            muteButton.active = !(scr.isSync && !scr.owner);
-            muteButton.setIconTextureId(Identifier.fromNamespaceAndPath(
+        if (muteButtonWidget != null) {
+            muteButtonWidget.setX(controlsLeft + CTRL_BTN * 2 + 8);
+            muteButtonWidget.setY(controlsRowY);
+            muteButtonWidget.setWidth(CTRL_BTN);
+            muteButtonWidget.setHeight(CTRL_BTN);
+            muteButtonWidget.active = !(scr.isSync && !scr.owner);
+            muteButtonWidget.setIconTextureId(Identifier.fromNamespaceAndPath(
                     Initializer.MOD_ID, scr.muted ? "mute" : "sound"));
         }
-        if (pauseButton != null) {
-            pauseButton.setX(controlsRight - CTRL_BTN);
-            pauseButton.setY(controlsRowY);
-            pauseButton.setWidth(CTRL_BTN);
-            pauseButton.setHeight(CTRL_BTN);
-            pauseButton.active = !(scr.isSync && !scr.owner);
-            pauseButton.setIconTextureId(Identifier.fromNamespaceAndPath(
+        if (pauseButtonWidget != null) {
+            pauseButtonWidget.setX(controlsRight - CTRL_BTN);
+            pauseButtonWidget.setY(controlsRowY);
+            pauseButtonWidget.setWidth(CTRL_BTN);
+            pauseButtonWidget.setHeight(CTRL_BTN);
+            pauseButtonWidget.active = !(scr.isSync && !scr.owner);
+            pauseButtonWidget.setIconTextureId(Identifier.fromNamespaceAndPath(
                     Initializer.MOD_ID, scr.getPaused() ? "play" : "pause"));
         }
         if (progress != null) {
@@ -602,7 +607,7 @@ public class Configuration extends Screen {
         }
     }
 
-    private void renderTitleOverlay(GuiGraphics g, com.dreamdisplays.screen.Screen scr,
+    private void renderTitleOverlay(GuiGraphics g, DisplayScreen scr,
                                     int x, int y, int w) {
         String videoId = YtDlp.extractVideoId(scr.getVideoUrl());
         com.dreamdisplays.ytdlp.YtVideoInfo meta = videoId != null
@@ -679,8 +684,8 @@ public class Configuration extends Screen {
     }
 
     private @Nullable Identifier currentThumbnail() {
-        if (screen == null) return null;
-        String url = screen.getVideoUrl();
+        if (displayScreen == null) return null;
+        String url = displayScreen.getVideoUrl();
         if (url == null) return null;
         String id = YtDlp.extractVideoId(url);
         if (id == null) return null;
@@ -722,7 +727,7 @@ public class Configuration extends Screen {
     }
 
     private int renderRow(GuiGraphics g, int x, int y, int w, String key,
-                          @Nullable AbstractWidget control, @Nullable Button reset) {
+                          @Nullable AbstractWidget control, @Nullable ButtonWidget reset) {
         g.fill(x, y, x + w, y + ROW_H, ROW_BG);
         Component label = Component.translatable(key);
         g.drawString(font, label, x + 6, y + ROW_H / 2 - font.lineHeight / 2, 0xFFFFFFFF, false);
@@ -752,18 +757,18 @@ public class Configuration extends Screen {
         int rightEdge = sx + sw - padding;
         int yEdge = sy + sh - padding - btn;
 
-        if (reportButton != null) {
-            reportButton.setX(rightEdge - btn);
-            reportButton.setY(yEdge);
-            reportButton.setWidth(btn);
-            reportButton.setHeight(btn);
+        if (reportButtonWidget != null) {
+            reportButtonWidget.setX(rightEdge - btn);
+            reportButtonWidget.setY(yEdge);
+            reportButtonWidget.setWidth(btn);
+            reportButtonWidget.setHeight(btn);
             rightEdge -= btn + 4;
         }
-        if (deleteButton != null) {
-            deleteButton.setX(rightEdge - btn);
-            deleteButton.setY(yEdge);
-            deleteButton.setWidth(btn);
-            deleteButton.setHeight(btn);
+        if (deleteButtonWidget != null) {
+            deleteButtonWidget.setX(rightEdge - btn);
+            deleteButtonWidget.setY(yEdge);
+            deleteButtonWidget.setWidth(btn);
+            deleteButtonWidget.setHeight(btn);
         }
     }
 
@@ -793,7 +798,7 @@ public class Configuration extends Screen {
     }
 
     private void renderTooltips(GuiGraphics g, int mouseX, int mouseY) {
-        com.dreamdisplays.screen.Screen scr = screen;
+        DisplayScreen scr = displayScreen;
         if (scr == null || scr.errored) return;
 
         if (volumeHover != null && volumeHover.contains(mouseX, mouseY)) {
@@ -859,13 +864,13 @@ public class Configuration extends Screen {
             ), mouseX, mouseY);
         }
 
-        if (deleteButton != null && hovered(mouseX, mouseY, deleteButton)) {
+        if (deleteButtonWidget != null && hovered(mouseX, mouseY, deleteButtonWidget)) {
             g.setComponentTooltipForNextFrame(font, List.of(
                     Component.translatable("dreamdisplays.button.delete.tooltip.1").withStyle(s -> s.withColor(ChatFormatting.WHITE).withBold(true)),
                     Component.translatable("dreamdisplays.button.delete.tooltip.2").withStyle(s -> s.withColor(ChatFormatting.GRAY))
             ), mouseX, mouseY);
         }
-        if (reportButton != null && hovered(mouseX, mouseY, reportButton)) {
+        if (reportButtonWidget != null && hovered(mouseX, mouseY, reportButtonWidget)) {
             g.setComponentTooltipForNextFrame(font, List.of(
                     Component.translatable("dreamdisplays.button.report.tooltip.1").withStyle(s -> s.withColor(ChatFormatting.WHITE).withBold(true)),
                     Component.translatable("dreamdisplays.button.report.tooltip.2").withStyle(s -> s.withColor(ChatFormatting.GRAY))
@@ -884,8 +889,8 @@ public class Configuration extends Screen {
     }
 
     private double qualityFraction(String q) {
-        if (screen == null) return 0;
-        List<Integer> list = screen.getQualityList();
+        if (displayScreen == null) return 0;
+        List<Integer> list = displayScreen.getQualityList();
         if (list.isEmpty()) return 0;
         int target;
         try {
@@ -906,8 +911,8 @@ public class Configuration extends Screen {
     }
 
     private String qualityFromFraction(double v) {
-        if (screen == null) return "720";
-        List<Integer> list = screen.getQualityList();
+        if (displayScreen == null) return "720";
+        List<Integer> list = displayScreen.getQualityList();
         if (list.isEmpty()) return "144";
         int idx = (int) Math.round(v * (list.size() - 1));
         idx = Math.max(0, Math.min(list.size() - 1, idx));
@@ -922,7 +927,7 @@ public class Configuration extends Screen {
     private void renderModLabel(GuiGraphics g, int x, int y) {
         boolean update = UpdateCheck.shouldShowArrow();
         Component name = Component.literal("Dream Displays");
-        Component ver = Component.literal(" " + com.dreamdisplays.util.Utils.getModVersion())
+        Component ver = Component.literal(" " + GeneralUtil.getModVersion())
                 .withStyle(net.minecraft.network.chat.Style.EMPTY.withColor(0xFF6AB7FF));
         Component label = name.copy().append(ver);
         g.drawString(font, label, x, y, 0xFFFFFFFF, true);

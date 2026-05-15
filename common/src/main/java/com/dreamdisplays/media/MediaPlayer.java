@@ -1,7 +1,10 @@
-package com.dreamdisplays.screen;
+package com.dreamdisplays.media;
 
 import com.dreamdisplays.Initializer;
-import com.dreamdisplays.ffmpeg.FfmpegBinary;
+import com.dreamdisplays.display.DisplayScreen;
+import com.dreamdisplays.ffmpeg.FFmpegBinary;
+import com.dreamdisplays.util.ConverterUtil;
+import com.dreamdisplays.util.GeneralUtil;
 import com.dreamdisplays.ytdlp.YtDlp;
 import com.dreamdisplays.ytdlp.YtStream;
 import com.mojang.blaze3d.platform.NativeImage;
@@ -34,10 +37,6 @@ public class MediaPlayer {
                     || "1".equals(System.getenv("DREAMDISPLAYS_DEBUG"))
                     || "true".equalsIgnoreCase(System.getenv("DREAMDISPLAYS_DEBUG"));
 
-    private static final String USER_AGENT_V =
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                    + " (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
-
     private static final AtomicInteger INIT_THREAD_COUNTER = new AtomicInteger();
     private static final ExecutorService INIT_EXECUTOR =
             Executors.newFixedThreadPool(
@@ -67,7 +66,7 @@ public class MediaPlayer {
     private final AtomicLong framesDropped = new AtomicLong();
     private final String youtubeUrl;
     private final String lang;
-    private final Screen screen;
+    private final DisplayScreen displayScreen;
     private final String debugLabel;
     private final AtomicBoolean terminated = new AtomicBoolean(false);
     private final AtomicBoolean frameTaskQueued = new AtomicBoolean(false);
@@ -123,94 +122,12 @@ public class MediaPlayer {
     private volatile double currentVolume = Initializer.config.defaultDisplayVolume;
     private volatile double brightness = 1.0;
 
-    public MediaPlayer(String youtubeUrl, String lang, Screen screen) {
+    public MediaPlayer(String youtubeUrl, String lang, DisplayScreen displayScreen) {
         this.youtubeUrl = youtubeUrl;
-        this.screen = screen;
+        this.displayScreen = displayScreen;
         this.lang = lang;
-        this.debugLabel = screen.getUUID() + "/" + Integer.toHexString(System.identityHashCode(this));
+        this.debugLabel = displayScreen.getUUID() + "/" + Integer.toHexString(System.identityHashCode(this));
         INIT_EXECUTOR.submit(this::initialize);
-    }
-
-    private static boolean isInterestingStderr(String line) {
-        if (line.contains("Broken pipe")) return false;
-        if (line.contains("Error muxing a packet")) return false;
-        if (line.contains("Error submitting a packet to the muxer")) return false;
-        if (line.contains("Error writing trailer")) return false;
-        if (line.contains("Error closing file")) return false;
-        if (line.contains("Terminating thread with return code")) return false;
-        if (line.contains("Task finished with error code")) return false;
-        return !line.contains("Last message repeated");
-    }
-
-    private static String truncate(@Nullable String s) {
-        if (s == null) return "null";
-        return s.length() <= 120 ? s : s.substring(0, 120) + "...(" + s.length() + ")";
-    }
-
-    private static int parseQuality(YtStream stream) {
-        return parseQualityValue(stream.getResolution(), Integer.MAX_VALUE);
-    }
-
-    private static int parseQualityValue(@Nullable String raw, int fallback) {
-        if (raw == null) return fallback;
-        int i = 0, n = raw.length();
-        while (i < n && !Character.isDigit(raw.charAt(i))) i++;
-        int start = i;
-        while (i < n && Character.isDigit(raw.charAt(i))) i++;
-        if (start == i) return fallback;
-        try {
-            return Integer.parseInt(raw.substring(start, i));
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
-    }
-
-    private static int[] qualityToDims(int quality) {
-        if (quality <= 240) return new int[]{426, 240};
-        if (quality <= 360) return new int[]{640, 360};
-        if (quality <= 480) return new int[]{854, 480};
-        if (quality <= 720) return new int[]{1280, 720};
-        if (quality <= 1080) return new int[]{1920, 1080};
-        if (quality <= 1440) return new int[]{2560, 1440};
-        return new int[]{3840, 2160};
-    }
-
-    private static int readFull(InputStream in, byte[] buf, int len) throws IOException {
-        int total = 0;
-        while (total < len) {
-            int n = in.read(buf, total, len - total);
-            if (n < 0) return total;
-            total += n;
-        }
-        return total;
-    }
-
-    private static void applyBrightnessToBuffer(ByteBuffer buffer, double brightness) {
-        if (Math.abs(brightness - 1.0) < 1e-5) return;
-        buffer.rewind();
-        while (buffer.remaining() >= 4) {
-            int r = (int) Math.min(255, (buffer.get() & 0xFF) * brightness);
-            int g = (int) Math.min(255, (buffer.get() & 0xFF) * brightness);
-            int b = (int) Math.min(255, (buffer.get() & 0xFF) * brightness);
-            byte a = buffer.get();
-            buffer.position(buffer.position() - 4);
-            buffer.put((byte) r).put((byte) g).put((byte) b).put(a);
-        }
-        buffer.flip();
-    }
-
-    private static void applyVolumeS16LE(byte[] buf, int len, double volume) {
-        if (Math.abs(volume - 1.0) < 1e-5) return;
-        for (int i = 0; i + 1 < len; i += 2) {
-            int lo = buf[i] & 0xFF;
-            int hi = buf[i + 1]; // Sign-extended
-            int s = (hi << 8) | lo;
-            int scaled = (int) (s * volume);
-            if (scaled > 32767) scaled = 32767;
-            else if (scaled < -32768) scaled = -32768;
-            buf[i] = (byte) (scaled & 0xFF);
-            buf[i + 1] = (byte) ((scaled >> 8) & 0xFF);
-        }
     }
 
     public void play() {
@@ -305,7 +222,7 @@ public class MediaPlayer {
         synchronized (frameLock) {
             if (preparedBuffer == null || !frameReady) return;
 
-            int w = screen.textureWidth, h = screen.textureHeight;
+            int w = displayScreen.textureWidth, h = displayScreen.textureHeight;
             if (w != preparedW || h != preparedH) return;
 
             CommandEncoder encoder = RenderSystem.getDevice().createCommandEncoder();
@@ -342,7 +259,7 @@ public class MediaPlayer {
         return availableVideoStreams.stream()
                 .map(YtStream::getResolution)
                 .filter(Objects::nonNull)
-                .map(r -> parseQualityValue(r, Integer.MAX_VALUE))
+                .map(r -> MediaStreamSelector.parseQualityValue(r, Integer.MAX_VALUE))
                 .filter(r -> r != Integer.MAX_VALUE)
                 .distinct()
                 .filter(r -> r <= (Initializer.isPremium ? 2160 : 1080))
@@ -356,7 +273,7 @@ public class MediaPlayer {
 
     public void tick(BlockPos playerPos, double maxRadius) {
         if (!initialized) return;
-        double dist = screen.getDistanceToScreen(playerPos);
+        double dist = displayScreen.getDistanceToScreen(playerPos);
         double attenuation = Math.pow(1.0 - Math.min(1.0, dist / maxRadius), 2);
         if (Math.abs(attenuation - lastAttenuation) > 1e-5) {
             lastAttenuation = attenuation;
@@ -366,16 +283,16 @@ public class MediaPlayer {
 
     private void initialize() {
         try {
-            String videoId = com.dreamdisplays.util.Utils.extractVideoId(youtubeUrl);
+            String videoId = GeneralUtil.extractVideoId(youtubeUrl);
             if (videoId == null || videoId.isEmpty()) {
                 LoggingManager.error("Could not extract video ID from URL: " + youtubeUrl);
-                screen.errored = true;
+                displayScreen.errored = true;
                 return;
             }
 
-            if (FfmpegBinary.getPath() == null) {
+            if (FFmpegBinary.getPath() == null) {
                 LoggingManager.error("[MediaPlayer] FFmpeg binary not available");
-                screen.errored = true;
+                displayScreen.errored = true;
                 return;
             }
 
@@ -384,7 +301,7 @@ public class MediaPlayer {
             if (terminated.get()) return;
             if (all.isEmpty()) {
                 LoggingManager.error("No streams available for " + cleanUrl);
-                screen.errored = true;
+                displayScreen.errored = true;
                 return;
             }
 
@@ -398,19 +315,19 @@ public class MediaPlayer {
             availableVideoStreams = all.stream().filter(YtStream::hasVideo).toList();
             availableAudioStreams = all.stream().filter(YtStream::hasAudio).toList();
 
-            int requestedQuality = parseQualityValue(screen.getQuality(), 720);
-            Optional<YtStream> videoOpt = pickVideo(requestedQuality)
+            int requestedQuality = MediaStreamSelector.parseQualityValue(displayScreen.getQuality(), 720);
+            Optional<YtStream> videoOpt = MediaStreamSelector.pickVideo(availableVideoStreams, requestedQuality)
                     .or(() -> availableVideoStreams.stream().findFirst());
-            Optional<YtStream> audioOpt = pickAudio(availableAudioStreams, videoOpt.orElse(null));
+            Optional<YtStream> audioOpt = MediaStreamSelector.pickAudio(availableAudioStreams, lang, videoOpt.orElse(null));
             if (videoOpt.isEmpty() || audioOpt.isEmpty()) {
                 LoggingManager.error("No usable streams for " + cleanUrl);
-                screen.errored = true;
+                displayScreen.errored = true;
                 return;
             }
 
             currentVideoStream = videoOpt.get();
             currentAudioStream = audioOpt.get();
-            lastQuality = parseQuality(currentVideoStream);
+            lastQuality = MediaStreamSelector.parseQuality(currentVideoStream);
             fetchRetries = 0;
             initialized = true;
 
@@ -435,7 +352,7 @@ public class MediaPlayer {
 
         } catch (Exception e) {
             LoggingManager.error("Failed to initialize MediaPlayer", e);
-            screen.errored = true;
+            displayScreen.errored = true;
         }
     }
 
@@ -443,26 +360,26 @@ public class MediaPlayer {
         if (terminated.get()) return;
         stopStreams();
 
-        String ffmpeg = FfmpegBinary.getPath();
+        String ffmpeg = FFmpegBinary.getPath();
         if (ffmpeg == null) {
-            screen.errored = true;
+            displayScreen.errored = true;
             return;
         }
 
         seekOffsetNanos = offsetNanos;
         startWallNanos = CLOCK_NOT_STARTED;
 
-        int[] dims = qualityToDims(lastQuality > 0 ? lastQuality : parseQuality(video));
+        int[] dims = MediaStreamSelector.qualityToDims(lastQuality > 0 ? lastQuality : MediaStreamSelector.parseQuality(video));
         int frameW = dims[0], frameH = dims[1];
 
         try {
             LoggingManager.info("[MediaPlayer " + debugLabel + "] starting ffmpeg: "
                     + frameW + "x" + frameH + " quality=" + lastQuality
                     + " offset=" + (offsetNanos / 1_000_000L) + "ms"
-                    + " videoUrl=" + truncate(video.getUrl())
-                    + " audioUrl=" + truncate(audio.getUrl()));
-            Process vp = buildVideoProcess(ffmpeg, video.getUrl(), frameW, frameH, offsetNanos);
-            Process ap = buildAudioProcess(ffmpeg, audio.getUrl(), offsetNanos);
+                    + " videoUrl=" + MediaUtils.truncate(video.getUrl())
+                    + " audioUrl=" + MediaUtils.truncate(audio.getUrl()));
+            Process vp = MediaProcess.buildVideo(ffmpeg, video.getUrl(), frameW, frameH, offsetNanos);
+            Process ap = MediaProcess.buildAudio(ffmpeg, audio.getUrl(), offsetNanos, AUDIO_SAMPLE_RATE);
             videoProcess = vp;
             audioProcess = ap;
 
@@ -483,7 +400,7 @@ public class MediaPlayer {
             startWatchdog();
         } catch (IOException e) {
             LoggingManager.error("[MediaPlayer " + debugLabel + "] Failed to start ffmpeg", e);
-            screen.errored = true;
+            displayScreen.errored = true;
         }
     }
 
@@ -503,8 +420,8 @@ public class MediaPlayer {
         if (vStop != null) vStop.set(true);
         if (aStop != null) aStop.set(true);
 
-        gracefulDestroy(vp);
-        gracefulDestroy(ap);
+        MediaProcess.gracefulDestroy(vp);
+        MediaProcess.gracefulDestroy(ap);
 
         synchronized (frameLock) {
             frameReady = false;
@@ -527,73 +444,6 @@ public class MediaPlayer {
         }
     }
 
-    private static void gracefulDestroy(@Nullable Process proc) {
-        if (proc == null) return;
-        try {
-            OutputStream stdin = proc.getOutputStream();
-            if (stdin != null) {
-                stdin.close();
-            }
-        } catch (IOException ignored) {
-        }
-        proc.destroy();
-        try {
-            if (!proc.waitFor(1, TimeUnit.SECONDS)) {
-                proc.destroyForcibly();
-            }
-        } catch (InterruptedException e) {
-            proc.destroyForcibly();
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private static void addReconnectFlags(List<String> cmd) {
-        cmd.addAll(List.of(
-                "-reconnect", "1",
-                "-reconnect_streamed", "1",
-                "-reconnect_delay_max", "10",
-                "-reconnect_on_network_error", "1",
-                "-reconnect_on_http_error", "4xx,5xx"
-        ));
-    }
-
-    private Process buildVideoProcess(String ffmpeg, String url, int w, int h, long offsetNanos)
-            throws IOException {
-        List<String> cmd = new ArrayList<>();
-        cmd.add(ffmpeg);
-        cmd.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostats"));
-        cmd.addAll(List.of("-headers",
-                "User-Agent: " + USER_AGENT_V + "\r\nReferer: https://www.youtube.com/\r\n"));
-        addReconnectFlags(cmd);
-        cmd.addAll(List.of("-rw_timeout", "15000000"));
-        if (offsetNanos > 0) {
-            cmd.addAll(List.of("-ss",
-                    String.format(Locale.US, "%.6f", offsetNanos / 1e9)));
-        }
-        cmd.addAll(List.of("-re", "-i", url, "-an",
-                "-vf", "scale=" + w + ":" + h,
-                "-f", "rawvideo", "-pix_fmt", "rgba", "-"));
-        return new ProcessBuilder(cmd).start();
-    }
-
-    private Process buildAudioProcess(String ffmpeg, String url, long offsetNanos)
-            throws IOException {
-        List<String> cmd = new ArrayList<>();
-        cmd.add(ffmpeg);
-        cmd.addAll(List.of("-hide_banner", "-loglevel", "error", "-nostats"));
-        cmd.addAll(List.of("-headers",
-                "User-Agent: " + USER_AGENT_V + "\r\nReferer: https://www.youtube.com/\r\n"));
-        addReconnectFlags(cmd);
-        cmd.addAll(List.of("-rw_timeout", "15000000"));
-        if (offsetNanos > 0) {
-            cmd.addAll(List.of("-ss",
-                    String.format(Locale.US, "%.6f", offsetNanos / 1e9)));
-        }
-        cmd.addAll(List.of("-re", "-i", url, "-vn",
-                "-f", "s16le", "-ar", String.valueOf(AUDIO_SAMPLE_RATE), "-ac", "2", "-"));
-        return new ProcessBuilder(cmd).start();
-    }
-
     private void videoReaderLoop(Process proc, int w, int h, AtomicBoolean stopFlag) {
         int frameSize = w * h * 4;
         byte[] frameData = new byte[frameSize];
@@ -614,7 +464,7 @@ public class MediaPlayer {
                     synchronized (stderrBuf) {
                         stderrBuf.append(line).append('\n');
                     }
-                    if (isInterestingStderr(line)) {
+                    if (MediaUtils.isInterestingStderr(line)) {
                         LoggingManager.warn("[ffmpeg-v " + debugLabel + "] " + line);
                     }
                 }
@@ -627,7 +477,7 @@ public class MediaPlayer {
         boolean normalEos = false;
         try (InputStream in = proc.getInputStream()) {
             while (!terminated.get() && !stopFlag.get()) {
-                int n = readFull(in, frameData, frameSize);
+                int n = MediaUtils.readFull(in, frameData, frameSize);
                 if (n < frameSize) {
                     normalEos = true;
                     break;
@@ -750,9 +600,9 @@ public class MediaPlayer {
 
             byte[] chunk = new byte[AUDIO_CHUNK_BYTES];
             while (!terminated.get() && !stopFlag.get()) {
-                int n = readFull(in, chunk, AUDIO_CHUNK_BYTES);
+                int n = MediaUtils.readFull(in, chunk, AUDIO_CHUNK_BYTES);
                 if (n <= 0) break;
-                applyVolumeS16LE(chunk, n, currentVolume);
+                MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume);
                 int written = 0;
                 while (written < n && !terminated.get() && !stopFlag.get()) {
                     int w = line.write(chunk, written, n - written);
@@ -787,26 +637,12 @@ public class MediaPlayer {
         }
     }
 
-    private static boolean isTransientError(String stderr) {
-        return stderr.contains("403") || stderr.contains("Forbidden")
-                || stderr.contains("404") || stderr.contains("Not Found")
-                || stderr.contains("429") || stderr.contains("Too Many Requests")
-                || stderr.contains("503") || stderr.contains("Service Unavailable")
-                || stderr.contains("502") || stderr.contains("Bad Gateway")
-                || stderr.contains("Connection reset")
-                || stderr.contains("Connection refused")
-                || stderr.contains("Connection timed out")
-                || stderr.contains("Network is unreachable")
-                || stderr.contains("Operation timed out")
-                || stderr.contains("Server returned");
-    }
-
     private void handleStreamEnd(String stderr, boolean normalEos, boolean isVideo) {
         if (terminated.get()) return;
 
         boolean is403or404 = stderr.contains("403") || stderr.contains("Forbidden")
                 || stderr.contains("404") || stderr.contains("Not Found");
-        boolean isTransient = isTransientError(stderr);
+        boolean isTransient = MediaUtils.isTransientError(stderr);
 
         if (is403or404 && fetchRetries < MAX_FETCH_RETRIES) {
             scheduleRetry(true);
@@ -830,10 +666,10 @@ public class MediaPlayer {
                     try {
                         YtStream vs = currentVideoStream;
                         YtStream as = currentAudioStream;
-                        if (!terminated.get() && !screen.getPaused() && vs != null && as != null) {
+                        if (!terminated.get() && !displayScreen.getPaused() && vs != null && as != null) {
                             seekOffsetNanos = 0;
                             startStreams(vs, as, 0);
-                            screen.afterSeek();
+                            displayScreen.afterSeek();
                         }
                     } finally {
                         restartPending.set(false);
@@ -845,9 +681,9 @@ public class MediaPlayer {
 
         if (!stderr.isEmpty()) {
             LoggingManager.error("[MediaPlayer " + debugLabel + "] unrecoverable stream error: "
-                    + truncate(stderr));
+                    + MediaUtils.truncate(stderr));
         }
-        screen.errored = true;
+        displayScreen.errored = true;
     }
 
     private void scheduleRetry(boolean invalidateCache) {
@@ -885,7 +721,7 @@ public class MediaPlayer {
 
     private void prepareBuffer() {
         try {
-            int targetW = screen.textureWidth, targetH = screen.textureHeight;
+            int targetW = displayScreen.textureWidth, targetH = displayScreen.textureHeight;
             if (targetW == 0 || targetH == 0) return;
 
             synchronized (frameLock) {
@@ -903,17 +739,17 @@ public class MediaPlayer {
                     output.flip();
                 } else {
                     output.position(0).limit(outputSize);
-                    Converter.scaleRGBA(source, sourceW, sourceH, output, targetW, targetH);
+                    ConverterUtil.scaleRGBA(source, sourceW, sourceH, output, targetW, targetH);
                     output.position(0).limit(outputSize);
                 }
 
-                applyBrightnessToBuffer(output, brightness);
+                MediaBufferEffects.applyBrightness(output, brightness);
                 preparedW = targetW;
                 preparedH = targetH;
                 frameReady = true;
             }
 
-            Minecraft.getInstance().execute(screen::fitTexture);
+            Minecraft.getInstance().execute(displayScreen::fitTexture);
         } finally {
             frameTaskQueued.set(false);
         }
@@ -972,13 +808,13 @@ public class MediaPlayer {
             preparedBuffer = null;
             preparedBufferSize = 0;
         }
-        Minecraft.getInstance().execute(screen::reloadTexture);
+        Minecraft.getInstance().execute(displayScreen::reloadTexture);
 
         seekOffsetNanos = nanos;
         if (wasPlaying) {
             startStreams(vs, as, nanos);
         }
-        if (fire) screen.afterSeek();
+        if (fire) displayScreen.afterSeek();
     }
 
     private void changeQuality(String desired) {
@@ -986,74 +822,30 @@ public class MediaPlayer {
         YtStream currentVideo = currentVideoStream, currentAudio = currentAudioStream;
         if (currentVideo == null || currentAudio == null) return;
 
-        int target = parseQualityValue(desired, -1);
+        int target = MediaStreamSelector.parseQualityValue(desired, -1);
         if (target < 0 || target == lastQuality) return;
 
-        Optional<YtStream> best = pickVideo(target);
+        Optional<YtStream> best = MediaStreamSelector.pickVideo(availableVideoStreams, target);
         if (best.isEmpty()) return;
         YtStream chosenVideo = best.get();
         if (chosenVideo.getUrl().equals(currentVideo.getUrl())) return;
 
         YtStream chosenAudio = currentAudio;
         if (availableAudioStreams != null) {
-            Optional<YtStream> audioOpt = pickAudio(availableAudioStreams, chosenVideo);
+            Optional<YtStream> audioOpt = MediaStreamSelector.pickAudio(availableAudioStreams, lang, chosenVideo);
             if (audioOpt.isPresent()) chosenAudio = audioOpt.get();
         }
 
         long pos = liveStream ? 0L : getCurrentTime();
-        Minecraft.getInstance().execute(screen::reloadTexture);
+        Minecraft.getInstance().execute(displayScreen::reloadTexture);
         currentVideoStream = chosenVideo;
         currentAudioStream = chosenAudio;
-        lastQuality = parseQuality(chosenVideo);
+        lastQuality = MediaStreamSelector.parseQuality(chosenVideo);
         if (playing) {
             startStreams(chosenVideo, chosenAudio, pos);
         } else {
             seekOffsetNanos = pos;
         }
-    }
-
-    private Optional<YtStream> pickVideo(int target) {
-        List<YtStream> streams = availableVideoStreams;
-        if (streams == null) return Optional.empty();
-        return streams.stream()
-                .filter(s -> s.getResolution() != null)
-                .min(Comparator
-                        .comparingInt((YtStream s) -> Math.abs(parseQuality(s) - target))
-                        .thenComparingInt(s -> s.isMuxed() ? 0 : 1)
-                        .thenComparingInt(s -> s.hasAudio() ? 0 : 1));
-    }
-
-    private Optional<YtStream> pickAudio(List<YtStream> audioStreams, @Nullable YtStream chosenVideo) {
-        LoggingManager.info("[pickAudio] lang='" + lang + "' candidates: " +
-                audioStreams.stream()
-                        .filter(s -> !s.hasVideo())
-                        .map(s -> "trackId=" + s.getAudioTrackId() + " note=" + s.getAudioTrackName())
-                        .collect(Collectors.joining(", ")));
-
-        Optional<YtStream> preferred = audioStreams.stream()
-                .filter(s -> !s.hasVideo())
-                .filter(this::matchesRequestedLanguage)
-                .reduce((f, n) -> n);
-        if (preferred.isPresent()) return preferred;
-
-        preferred = audioStreams.stream()
-                .filter(s -> !s.hasVideo())
-                .filter(s -> s.getAudioTrackId() == null || s.getAudioTrackId().equals("und"))
-                .reduce((f, n) -> n);
-        if (preferred.isPresent()) return preferred;
-
-        preferred = audioStreams.stream().filter(s -> !s.hasVideo()).reduce((f, n) -> n);
-        if (preferred.isPresent()) return preferred;
-
-        if (chosenVideo != null && chosenVideo.hasAudio()) return Optional.of(chosenVideo);
-
-        preferred = audioStreams.stream().filter(this::matchesRequestedLanguage).reduce((f, n) -> n);
-        return preferred.isPresent() ? preferred : audioStreams.stream().findFirst();
-    }
-
-    private boolean matchesRequestedLanguage(YtStream stream) {
-        return (stream.getAudioTrackId() != null && stream.getAudioTrackId().contains(lang))
-                || (stream.getAudioTrackName() != null && stream.getAudioTrackName().contains(lang));
     }
 
     private void startWatchdog() {

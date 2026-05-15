@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen.widgets;
+package com.dreamdisplays.client.ui.widgets;
 
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;
@@ -18,7 +18,7 @@ import java.util.function.LongConsumer;
 import java.util.function.LongSupplier;
 
 @NullMarked
-public class ProgressSlider extends AbstractWidget {
+public class ProgressSliderWidget extends AbstractWidget {
 
     public static final long MAX_DRAG_DELTA_NS = 10L * 1_000_000_000L;
     private static final Identifier TEXTURE_ID =
@@ -38,10 +38,10 @@ public class ProgressSlider extends AbstractWidget {
     private long dragAnchorNanos = 0;
     private long dragTargetNanos = 0;
 
-    public ProgressSlider(int x, int y, int width, int height,
-                          LongSupplier currentSupplier,
-                          LongSupplier durationSupplier,
-                          LongConsumer seekConsumer) {
+    public ProgressSliderWidget(int x, int y, int width, int height,
+                                LongSupplier currentSupplier,
+                                LongSupplier durationSupplier,
+                                LongConsumer seekConsumer) {
         super(x, y, width, height, Component.empty());
         this.currentSupplier = currentSupplier;
         this.durationSupplier = durationSupplier;

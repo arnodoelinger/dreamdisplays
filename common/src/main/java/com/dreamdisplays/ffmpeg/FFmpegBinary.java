@@ -21,7 +21,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @NullMarked
-public class FfmpegBinary {
+public class FFmpegBinary {
 
     private static final String CACHE_ROOT = "./dreamdisplays/ffmpeg";
     private static final String BTBN_BASE =
@@ -31,7 +31,7 @@ public class FfmpegBinary {
 
     public static @Nullable String getPath() {
         if (cachedPath != null) return cachedPath;
-        synchronized (FfmpegBinary.class) {
+        synchronized (FFmpegBinary.class) {
             if (cachedPath != null) return cachedPath;
             cachedPath = resolve();
             return cachedPath;

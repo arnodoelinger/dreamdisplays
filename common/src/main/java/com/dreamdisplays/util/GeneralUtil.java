@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * Helpers.
  */
 @NullMarked
-public class Utils {
+public class GeneralUtil {
 
     // Detects the current operating system platform
     public static String detectPlatform() {
@@ -97,7 +97,7 @@ public class Utils {
     }
 
     public static String readResource(String resourcePath) throws IOException {
-        try (InputStream in = Utils.class.getResourceAsStream(resourcePath)) {
+        try (InputStream in = GeneralUtil.class.getResourceAsStream(resourcePath)) {
             if (in == null) {
                 throw new IOException(
                         "Can't find the resource: " + resourcePath

@@ -1,4 +1,4 @@
-package com.dreamdisplays.screen;
+package com.dreamdisplays.display;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -17,14 +17,14 @@ import java.util.UUID;
  * Manages loading and saving of display settings and data.
  */
 @NullMarked
-public class Settings {
+public class DisplaySettings {
     // Store settings per server
     private static final File SETTINGS_DIR = new File("./config/dreamdisplays");
     private static final Gson GSON = new GsonBuilder()
             .setPrettyPrinting()
             .create();
     // displayUuid -> DisplaySettings
-    private static final Map<UUID, DisplaySettings> displaySettings =
+    private static final Map<UUID, ClientDisplaySettings> displaySettings =
             new HashMap<>();
     // serverId -> (displayUuid -> FullDisplayData)
     private static final Map<
@@ -48,10 +48,10 @@ public class Settings {
         );
         try (Reader reader = new FileReader(clientSettingsFile)) {
             Type type = new TypeToken<
-                    Map<String, DisplaySettings>
+                    Map<String, ClientDisplaySettings>
                     >() {
             }.getType();
-            Map<String, DisplaySettings> loadedSettings = GSON.fromJson(
+            Map<String, ClientDisplaySettings> loadedSettings = GSON.fromJson(
                     reader,
                     type
             );
@@ -60,7 +60,7 @@ public class Settings {
                 displaySettings.clear();
                 for (Map.Entry<
                         String,
-                        DisplaySettings
+                        ClientDisplaySettings
                         > entry : loadedSettings.entrySet()) {
                     try {
                         UUID uuid = UUID.fromString(entry.getKey());
@@ -140,10 +140,10 @@ public class Settings {
                 return;
             }
 
-            Map<String, DisplaySettings> toSave = new HashMap<>();
+            Map<String, ClientDisplaySettings> toSave = new HashMap<>();
             for (Map.Entry<
                     UUID,
-                    DisplaySettings
+                    ClientDisplaySettings
                     > entry : displaySettings.entrySet()) {
                 toSave.put(entry.getKey().toString(), entry.getValue());
             }
@@ -193,9 +193,9 @@ public class Settings {
     }
 
     // Get client display settings
-    public static DisplaySettings getSettings(UUID displayUuid) {
+    public static ClientDisplaySettings getSettings(UUID displayUuid) {
         return displaySettings.computeIfAbsent(displayUuid, k ->
-                new DisplaySettings()
+                new ClientDisplaySettings()
         );
     }
 
@@ -208,7 +208,7 @@ public class Settings {
             boolean muted,
             boolean paused
     ) {
-        DisplaySettings settings = getSettings(displayUuid);
+        ClientDisplaySettings settings = getSettings(displayUuid);
         settings.volume = volume;
         settings.quality = quality;
         settings.brightness = brightness;
@@ -219,7 +219,7 @@ public class Settings {
 
     // Update the client-side URL override for a display (set when user picks from suggestions)
     public static void setUrlOverride(UUID displayUuid, @Nullable String url, @Nullable String lang) {
-        DisplaySettings settings = getSettings(displayUuid);
+        ClientDisplaySettings settings = getSettings(displayUuid);
         settings.urlOverride = url;
         settings.langOverride = lang;
         save();
@@ -270,7 +270,7 @@ public class Settings {
     }
 
     // Client settings for a display (volume, quality, muted, brightness, paused)
-    public static class DisplaySettings {
+    public static class ClientDisplaySettings {
 
         public float volume = 0.5f;
         public String quality = "720";
@@ -280,7 +280,7 @@ public class Settings {
         public @Nullable String urlOverride = null;
         public @Nullable String langOverride = null;
 
-        public DisplaySettings() {
+        public ClientDisplaySettings() {
         }
     }
 

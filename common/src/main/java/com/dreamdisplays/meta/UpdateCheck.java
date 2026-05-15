@@ -1,6 +1,6 @@
-package com.dreamdisplays.screen;
+package com.dreamdisplays.meta;
 
-import com.dreamdisplays.util.Utils;
+import com.dreamdisplays.util.GeneralUtil;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -36,13 +36,13 @@ public final class UpdateCheck {
         if (!checked) startCheck();
         String latest = latestVersion;
         if (latest == null) return false;
-        String current = Utils.getModVersion();
+        String current = GeneralUtil.getModVersion();
         return !latest.equalsIgnoreCase(current);
     }
 
     public static String latestVersion() {
         String v = latestVersion;
-        return v == null ? Utils.getModVersion() : v;
+        return v == null ? GeneralUtil.getModVersion() : v;
     }
 
     private static synchronized void startCheck() {
@@ -60,7 +60,7 @@ public final class UpdateCheck {
             conn.setConnectTimeout(5_000);
             conn.setReadTimeout(8_000);
             conn.setRequestProperty("User-Agent",
-                    "DreamDisplays/" + Utils.getModVersion() + " (+github.com/arsmotorin/dreamdisplays)");
+                    "DreamDisplays/" + GeneralUtil.getModVersion() + " (+github.com/arsmotorin/dreamdisplays)");
             conn.setRequestProperty("Accept", "application/vnd.github+json");
             int code = conn.getResponseCode();
             if (code != 200) return;
@@ -83,7 +83,7 @@ public final class UpdateCheck {
             if (tag == null) return;
             if (tag.startsWith("v") || tag.startsWith("V")) tag = tag.substring(1);
             latestVersion = tag;
-            if (compareVersions(tag, Utils.getModVersion()) > 0) {
+            if (compareVersions(tag, GeneralUtil.getModVersion()) > 0) {
                 updateAvailable = true;
             }
         } catch (Exception e) {

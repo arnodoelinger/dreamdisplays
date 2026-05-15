@@ -1,14 +1,14 @@
 package com.dreamdisplays;
 
-import com.dreamdisplays.ffmpeg.FfmpegBinary;
+import com.dreamdisplays.display.DisplayScreen;
+import com.dreamdisplays.ffmpeg.FFmpegBinary;
 import com.dreamdisplays.net.Packets.*;
-import com.dreamdisplays.screen.Configuration;
-import com.dreamdisplays.screen.Manager;
-import com.dreamdisplays.screen.Screen;
-import com.dreamdisplays.screen.Settings;
-import com.dreamdisplays.util.Facing;
-import com.dreamdisplays.util.RayCasting;
-import com.dreamdisplays.util.Utils;
+import com.dreamdisplays.client.ui.DisplayMenu;
+import com.dreamdisplays.display.DisplayManager;
+import com.dreamdisplays.display.DisplaySettings;
+import com.dreamdisplays.util.FacingUtil;
+import com.dreamdisplays.util.RayCastingUtil;
+import com.dreamdisplays.util.GeneralUtil;
 import com.dreamdisplays.ytdlp.FormatDiskCache;
 import com.dreamdisplays.ytdlp.YtDlp;
 import me.inotsleep.utils.logging.LoggingManager;
@@ -50,7 +50,7 @@ public class Initializer {
     public static Thread timerThread = new Thread(() -> {
         boolean running = true;
         while (running) {
-            Manager.getScreens().forEach(Screen::reloadQuality);
+            DisplayManager.getScreens().forEach(DisplayScreen::reloadQuality);
             try {
                 Thread.sleep(2500);
             } catch (InterruptedException e) {
@@ -65,7 +65,7 @@ public class Initializer {
     public static boolean isPremium = false;
     public static boolean isReportingEnabled = true;
     private static int unloadCheckTick = 0;
-    private static @Nullable Screen hoveredScreen = null;
+    private static @Nullable DisplayScreen hoveredDisplayScreen = null;
     private static Mod mod;
 
     public static Config getConfig() {
@@ -79,10 +79,10 @@ public class Initializer {
         config.reload();
 
         // Load client display settings
-        Settings.load();
+        DisplaySettings.load();
 
         YtDlp.prewarmAsync();
-        FfmpegBinary.prewarmAsync();
+        FFmpegBinary.prewarmAsync();
         // Drop yt-dlp cache entries older than the URL TTL on a background thread
         new Thread(FormatDiskCache::sweepExpired,
                 "dreamdisplays-cache-sweep").start();
@@ -98,9 +98,9 @@ public class Initializer {
         // already cached.
         YtDlp.prefetchFormats(packet.url());
 
-        if (Manager.screens.containsKey(packet.uuid())) {
-            Screen screen = Manager.screens.get(packet.uuid());
-            screen.updateData(packet);
+        if (DisplayManager.screens.containsKey(packet.uuid())) {
+            DisplayScreen displayScreen = DisplayManager.screens.get(packet.uuid());
+            displayScreen.updateData(packet);
             return;
         }
 
@@ -108,7 +108,7 @@ public class Initializer {
         Player player = Minecraft.getInstance().player;
         if (player != null) {
             // Get saved render distance or use default
-            Settings.FullDisplayData savedData = Settings.getDisplayData(packet.uuid());
+            DisplaySettings.FullDisplayData savedData = DisplaySettings.getDisplayData(packet.uuid());
             int renderDistance = savedData != null ? savedData.renderDistance : config.defaultDistance;
 
             // Screen.getDistanceToScreen()
@@ -117,7 +117,7 @@ public class Initializer {
             int z = packet.pos().z;
             int width = packet.width();
             int height = packet.height();
-            String facing = packet.facing().toString();
+            String facing = packet.facingUtil().toString();
 
             int maxX = x;
             int maxY = y + height - 1;
@@ -142,13 +142,13 @@ public class Initializer {
             }
         }
 
-        Manager.unloadedScreens.remove(packet.uuid());
+        DisplayManager.unloadedScreens.remove(packet.uuid());
 
         createScreen(
                 packet.uuid(),
                 packet.ownerUuid(),
                 packet.pos(),
-                packet.facing(),
+                packet.facingUtil(),
                 packet.width(),
                 packet.height(),
                 packet.url(),
@@ -167,44 +167,44 @@ public class Initializer {
             UUID uuid,
             UUID ownerUuid,
             Vector3i pos,
-            Facing facing,
+            FacingUtil facingUtil,
             int width,
             int height,
             String code,
             String lang,
             boolean isSync
     ) {
-        Screen screen = new Screen(
+        DisplayScreen displayScreen = new DisplayScreen(
                 uuid,
                 ownerUuid,
                 pos.x(),
                 pos.y(),
                 pos.z(),
-                facing.toString(),
+                facingUtil.toString(),
                 width,
                 height,
                 isSync
         );
 
-        Settings.FullDisplayData savedData = Settings.getDisplayData(uuid);
+        DisplaySettings.FullDisplayData savedData = DisplaySettings.getDisplayData(uuid);
         int renderDistance = savedData != null ? savedData.renderDistance : config.defaultDistance;
-        screen.setRenderDistance(renderDistance);
+        displayScreen.setRenderDistance(renderDistance);
 
-        Manager.registerScreen(screen);
-        if (!Objects.equals(code, "")) screen.loadVideo(code, lang);
+        DisplayManager.registerScreen(displayScreen);
+        if (!Objects.equals(code, "")) displayScreen.loadVideo(code, lang);
     }
 
     public static void onSyncPacket(Sync packet) {
-        if (!Manager.screens.containsKey(packet.uuid())) return;
-        Screen screen = Manager.screens.get(packet.uuid());
-        if (screen != null) {
-            screen.updateData(packet);
+        if (!DisplayManager.screens.containsKey(packet.uuid())) return;
+        DisplayScreen displayScreen = DisplayManager.screens.get(packet.uuid());
+        if (displayScreen != null) {
+            displayScreen.updateData(packet);
         }
     }
 
     // Restore a screen from cached data (when player enters render distance)
-    private static void restoreScreen(Settings.FullDisplayData data) {
-        Screen screen = new Screen(
+    private static void restoreScreen(DisplaySettings.FullDisplayData data) {
+        DisplayScreen displayScreen = new DisplayScreen(
                 data.uuid,
                 data.ownerUuid,
                 data.x,
@@ -216,23 +216,23 @@ public class Initializer {
                 data.isSync
         );
 
-        screen.setRenderDistance(data.renderDistance);
-        screen.setSavedTimeNanos(data.currentTimeNanos);
-        screen.setVolume(data.volume);
-        screen.setQuality(data.quality);
-        screen.setBrightness(data.brightness);
-        screen.muted = data.muted;
+        displayScreen.setRenderDistance(data.renderDistance);
+        displayScreen.setSavedTimeNanos(data.currentTimeNanos);
+        displayScreen.setVolume(data.volume);
+        displayScreen.setQuality(data.quality);
+        displayScreen.setBrightness(data.brightness);
+        displayScreen.muted = data.muted;
 
-        Manager.screens.put(screen.getUUID(), screen);
+        DisplayManager.screens.put(displayScreen.getUUID(), displayScreen);
 
         if (data.videoUrl != null && !data.videoUrl.isEmpty()) {
-            screen.loadVideo(data.videoUrl, data.lang != null ? data.lang : "");
+            displayScreen.loadVideo(data.videoUrl, data.lang != null ? data.lang : "");
         }
     }
 
     private static void checkVersionAndSendPacket() {
         try {
-            String version = Utils.getModVersion();
+            String version = GeneralUtil.getModVersion();
             sendPacket(new Version(version));
         } catch (Exception e) {
             LoggingManager.error("Unable to get version", e);
@@ -250,8 +250,8 @@ public class Initializer {
             if (level != lastLevel.get()) {
                 lastLevel.set(level);
 
-                Manager.unloadAll();
-                hoveredScreen = null;
+                DisplayManager.unloadAll();
+                hoveredDisplayScreen = null;
 
                 checkVersionAndSendPacket();
             }
@@ -260,26 +260,26 @@ public class Initializer {
         } else {
             if (wasInMultiplayer.get()) {
                 wasInMultiplayer.set(false);
-                Manager.unloadAll();
-                hoveredScreen = null;
+                DisplayManager.unloadAll();
+                hoveredDisplayScreen = null;
                 lastLevel.set(null);
                 return;
             }
         }
 
-        BlockHitResult result = RayCasting.rCBlock(64);
-        hoveredScreen = null;
+        BlockHitResult result = RayCastingUtil.rCBlock(64);
+        hoveredDisplayScreen = null;
         Initializer.isOnScreen = false;
         Player player = minecraft.player;
         if (player == null) return;
 
         unloadCheckTick++;
-        if (unloadCheckTick >= 10 && Initializer.displaysEnabled && !Manager.unloadedScreens.isEmpty()) {
+        if (unloadCheckTick >= 10 && Initializer.displaysEnabled && !DisplayManager.unloadedScreens.isEmpty()) {
             unloadCheckTick = 0;
             // Collect screens to restore first to avoid ConcurrentModificationException
-            java.util.List<Settings.FullDisplayData> toRestore = new java.util.ArrayList<>();
+            java.util.List<DisplaySettings.FullDisplayData> toRestore = new java.util.ArrayList<>();
 
-            for (Settings.FullDisplayData data : Manager.unloadedScreens.values()) {
+            for (DisplaySettings.FullDisplayData data : DisplayManager.unloadedScreens.values()) {
                 if (data.videoUrl == null || data.videoUrl.isEmpty()) continue;
 
                 // Screen.getDistanceToScreen
@@ -307,35 +307,35 @@ public class Initializer {
             }
 
             // Now restore outside the iteration
-            for (Settings.FullDisplayData data : toRestore) {
-                Manager.unloadedScreens.remove(data.uuid);
+            for (DisplaySettings.FullDisplayData data : toRestore) {
+                DisplayManager.unloadedScreens.remove(data.uuid);
                 restoreScreen(data);
             }
         }
 
-        for (Screen screen : Manager.getScreens()) {
-            double displayRenderDistance = screen.getRenderDistance();
+        for (DisplayScreen displayScreen : DisplayManager.getScreens()) {
+            double displayRenderDistance = displayScreen.getRenderDistance();
 
             if (
                     displayRenderDistance <
-                            screen.getDistanceToScreen(player.blockPosition()) ||
+                            displayScreen.getDistanceToScreen(player.blockPosition()) ||
                             !Initializer.displaysEnabled
             ) {
-                Manager.saveScreenData(screen);
-                Manager.unregisterScreen(screen);
-                if (hoveredScreen == screen) {
-                    hoveredScreen = null;
+                DisplayManager.saveScreenData(displayScreen);
+                DisplayManager.unregisterScreen(displayScreen);
+                if (hoveredDisplayScreen == displayScreen) {
+                    hoveredDisplayScreen = null;
                     Initializer.isOnScreen = false;
                 }
             } else {
                 if (result != null) if (
-                        screen.isInScreen(result.getBlockPos())
+                        displayScreen.isInScreen(result.getBlockPos())
                 ) {
-                    hoveredScreen = screen;
+                    hoveredDisplayScreen = displayScreen;
                     Initializer.isOnScreen = true;
                 }
 
-                screen.tick(player.blockPosition());
+                displayScreen.tick(player.blockPosition());
             }
         }
 
@@ -352,7 +352,7 @@ public class Initializer {
 
         wasPressed[0] = pressed;
 
-        if (Initializer.focusMode && hoveredScreen != null) {
+        if (Initializer.focusMode && hoveredDisplayScreen != null) {
             player.addEffect(
                     new MobEffectInstance(
                             MobEffects.BLINDNESS,
@@ -372,8 +372,8 @@ public class Initializer {
     }
 
     private static void checkAndOpenScreen() {
-        if (hoveredScreen == null) return;
-        Configuration.open(hoveredScreen);
+        if (hoveredDisplayScreen == null) return;
+        DisplayMenu.open(hoveredDisplayScreen);
     }
 
     public static void sendPacket(CustomPacketPayload packet) {
@@ -381,23 +381,23 @@ public class Initializer {
     }
 
     public static void onDeletePacket(Delete packet) {
-        Screen screen = Manager.screens.get(packet.uuid());
-        if (screen != null) {
-            Manager.unregisterScreen(screen);
+        DisplayScreen displayScreen = DisplayManager.screens.get(packet.uuid());
+        if (displayScreen != null) {
+            DisplayManager.unregisterScreen(displayScreen);
         }
 
-        Manager.unloadedScreens.remove(packet.uuid());
+        DisplayManager.unloadedScreens.remove(packet.uuid());
 
-        Settings.removeDisplay(packet.uuid());
+        DisplaySettings.removeDisplay(packet.uuid());
         LoggingManager.info(
                 "Display deleted and removed from saved data: " + packet.uuid()
         );
     }
 
     public static void onStop() {
-        Manager.saveAllScreens();
+        DisplayManager.saveAllScreens();
         timerThread.interrupt();
-        Manager.unloadAll();
+        DisplayManager.unloadAll();
         Focuser.instance.interrupt();
     }
 
@@ -412,14 +412,14 @@ public class Initializer {
     public static void onClearCachePacket(ClearCache packet) {
         // Remove specific displays from active screens and cache
         for (UUID displayUuid : packet.displayUuids()) {
-            Screen screen = Manager.screens.get(displayUuid);
-            if (screen != null) {
-                screen.unregister();
-                Manager.screens.remove(displayUuid);
+            DisplayScreen displayScreen = DisplayManager.screens.get(displayUuid);
+            if (displayScreen != null) {
+                displayScreen.unregister();
+                DisplayManager.screens.remove(displayUuid);
             }
 
             // Remove from persistent storage
-            Settings.removeDisplay(displayUuid);
+            DisplaySettings.removeDisplay(displayUuid);
         }
     }
 }
