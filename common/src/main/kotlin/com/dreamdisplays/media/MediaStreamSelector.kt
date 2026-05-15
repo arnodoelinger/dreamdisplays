@@ -50,17 +50,39 @@ object MediaStreamSelector {
 
     fun pickAudio(audioStreams: List<YtStream>, lang: String, chosenVideo: YtStream?): YtStream? {
         val audioOnly = audioStreams.filter { !it.hasVideo() }
+        val requested = lang.trim()
 
-        audioOnly.lastOrNull { matchesLanguage(it, lang) }?.let { return it }
-        audioOnly.lastOrNull { it.audioTrackId == null || it.audioTrackId == "und" }?.let { return it }
-        audioOnly.lastOrNull()?.let { return it }
+        // Explicit language requested: match case-insensitively against the
+        // track id (e.g. "ru", "en-US") or the human-readable name (e.g.
+        // "Russian", "English (original)").  YouTube's audioTrackName for
+        // multilingual videos carries the language word, so this catches both
+        // codes and full names regardless of case.
+        if (requested.isNotEmpty()) {
+            audioOnly.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
+        }
+
+        // No explicit language (or no match): prefer the track YouTube marks
+        // as the original / default, falling back to an unspecified ("und")
+        // language code, then the first audio stream.
+        audioOnly.firstOrNull {
+            it.audioTrackName?.lowercase()?.let { n -> "original" in n || "default" in n } == true
+        }?.let { return it }
+        audioOnly.firstOrNull { it.audioTrackId.isNullOrBlank() || it.audioTrackId == "und" }
+            ?.let { return it }
+        audioOnly.firstOrNull()?.let { return it }
+
         if (chosenVideo != null && chosenVideo.hasAudio()) return chosenVideo
-        audioStreams.lastOrNull { matchesLanguage(it, lang) }?.let { return it }
+        if (requested.isNotEmpty()) {
+            audioStreams.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
+        }
         return audioStreams.firstOrNull()
     }
 
 
-    fun matchesLanguage(stream: YtStream, lang: String): Boolean =
-        (stream.audioTrackId?.contains(lang) == true) ||
-                (stream.audioTrackName?.contains(lang) == true)
+    fun matchesLanguage(stream: YtStream, lang: String): Boolean {
+        val needle = lang.lowercase()
+        if (needle.isEmpty()) return false
+        return stream.audioTrackId?.lowercase()?.contains(needle) == true
+                || stream.audioTrackName?.lowercase()?.contains(needle) == true
+    }
 }
