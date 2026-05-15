@@ -25,7 +25,6 @@ class ProgressSliderWidget(
 
     private var sliderFocused = false
     private var dragging = false
-    private var dragAnchorNanos = 0L
     private var dragTargetNanos = 0L
 
     override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
@@ -67,8 +66,7 @@ class ProgressSliderWidget(
         if (!active) return
         val dur = durationSupplier.asLong
         if (dur <= 0) return
-        dragAnchorNanos = currentSupplier.asLong
-        dragTargetNanos = clampDelta(positionFromMouse(event.x(), dur))
+        dragTargetNanos = positionFromMouse(event.x(), dur)
         dragging = true
     }
 
@@ -77,7 +75,7 @@ class ProgressSliderWidget(
         if (!dragging || !active) return
         val dur = durationSupplier.asLong
         if (dur <= 0) return
-        dragTargetNanos = clampDelta(positionFromMouse(event.x(), dur))
+        dragTargetNanos = positionFromMouse(event.x(), dur)
     }
 
     fun commitDragIfActive(): Boolean {
@@ -92,12 +90,6 @@ class ProgressSliderWidget(
         return (pct * dur).toLong()
     }
 
-    private fun clampDelta(target: Long): Long {
-        val min = maxOf(0L, dragAnchorNanos - MAX_DRAG_DELTA_NS)
-        val max = dragAnchorNanos + MAX_DRAG_DELTA_NS
-        return maxOf(min, minOf(max, target))
-    }
-
     override fun setFocused(focused: Boolean) {
         super.setFocused(focused)
         if (!focused) {
@@ -109,7 +101,6 @@ class ProgressSliderWidget(
     }
 
     companion object {
-        const val MAX_DRAG_DELTA_NS: Long = 10L * 1_000_000_000L
         private val TEXTURE_ID = Identifier.withDefaultNamespace("widget/slider")
         private val HIGHLIGHTED_TEXTURE_ID = Identifier.withDefaultNamespace("widget/slider_highlighted")
         private val HANDLE_TEXTURE_ID = Identifier.withDefaultNamespace("widget/slider_handle")
