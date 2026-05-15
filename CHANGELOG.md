@@ -14,19 +14,17 @@ Mod:
 - [x] Save brightness to display settings
 - [x] Some thumbnail loading optimizations
 - [x] Enhance project structure and code quality in some places
-- [x] Fix focuser activation error when Minecraft hasn't been loaded yet
+- [x] Fix client null error in window focus handling
 - [x] Fix list of available qualities
 - [x] Fix frame buffers preallocation to reduce GC pressure during playback
 - [ ] Fix language selector ([#73](https://github.com/arsmotorin/dreamdisplays/issues/73))
 - [x] Fix volume reset after leaving active display distance ([#76](https://github.com/arsmotorin/dreamdisplays/issues/76))
-- [ ] Discontinue to use INotSleep's utils library for safety and stability reasons
 
 Plugin:
 
 - [x] Rate-limit sync packet broadcasting to prevent flooding when owner seeks rapidly
 - [x] Batch display info packets on player join to prevent client overload on servers with many displays
 - [x] Validate sync packet time values to reject out-of-range data
-- [ ] Discontinue to use INotSleep's utils library for safety and stability reasons
 
 # Version 1.6.1
 

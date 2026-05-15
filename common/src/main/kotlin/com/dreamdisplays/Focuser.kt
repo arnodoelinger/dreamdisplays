@@ -14,10 +14,13 @@ class Focuser : Thread() {
 
     override fun run() {
         while (true) {
-            val focused = Minecraft.getInstance().isWindowActive
             if (Initializer.config.muteOnAltTab) {
-                for (screen in DisplayManager.getScreens()) {
-                    screen.mute(!focused)
+                val mc: Minecraft? = runCatching { Minecraft.getInstance() }.getOrNull()
+                if (mc != null) {
+                    val focused = mc.isWindowActive
+                    for (screen in DisplayManager.getScreens()) {
+                        screen.mute(!focused)
+                    }
                 }
             }
             try {
