@@ -26,6 +26,7 @@ object FormatDiskCache {
     private val GSON: Gson = GsonBuilder().create()
     private val STREAM_LIST_TYPE = object : TypeToken<List<YtStream>>() {}.type
     private const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
+    private const val SCHEMA_VERSION = 2
 
     private val WRITER = Executors.newSingleThreadExecutor { r ->
         Thread(r, "DD-FormatCache-writer").apply { isDaemon = true }
@@ -38,6 +39,11 @@ object FormatDiskCache {
         return try {
             val json = Files.readString(f.toPath(), StandardCharsets.UTF_8)
             val obj = JsonParser.parseString(json).asJsonObject
+            val version = if (obj.has("v")) obj.get("v").asInt else 0
+            if (version != SCHEMA_VERSION) {
+                f.delete()
+                return null
+            }
             val ts = if (obj.has("ts")) obj.get("ts").asLong else 0L
             if (System.currentTimeMillis() - ts > maxAgeMs) {
                 f.delete()
@@ -63,6 +69,7 @@ object FormatDiskCache {
             val target = fileFor(videoUrl)
             val tmp = File(target.parentFile, target.name + ".tmp")
             val root = JsonObject().apply {
+                addProperty("v", SCHEMA_VERSION)
                 addProperty("ts", System.currentTimeMillis())
                 addProperty("url", videoUrl)
                 add("streams", GSON.toJsonTree(streams, STREAM_LIST_TYPE))

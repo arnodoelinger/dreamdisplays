@@ -438,7 +438,6 @@ object YtDlp {
             "--ignore-config", "--no-mark-watched",
             "--extractor-retries", "1",
             "--socket-timeout", "10",
-            "--extractor-args", "youtube:player_client=web_safari,web",
             videoUrl,
         ))
         val pb = ProcessBuilder(cmd)
