@@ -9,6 +9,7 @@ utils = "1.4.10"
 loom = "1.16.0-alpha.13"
 moddev = "2.0.141"
 shadow = "9.4.1"
+kotlin = "2.3.21"
 
 # Fabric
 fabricLoader = "0.19.2"
@@ -23,6 +24,7 @@ neoforge = "21.11.42"
 # Common
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 utils = { module = "me.inotsleep:utils", version.ref = "utils" }
+kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 
 # Fabric
 fabricLoader = { module = "net.fabricmc:fabric-loader", version.ref = "fabricLoader" }

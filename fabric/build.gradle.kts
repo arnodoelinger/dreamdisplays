@@ -19,6 +19,7 @@ dependencies {
     modImplementation(libs.fabricLoader)
     modImplementation(libs.fabricApi)
     shadow(project(":common"))
+    shadow(libs.kotlinStdlib)
 }
 
 tasks.processResources {
@@ -62,13 +63,23 @@ tasks.shadowJar {
         include(dependency("me.inotsleep:utils"))
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))
+        include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
+        include(dependency("org.jetbrains:annotations"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
         "me.inotsleep.utils",
         "org.apache.commons.compress",
         "org.tukaani.xz",
+        "kotlin",
+        "org.jetbrains.annotations",
+        "org.intellij.lang.annotations",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
+    mergeServiceFiles()
+    exclude("META-INF/versions/9/module-info.class")
+    exclude("META-INF/maven/**")
+    exclude("META-INF/proguard/**")
+    exclude("META-INF/*.kotlin_module")
 }

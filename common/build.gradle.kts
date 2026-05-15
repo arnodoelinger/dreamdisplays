@@ -1,5 +1,6 @@
 plugins {
     id("net.neoforged.moddev") version libs.versions.moddev
+    kotlin("jvm") version libs.versions.kotlin
 }
 
 dependencies {
@@ -7,6 +8,7 @@ dependencies {
     api(libs.jspecify)
     api("org.apache.commons:commons-compress:1.27.1")
     api("org.tukaani:xz:1.10")
+    compileOnly(libs.kotlinStdlib)
 }
 
 neoForge {
@@ -14,8 +16,16 @@ neoForge {
         version = libs.versions.neoforge.get()
     }
 }
+
 java {
     toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+}
+
+kotlin {
+    jvmToolchain(21)
+    compilerOptions {
+        freeCompilerArgs.addAll("-Xjvm-default=all")
+    }
 }
 
 tasks.withType<JavaCompile>().configureEach {
