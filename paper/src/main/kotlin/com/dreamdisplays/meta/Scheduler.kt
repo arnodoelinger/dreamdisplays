@@ -1,6 +1,6 @@
-package com.dreamdisplays.utils
+package com.dreamdisplays.meta
 
-import com.dreamdisplays.utils.PlatformUtils.isFolia
+import com.dreamdisplays.utils.PlatformUtil.isFolia
 import org.bukkit.plugin.Plugin
 import org.jspecify.annotations.NullMarked
 import java.lang.reflect.Proxy

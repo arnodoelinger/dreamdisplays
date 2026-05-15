@@ -1,7 +1,7 @@
 package com.dreamdisplays.datatypes
 
-import com.dreamdisplays.utils.Outliner.showOutline
-import com.dreamdisplays.utils.Region.calculateRegion
+import com.dreamdisplays.utils.OutlinerUtil.showOutline
+import com.dreamdisplays.utils.RegionUtil.calculateRegion
 import org.bukkit.Bukkit.getPlayer
 import org.bukkit.Location
 import org.bukkit.block.BlockFace

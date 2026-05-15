@@ -6,7 +6,7 @@ import com.dreamdisplays.managers.DisplayManager.register
 import com.dreamdisplays.managers.DisplayValidator.isValidDisplay
 import com.dreamdisplays.managers.DisplayValidator.sendErrorMessage
 import com.dreamdisplays.managers.SelectionManager.selectionPoints
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 

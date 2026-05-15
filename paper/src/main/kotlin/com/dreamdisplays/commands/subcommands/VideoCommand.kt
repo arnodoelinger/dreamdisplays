@@ -4,8 +4,8 @@ import com.dreamdisplays.Main
 import com.dreamdisplays.managers.DisplayManager.getReceivers
 import com.dreamdisplays.managers.DisplayManager.isContains
 import com.dreamdisplays.managers.DisplayManager.sendUpdate
-import com.dreamdisplays.utils.Message
-import com.dreamdisplays.utils.YouTubeUtils
+import com.dreamdisplays.utils.MessageUtil
+import com.dreamdisplays.utils.YouTubeUtil
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import java.util.*
@@ -19,28 +19,28 @@ class VideoCommand : SubCommand {
     override fun execute(sender: CommandSender, args: Array<String?>) {
         val player = (sender as? Player) ?: return
         if (args.size < 2) {
-            Message.sendMessage(player, "invalidURL")
+            MessageUtil.sendMessage(player, "invalidURL")
             return
         }
 
-        val code = YouTubeUtils.extractVideoIdFromUri(args[1] ?: "")
-            ?: return Message.sendMessage(player, "invalidURL")
+        val code = YouTubeUtil.extractVideoIdFromUri(args[1] ?: "")
+            ?: return MessageUtil.sendMessage(player, "invalidURL")
 
         val block = player.getTargetBlock(null, 32)
 
         if (block.type != Main.config.settings.baseMaterial) {
-            Message.sendMessage(player, "displayVideoWrongTargetBlock")
+            MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock")
             return
         }
 
         val data = isContains(block.location)
         if (data == null) {
-            Message.sendMessage(player, "noDisplay")
+            MessageUtil.sendMessage(player, "noDisplay")
             return
         }
 
         if (data.ownerId != player.uniqueId) {
-            Message.sendMessage(player, "displayVideoNotOwner")
+            MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return
         }
 
@@ -52,7 +52,7 @@ class VideoCommand : SubCommand {
 
         sendUpdate(data, getReceivers(data))
 
-        Message.sendMessage(player, "settedURL")
+        MessageUtil.sendMessage(player, "settedURL")
     }
 
     override fun complete(sender: CommandSender, args: Array<String?>): List<String> {

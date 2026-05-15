@@ -14,7 +14,7 @@ import java.net.http.HttpResponse.BodyHandlers.ofString
 import java.time.Duration
 
 @NullMarked
-object GitHubFetcher {
+object GitHubFetcherUtil {
     private val gson = Gson()
     private val client: HttpClient = newHttpClient()
 

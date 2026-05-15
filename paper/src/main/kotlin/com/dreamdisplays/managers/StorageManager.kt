@@ -6,7 +6,7 @@ import com.dreamdisplays.Main.Companion.disablePlugin
 import com.dreamdisplays.datatypes.DisplayData
 import com.dreamdisplays.managers.DisplayManager.register
 import com.dreamdisplays.managers.DisplayManager.save
-import com.dreamdisplays.utils.Scheduler
+import com.dreamdisplays.meta.Scheduler
 import me.inotsleep.utils.logging.LoggingManager.error
 import me.inotsleep.utils.storage.connection.BaseConnection
 import org.bukkit.Bukkit

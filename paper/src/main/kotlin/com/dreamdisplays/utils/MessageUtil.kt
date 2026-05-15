@@ -10,7 +10,7 @@ import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 
 @NullMarked
-object Message {
+object MessageUtil {
     private val gson by lazy { Gson() }
     private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
     private val gsonSerializer = GsonComponentSerializer.gson()

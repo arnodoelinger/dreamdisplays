@@ -2,8 +2,8 @@ package com.dreamdisplays.commands.subcommands
 
 import com.dreamdisplays.Main.Companion.config
 import com.dreamdisplays.managers.PlayerManager.getVersions
-import com.dreamdisplays.utils.Message.sendColoredMessage
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendColoredMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 

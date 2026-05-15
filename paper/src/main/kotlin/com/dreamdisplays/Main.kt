@@ -1,6 +1,7 @@
 package com.dreamdisplays
 
 import com.dreamdisplays.managers.StorageManager
+import com.dreamdisplays.meta.Scheduler
 import com.dreamdisplays.registrar.ChannelRegistrar.registerChannels
 import com.dreamdisplays.registrar.CommandRegistrar
 import com.dreamdisplays.registrar.ListenerRegistrar.registerListeners
@@ -34,9 +35,10 @@ class Main : JavaPlugin() {
     }
 
     fun doEnable() {
+        @Suppress("DEPRECATION")
         log("Enabling DreamDisplays ${description.version}...")
 
-        com.dreamdisplays.utils.Scheduler.init(this)
+        Scheduler.init(this)
 
         storage = StorageManager(this)
 

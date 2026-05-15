@@ -3,9 +3,9 @@ package com.dreamdisplays.commands.subcommands
 import com.dreamdisplays.Main
 import com.dreamdisplays.datatypes.DisplayData
 import com.dreamdisplays.managers.DisplayManager.getDisplays
-import com.dreamdisplays.utils.Message.sendColoredMessage
-import com.dreamdisplays.utils.Message.sendComponent
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendColoredMessage
+import com.dreamdisplays.utils.MessageUtil.sendComponent
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import net.kyori.adventure.text.Component.text
 import net.kyori.adventure.text.event.ClickEvent
 import net.kyori.adventure.text.format.NamedTextColor

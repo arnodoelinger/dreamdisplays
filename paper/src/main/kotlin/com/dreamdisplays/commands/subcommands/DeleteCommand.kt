@@ -3,7 +3,7 @@ package com.dreamdisplays.commands.subcommands
 import com.dreamdisplays.Main.Companion.config
 import com.dreamdisplays.managers.DisplayManager.delete
 import com.dreamdisplays.managers.DisplayManager.isContains
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 

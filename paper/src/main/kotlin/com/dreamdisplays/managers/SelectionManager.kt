@@ -1,8 +1,8 @@
 package com.dreamdisplays.managers
 
 import com.dreamdisplays.datatypes.SelectionData
-import com.dreamdisplays.utils.Message.sendMessage
-import com.dreamdisplays.utils.Region.isInBoundaries
+import com.dreamdisplays.utils.MessageUtil.sendMessage
+import com.dreamdisplays.utils.RegionUtil.isInBoundaries
 import org.bukkit.Location
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player

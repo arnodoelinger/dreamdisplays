@@ -3,8 +3,8 @@ package com.dreamdisplays.managers
 import com.dreamdisplays.Main
 import com.dreamdisplays.Main.Companion.config
 import com.dreamdisplays.managers.SelectionManager.selectionPoints
-import com.dreamdisplays.utils.PlatformUtils.isFolia
-import com.dreamdisplays.utils.Outliner.showOutline
+import com.dreamdisplays.utils.PlatformUtil.isFolia
+import com.dreamdisplays.utils.OutlinerUtil.showOutline
 import org.bukkit.Bukkit
 
 object SelectionVisualizer {

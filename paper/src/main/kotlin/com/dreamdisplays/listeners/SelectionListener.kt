@@ -7,7 +7,7 @@ import com.dreamdisplays.managers.SelectionManager.selectionPoints
 import com.dreamdisplays.managers.SelectionManager.setFirstPoint
 import com.dreamdisplays.managers.SelectionManager.setSecondPoint
 import com.dreamdisplays.managers.SelectionVisualizer.startParticleTask
-import com.dreamdisplays.utils.Message
+import com.dreamdisplays.utils.MessageUtil
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
@@ -38,7 +38,7 @@ class SelectionListener(plugin: Main) : Listener {
         if (player.isSneaking && event.action.isRightClick) {
             if (selectionPoints.containsKey(player.uniqueId)) {
                 resetSelection(player)
-                Message.sendMessage(player, "selectionClear")
+                MessageUtil.sendMessage(player, "selectionClear")
             }
             return
         }

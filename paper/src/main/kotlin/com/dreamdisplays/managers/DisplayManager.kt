@@ -4,11 +4,11 @@ import com.dreamdisplays.Main.Companion.config
 import com.dreamdisplays.Main.Companion.getInstance
 import com.dreamdisplays.datatypes.DisplayData
 import com.dreamdisplays.datatypes.SelectionData
-import com.dreamdisplays.utils.Message.sendMessage
-import com.dreamdisplays.utils.Region.calculateRegion
-import com.dreamdisplays.utils.Reporter.sendReport
-import com.dreamdisplays.utils.Scheduler.runAsync
-import com.dreamdisplays.utils.Scheduler.runSync
+import com.dreamdisplays.utils.MessageUtil.sendMessage
+import com.dreamdisplays.utils.RegionUtil.calculateRegion
+import com.dreamdisplays.utils.ReporterUtil.sendReport
+import com.dreamdisplays.meta.Scheduler.runAsync
+import com.dreamdisplays.meta.Scheduler.runSync
 import com.dreamdisplays.utils.net.PacketUtils
 import com.dreamdisplays.utils.net.PacketUtils.sendDelete
 import org.bukkit.Bukkit.getOfflinePlayer

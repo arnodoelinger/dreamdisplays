@@ -1,7 +1,8 @@
-package com.dreamdisplays.utils
+package com.dreamdisplays.meta
 
 import com.dreamdisplays.Main.Companion.modVersion
 import com.dreamdisplays.Main.Companion.pluginLatestVersion
+import com.dreamdisplays.utils.GitHubFetcherUtil
 import com.github.zafarkhaja.semver.Version
 import me.inotsleep.utils.logging.LoggingManager.warn
 import java.net.ConnectException
@@ -17,7 +18,7 @@ object Updater {
 
     fun checkForUpdates(repoOwner: String, repoName: String) {
         try {
-            val releases = GitHubFetcher.fetchReleases(repoOwner, repoName)
+            val releases = GitHubFetcherUtil.fetchReleases(repoOwner, repoName)
 
             if (releases.isEmpty()) {
                 warn("No releases found on GitHub. This may be due to network issues or API problems.")

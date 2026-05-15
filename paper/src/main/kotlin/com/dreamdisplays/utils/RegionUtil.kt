@@ -10,7 +10,7 @@ import kotlin.math.min
  * Utils for 3D region calculations and boundary checks.
  */
 @NullMarked
-object Region {
+object RegionUtil {
     fun calculateRegion(pos1: Location, pos2: Location): RegionData {
         val minX = min(pos1.blockX, pos2.blockX)
         val minY = min(pos1.blockY, pos2.blockY)

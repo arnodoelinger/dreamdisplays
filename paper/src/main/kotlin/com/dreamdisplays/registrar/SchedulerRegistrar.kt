@@ -3,7 +3,7 @@ package com.dreamdisplays.registrar
 import com.dreamdisplays.Main
 import com.dreamdisplays.managers.DisplayManager
 import com.dreamdisplays.scheduler.ProviderScheduler
-import com.dreamdisplays.utils.Updater.checkForUpdates
+import com.dreamdisplays.meta.Updater.checkForUpdates
 
 /**
  * Manages the registration of scheduled tasks.

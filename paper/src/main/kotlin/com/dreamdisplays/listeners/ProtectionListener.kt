@@ -3,7 +3,7 @@ package com.dreamdisplays.listeners
 import com.dreamdisplays.managers.DisplayManager.isContains
 import com.dreamdisplays.managers.PlayerManager
 import com.dreamdisplays.managers.SelectionManager.isLocationSelected
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import org.bukkit.Location
 import org.bukkit.block.Block
 import org.bukkit.event.Cancellable

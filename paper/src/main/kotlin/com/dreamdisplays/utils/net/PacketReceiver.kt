@@ -18,9 +18,10 @@ import com.dreamdisplays.managers.PlayerManager.setPluginUpdateNotified
 import com.dreamdisplays.managers.PlayerManager.setVersion
 import com.dreamdisplays.managers.StateManager.processSyncPacket
 import com.dreamdisplays.managers.StateManager.sendSyncPacket
-import com.dreamdisplays.utils.Message.sendColoredMessage
-import com.dreamdisplays.utils.Message.sendMessage
-import com.dreamdisplays.utils.YouTubeUtils.sanitize
+import com.dreamdisplays.meta.Scheduler
+import com.dreamdisplays.utils.MessageUtil.sendColoredMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
+import com.dreamdisplays.utils.YouTubeUtil.sanitize
 import com.dreamdisplays.utils.net.PacketUtils.sendDisplayInfo
 import com.dreamdisplays.utils.net.PacketUtils.sendPremium
 import com.dreamdisplays.utils.net.PacketUtils.sendReportEnabled
@@ -227,7 +228,7 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
             if (delayTicks == 0L) {
                 sendDisplayBatch(player, batch)
             } else {
-                com.dreamdisplays.utils.Scheduler.runLater(delayTicks) {
+                Scheduler.runLater(delayTicks) {
                     if (player.isOnline) sendDisplayBatch(player, batch)
                 }
             }

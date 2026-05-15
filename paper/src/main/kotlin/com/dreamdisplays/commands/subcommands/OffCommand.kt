@@ -3,8 +3,8 @@ package com.dreamdisplays.commands.subcommands
 import com.dreamdisplays.Main
 import com.dreamdisplays.managers.PlayerManager.isDisplaysEnabled
 import com.dreamdisplays.managers.PlayerManager.setDisplaysEnabled
-import com.dreamdisplays.utils.Message.sendColoredMessage
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendColoredMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import com.dreamdisplays.utils.net.PacketUtils.sendDisplayEnabled
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender

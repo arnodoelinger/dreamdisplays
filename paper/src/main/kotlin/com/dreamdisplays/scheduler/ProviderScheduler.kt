@@ -1,6 +1,6 @@
 package com.dreamdisplays.scheduler
 
-import com.dreamdisplays.utils.PlatformUtils.isFolia
+import com.dreamdisplays.utils.PlatformUtil.isFolia
 import org.jspecify.annotations.NullMarked
 
 /**

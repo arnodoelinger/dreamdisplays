@@ -8,7 +8,7 @@ import java.util.*
  * Utility functions for handling YouTube URLs and video IDs.
  */
 @NullMarked
-object YouTubeUtils {
+object YouTubeUtil {
 
     private val SANITIZE_REGEX = "[^0-9A-Za-z+.-]".toRegex()
     private val VIDEO_ID_REGEX = Regex("^[A-Za-z0-9_-]{11}$")

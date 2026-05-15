@@ -20,7 +20,7 @@ import java.util.*
 // TODO: add rate limiting to prevent spam
 // TODO: customize embed further (add more fields, etc.)
 @NullMarked
-object Reporter {
+object ReporterUtil {
     private val httpClient: HttpClient by lazy { HttpClient.newHttpClient() }
     private const val EMBED_COLOR = 0x2F3136
     private const val EMBED_TITLE = "# 🛡️ New report"

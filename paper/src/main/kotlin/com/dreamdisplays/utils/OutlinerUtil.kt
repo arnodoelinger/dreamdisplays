@@ -10,7 +10,7 @@ import java.util.*
  * Utility object for outlining areas with particles.
  */
 @NullMarked
-object Outliner {
+object OutlinerUtil {
 
     private val activeOutlines: MutableMap<UUID, OutlineData> = mutableMapOf()
 

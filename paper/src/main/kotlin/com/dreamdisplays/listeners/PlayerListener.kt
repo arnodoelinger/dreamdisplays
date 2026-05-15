@@ -6,9 +6,9 @@ import com.dreamdisplays.managers.DisplayManager.getDisplays
 import com.dreamdisplays.managers.PlayerManager
 import com.dreamdisplays.managers.PlayerManager.hasBeenNotifiedAboutModRequired
 import com.dreamdisplays.managers.PlayerManager.setModRequiredNotified
-import com.dreamdisplays.utils.Message.sendMessage
-import com.dreamdisplays.utils.PlatformUtils.isFolia
-import com.dreamdisplays.utils.Scheduler
+import com.dreamdisplays.utils.MessageUtil.sendMessage
+import com.dreamdisplays.utils.PlatformUtil.isFolia
+import com.dreamdisplays.meta.Scheduler
 import com.dreamdisplays.utils.net.PacketUtils
 import org.bukkit.Bukkit
 import org.bukkit.event.EventHandler

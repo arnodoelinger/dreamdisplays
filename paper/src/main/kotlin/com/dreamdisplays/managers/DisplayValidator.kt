@@ -2,7 +2,7 @@ package com.dreamdisplays.managers
 
 import com.dreamdisplays.Main.Companion.config
 import com.dreamdisplays.datatypes.SelectionData
-import com.dreamdisplays.utils.Message.sendMessage
+import com.dreamdisplays.utils.MessageUtil.sendMessage
 import org.bukkit.entity.Player
 
 object DisplayValidator {

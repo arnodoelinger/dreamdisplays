@@ -1,7 +1,7 @@
 package com.dreamdisplays.commands.subcommands
 
 import com.dreamdisplays.Main.Companion.config
-import com.dreamdisplays.utils.Message.sendColoredMessage
+import com.dreamdisplays.utils.MessageUtil.sendColoredMessage
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
