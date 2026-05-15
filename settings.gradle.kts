@@ -20,5 +20,5 @@ plugins {
 rootProject.name = "displays"
 include(":common")
 include(":fabric")
-// include(":neoforge")
+include(":neoforge")
 include(":paper")

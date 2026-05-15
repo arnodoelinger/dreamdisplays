@@ -16,7 +16,7 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
 @Suppress("UNUSED")
-@Mod(value = DreamDisplaysMod.MOD_ID, dist = [Dist.CLIENT])
+@Mod(value = Initializer.MOD_ID, dist = [Dist.CLIENT])
 class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
 
     init {
@@ -26,7 +26,7 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     }
 
     fun registerPayloads(event: RegisterPayloadHandlersEvent) {
-        val registrar = event.registrar(MOD_ID).optional().versioned("1")
+        val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
 
         registrar.playBidirectional(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC,
             { _, _ -> },
@@ -56,30 +56,7 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     }
 
     @SubscribeEvent
-    fun onClientTick(event: ClientTickEvent.Post) {
-        Initializer.onEndTick(Minecraft.getInstance())
-    }
-
-    @SubscribeEvent
-    fun onClientStop(event: ClientPlayerNetworkEvent.LoggingOut) {
-        DisplayManager.saveAllScreens()
-        DisplayManager.unloadAll()
-    }
-
-    @SubscribeEvent
-    fun onClientStopping(event: ClientPlayerNetworkEvent.LoggingOut) {
-        Initializer.onStop()
-    }
-
-    @SubscribeEvent
-    fun onRenderLevelAfterEntities(event: RenderLevelStageEvent.AfterEntities) {
-        val mc = Minecraft.getInstance()
-        if (mc.level == null || mc.player == null) return
-        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
-    }
-
-    @SubscribeEvent
-    fun onClientLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
+    fun onLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
         val mc = Minecraft.getInstance()
         if (mc.level != null && mc.player != null) {
             val serverId = if (mc.hasSingleplayerServer()) "singleplayer"
@@ -88,11 +65,26 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         }
     }
 
-    override fun sendPacket(packet: CustomPacketPayload) {
-        Minecraft.getInstance().connection?.send(packet)
+    @SubscribeEvent
+    fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
+        DisplayManager.saveAllScreens()
+        DisplayManager.unloadAll()
+        Initializer.onStop()
     }
 
-    companion object {
-        const val MOD_ID: String = "dreamdisplays"
+    @SubscribeEvent
+    fun onRenderAfterEntities(event: RenderLevelStageEvent.AfterEntities) {
+        val mc = Minecraft.getInstance()
+        if (mc.level == null || mc.player == null) return
+        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+    }
+
+    @SubscribeEvent
+    fun onEndTick(event: ClientTickEvent.Post) {
+        Initializer.onEndTick(Minecraft.getInstance())
+    }
+
+    override fun sendPacket(packet: CustomPacketPayload) {
+        Minecraft.getInstance().connection?.send(packet)
     }
 }
