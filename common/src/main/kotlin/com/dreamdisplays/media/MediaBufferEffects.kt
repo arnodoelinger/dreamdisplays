@@ -1,30 +1,36 @@
 package com.dreamdisplays.media
 
-import java.nio.ByteBuffer
 import kotlin.math.abs
-import kotlin.math.min
 
 /**
  * Per-sample / pixel adjustments applied to raw RGBA video frames and S16LE
  * audio before they reach the GPU / audio line.
+ *
+ * Both operate on heap `ByteArray`s using 8.8 fixed-point integer math –
+ * orders of magnitude faster than per-byte `ByteBuffer.get`/`put` calls,
+ * especially in the hot 1080p+ video path.
  */
 object MediaBufferEffects {
 
-
-    fun applyBrightness(buffer: ByteBuffer, brightness: Double) {
+    /**
+     * Apply brightness in place to an interleaved RGBA buffer (alpha untouched).
+     * `len` is the number of valid bytes (must be a multiple of 4).
+     */
+    fun applyBrightness(buf: ByteArray, len: Int, brightness: Double) {
         if (abs(brightness - 1.0) < 1e-5) return
-        buffer.rewind()
-        while (buffer.remaining() >= 4) {
-            val r = min(255.0, (buffer.get().toInt() and 0xFF) * brightness).toInt()
-            val g = min(255.0, (buffer.get().toInt() and 0xFF) * brightness).toInt()
-            val b = min(255.0, (buffer.get().toInt() and 0xFF) * brightness).toInt()
-            val a = buffer.get()
-            buffer.position(buffer.position() - 4)
-            buffer.put(r.toByte()).put(g.toByte()).put(b.toByte()).put(a)
+        val factor = (brightness * 256.0 + 0.5).toInt().coerceIn(0, 512)
+        var i = 0
+        while (i + 3 < len) {
+            val r = ((buf[i].toInt() and 0xFF) * factor) shr 8
+            val g = ((buf[i + 1].toInt() and 0xFF) * factor) shr 8
+            val b = ((buf[i + 2].toInt() and 0xFF) * factor) shr 8
+            buf[i]     = (if (r > 255) 255 else r).toByte()
+            buf[i + 1] = (if (g > 255) 255 else g).toByte()
+            buf[i + 2] = (if (b > 255) 255 else b).toByte()
+            // buf[i+3] = alpha
+            i += 4
         }
-        buffer.flip()
     }
-
 
     fun applyVolumeS16LE(buf: ByteArray, len: Int, volume: Double) {
         if (abs(volume - 1.0) < 1e-5) return

@@ -20,12 +20,12 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
-import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.locks.LockSupport
 import javax.sound.sampled.AudioFormat
 import javax.sound.sampled.AudioSystem
@@ -82,9 +82,7 @@ class MediaPlayer(
         "${displayScreen.uuid}/${Integer.toHexString(System.identityHashCode(this))}"
 
     private val terminated = AtomicBoolean(false)
-    private val frameTaskQueued = AtomicBoolean(false)
     private val restartPending = AtomicBoolean(false)
-    private val frameLock = Any()
 
     private val samplesIn = AtomicLong()
     private val framesToGpu = AtomicLong()
@@ -93,8 +91,10 @@ class MediaPlayer(
 
     private val controlExecutor: ExecutorService =
         Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
-    private val frameExecutor: ExecutorService =
-        Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-frame") }
+
+    // Posted to the Minecraft render queue from the video reader thread.
+    // Cached as a single instance to avoid per-frame allocation.
+    private val fitTextureTask: Runnable = Runnable { displayScreen.fitTexture() }
 
     @Volatile private var statsExecutor: ScheduledExecutorService? = null
     @Volatile private var watchdogExecutor: ScheduledExecutorService? = null
@@ -122,16 +122,13 @@ class MediaPlayer(
     @Volatile private var seekOffsetNanos = 0L
     @Volatile private var startWallNanos = CLOCK_NOT_STARTED
 
-    @Volatile private var currentFrameBuffer: ByteBuffer? = null
-    @Volatile private var currentFrameWidth = 0
-    @Volatile private var currentFrameHeight = 0
-    @Volatile private var preparedBuffer: ByteBuffer? = null
-    private var preparedBufferSize = 0
-    @Volatile private var lastTexW = 0
-    @Volatile private var lastTexH = 0
-    @Volatile private var preparedW = 0
-    @Volatile private var preparedH = 0
-    @Volatile private var frameReady = false
+    // Frame pipeline: producer-consumer with two pre-allocated direct buffers.
+    // The reader thread fills the "spare" buffer, then atomically swaps it
+    // into `readyBufferRef`; the render thread reads from `readyBufferRef`.
+    private val readyBufferRef = AtomicReference<ByteBuffer?>(null)
+    private val frameAvailable = AtomicBoolean(false)
+    @Volatile private var frameW = 0
+    @Volatile private var frameH = 0
 
     @Volatile private var userVolume = Initializer.config.defaultDisplayVolume
     @Volatile private var lastAttenuation = 1.0
@@ -141,8 +138,6 @@ class MediaPlayer(
     init {
         INIT_EXECUTOR.submit { initialize() }
     }
-
-    // === public API (called from Java) =========================================
 
     fun play() = safeExecute(::doPlay)
 
@@ -163,7 +158,6 @@ class MediaPlayer(
             doStop()
         }
         controlExecutor.shutdownNow()
-        frameExecutor.shutdownNow()
     }
 
     fun seekTo(nanos: Long, fire: Boolean) = safeExecute { doSeek(nanos, fire) }
@@ -209,26 +203,15 @@ class MediaPlayer(
         this.brightness = brightness.toDouble().coerceIn(0.0, 2.0)
     }
 
-    fun textureFilled(): Boolean = synchronized(frameLock) {
-        preparedBuffer?.let { it.limit() > 0 } == true
-    }
+    fun textureFilled(): Boolean = readyBufferRef.get() != null
 
-    fun updateFrame(texture: GpuTexture): Unit = synchronized(frameLock) {
-        val buf = preparedBuffer ?: return
-        if (!frameReady) return
+    fun updateFrame(texture: GpuTexture) {
+        if (!frameAvailable.compareAndSet(true, false)) return
+        val buf = readyBufferRef.get() ?: return
         val w = displayScreen.textureWidth
         val h = displayScreen.textureHeight
-        if (w != preparedW || h != preparedH) return
-
+        if (w != frameW || h != frameH) return
         buf.rewind()
-        val expected = w * h * 4
-        if (buf.remaining() < expected) {
-            LoggingManager.error("Buffer underrun: expected $expected bytes, only ${buf.remaining()} remaining")
-            return
-        }
-        if (w != lastTexW || h != lastTexH) {
-            lastTexW = w; lastTexH = h
-        }
         if (!texture.isClosed) {
             RenderSystem.getDevice().createCommandEncoder().writeToTexture(
                 texture, buf, NativeImage.Format.RGBA,
@@ -236,7 +219,6 @@ class MediaPlayer(
             )
         }
         if (DEBUG) framesToGpu.incrementAndGet()
-        frameReady = false
     }
 
     fun getAvailableQualities(): List<Int> {
@@ -339,15 +321,14 @@ class MediaPlayer(
         startWallNanos = CLOCK_NOT_STARTED
 
         val q = if (lastQuality > 0) lastQuality else MediaStreamSelector.parseQuality(video)
-        // FFmpeg now scales+crops directly to the on-screen texture size, so
-        // the Java side never has to rescale a frame.  Fall back to the quality
-        // preset only if the screen hasn't allocated its texture yet.
         val (frameW, frameH) = run {
             val tw = displayScreen.textureWidth
             val th = displayScreen.textureHeight
             if (tw > 0 && th > 0) tw to th
             else MediaStreamSelector.qualityToDims(q).let { it[0] to it[1] }
         }
+        this.frameW = frameW
+        this.frameH = frameH
 
         try {
             if (DEBUG) {
@@ -387,8 +368,8 @@ class MediaPlayer(
         MediaProcess.gracefulDestroy(vp)
         MediaProcess.gracefulDestroy(ap)
 
-        synchronized(frameLock) { frameReady = false }
-        frameTaskQueued.set(false)
+        frameAvailable.set(false)
+        readyBufferRef.set(null)
 
         joinSafely(vt); joinSafely(at)
     }
@@ -403,78 +384,47 @@ class MediaPlayer(
         val frameSize = w * h * 4
         val frameData = ByteArray(frameSize)
 
+        val bufA = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
+        val bufB = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
+        var spare: ByteBuffer = bufA
+
         var firstFrameLogged = false
         var videoPts = seekOffsetNanos
 
-        synchronized(frameLock) {
-            val cur = currentFrameBuffer
-            if (cur == null || cur.capacity() < frameSize) {
-                currentFrameBuffer = ByteBuffer.allocateDirect(frameSize)
-                    .order(ByteOrder.nativeOrder())
-            }
-        }
-
         val stderrBuf = StringBuilder()
-
         val stderrThread = daemon({
             try {
                 BufferedReader(InputStreamReader(proc.errorStream)).use { r ->
                     r.lineSequence().forEach { line ->
-                        synchronized(stderrBuf) {
-                            stderrBuf.append(line).append('\n')
-                        }
-
+                        synchronized(stderrBuf) { stderrBuf.append(line).append('\n') }
                         if (MediaUtils.isInterestingStderr(line)) {
                             LoggingManager.warn("[ffmpeg-v $debugLabel] $line")
                         }
                     }
                 }
-            } catch (_: IOException) {
-            }
+            } catch (_: IOException) {}
         }, "MediaPlayer-vstderr").also { it.start() }
 
         var normalEos = false
+        val mc = Minecraft.getInstance()
 
         try {
             proc.inputStream.use { input ->
-
                 while (!terminated.get() && !stopFlag.get()) {
-
                     val n = MediaUtils.readFull(input, frameData, frameSize)
-
-                    if (n < frameSize) {
-                        normalEos = true
-                        break
-                    }
+                    if (n < frameSize) { normalEos = true; break }
 
                     lastFrameReceivedNanos.set(System.nanoTime())
-
                     if (!firstFrameLogged) {
                         firstFrameLogged = true
-
                         startWallNanos = System.nanoTime()
-
-                        if (DEBUG) {
-                            LoggingManager.info(
-                                "[MP $debugLabel] first frame ${w}x${h}"
-                            )
-                        }
+                        if (DEBUG) LoggingManager.info("[MP $debugLabel] first frame ${w}x${h}")
                     }
 
-                    val audioClock = getAudioClockNanos()
-                    val diff = videoPts - audioClock
-
-                    // Video ahead -> wait
-                    if (diff > VIDEO_SYNC_THRESHOLD_NS) {
-                        LockSupport.parkNanos(diff)
-                    }
-
-                    // Video too late -> drop frame
+                    val diff = videoPts - getAudioClockNanos()
+                    if (diff > VIDEO_SYNC_THRESHOLD_NS) LockSupport.parkNanos(diff)
                     if (diff < -VIDEO_DROP_THRESHOLD_NS) {
-                        if (DEBUG) {
-                            framesDropped.incrementAndGet()
-                        }
-
+                        if (DEBUG) framesDropped.incrementAndGet()
                         videoPts += VIDEO_FRAME_NS
                         continue
                     }
@@ -484,55 +434,27 @@ class MediaPlayer(
                         continue
                     }
 
-                    synchronized(frameLock) {
-
-                        var frame = currentFrameBuffer
-
-                        if (frame == null || frame.capacity() < frameSize) {
-                            frame = ByteBuffer.allocateDirect(frameSize)
-                                .order(ByteOrder.nativeOrder())
-
-                            currentFrameBuffer = frame
-                        }
-
-                        frame.clear()
-                        frame.put(frameData, 0, frameSize)
-                        frame.flip()
-
-                        currentFrameWidth = w
-                        currentFrameHeight = h
+                    if (brightness != 1.0) {
+                        MediaBufferEffects.applyBrightness(frameData, frameSize, brightness)
                     }
 
-                    if (DEBUG) {
-                        samplesIn.incrementAndGet()
-                    }
+                    spare.clear()
+                    spare.put(frameData, 0, frameSize)
+                    spare.flip()
 
-                    if (!frameTaskQueued.compareAndSet(false, true)) {
+                    val prev = readyBufferRef.getAndSet(spare)
+                    spare = prev ?: if (spare === bufA) bufB else bufA
+                    frameAvailable.set(true)
 
-                        if (DEBUG) {
-                            framesDropped.incrementAndGet()
-                        }
-
-                        videoPts += VIDEO_FRAME_NS
-                        continue
-                    }
-
-                    try {
-                        frameExecutor.submit(::prepareBuffer)
-                    } catch (_: RejectedExecutionException) {
-                        frameTaskQueued.set(false)
-                    }
+                    if (DEBUG) samplesIn.incrementAndGet()
+                    mc.execute(fitTextureTask)
 
                     videoPts += VIDEO_FRAME_NS
                 }
             }
-
         } catch (e: IOException) {
-
             if (DEBUG && !terminated.get() && !stopFlag.get()) {
-                LoggingManager.warn(
-                    "[MP $debugLabel] video read: ${e.message}"
-                )
+                LoggingManager.warn("[MP $debugLabel] video read: ${e.message}")
             }
         }
 
@@ -704,46 +626,6 @@ class MediaPlayer(
         }
     }
 
-    private fun ensurePreparedBufferCapacity(size: Int): ByteBuffer {
-        var buffer = preparedBuffer
-        if (buffer == null || preparedBufferSize < size) {
-            buffer = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-            preparedBuffer = buffer
-            preparedBufferSize = size
-        }
-        buffer.clear()
-        buffer.limit(size)
-        return buffer
-    }
-
-    private fun prepareBuffer() {
-        try {
-            val targetW = displayScreen.textureWidth
-            val targetH = displayScreen.textureHeight
-            if (targetW == 0 || targetH == 0) return
-
-            synchronized(frameLock) {
-                val sourceBuf = currentFrameBuffer ?: return@synchronized
-                val outputSize = targetW * targetH * 4
-                val source = sourceBuf.duplicate().order(ByteOrder.nativeOrder()).apply { rewind() }
-                val output = ensurePreparedBufferCapacity(outputSize)
-
-                // FFmpeg already produces frames at exactly targetW × targetH —
-                // a straight bulk copy is all that's needed.
-                output.put(source).flip()
-
-                MediaBufferEffects.applyBrightness(output, brightness)
-                preparedW = targetW
-                preparedH = targetH
-                frameReady = true
-            }
-
-            Minecraft.getInstance().execute(displayScreen::fitTexture)
-        } finally {
-            frameTaskQueued.set(false)
-        }
-    }
-
     private fun doPlay() {
         if (!_initialized || terminated.get() || playing) return
         val video = currentVideoStream ?: return
@@ -767,13 +649,8 @@ class MediaPlayer(
 
     private fun doStop() {
         _initialized = false
-        frameTaskQueued.set(false)
-        synchronized(frameLock) {
-            frameReady = false
-            preparedBuffer = null
-            preparedBufferSize = 0
-            currentFrameBuffer = null
-        }
+        frameAvailable.set(false)
+        readyBufferRef.set(null)
         stopWatchdog()
         stopStatsReporter()
         stopStreams()
@@ -787,11 +664,8 @@ class MediaPlayer(
         val audio = currentAudioStream ?: return
 
         val wasPlaying = playing
-        synchronized(frameLock) {
-            frameReady = false
-            preparedBuffer = null
-            preparedBufferSize = 0
-        }
+        frameAvailable.set(false)
+        readyBufferRef.set(null)
         Minecraft.getInstance().execute(displayScreen::reloadTexture)
 
         seekOffsetNanos = nanos
