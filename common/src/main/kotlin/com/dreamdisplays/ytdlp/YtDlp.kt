@@ -188,8 +188,6 @@ object YtDlp {
                     if (hits.size > n) hits = ArrayList(hits.subList(0, n))
                     val immutable = hits.toList()
                     RELATED_CACHE[key] = InfoCacheEntry(immutable, System.currentTimeMillis())
-                    // Speculatively prefetch stream URLs for the top related videos
-                    immutable.take(3).forEach { prefetchFormats("https://www.youtube.com/watch?v=${it.id}") }
                     immutable
                 } catch (e: Exception) {
                     throw e as? CompletionException
