@@ -10,6 +10,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
+import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
@@ -334,7 +335,7 @@ class DisplayScreen(
             t.close()
             textureId?.let { Minecraft.getInstance().textureManager.release(it) }
         }
-        texture = DynamicTexture(UUID.randomUUID().toString(), textureWidth, textureHeight, true)
+        texture = DynamicTexture({ UUID.randomUUID().toString() }, NativeImage(NativeImage.Format.RGB, textureWidth, textureHeight, false))
         textureId = Identifier.fromNamespaceAndPath(
             Initializer.MOD_ID,
             "screen-main-texture-$uuid-${UUID.randomUUID()}"

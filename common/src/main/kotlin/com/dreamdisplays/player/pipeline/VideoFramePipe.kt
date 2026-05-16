@@ -1,7 +1,6 @@
 package com.dreamdisplays.player.pipeline
 
 import com.dreamdisplays.player.MediaPlayer
-import com.dreamdisplays.player.util.MediaBufferEffects
 import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
 import com.mojang.blaze3d.platform.NativeImage
@@ -14,6 +13,7 @@ import java.io.IOException
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.nio.channels.Channels
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -49,6 +49,9 @@ internal class VideoFramePipe(private val debugLabel: String) {
 
     private val readyBufferRef = AtomicReference<ByteBuffer?>(null)
     private val frameAvailable = AtomicBoolean(false)
+
+    private var uploadTotalNs = 0L
+    private var uploadCount = 0
 
     /**
      * Returns true when a frame is available for upload. The render thread should call [updateFrame] as soon as possible
@@ -111,8 +114,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, fitTexture: Runnable,
     ) {
-        val frameSize = w * h * 4
-        val frameData = ByteArray(frameSize)
+        val frameSize = w * h * 3
         val bufA = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
         val bufB = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
         var spare: ByteBuffer = bufA
@@ -138,10 +140,17 @@ internal class VideoFramePipe(private val debugLabel: String) {
         val mc = Minecraft.getInstance()
 
         try {
-            proc.inputStream.use { input ->
+            Channels.newChannel(proc.inputStream).use { channel ->
                 while (!terminated.get() && !stopFlag.get()) {
-                    val n = MediaUtil.readFull(input, frameData, frameSize)
-                    if (n < frameSize) { normalEos = true; break }
+                    spare.clear()
+                    while (spare.hasRemaining()) {
+                        val n = channel.read(spare)
+                        if (n < 0) { normalEos = true
+                            break
+                        }
+                    }
+                    if (normalEos) break
+                    spare.flip()
 
                     lastFrameReceivedNanos.set(System.nanoTime())
                     if (!firstFrame) {
@@ -160,13 +169,6 @@ internal class VideoFramePipe(private val debugLabel: String) {
                     }
 
                     if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
-
-                    val br = getBrightness()
-                    if (br != 1.0) MediaBufferEffects.applyBrightness(frameData, frameSize, br)
-
-                    spare.clear()
-                    spare.put(frameData, 0, frameSize)
-                    spare.flip()
 
                     val prev = readyBufferRef.getAndSet(spare)
                     spare = when {
