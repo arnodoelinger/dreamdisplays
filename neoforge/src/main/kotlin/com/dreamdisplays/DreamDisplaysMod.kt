@@ -75,10 +75,10 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     }
 
     @SubscribeEvent
-    fun onRenderAfterEntities(event: RenderLevelStageEvent.AfterEntities) {
+    fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
-        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+        ScreenRenderer.render(event.getPoseStack(), mc.gameRenderer.mainCamera)
     }
 
     @SubscribeEvent

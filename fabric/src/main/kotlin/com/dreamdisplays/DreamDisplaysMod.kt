@@ -8,7 +8,7 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -19,7 +19,7 @@ class DreamDisplaysMod : ClientModInitializer, Mod {
     override fun onInitializeClient() {
         Initializer.onModInit(this)
 
-        with(PayloadTypeRegistry.playS2C()) {
+        with(PayloadTypeRegistry.clientboundPlay()) {
             register(Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
             register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
             register(Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
@@ -29,7 +29,7 @@ class DreamDisplaysMod : ClientModInitializer, Mod {
             register(Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC)
         }
 
-        with(PayloadTypeRegistry.playC2S()) {
+        with(PayloadTypeRegistry.serverboundPlay()) {
             register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
             register(Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
             register(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
@@ -60,10 +60,10 @@ class DreamDisplaysMod : ClientModInitializer, Mod {
             Initializer.onClearCachePacket(payload)
         }
 
-        WorldRenderEvents.AFTER_ENTITIES.register { context ->
+        LevelRenderEvents.BEFORE_GIZMOS.register { context ->
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
-                ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
+                ScreenRenderer.render(context.poseStack(), mc.gameRenderer.mainCamera)
             }
         }
 

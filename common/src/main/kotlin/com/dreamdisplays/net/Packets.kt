@@ -2,7 +2,7 @@ package com.dreamdisplays.net
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.util.FacingUtil
-import net.minecraft.network.FriendlyByteBuf
+import net.minecraft.network.RegistryFriendlyByteBuf
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.minecraft.resources.Identifier
@@ -19,7 +19,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Delete> = createType("delete")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Delete> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Delete> = StreamCodec.of(
                 { buf, packet -> buf.writeUUID(packet.uuid) },
                 { buf -> Delete(buf.readUUID()) }
             )
@@ -31,7 +31,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<DisplayEnabled> = createType("display_enabled")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, DisplayEnabled> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, DisplayEnabled> = StreamCodec.of(
                 { buf, packet -> buf.writeBoolean(packet.enabled) },
                 { buf -> DisplayEnabled(buf.readBoolean()) }
             )
@@ -53,7 +53,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Info> = createType("display_info")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Info> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Info> = StreamCodec.of(
                 { buf, packet ->
                     buf.writeUUID(packet.uuid)
                     buf.writeUUID(packet.ownerUuid)
@@ -89,7 +89,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Premium> = createType("premium")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Premium> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Premium> = StreamCodec.of(
                 { buf, packet -> buf.writeBoolean(packet.premium) },
                 { buf -> Premium(buf.readBoolean()) }
             )
@@ -101,7 +101,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Report> = createType("report")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Report> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Report> = StreamCodec.of(
                 { buf, packet -> buf.writeUUID(packet.uuid) },
                 { buf -> Report(buf.readUUID()) }
             )
@@ -113,7 +113,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<RequestSync> = createType("req_sync")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, RequestSync> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, RequestSync> = StreamCodec.of(
                 { buf, packet -> buf.writeUUID(packet.uuid) },
                 { buf -> RequestSync(buf.readUUID()) }
             )
@@ -131,7 +131,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Sync> = createType("sync")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Sync> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Sync> = StreamCodec.of(
                 { buf, packet ->
                     buf.writeUUID(packet.uuid)
                     buf.writeBoolean(packet.isSync)
@@ -157,7 +157,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<Version> = createType("version")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, Version> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, Version> = StreamCodec.of(
                 { buf, packet -> buf.writeUtf(packet.version) },
                 { buf -> Version(buf.readUtf()) }
             )
@@ -169,7 +169,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<ReportEnabled> = createType("report_enabled")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, ReportEnabled> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, ReportEnabled> = StreamCodec.of(
                 { buf, packet -> buf.writeBoolean(packet.enabled) },
                 { buf -> ReportEnabled(buf.readBoolean()) }
             )
@@ -181,7 +181,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<SetVideo> = createType("set_video")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, SetVideo> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, SetVideo> = StreamCodec.of(
                 { buf, packet ->
                     buf.writeUUID(packet.uuid)
                     buf.writeUtf(packet.url)
@@ -197,7 +197,7 @@ object Packets {
 
         companion object {
             val PACKET_ID: CustomPacketPayload.Type<ClearCache> = createType("clear_cache")
-            val PACKET_CODEC: StreamCodec<FriendlyByteBuf, ClearCache> = StreamCodec.of(
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, ClearCache> = StreamCodec.of(
                 { buf, packet ->
                     buf.writeVarInt(packet.displayUuids.size)
                     packet.displayUuids.forEach { buf.writeUUID(it) }

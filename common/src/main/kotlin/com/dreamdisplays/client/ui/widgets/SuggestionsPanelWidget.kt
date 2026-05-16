@@ -8,7 +8,7 @@ import com.dreamdisplays.ytdlp.YtVideoInfo
 import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -208,7 +208,7 @@ class SuggestionsPanelWidget(
         searchBox.width = searchBoxWidth(w)
     }
 
-    override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float) {
+    override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, dt: Float) {
         g.fill(x, y, x + width, y + height, PANEL_BG)
         g.fill(x, y, x + width, y + 1, PANEL_BORDER)
         g.fill(x, y + height - 1, x + width, y + height, PANEL_BORDER)
@@ -216,16 +216,16 @@ class SuggestionsPanelWidget(
         g.fill(x + width - 1, y, x + width, y + height, PANEL_BORDER)
 
         val f = Minecraft.getInstance().font
-        g.drawString(f, message, x + 10, y + 10, 0xFFFFFFFF.toInt(), false)
-        searchBox.render(g, mouseX, mouseY, dt)
+        g.text(f, message, x + 10, y + 10, 0xFFFFFFFF.toInt(), false)
+        searchBox.extractRenderState(g, mouseX, mouseY, dt)
 
         clearButtonWidget.x = clearButtonX()
         clearButtonWidget.y = actionRowY()
-        clearButtonWidget.render(g, mouseX, mouseY, dt)
+        clearButtonWidget.extractRenderState(g, mouseX, mouseY, dt)
 
         searchActionButtonWidget.x = searchButtonX()
         searchActionButtonWidget.y = actionRowY()
-        searchActionButtonWidget.render(g, mouseX, mouseY, dt)
+        searchActionButtonWidget.extractRenderState(g, mouseX, mouseY, dt)
 
         val stripTop = searchBox.y + SEARCH_H + 8
         val stripBottom = y + height - 10
@@ -238,7 +238,7 @@ class SuggestionsPanelWidget(
                 val elapsed = maxOf(0L, (System.currentTimeMillis() - loadStartedAtMs) / 1000L)
                 base.replace(Regex("\\.+$"), "") + " • " + elapsed + "s"
             } else base
-            g.drawString(f, msg, x + 10, stripTop + 6, 0xFFAAAAAA.toInt(), false)
+            g.text(f, msg, x + 10, stripTop + 6, 0xFFAAAAAA.toInt(), false)
             return
         }
 
@@ -340,7 +340,7 @@ class SuggestionsPanelWidget(
     }
 
     private fun renderCardSized(
-        g: GuiGraphics, f: Font, info: YtVideoInfo, x: Int, y: Int,
+        g: GuiGraphicsExtractor, f: Font, info: YtVideoInfo, x: Int, y: Int,
         w: Int, thumbH: Int, cardH: Int, hover: Boolean
     ) {
         val bg = if (hover) {
@@ -368,7 +368,7 @@ class SuggestionsPanelWidget(
             val tw = f.width(tag) + 4
             val th = f.lineHeight + 2
             g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + th, 0xFFE53935.toInt())
-            g.drawString(f, tag, thumbX + 4, thumbY + 3, 0xFFFFFFFF.toInt(), false)
+            g.text(f, tag, thumbX + 4, thumbY + 3, 0xFFFFFFFF.toInt(), false)
         }
 
         val dur = info.formatDuration()
@@ -378,7 +378,7 @@ class SuggestionsPanelWidget(
             val dx = thumbX + thumbW - dw - 2
             val dy = thumbY + thumbH - dh - 2
             g.fill(dx, dy, dx + dw, dy + dh, 0xC0000000.toInt())
-            g.drawString(f, dur, dx + 2, dy + 2, 0xFFFFFFFF.toInt(), false)
+            g.text(f, dur, dx + 2, dy + 2, 0xFFFFFFFF.toInt(), false)
         }
 
         if (compactCards) return
@@ -388,7 +388,7 @@ class SuggestionsPanelWidget(
         var textY = thumbY + thumbH + 3
         val titleLines = wrap(f, info.title, textW, 2)
         for (line in titleLines) {
-            g.drawString(f, line, textX, textY, 0xFFFFFFFF.toInt(), false)
+            g.text(f, line, textX, textY, 0xFFFFFFFF.toInt(), false)
             textY += f.lineHeight + 1
         }
 
@@ -399,7 +399,7 @@ class SuggestionsPanelWidget(
             else trim(f, meta, max(20, textW - f.width(" • $views"))) + " • " + views
         }
         if (meta.isNotEmpty()) {
-            g.drawString(f, trim(f, meta, textW), textX, textY, 0xFFB8B8B8.toInt(), false)
+            g.text(f, trim(f, meta, textW), textX, textY, 0xFFB8B8B8.toInt(), false)
         }
     }
 

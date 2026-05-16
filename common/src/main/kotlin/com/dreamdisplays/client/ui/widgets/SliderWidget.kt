@@ -2,7 +2,7 @@ package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -45,16 +45,16 @@ abstract class SliderWidget(
         }
     }
 
-    override fun renderWidget(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
-        graphics.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
-        graphics.blitSprite(
+    override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(
             RenderPipelines.GUI_TEXTURED, getHandleTexture(),
             x + (value * (width - 8).toDouble()).toInt(), y, 8, height
         )
         val i = if (active) 16777215 else 10526880
         val msg = message.copy().withStyle { it.withColor(i) }
-        renderScrollingStringOverContents(
-            graphics.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+        extractScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.TOOLTIP_AND_CURSOR),
             msg, 2
         )
     }

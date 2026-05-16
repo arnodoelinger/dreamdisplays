@@ -11,7 +11,7 @@ import com.dreamdisplays.util.GeneralUtil
 import com.dreamdisplays.ytdlp.*
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.screens.Screen
@@ -306,12 +306,12 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         suggestions?.setRelatedTo(info.id)
     }
 
-    override fun render(g: GuiGraphics, mouseX: Int, mouseY: Int, delta: Float) {
-        renderTransparentBackground(g)
+    override fun extractRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
+        extractTransparentBackground(g)
 
         val ds = displayScreen
         if (ds == null) {
-            super.render(g, mouseX, mouseY, delta)
+            super.extractRenderState(g, mouseX, mouseY, delta)
             return
         }
 
@@ -432,11 +432,11 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
 
         layoutOwnerActions(settingsX, settingsY, settingsW, settingsH)
-        super.render(g, mouseX, mouseY, delta)
+        super.extractRenderState(g, mouseX, mouseY, delta)
         renderTooltips(g, mouseX, mouseY)
     }
 
-    private fun renderErroredOverlay(g: GuiGraphics, mouseX: Int, mouseY: Int, delta: Float) {
+    private fun renderErroredOverlay(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
         suggestions?.visible = false
         listOf(volume, renderD, quality, brightness).forEach { w ->
             w?.active = false; w?.visible = false
@@ -467,7 +467,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         )
         var y = panelY + headerHeight() + 8
         for (line in lines) {
-            g.drawString(font, line, this.width / 2 - font.width(line) / 2, y, 0xFFFFFFFF.toInt(), false)
+            g.text(font, line, this.width / 2 - font.width(line) / 2, y, 0xFFFFFFFF.toInt(), false)
             y += font.lineHeight + 4
         }
         deleteButtonWidget?.let {
@@ -482,10 +482,10 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             it.width = 20
             it.height = 20
         }
-        super.render(g, mouseX, mouseY, delta)
+        super.extractRenderState(g, mouseX, mouseY, delta)
     }
 
-    private fun renderPreviewSection(g: GuiGraphics, px: Int, py: Int, pw: Int, ph: Int) {
+    private fun renderPreviewSection(g: GuiGraphicsExtractor, px: Int, py: Int, pw: Int, ph: Int) {
         val scr = displayScreen ?: return
         val innerX = px + PANEL_PADDING_X
         val innerY = py + headerHeight()
@@ -526,7 +526,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
                 g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
             }
             val waiting = Component.translatable("dreamdisplays.ui.waiting").string
-            g.drawString(
+            g.text(
                 font, waiting,
                 innerX + innerW / 2 - font.width(waiting) / 2,
                 innerY + previewMaxH / 2 - font.lineHeight / 2,
@@ -578,7 +578,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
     }
 
-    private fun renderTitleOverlay(g: GuiGraphics, scr: DisplayScreen, x: Int, y: Int, w: Int) {
+    private fun renderTitleOverlay(g: GuiGraphicsExtractor, scr: DisplayScreen, x: Int, y: Int, w: Int) {
         val videoId = YtDlp.extractVideoId(scr.videoUrl)
         val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
         if (videoId != null && meta == null) VideoMetadataCache.requestAsync(videoId)
@@ -610,11 +610,11 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             val tw = font.width(tag) + 6
             val th = font.lineHeight
             g.fill(titleX, titleY - 1, titleX + tw, titleY + th, 0xFFE53935.toInt())
-            g.drawString(font, tag, titleX + 3, titleY, 0xFFFFFFFF.toInt(), false)
+            g.text(font, tag, titleX + 3, titleY, 0xFFFFFFFF.toInt(), false)
             titleX += tw + 4
             shown = trimToWidth(title, textW - tw - 4)
         }
-        g.drawString(font, shown, titleX, titleY, 0xFFFFFFFF.toInt(), false)
+        g.text(font, shown, titleX, titleY, 0xFFFFFFFF.toInt(), false)
 
         val meta2 = StringBuilder()
         if (!channel.isNullOrEmpty()) meta2.append(channel)
@@ -631,7 +631,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             meta2.append(published)
         }
         val metaShown = trimToWidth(meta2.toString(), textW)
-        g.drawString(font, metaShown, x + padX, boxY + padY + font.lineHeight + padY, 0xFFAAAAAA.toInt(), false)
+        g.text(font, metaShown, x + padX, boxY + padY + font.lineHeight + padY, 0xFFAAAAAA.toInt(), false)
     }
 
     private fun trimToWidth(s: String, maxW: Int): String {
@@ -653,7 +653,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         return null
     }
 
-    private fun renderSettingsSection(g: GuiGraphics, px: Int, py: Int, pw: Int, ph: Int) {
+    private fun renderSettingsSection(g: GuiGraphicsExtractor, px: Int, py: Int, pw: Int, ph: Int) {
         val innerX = px + PANEL_PADDING_X
         val innerY = py + headerHeight()
         val innerW = pw - PANEL_PADDING_X * 2
@@ -685,12 +685,12 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
     }
 
     private fun renderRow(
-        g: GuiGraphics, x: Int, y: Int, w: Int, key: String,
+        g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, key: String,
         control: AbstractWidget?, reset: ButtonWidget?
     ): Int {
         g.fill(x, y, x + w, y + ROW_H, ROW_BG)
         val label = Component.translatable(key)
-        g.drawString(font, label, x + 6, y + ROW_H / 2 - font.lineHeight / 2, 0xFFFFFFFF.toInt(), false)
+        g.text(font, label, x + 6, y + ROW_H / 2 - font.lineHeight / 2, 0xFFFFFFFF.toInt(), false)
 
         var rightEdge = x + w - 4
         if (reset != null) {
@@ -745,7 +745,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         return super.mouseReleased(event)
     }
 
-    private fun renderTooltips(g: GuiGraphics, mouseX: Int, mouseY: Int) {
+    private fun renderTooltips(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {
         val scr = displayScreen ?: return
         if (scr.errored) return
 
@@ -863,14 +863,14 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
     }
 
-    private fun drawPanel(g: GuiGraphics, x: Int, y: Int, w: Int, h: Int, title: String) {
+    private fun drawPanel(g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, h: Int, title: String) {
         g.fill(x, y, x + w, y + h, PANEL_BG)
         val b = PANEL_BORDER
         g.fill(x, y, x + w, y + 1, b)
         g.fill(x, y + h - 1, x + w, y + h, b)
         g.fill(x, y, x + 1, y + h, b)
         g.fill(x + w - 1, y, x + w, y + h, b)
-        g.drawString(font, title, x + PANEL_PADDING_X, y + PANEL_PADDING_Y, 0xFFFFFFFF.toInt(), false)
+        g.text(font, title, x + PANEL_PADDING_X, y + PANEL_PADDING_Y, 0xFFFFFFFF.toInt(), false)
     }
 
     private fun qualityFraction(q: String): Double {
@@ -904,13 +904,13 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
 
     override fun isPauseScreen(): Boolean = false
 
-    private fun renderModLabel(g: GuiGraphics, x: Int, y: Int) {
+    private fun renderModLabel(g: GuiGraphicsExtractor, x: Int, y: Int) {
         val update = UpdateCheck.shouldShowArrow()
         val name = Component.literal("Dream Displays")
         val ver = Component.literal(" ${GeneralUtil.getModVersion()}")
             .withStyle(Style.EMPTY.withColor(0xFF6AB7FF.toInt()))
         val label = name.copy().append(ver)
-        g.drawString(font, label, x, y, 0xFFFFFFFF.toInt(), true)
+        g.text(font, label, x, y, 0xFFFFFFFF.toInt(), true)
 
         val textW = font.width(label)
         var totalW = textW
@@ -923,7 +923,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             }
             val arrow = Component.literal(" ▲")
                 .withStyle(Style.EMPTY.withColor(0xFFFF4040.toInt()))
-            g.drawString(font, arrow, x + textW, y + arrowYOffset, 0xFFFFFFFF.toInt(), true)
+            g.text(font, arrow, x + textW, y + arrowYOffset, 0xFFFFFFFF.toInt(), true)
             totalW += font.width(arrow)
         }
         modLabelHover = HoverArea(x, y - 1, totalW, font.lineHeight + 2)

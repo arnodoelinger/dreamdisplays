@@ -2,7 +2,7 @@ package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarrationElementOutput
 import net.minecraft.client.input.MouseButtonEvent
@@ -32,16 +32,16 @@ abstract class ToggleWidget(
 
     override fun updateWidgetNarration(output: NarrationElementOutput) {}
 
-    override fun renderWidget(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
-        guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
-        guiGraphics.blitSprite(
+    override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(
             RenderPipelines.GUI_TEXTURED, getHandleTexture(),
             x + (dValue * (width - 8).toDouble()).toInt(), y, 8, height
         )
         val i = if (active) 16777215 else 10526880
         val msg: MutableComponent = message.copy().withStyle { it.withColor(i) }
-        renderScrollingStringOverContents(
-            guiGraphics.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+        extractScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.TOOLTIP_AND_CURSOR),
             msg, 2
         )
     }

@@ -2,7 +2,7 @@ package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -27,7 +27,7 @@ class ProgressSliderWidget(
     private var dragging = false
     private var dragTargetNanos = 0L
 
-    override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+    override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         val dur = durationSupplier.asLong
         val cur = if (dragging) dragTargetNanos else currentSupplier.asLong
         val value = if (dur > 0) Mth.clamp(cur / dur.toDouble(), 0.0, 1.0) else 0.0
@@ -37,8 +37,8 @@ class ProgressSliderWidget(
         g.blitSprite(RenderPipelines.GUI_TEXTURED, getHandleSprite(), handleX, y, 8, height)
 
         val label = buildLabel(cur, dur)
-        renderScrollingStringOverContents(
-            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+        extractScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphicsExtractor.HoveredTextEffects.TOOLTIP_AND_CURSOR),
             label, 4
         )
     }

@@ -1,7 +1,7 @@
 package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.Minecraft
-import net.minecraft.client.gui.GuiGraphics
+import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -40,9 +40,9 @@ abstract class ButtonWidget(
 
     override fun updateWidgetNarration(builder: NarrationElementOutput) {}
 
-    override fun renderWidget(guiGraphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+    override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         val sprite = setSprites?.get(active, isHoveredOrFocused) ?: SPRITES.get(active, isHoveredOrFocused)
-        guiGraphics.blitSprite(
+        g.blitSprite(
             RenderPipelines.GUI_TEXTURED, sprite,
             x, y, width, height, ARGB.white(alpha)
         )
@@ -57,7 +57,7 @@ abstract class ButtonWidget(
         val dx = x + width / 2 - iconW / 2
         val dy = y + height / 2 - iconH / 2
 
-        guiGraphics.blitSprite(
+        g.blitSprite(
             RenderPipelines.GUI_TEXTURED, iconTextureId,
             dx, dy, iconW, iconH, ARGB.white(alpha)
         )
