@@ -1,69 +1,122 @@
 package com.dreamdisplays.ytdlp
 
+import com.dreamdisplays.Initializer
+import com.google.gson.JsonArray
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import me.inotsleep.utils.logging.LoggingManager
 import java.io.IOException
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URI
-import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
-/** `YouTube` web. **/
-object YouTubeWeb {
+/**
+ * Direct client for `YouTube`'s InnerTube API.
+ */
+object YouTubeInnerTube {
 
+    private const val BASE_URL = "https://www.youtube.com/youtubei/v1"
+    private const val CLIENT_NAME = "WEB"
+    private const val CLIENT_VERSION = "2.20250501.00.00"
     private const val UA =
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
     private val AGE_PATTERN: Pattern = Pattern.compile(
         "(\\d+)\\s+(second|minute|hour|day|week|month|year)s?\\s+ago",
         Pattern.CASE_INSENSITIVE
     )
 
-
     @Throws(IOException::class)
     fun search(query: String, limit: Int): List<YtVideoInfo> {
-        val url = "https://www.youtube.com/results?search_query=" +
-                URLEncoder.encode(query, StandardCharsets.UTF_8) + "&hl=en"
-        return extractSearchVideos(fetchInitialData(url), limit)
+        val body = baseContext().apply {
+            addProperty("query", query)
+        }
+        val root = post("search", body)
+        return extractSearchVideos(root, limit)
     }
 
+    @Throws(IOException::class)
+    fun next(videoId: String): NextResult {
+        val body = baseContext().apply {
+            addProperty("videoId", videoId)
+        }
+        val root = post("next", body)
+        val meta = extractWatchMetadata(root, videoId)
+        val related = extractRelatedVideos(root, videoId, 25)
+        return NextResult(meta?.title, meta?.uploader, meta?.viewCountRaw, meta?.likeCountRaw, related)
+    }
 
     @Throws(IOException::class)
     fun related(videoId: String, limit: Int): List<YtVideoInfo> {
-        val url = "https://www.youtube.com/watch?v=$videoId&hl=en"
-        return extractRelatedVideos(fetchInitialData(url), videoId, limit)
+        val result = next(videoId)
+        val list = result.related.toMutableList()
+        list.removeAll { it.id == videoId }
+        return if (list.size > limit) list.subList(0, limit) else list
     }
-
 
     @Throws(IOException::class)
     fun metadata(videoId: String): YtVideoInfo? {
-        val url = "https://www.youtube.com/watch?v=$videoId&hl=en"
-        return extractWatchMetadata(fetchInitialData(url), videoId)
+        val body = baseContext().apply {
+            addProperty("videoId", videoId)
+        }
+        val root = post("next", body)
+        val meta = extractWatchMetadata(root, videoId) ?: return null
+        return YtVideoInfo(videoId, meta.title ?: return null, meta.uploader, null,
+            meta.viewCountRaw, meta.likeCountRaw, meta.publishedText, meta.daysAgo)
     }
 
+    data class NextResult(
+        val title: String?,
+        val uploader: String?,
+        val views: Long?,
+        val likes: Long?,
+        val related: List<YtVideoInfo>,
+    )
+
+    private data class MetaHolder(
+        val title: String?,
+        val uploader: String?,
+        val viewCountRaw: Long?,
+        val likeCountRaw: Long?,
+        val publishedText: String?,
+        val daysAgo: Int?,
+    )
+
     @Throws(IOException::class)
-    private fun fetchInitialData(url: String): JsonObject {
-        val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
-        conn.instanceFollowRedirects = true
+    private fun post(endpoint: String, body: JsonObject): JsonObject {
+        val url = "$BASE_URL/$endpoint?prettyPrint=false"
+        val conn = openConnection(url)
+        conn.requestMethod = "POST"
+        conn.doOutput = true
         conn.connectTimeout = 8_000
         conn.readTimeout = 15_000
+        conn.setRequestProperty("Content-Type", "application/json")
         conn.setRequestProperty("User-Agent", UA)
         conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
-        conn.setRequestProperty("Accept", "text/html,application/xhtml+xml")
-        val realCookies = YtDlp.getPublicCookieHeader()
-        conn.setRequestProperty("Cookie", realCookies ?: "CONSENT=YES+cb; SOCS=CAI; PREF=hl=en")
+        val cookies = YtDlp.getPublicCookieHeader()
+        conn.setRequestProperty("Cookie", cookies ?: "CONSENT=YES+cb; SOCS=CAI; PREF=hl=en")
+
         try {
+            val bytes = body.toString().toByteArray(StandardCharsets.UTF_8)
+            conn.outputStream.use { it.write(bytes) }
+
+            val status = conn.responseCode
+            if (status !in 200..299) {
+                val errBody = try {
+                    conn.errorStream?.readAllBytes()?.toString(StandardCharsets.UTF_8)?.take(500) ?: ""
+                } catch (_: Exception) { "" }
+                throw IOException("InnerTube $endpoint returned HTTP $status: $errBody")
+            }
             conn.inputStream.use { input ->
-                val body = String(input.readAllBytes(), StandardCharsets.UTF_8)
-                val json = YtDlp.extractJsonObject(body, "var ytInitialData")
-                    ?: YtDlp.extractJsonObject(body, "window[\"ytInitialData\"]")
-                    ?: throw IOException("ytInitialData not found")
+                val raw = String(input.readAllBytes(), StandardCharsets.UTF_8)
                 return try {
-                    JsonParser.parseString(json).asJsonObject
+                    JsonParser.parseString(raw).asJsonObject
                 } catch (e: Exception) {
-                    throw IOException("Failed to parse ytInitialData JSON", e)
+                    throw IOException("Failed to parse InnerTube $endpoint response", e)
                 }
             }
         } finally {
@@ -71,18 +124,54 @@ object YouTubeWeb {
         }
     }
 
+    private fun openConnection(url: String): HttpURLConnection {
+        val uri = URI.create(url)
+        val proxyStr = try { Initializer.config.ytdlpProxy.trim() } catch (_: Exception) { "" }
+        if (proxyStr.isEmpty()) {
+            return uri.toURL().openConnection() as HttpURLConnection
+        }
+        val proxyUri = try { URI.create(proxyStr) } catch (_: Exception) {
+            LoggingManager.warn("[InnerTube] invalid proxy URL: $proxyStr")
+            return uri.toURL().openConnection() as HttpURLConnection
+        }
+        val type = when (proxyUri.scheme?.lowercase()) {
+            "socks5", "socks4", "socks" -> Proxy.Type.SOCKS
+            else -> Proxy.Type.HTTP
+        }
+        val port = if (proxyUri.port > 0) proxyUri.port else 1080
+        val host = proxyUri.host ?: return uri.toURL().openConnection() as HttpURLConnection
+        val proxy = Proxy(type, InetSocketAddress(host, port))
+        return uri.toURL().openConnection(proxy) as HttpURLConnection
+    }
+
+    private fun baseContext(): JsonObject {
+        val client = JsonObject().apply {
+            addProperty("clientName", CLIENT_NAME)
+            addProperty("clientVersion", CLIENT_VERSION)
+            addProperty("hl", "en")
+        }
+        val context = JsonObject().apply {
+            add("client", client)
+        }
+        return JsonObject().apply {
+            add("context", context)
+        }
+    }
+
     private fun extractSearchVideos(root: JsonObject, limit: Int): List<YtVideoInfo> {
         val out = ArrayList<YtVideoInfo>()
         try {
             val sections = path(root, "contents", "twoColumnSearchResultsRenderer", "primaryContents",
-                "sectionListRenderer", "contents").asJsonArray
-            for (sec in sections) {
+                "sectionListRenderer", "contents")
+            if (!sections.isJsonArray) return out
+            for (sec in sections.asJsonArray) {
+                if (!sec.isJsonObject) continue
                 val isr = sec.asJsonObject.get("itemSectionRenderer")
                 if (isr == null || !isr.isJsonObject) continue
                 val contents = isr.asJsonObject.getAsJsonArray("contents") ?: continue
                 for (el in contents) {
-                    val obj = el.asJsonObject
-                    val vr = obj.get("videoRenderer")
+                    if (!el.isJsonObject) continue
+                    val vr = el.asJsonObject.get("videoRenderer")
                     if (vr == null || !vr.isJsonObject) continue
                     parseVideoRenderer(vr.asJsonObject)?.let {
                         out.add(it)
@@ -91,7 +180,7 @@ object YouTubeWeb {
                 }
             }
         } catch (e: Exception) {
-            LoggingManager.warn("Search parse failed: ${e.message}")
+            LoggingManager.warn("[InnerTube] search parse failed: ${e.message}")
         }
         return out
     }
@@ -112,72 +201,18 @@ object YouTubeWeb {
         return YtVideoInfo(id, title, uploader, duration, views, null, publishedText, daysAgo)
     }
 
-    private fun looksLikeShorts(vr: JsonObject): Boolean {
-        try {
-            val nav = vr.getAsJsonObject("navigationEndpoint")
-            if (nav != null) {
-                val cmd = nav.getAsJsonObject("commandMetadata")
-                if (cmd != null) {
-                    val web = cmd.getAsJsonObject("webCommandMetadata")
-                    if (web != null) {
-                        val webUrl = optString(web, "url")
-                        if (webUrl != null && webUrl.startsWith("/shorts/")) return true
-                    }
-                }
-            }
-        } catch (_: Exception) {
-        }
-        val s = vr.toString()
-        return "\"label\":\"Shorts\"" in s || "shortsLockupViewModel" in s
-    }
-
-    private fun extractRelatedVideos(root: JsonObject, selfId: String, limit: Int): List<YtVideoInfo> {
-        val out = ArrayList<YtVideoInfo>()
-        try {
-            val results = path(root, "contents", "twoColumnWatchNextResults", "secondaryResults",
-                "secondaryResults", "results").asJsonArray
-            for (el in results) {
-                if (!el.isJsonObject) continue
-                val cvr = el.asJsonObject.get("compactVideoRenderer")
-                if (cvr == null || !cvr.isJsonObject) continue
-                val info = parseCompactVideoRenderer(cvr.asJsonObject)
-                if (info != null && info.id != selfId) {
-                    out.add(info)
-                    if (out.size >= limit) return out
-                }
-            }
-        } catch (e: Exception) {
-            LoggingManager.warn("Related parse failed: ${e.message}")
-        }
-        return out
-    }
-
-    private fun parseCompactVideoRenderer(cvr: JsonObject): YtVideoInfo? {
-        val id = optString(cvr, "videoId") ?: return null
-        if (looksLikeShorts(cvr)) return null
-        val title = simpleText(cvr.getAsJsonObject("title")) ?: id
-        val uploader = simpleText(cvr.getAsJsonObject("longBylineText"))
-            ?: simpleText(cvr.getAsJsonObject("shortBylineText"))
-        val duration = parseDuration(simpleText(cvr.getAsJsonObject("lengthText")))
-        if (duration != null && duration < 65) return null
-        val views = parseViews(simpleText(cvr.getAsJsonObject("viewCountText")))
-            ?: parseViews(simpleText(cvr.getAsJsonObject("shortViewCountText")))
-        val publishedText = simpleText(cvr.getAsJsonObject("publishedTimeText"))
-        val daysAgo = parseDaysAgo(publishedText)
-        return YtVideoInfo(id, title, uploader, duration, views, null, publishedText, daysAgo)
-    }
-
-    private fun extractWatchMetadata(root: JsonObject, videoId: String): YtVideoInfo? {
+    private fun extractWatchMetadata(root: JsonObject, videoId: String): MetaHolder? {
         try {
             val contents = path(root, "contents", "twoColumnWatchNextResults", "results",
-                "results", "contents").asJsonArray
+                "results", "contents")
+            if (!contents.isJsonArray) return null
             var title: String? = null
             var channel: String? = null
             var views: Long? = null
             var likes: Long? = null
             var publishedText: String? = null
             var daysAgo: Int? = null
-            for (el in contents) {
+            for (el in contents.asJsonArray) {
                 if (!el.isJsonObject) continue
                 val obj = el.asJsonObject
                 if (obj.has("videoPrimaryInfoRenderer")) {
@@ -205,19 +240,56 @@ object YouTubeWeb {
                 }
             }
             if (title == null) return null
-            return YtVideoInfo(videoId, title, channel, null, views, likes, publishedText, daysAgo)
+            return MetaHolder(title, channel, views, likes, publishedText, daysAgo)
         } catch (e: Exception) {
-            LoggingManager.warn("Watch metadata parse failed: ${e.message}")
+            LoggingManager.warn("[InnerTube] watch metadata parse failed: ${e.message}")
             return null
         }
     }
 
+    private fun extractRelatedVideos(root: JsonObject, selfId: String, limit: Int): List<YtVideoInfo> {
+        val out = ArrayList<YtVideoInfo>()
+        try {
+            val results = path(root, "contents", "twoColumnWatchNextResults", "secondaryResults",
+                "secondaryResults", "results")
+            if (!results.isJsonArray) return out
+            for (el in results.asJsonArray) {
+                if (!el.isJsonObject) continue
+                val cvr = el.asJsonObject.get("compactVideoRenderer")
+                if (cvr == null || !cvr.isJsonObject) continue
+                val info = parseCompactVideoRenderer(cvr.asJsonObject)
+                if (info != null && info.id != selfId) {
+                    out.add(info)
+                    if (out.size >= limit) return out
+                }
+            }
+        } catch (e: Exception) {
+            LoggingManager.warn("[InnerTube] related parse failed: ${e.message}")
+        }
+        return out
+    }
+
+    private fun parseCompactVideoRenderer(cvr: JsonObject): YtVideoInfo? {
+        val id = optString(cvr, "videoId") ?: return null
+        if (looksLikeShorts(cvr)) return null
+        val title = simpleText(cvr.getAsJsonObject("title")) ?: id
+        val uploader = simpleText(cvr.getAsJsonObject("longBylineText"))
+            ?: simpleText(cvr.getAsJsonObject("shortBylineText"))
+        val duration = parseDuration(simpleText(cvr.getAsJsonObject("lengthText")))
+        if (duration != null && duration < 65) return null
+        val views = parseViews(simpleText(cvr.getAsJsonObject("viewCountText")))
+            ?: parseViews(simpleText(cvr.getAsJsonObject("shortViewCountText")))
+        val publishedText = simpleText(cvr.getAsJsonObject("publishedTimeText"))
+        val daysAgo = parseDaysAgo(publishedText)
+        return YtVideoInfo(id, title, uploader, duration, views, null, publishedText, daysAgo)
+    }
+
     private fun maybeViewCountText(vp: JsonObject): JsonObject? {
         if (!vp.has("viewCount")) return null
-        val vc = vp.getAsJsonObject("viewCount")
+        val vc = vp.getAsJsonObject("viewCount") ?: return null
         if (vc.has("videoViewCountRenderer")) {
             val vvcr = vc.getAsJsonObject("videoViewCountRenderer")
-            if (vvcr.has("viewCount")) return vvcr.getAsJsonObject("viewCount")
+            if (vvcr != null && vvcr.has("viewCount")) return vvcr.getAsJsonObject("viewCount")
         }
         return null
     }
@@ -241,6 +313,25 @@ object YouTubeWeb {
             if (parsed != null) return parsed
         }
         return null
+    }
+
+    private fun looksLikeShorts(vr: JsonObject): Boolean {
+        try {
+            val nav = vr.getAsJsonObject("navigationEndpoint")
+            if (nav != null) {
+                val cmd = nav.getAsJsonObject("commandMetadata")
+                if (cmd != null) {
+                    val web = cmd.getAsJsonObject("webCommandMetadata")
+                    if (web != null) {
+                        val webUrl = optString(web, "url")
+                        if (webUrl != null && webUrl.startsWith("/shorts/")) return true
+                    }
+                }
+            }
+        } catch (_: Exception) {
+        }
+        val s = vr.toString()
+        return "\"label\":\"Shorts\"" in s || "shortsLockupViewModel" in s
     }
 
     private fun path(obj: JsonObject, vararg keys: String): JsonElement {

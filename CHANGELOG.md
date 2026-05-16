@@ -17,6 +17,7 @@ Plugin:
 
 Mod:
 
+- [x] Faster YouTube web operations and video loading
 - [x] Use different browser list for macOS to avoid false security messages
 - [x] Add `yt-dlp` proxy in config
 

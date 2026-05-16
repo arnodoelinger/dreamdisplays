@@ -25,7 +25,6 @@ import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.regex.Pattern
-import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.round
 
@@ -44,7 +43,7 @@ object YtDlp {
     )
     private val BUNDLED_DIR: Path = Path.of("libs", "yt-dlp")
     private const val DOWNLOAD_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
-    private const val CACHE_TTL_MS: Long = 2L * 60L * 60L * 1_000L
+    private const val CACHE_TTL_MS: Long = 5L * 60L * 60L * 1_000L
     private const val INFO_CACHE_TTL_MS: Long = 30L * 60L * 1_000L
     private const val COOKIE_REFRESH_MS: Long = 2L * 60L * 60L * 1_000L
 
@@ -67,8 +66,6 @@ object YtDlp {
     private val RELATED_CACHE: ConcurrentMap<String, InfoCacheEntry> = ConcurrentHashMap()
     private val IN_FLIGHT_SEARCHES: ConcurrentMap<String, CompletableFuture<List<YtVideoInfo>>> = ConcurrentHashMap()
     private val IN_FLIGHT_RELATED: ConcurrentMap<String, CompletableFuture<List<YtVideoInfo>>> = ConcurrentHashMap()
-    private val TITLE_CACHE: ConcurrentMap<String, TitleCacheEntry> = ConcurrentHashMap()
-    private val IN_FLIGHT_TITLES: ConcurrentMap<String, CompletableFuture<String?>> = ConcurrentHashMap()
 
     @Volatile private var resolvedBinary: String? = null
     @Volatile private var resolvedCookieBrowser: String? = null
@@ -90,7 +87,7 @@ object YtDlp {
 
         val future = startFetchInternal(videoUrl)
         try {
-            return future.get(180, TimeUnit.SECONDS)
+            return future.get(90, TimeUnit.SECONDS)
         } catch (e: CompletionException) {
             throw (e.cause as? IOException) ?: IOException("yt-dlp fetch failed for url: $videoUrl", e.cause ?: e)
         } catch (e: Exception) {
@@ -147,21 +144,14 @@ object YtDlp {
         val future = IN_FLIGHT_SEARCHES.computeIfAbsent(key) {
             CompletableFuture.supplyAsync({
                 try {
-                    val web = YouTubeWeb.search(query.trim(), n)
-                    if (web.isNotEmpty()) {
-                        val results = web.toList()
-                        SEARCH_CACHE[key] = InfoCacheEntry(results, System.currentTimeMillis())
-                        return@supplyAsync results
-                    }
-                } catch (webEx: Exception) {
-                    LoggingManager.warn("[YouTubeWeb] search failed, falling back to yt-dlp: ${webEx.message}")
-                }
-                try {
-                    val results = searchUncached(query.trim(), n).toList()
+                    val results = YouTubeInnerTube.search(query.trim(), n).toList()
                     SEARCH_CACHE[key] = InfoCacheEntry(results, System.currentTimeMillis())
                     results
-                } catch (e: IOException) {
-                    throw CompletionException(e)
+                } catch (e: Exception) {
+                    throw e as? CompletionException
+                        ?: CompletionException(
+                            e as? IOException ?: IOException("InnerTube search failed", e)
+                        )
                 }
             }, SEARCH_EXECUTOR)
         }
@@ -180,18 +170,25 @@ object YtDlp {
         val future = IN_FLIGHT_RELATED.computeIfAbsent(key) {
             CompletableFuture.supplyAsync({
                 try {
-                    val web = YouTubeWeb.related(videoId, n)
-                    if (web.isNotEmpty()) {
-                        val immutable = web.toList()
-                        RELATED_CACHE[key] = InfoCacheEntry(immutable, System.currentTimeMillis())
-                        return@supplyAsync immutable
+                    val nextResult = YouTubeInnerTube.next(videoId)
+                    var hits = ArrayList(nextResult.related)
+                    hits.removeAll { it.id == videoId }
+                    // If no related found, fall back to searching by title
+                    if (hits.isEmpty() && !nextResult.title.isNullOrBlank()) {
+                        hits = ArrayList(YouTubeInnerTube.search(nextResult.title, n + 2))
+                        hits.removeAll { it.id == videoId }
                     }
-                } catch (_: Exception) {
-                }
-                try {
-                    loadRelatedUncached(videoId, n, key)
-                } catch (e: IOException) {
-                    throw CompletionException(e)
+                    if (hits.size > n) hits = ArrayList(hits.subList(0, n))
+                    val immutable = hits.toList()
+                    RELATED_CACHE[key] = InfoCacheEntry(immutable, System.currentTimeMillis())
+                    // Speculatively prefetch stream URLs for the top related videos
+                    immutable.take(3).forEach { prefetchFormats("https://www.youtube.com/watch?v=${it.id}") }
+                    immutable
+                } catch (e: Exception) {
+                    throw e as? CompletionException
+                        ?: CompletionException(
+                            e as? IOException ?: IOException("InnerTube related failed", e)
+                        )
                 }
             }, SEARCH_EXECUTOR)
         }
@@ -227,19 +224,6 @@ object YtDlp {
         return null
     }
 
-    @Throws(IOException::class)
-    private fun searchUncached(query: String, limit: Int): List<YtVideoInfo> {
-        val binary = resolveBinary()
-        val args = ArrayList<String>()
-        args.add(binary)
-        addCookieArgs(args)
-        args.addAll(listOf("-J", "--flat-playlist", "--no-warnings",
-            "--extractor-args", "youtube:player_client=web",
-            "--playlist-end", limit.toString(),
-            "ytsearch$limit:$query"))
-        return parseEntries(runJsonProcess(ProcessBuilder(args), "search:$query", 25))
-    }
-
     private fun addCookieArgs(args: MutableList<String>) {
         val proxy = Initializer.config.ytdlpProxy.trim()
         if (proxy.isNotEmpty()) {
@@ -265,138 +249,6 @@ object YtDlp {
     }
 
     @Throws(IOException::class)
-    private fun loadRelatedUncached(videoId: String, limit: Int, cacheKey: String): List<YtVideoInfo> {
-        val binary = resolveBinary()
-        val args = ArrayList<String>()
-        args.add(binary)
-        addCookieArgs(args)
-        args.addAll(listOf("-J", "--flat-playlist", "--no-warnings",
-            "--extractor-args", "youtube:player_client=web",
-            "--playlist-end", (limit + 2).toString(),
-            "--lazy-playlist",
-            "https://www.youtube.com/watch?v=$videoId&list=RD$videoId"))
-        var hits: MutableList<YtVideoInfo>
-        try {
-            hits = ArrayList(parseEntries(runJsonProcess(ProcessBuilder(args), "mix:$videoId", 20)))
-        } catch (_: IOException) {
-            var title: String? = null
-            try {
-                YouTubeWeb.metadata(videoId)?.let { title = it.title }
-            } catch (_: Exception) {
-            }
-            if (title.isNullOrBlank()) title = fetchVideoTitle(videoId)
-            if (title.isNullOrBlank()) {
-                RELATED_CACHE[cacheKey] = InfoCacheEntry(emptyList(), System.currentTimeMillis())
-                return emptyList()
-            }
-            hits = ArrayList(search(title, limit + 2))
-        }
-        hits.removeAll { it.id == videoId }
-        if (hits.size > limit) hits = hits.subList(0, limit)
-        val immutable = hits.toList()
-        RELATED_CACHE[cacheKey] = InfoCacheEntry(immutable, System.currentTimeMillis())
-        return immutable
-    }
-
-    @Throws(IOException::class)
-    private fun fetchVideoTitle(videoId: String): String? {
-        val cached = TITLE_CACHE[videoId]
-        val now = System.currentTimeMillis()
-        if (cached != null && (now - cached.createdAtMs) <= INFO_CACHE_TTL_MS) return cached.title
-
-        val future = IN_FLIGHT_TITLES.computeIfAbsent(videoId) {
-            CompletableFuture.supplyAsync({
-                try {
-                    val title = fetchVideoTitleUncached(videoId)
-                    TITLE_CACHE[videoId] = TitleCacheEntry(title, System.currentTimeMillis())
-                    title
-                } catch (e: IOException) {
-                    throw CompletionException(e)
-                }
-            }, SEARCH_EXECUTOR)
-        }
-        try {
-            return future.get(30, TimeUnit.SECONDS)
-        } catch (e: CompletionException) {
-            throw (e.cause as? IOException) ?: IOException("yt-dlp title fetch failed for video: $videoId", e.cause ?: e)
-        } catch (e: Exception) {
-            throw (e.cause as? IOException) ?: IOException("yt-dlp title fetch failed for video: $videoId", e.cause ?: e)
-        } finally {
-            IN_FLIGHT_TITLES.remove(videoId, future)
-        }
-    }
-
-    @Throws(IOException::class)
-    private fun fetchVideoTitleUncached(videoId: String): String? {
-        val binary = resolveBinary()
-        val args = ArrayList<String>()
-        args.add(binary)
-        addCookieArgs(args)
-        args.addAll(listOf("--print", "%(title)s", "--no-warnings", "--skip-download",
-            "https://www.youtube.com/watch?v=$videoId"))
-        val out = runJsonProcess(ProcessBuilder(args), "title:$videoId", 25).trim()
-        return out.ifEmpty { null }
-    }
-
-    @Throws(IOException::class)
-    private fun runJsonProcess(pb: ProcessBuilder, tag: String, timeoutSec: Int): String {
-        pb.redirectErrorStream(false)
-        val process = pb.start()
-        val stdout = StringBuilder()
-        val stderr = StringBuilder()
-        val stdoutReader = streamReader(process.inputStream, stdout, "YtDlp-stdout")
-        val stderrReader = streamReader(process.errorStream, stderr, "YtDlp-stderr")
-        stdoutReader.start()
-        stderrReader.start()
-        try {
-            if (!process.waitFor(timeoutSec.toLong(), TimeUnit.SECONDS)) {
-                process.destroyForcibly()
-                stdoutReader.join(2_000)
-                stderrReader.join(2_000)
-                throw IOException("yt-dlp timed out for $tag")
-            }
-            stdoutReader.join(5_000)
-            stderrReader.join(5_000)
-        } catch (e: InterruptedException) {
-            process.destroyForcibly()
-            Thread.currentThread().interrupt()
-            throw IOException("Interrupted waiting for yt-dlp", e)
-        }
-        if (process.exitValue() != 0) {
-            throw IOException("yt-dlp exited ${process.exitValue()}: ${stderr.toString().trim()}")
-        }
-        return stdout.toString()
-    }
-
-    @Throws(IOException::class)
-    private fun parseEntries(json: String): List<YtVideoInfo> {
-        val out = ArrayList<YtVideoInfo>()
-        try {
-            val root = JsonParser.parseString(json).asJsonObject
-            if (!root.has("entries") || !root.get("entries").isJsonArray) return out
-            for (el in root.getAsJsonArray("entries")) {
-                if (!el.isJsonObject) continue
-                val e = el.asJsonObject
-                val id = optString(e, "id") ?: continue
-                val title = optString(e, "title") ?: continue
-                val dur = optDouble(e, "duration")
-                val durSec = dur?.let { floor(it).toLong() }
-                val views = optLong(e)
-                val uploader = optString(e, "uploader") ?: optString(e, "channel")
-                out.add(YtVideoInfo(id, title, uploader, durSec, views))
-            }
-            return out
-        } catch (e: Exception) {
-            throw IOException("Failed to parse search JSON", e)
-        }
-    }
-
-    private fun optLong(obj: JsonObject): Long? {
-        if (!obj.has("view_count") || obj.get("view_count").isJsonNull) return null
-        return try { obj.get("view_count").asLong } catch (_: Exception) { null }
-    }
-
-    @Throws(IOException::class)
     private fun waitForInfoFuture(
         future: CompletableFuture<List<YtVideoInfo>>,
         tag: String,
@@ -418,7 +270,7 @@ object YtDlp {
         var lastError: IOException? = null
         for (attempt in 0 until 2) {
             if (attempt > 0) {
-                try { Thread.sleep(5_000) } catch (ie: InterruptedException) {
+                try { Thread.sleep(2_000) } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt()
                     throw IOException("Interrupted before yt-dlp retry", ie)
                 }
@@ -441,14 +293,14 @@ object YtDlp {
         addCookieArgs(cmd)
 
         if (resolveCookieBrowser() == null && !Files.exists(BUNDLED_DIR.resolve("cookies.txt"))) {
-            cmd.addAll(listOf("--extractor-args", "youtube:player_client=tv_embedded,web,mweb"))
+            cmd.addAll(listOf("--extractor-args", "youtube:player_client=mweb"))
         }
 
         cmd.addAll(listOf(
             "-J", "--no-playlist", "--no-warnings", "--no-check-formats",
             "--ignore-config", "--no-mark-watched",
-            "--extractor-retries", "1",
-            "--socket-timeout", "10",
+            "--extractor-retries", "0",
+            "--socket-timeout", "8",
             videoUrl,
         ))
         val pb = ProcessBuilder(cmd)
@@ -461,11 +313,11 @@ object YtDlp {
         stdoutReader.start()
         stderrReader.start()
         try {
-            if (!process.waitFor(90, TimeUnit.SECONDS)) {
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
                 process.destroyForcibly()
                 stdoutReader.join(2_000)
                 stderrReader.join(2_000)
-                LoggingManager.warn("[YtDlp] fetch timeout after 90s for $videoUrl (stderr: ${stderr.toString().trim()})")
+                LoggingManager.warn("[YtDlp] fetch timeout after 30s for $videoUrl (stderr: ${stderr.toString().trim()})")
                 throw IOException("yt-dlp timed out for url: $videoUrl")
             }
             stdoutReader.join(5_000)
@@ -565,29 +417,6 @@ object YtDlp {
         if (result.isEmpty()) return null
         LoggingManager.info("[YtDlp] exported ${lines.size} cookie lines, header ${result.length} chars")
         return result
-    }
-
-    internal fun extractJsonObject(html: String, marker: String): String? {
-        val idx = html.indexOf(marker)
-        if (idx < 0) return null
-        val braceStart = html.indexOf('{', idx)
-        if (braceStart < 0) return null
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (i in braceStart until html.length) {
-            val c = html[i]
-            if (escaped) { escaped = false; continue }
-            if (c == '\\' && inString) { escaped = true; continue }
-            if (c == '"') { inString = !inString; continue }
-            if (inString) continue
-            if (c == '{') depth++
-            else if (c == '}') {
-                depth--
-                if (depth == 0) return html.substring(braceStart, i + 1)
-            }
-        }
-        return null
     }
 
     @Throws(IOException::class)
@@ -874,6 +703,5 @@ object YtDlp {
     }
 
     private data class InfoCacheEntry(val results: List<YtVideoInfo>, val createdAtMs: Long)
-    private data class TitleCacheEntry(val title: String?, val createdAtMs: Long)
     private data class CacheEntry(val streams: List<YtStream>, val createdAtMs: Long)
 }

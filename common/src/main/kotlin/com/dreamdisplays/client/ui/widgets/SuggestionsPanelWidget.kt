@@ -2,7 +2,7 @@ package com.dreamdisplays.client.ui.widgets
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.ytdlp.Thumbnails
-import com.dreamdisplays.ytdlp.YouTubeWeb
+import com.dreamdisplays.ytdlp.YouTubeInnerTube
 import com.dreamdisplays.ytdlp.YtDlp
 import com.dreamdisplays.ytdlp.YtVideoInfo
 import me.inotsleep.utils.logging.LoggingManager
@@ -103,7 +103,7 @@ class SuggestionsPanelWidget(
             val seq2 = requestSeq.incrementAndGet()
             EXECUTOR.submit {
                 try {
-                    val meta = YouTubeWeb.metadata(maybeId)
+                    val meta = YouTubeInnerTube.metadata(maybeId)
                     if (meta != null) publish(seq2, listOf(meta), null)
                     else publish(seq2, listOf(YtVideoInfo(maybeId,
                         "https://youtu.be/$maybeId", null, null, null)), null)

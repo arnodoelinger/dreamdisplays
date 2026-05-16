@@ -36,7 +36,7 @@ object VideoMetadataCache {
 
     private fun fetchAndStore(videoId: String) {
         try {
-            YouTubeWeb.metadata(videoId)?.let { put(videoId, it) }
+            YouTubeInnerTube.metadata(videoId)?.let { put(videoId, it) }
         } catch (e: Exception) {
             LoggingManager.warn("Metadata fetch failed for $videoId: ${e.message}")
         } finally {
