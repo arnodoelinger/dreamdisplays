@@ -1,4 +1,4 @@
-package com.dreamdisplays.media
+package com.dreamdisplays.player.stream
 
 import com.dreamdisplays.ytdlp.YtStream
 import kotlin.math.abs
@@ -9,8 +9,10 @@ import kotlin.math.abs
  */
 object MediaStreamSelector {
 
+    /** Parses a stream's resolution label (e.g. "720p") into an integer quality value (e.g. 720). */
     fun parseQuality(stream: YtStream): Int = parseQualityValue(stream.resolution, Int.MAX_VALUE)
 
+    /** Parses quality value. */
     fun parseQualityValue(raw: String?, fallback: Int): Int {
         if (raw == null) return fallback
         var i = 0
@@ -22,6 +24,10 @@ object MediaStreamSelector {
         return raw.substring(start, i).toIntOrNull() ?: fallback
     }
 
+    /**
+     * Maps a quality value (e.g. 720) to a standard video dimension (e.g. 1280x720). This is used to pick the best
+     * matching stream when the quality label is missing or unparseable.
+     */
     fun qualityToDims(quality: Int): IntArray = when {
         quality <= 240 -> intArrayOf(426, 240)
         quality <= 360 -> intArrayOf(640, 360)
@@ -32,6 +38,9 @@ object MediaStreamSelector {
         else -> intArrayOf(3840, 2160)
     }
 
+    /**
+     * Pick the best matching video stream from the list of candidates, based on the target quality and presence of audio.
+     */
     fun pickVideo(streams: List<YtStream>?, target: Int): YtStream? {
         if (streams.isNullOrEmpty()) return null
         return streams.asSequence()
@@ -43,6 +52,10 @@ object MediaStreamSelector {
             )
     }
 
+    /**
+     * Pick the best matching audio stream from the list of candidates, based on the requested language and presence of
+     * audio in the chosen video stream.
+     */
     fun pickAudio(audioStreams: List<YtStream>, lang: String, chosenVideo: YtStream?): YtStream? {
         val audioOnly = audioStreams.filter { !it.hasVideo() }
         val requested = lang.trim()
@@ -67,6 +80,7 @@ object MediaStreamSelector {
         return audioStreams.firstOrNull()
     }
 
+    /** Matches the requested language against the stream's audio track ID and name. Case-insensitive, partial match. */
     fun matchesLanguage(stream: YtStream, lang: String): Boolean {
         val needle = lang.lowercase()
         if (needle.isEmpty()) return false

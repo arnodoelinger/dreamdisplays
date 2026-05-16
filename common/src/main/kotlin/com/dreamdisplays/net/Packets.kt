@@ -1,7 +1,7 @@
 package com.dreamdisplays.net
 
 import com.dreamdisplays.Initializer
-import com.dreamdisplays.util.FacingUtil
+import com.dreamdisplays.utils.FacingUtil
 import net.minecraft.network.RegistryFriendlyByteBuf
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload

@@ -7,7 +7,7 @@ import com.dreamdisplays.display.DisplayScreen
 import com.dreamdisplays.display.DisplaySettings
 import com.dreamdisplays.meta.UpdateCheck
 import com.dreamdisplays.net.Packets
-import com.dreamdisplays.util.GeneralUtil
+import com.dreamdisplays.utils.GeneralUtil
 import com.dreamdisplays.ytdlp.*
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft

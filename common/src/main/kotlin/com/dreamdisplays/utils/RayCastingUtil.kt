@@ -1,4 +1,4 @@
-package com.dreamdisplays.util
+package com.dreamdisplays.utils
 
 import net.minecraft.client.Minecraft
 import net.minecraft.world.level.ClipContext

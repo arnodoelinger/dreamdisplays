@@ -1,6 +1,6 @@
 package com.dreamdisplays.meta
 
-import com.dreamdisplays.util.GeneralUtil
+import com.dreamdisplays.utils.GeneralUtil
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import me.inotsleep.utils.logging.LoggingManager

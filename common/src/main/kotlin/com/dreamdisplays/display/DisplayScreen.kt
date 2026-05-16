@@ -2,7 +2,7 @@ package com.dreamdisplays.display
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.client.ui.DisplayMenu
-import com.dreamdisplays.media.MediaPlayer
+import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.ytdlp.YtDlp
 import me.inotsleep.utils.logging.LoggingManager

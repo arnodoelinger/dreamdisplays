@@ -1,4 +1,4 @@
-package com.dreamdisplays.util
+package com.dreamdisplays.utils
 
 import java.io.IOException
 import java.net.URI

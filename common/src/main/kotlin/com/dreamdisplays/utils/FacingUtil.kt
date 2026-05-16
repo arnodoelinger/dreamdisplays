@@ -1,4 +1,4 @@
-package com.dreamdisplays.util
+package com.dreamdisplays.utils
 
 /** Facing directions for block placement and interaction. */
 enum class FacingUtil {

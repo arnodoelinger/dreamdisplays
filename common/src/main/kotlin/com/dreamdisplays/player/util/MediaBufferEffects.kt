@@ -1,4 +1,4 @@
-package com.dreamdisplays.media
+package com.dreamdisplays.player.util
 
 import kotlin.math.abs
 
@@ -32,6 +32,9 @@ object MediaBufferEffects {
         }
     }
 
+    /**
+     * Apply volume in place to an interleaved S16LE buffer. `len` is the number of valid bytes (must be a multiple of 2).
+     */
     fun applyVolumeS16LE(buf: ByteArray, len: Int, volume: Double) {
         if (abs(volume - 1.0) < 1e-5) return
         var i = 0

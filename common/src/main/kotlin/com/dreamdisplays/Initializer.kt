@@ -6,9 +6,9 @@ import com.dreamdisplays.display.DisplayScreen
 import com.dreamdisplays.display.DisplaySettings
 import com.dreamdisplays.ffmpeg.FFmpegBinary
 import com.dreamdisplays.net.Packets
-import com.dreamdisplays.util.FacingUtil
-import com.dreamdisplays.util.GeneralUtil
-import com.dreamdisplays.util.RayCastingUtil
+import com.dreamdisplays.utils.FacingUtil
+import com.dreamdisplays.utils.GeneralUtil
+import com.dreamdisplays.utils.RayCastingUtil
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
 import me.inotsleep.utils.logging.LoggingManager
