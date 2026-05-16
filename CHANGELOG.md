@@ -18,13 +18,19 @@ Plugin:
 Mod:
 
 - [x] Faster YouTube web operations and video loading
-- [x] Show 24 recommended videos based on the current video instead of 12
-- [x] Use different browser list for macOS to avoid false security messages
-- [x] Add `yt-dlp` proxy in config
+- [x] Show max 24 recommended videos based on the current video instead of 12
+- [x] Load 3 displays simultaneously instead of 4 to avoid `yt-dlp` overloading
+- [x] Don't prefetch suggestions videos to avoid unnecessary `yt-dlp` calls
+- [x] Use different browser list for macOS for better compatibility
+- [x] Add `yt-dlp` proxy option in config
+- [x] Fix critical bug where displays prefetching even far away from the player
+- [x] Standardize logs, warnings and errors
+- [x] Reformat codebase
 
 Plugin:
 
-- [x] No changes
+- [x] Standardize logs, warnings and errors
+- [x] Reformat codebase
 
 # Version 1.6.2
 
