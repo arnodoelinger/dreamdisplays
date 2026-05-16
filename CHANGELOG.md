@@ -2,7 +2,7 @@
 
 Mod:
 
-- [ ] Support 26.1.2 version and Java 25
+- [x] Support 26.1.2 version and Java 25
 - [ ] Support YouTube shorts (separate button)
 - [ ] Support Fabric servers
 - [ ] Support singleplayer mode
