@@ -55,7 +55,7 @@ object YtDlp {
     private val PREWARM_EXECUTOR = Executors.newSingleThreadExecutor { r ->
         Thread(r, "YtDlp-prewarm").apply { isDaemon = true }
     }
-    private val FETCH_EXECUTOR = Executors.newFixedThreadPool(4) { r ->
+    private val FETCH_EXECUTOR = Executors.newFixedThreadPool(3) { r ->
         Thread(r, "YtDlp-fetch").apply { isDaemon = true }
     }
     private val SEARCH_EXECUTOR = Executors.newFixedThreadPool(4) { r ->
