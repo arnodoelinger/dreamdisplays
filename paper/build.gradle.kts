@@ -5,7 +5,7 @@ plugins {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:26.1.2.build.63")
+    compileOnly("io.papermc.paper:paper-api:26.1.2.build.63-stable")
     compileOnly(libs.jspecify)
     implementation("me.inotsleep:utils:1.4.10")
     implementation("com.github.zafarkhaja:java-semver:0.10.2")
