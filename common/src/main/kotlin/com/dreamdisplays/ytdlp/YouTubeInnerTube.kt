@@ -138,7 +138,7 @@ object YouTubeInnerTube {
             "socks5", "socks4", "socks" -> Proxy.Type.SOCKS
             else -> Proxy.Type.HTTP
         }
-        val port = if (proxyUri.port > 0) proxyUri.port else 1080
+        val port = if (proxyUri.port > 0) proxyUri.port else if (type == Proxy.Type.SOCKS) 1080 else 8080
         val host = proxyUri.host ?: return uri.toURL().openConnection() as HttpURLConnection
         val proxy = Proxy(type, InetSocketAddress(host, port))
         return uri.toURL().openConnection(proxy) as HttpURLConnection
