@@ -5,7 +5,7 @@ plugins {
     kotlin("jvm") version libs.versions.kotlin
 }
 
-kotlin { jvmToolchain(21) }
+kotlin { jvmToolchain(25) }
 
 dependencies {
     implementation(project(":common"))
@@ -35,7 +35,7 @@ tasks.processResources {
 
 java {
     withSourcesJar()
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(25)) }
 }
 
 tasks.withType<JavaCompile>().configureEach {

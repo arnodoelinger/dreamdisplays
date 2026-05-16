@@ -17,13 +17,13 @@ config = "dreamdisplays.mixins.json"
 [[dependencies.dreamdisplays]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21.10.31,)"
+versionRange = "[26.1.2.0,)"
 ordering = "NONE"
 side = "CLIENT"
 
 [[dependencies.dreamdisplays]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.11]"
+versionRange = "[26.1.2]"
 ordering = "NONE"
 side = "CLIENT"

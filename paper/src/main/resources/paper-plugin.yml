@@ -1,7 +1,7 @@
 name: DreamDisplays
 version: '${version}'
 main: com.dreamdisplays.Main
-api-version: '1.21'
+api-version: '26.1.2'
 description: 'Plugin for the Dream Displays mod.'
 authors:
   - arsmotorin

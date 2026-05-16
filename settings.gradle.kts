@@ -9,7 +9,7 @@ pluginManagement {
         maven("https://maven.quiltmc.org/repository/snapshot/")
     }
     plugins {
-        kotlin("jvm") version "2.3.0"
+        kotlin("jvm") version "2.4.0-RC"
     }
 }
 

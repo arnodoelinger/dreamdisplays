@@ -5,18 +5,18 @@ plugins {
 }
 
 dependencies {
-    compileOnly("io.papermc.paper:paper-api:1.21-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:26.1.2.build.63")
     compileOnly(libs.jspecify)
-    implementation("me.inotsleep:utils:1.3.4")
+    implementation("me.inotsleep:utils:1.4.10")
     implementation("com.github.zafarkhaja:java-semver:0.10.2")
     implementation("com.moandjiezana.toml:toml4j:0.7.2") {
         exclude(group = "com.google.code.gson", module = "gson")
     }
-    implementation(kotlin("stdlib-jdk8:2.3.0"))
-    implementation("org.bstats:bstats-bukkit:3.1.0")
+    implementation(kotlin("stdlib-jdk8:2.4.0-RC"))
+    implementation("org.bstats:bstats-bukkit:3.2.1")
 }
 
-val targetJavaVersion = 21
+val targetJavaVersion = 25
 java {
     toolchain {
         languageVersion.set(JavaLanguageVersion.of(targetJavaVersion))

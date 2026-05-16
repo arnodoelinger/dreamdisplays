@@ -1,13 +1,11 @@
-import net.fabricmc.loom.task.RemapJarTask
-
 plugins {
-    id("net.fabricmc.fabric-loom-remap") version libs.versions.loom // remove remap in 26.1
+    id("net.fabricmc.fabric-loom") version libs.versions.loom
     id("maven-publish")
     id("com.gradleup.shadow") version libs.versions.shadow
     kotlin("jvm") version libs.versions.kotlin
 }
 
-kotlin { jvmToolchain(21) }
+kotlin { jvmToolchain(25) }
 
 loom {
     accessWidenerPath.set(project(":common").file("src/main/resources/dreamdisplays.classtweaker"))
@@ -15,12 +13,8 @@ loom {
 
 dependencies {
     minecraft(libs.fabricMinecraft)
-    mappings(loom.layered {
-        officialMojangMappings()
-        parchment(rootProject.property("neoForge.parchment.parchmentArtifact")!!)
-    })
-    modImplementation(libs.fabricLoader)
-    modImplementation(libs.fabricApi)
+    implementation(libs.fabricLoader)
+    implementation(libs.fabricApi)
     shadow(project(":common"))
     shadow(libs.kotlinStdlib)
 }
@@ -38,7 +32,7 @@ tasks.processResources {
 
 java {
     withSourcesJar()
-    toolchain { languageVersion.set(JavaLanguageVersion.of(21)) }
+    toolchain { languageVersion.set(JavaLanguageVersion.of(25)) }
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -49,18 +43,11 @@ tasks.jar {
     from(rootProject.file("LICENSE"))
 }
 
-tasks.withType<RemapJarTask>().configureEach {
-    inputFile.set(tasks.shadowJar.flatMap { it.archiveFile })
-
-    archiveClassifier = ""
-    destinationDirectory.set(rootProject.layout.buildDirectory.dir("libs"))
-
-    archiveBaseName = "dreamdisplays-fabric"
-    archiveVersion.set(rootProject.version.toString())
-}
-
 tasks.shadowJar {
     configurations = listOf(project.configurations.getByName("shadow"))
+    archiveBaseName = "dreamdisplays-fabric"
+    archiveClassifier = ""
+    destinationDirectory.set(rootProject.layout.buildDirectory.dir("libs"))
     dependencies {
         include(project(":common"))
         include(dependency("me.inotsleep:utils"))
