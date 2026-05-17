@@ -17,6 +17,11 @@ dependencies {
     implementation(libs.fabricApi)
     shadow(project(":common"))
     shadow(libs.kotlinStdlib)
+    shadow("com.moandjiezana.toml:toml4j:0.7.2") {
+        exclude(group = "com.google.code.gson", module = "gson")
+    }
+    shadow("com.github.zafarkhaja:java-semver:0.10.2")
+    shadow("org.xerial:sqlite-jdbc:3.49.1.0")
 }
 
 tasks.processResources {
@@ -56,10 +61,13 @@ tasks.shadowJar {
     dependencies {
         include(project(":common"))
         include(dependency("me.inotsleep:utils"))
+        include(dependency("org.xerial:sqlite-jdbc"))
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))
         include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
         include(dependency("org.jetbrains:annotations"))
+        include(dependency("com.moandjiezana.toml:toml4j"))
+        include(dependency("com.github.zafarkhaja:java-semver"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
@@ -69,6 +77,8 @@ tasks.shadowJar {
         "kotlin",
         "org.jetbrains.annotations",
         "org.intellij.lang.annotations",
+        "com.moandjiezana.toml",
+        "com.github.zafarkhaja.semver",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
