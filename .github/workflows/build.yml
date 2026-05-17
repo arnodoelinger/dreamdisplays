@@ -200,7 +200,7 @@ jobs:
 
       - name: Create GitHub Release
         # Remove if snapshot
-        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
