@@ -306,7 +306,7 @@ object YtDlp {
                 }
             }
             try {
-                return fetchUncachedOnce(videoUrl)
+                return fetchUncachedOnce(videoUrl, attempt)
             } catch (e: IOException) {
                 if (e.message?.contains("timed out") == true) throw e
                 lastError = e
@@ -316,7 +316,7 @@ object YtDlp {
     }
 
     @Throws(IOException::class)
-    private fun fetchUncachedOnce(videoUrl: String): List<YtStream> {
+    private fun fetchUncachedOnce(videoUrl: String, attempt: Int = 0): List<YtStream> {
         val binary = resolveBinary()
         val cmd = ArrayList<String>()
         cmd.add(binary)
@@ -324,7 +324,8 @@ object YtDlp {
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }
         if (!hasCookieArg) {
-            cmd.addAll(listOf("--extractor-args", "youtube:player_client=mweb"))
+            val clients = if (attempt == 0) "tv_embedded,mweb" else "ios,android,mweb"
+            cmd.addAll(listOf("--extractor-args", "youtube:player_client=$clients"))
         }
 
         cmd.addAll(
@@ -674,12 +675,13 @@ object YtDlp {
                     return browser
                 }
             }
-            LoggingManager.warn(
-                "[yt-dlp] No working browser cookies found (tried: ${candidates.joinToString(", ")}). " +
-                        "YouTube may rate-limit or refuse requests." +
-                        "Set 'ytdlp-cookies-from-browser' in config to your browser name," +
-                        "or to 'none' to silence this warning."
-            )
+            if (configured != "auto") {
+                LoggingManager.warn(
+                    "[yt-dlp] Browser '$configured' not found or has no YouTube cookies. " +
+                            "YouTube may rate-limit or refuse requests. " +
+                            "Set 'ytdlp-cookies-from-browser' to 'none' to disable."
+                )
+            }
             cookieBrowserResolved = true
             return null
         }
