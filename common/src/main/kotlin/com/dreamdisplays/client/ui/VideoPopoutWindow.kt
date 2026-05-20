@@ -226,6 +226,7 @@ private class QuadRenderer {
         uploadBuf.clear(); uploadBuf.put(bytes, 0, size); uploadBuf.flip()
 
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
         if (texW != w || texH != h) {
             GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
                 GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, uploadBuf)
@@ -234,6 +235,7 @@ private class QuadRenderer {
             GL11.glTexSubImage2D(GL11.GL_TEXTURE_2D, 0, 0, 0, w, h,
                 GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, uploadBuf)
         }
+        GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
         GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
     }
 
