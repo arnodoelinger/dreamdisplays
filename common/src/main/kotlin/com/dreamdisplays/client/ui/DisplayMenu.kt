@@ -538,14 +538,13 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             g.blit(
                 RenderPipelines.GUI_TEXTURED, texId,
                 videoX, videoY, 0f, 0f, videoW, videoH,
-                scr.textureWidth, scr.textureHeight,
-                scr.textureWidth, scr.textureHeight
+                videoW, videoH,
             )
         } else {
             currentThumbnail()?.let { thumb ->
                 g.blit(
                     RenderPipelines.GUI_TEXTURED, thumb,
-                    videoX, videoY, 0f, 0f, videoW, videoH, 320, 180
+                    videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH
                 )
                 g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
             }
