@@ -30,7 +30,6 @@ object DisplayManager {
         }
 
         screens[displayScreen.uuid] = displayScreen
-        saveScreenData(displayScreen)
     }
 
     fun unregisterScreen(displayScreen: DisplayScreen) {

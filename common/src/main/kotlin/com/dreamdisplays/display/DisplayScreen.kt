@@ -419,9 +419,7 @@ class DisplayScreen(
 
     fun restoreSavedTime() {
         val mp = mediaPlayer ?: return
-        if (savedTimeNanos > 0 && mp.isInitialized() && mp.canSeek()) {
-            mp.seekTo(savedTimeNanos, false)
-        }
+        if (savedTimeNanos > 0) mp.seekTo(savedTimeNanos, false)
     }
 
     fun canSeek(): Boolean = mediaPlayer?.canSeek() == true
