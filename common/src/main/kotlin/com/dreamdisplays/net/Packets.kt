@@ -46,7 +46,8 @@ object Packets {
         val url: String,
         val facingUtil: FacingUtil,
         val isSync: Boolean,
-        val lang: String
+        val lang: String,
+        val isLocked: Boolean? = null,
     ) : CustomPacketPayload {
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
 
@@ -65,6 +66,7 @@ object Packets {
                     buf.writeByte(packet.facingUtil.toPacket().toInt())
                     buf.writeBoolean(packet.isSync)
                     buf.writeUtf(packet.lang)
+                    buf.writeBoolean(packet.isLocked ?: true)
                 },
                 { buf ->
                     Info(
@@ -76,9 +78,22 @@ object Packets {
                         buf.readUtf(),
                         FacingUtil.fromPacket(buf.readByte()),
                         buf.readBoolean(),
-                        buf.readUtf()
+                        buf.readUtf(),
+                        if (buf.readableBytes() > 0) buf.readBoolean() else null,
                     )
                 }
+            )
+        }
+    }
+
+    data class SetLocked(val uuid: UUID, val locked: Boolean) : CustomPacketPayload {
+        override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
+
+        companion object {
+            val PACKET_ID: CustomPacketPayload.Type<SetLocked> = createType("set_locked")
+            val PACKET_CODEC: StreamCodec<RegistryFriendlyByteBuf, SetLocked> = StreamCodec.of(
+                { buf, packet -> buf.writeUUID(packet.uuid); buf.writeBoolean(packet.locked) },
+                { buf -> SetLocked(buf.readUUID(), buf.readBoolean()) }
             )
         }
     }

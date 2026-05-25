@@ -88,6 +88,7 @@ class Server : ModInitializer {
             runCatching { register(Packets.Report.PACKET_ID, Packets.Report.PACKET_CODEC) }
             runCatching { register(Packets.Version.PACKET_ID, Packets.Version.PACKET_CODEC) }
             runCatching { register(Packets.SetVideo.PACKET_ID, Packets.SetVideo.PACKET_CODEC) }
+            runCatching { register(Packets.SetLocked.PACKET_ID, Packets.SetLocked.PACKET_CODEC) }
             runCatching { register(Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC) }
         }
         // Fabric server end

@@ -99,6 +99,14 @@ class StorageManager(private val config: Config) {
                 )
             }
         }
+        meta.getColumns(null, null, "${tablePrefix}displays", "isLocked").use { cols ->
+            if (!cols.next()) {
+                conn.executeUpdate(
+                    "ALTER TABLE ${tablePrefix}displays " +
+                            "ADD COLUMN isLocked BOOLEAN NOT NULL DEFAULT 1"
+                )
+            }
+        }
 
         val allDisplays = fetchAllDisplays()
         DisplayManager.register(allDisplays.filterNotNull())
@@ -122,8 +130,8 @@ class StorageManager(private val config: Config) {
         }
 
         val sql = "REPLACE INTO ${tablePrefix}displays " +
-                "(id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang) " +
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+                "(id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang, isLocked) " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
 
         try {
             conn.executeUpdate(
@@ -142,7 +150,8 @@ class StorageManager(private val config: Config) {
                 // Fabric server end
                 data.isSync,
                 data.duration,
-                data.lang
+                data.lang,
+                data.isLocked
             )
         } catch (e: SQLException) {
             logger.error("[StorageManager] Could not save display to database", e)
@@ -155,7 +164,7 @@ class StorageManager(private val config: Config) {
             return emptyList()
         }
 
-        val sql = "SELECT id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang " +
+        val sql = "SELECT id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang, isLocked " +
                 "FROM ${tablePrefix}displays"
         val list = mutableListOf<DisplayData?>()
 
@@ -192,6 +201,7 @@ class StorageManager(private val config: Config) {
                     // Fabric server end
                     data.url = videoCode
                     data.isSync = rs.getBoolean("isSync")
+                    data.isLocked = rs.getBoolean("isLocked")
                     val dur = rs.getLong("duration")
                     if (!rs.wasNull()) data.duration = dur
                     data.lang = rs.getString("lang") ?: ""

@@ -45,6 +45,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
     private var syncReset: ButtonWidget? = null
     private var muteButtonWidget: ButtonWidget? = null
     private var popoutButtonWidget: ButtonWidget? = null
+    private var lockButtonWidget: ButtonWidget? = null
     private var deleteButtonWidget: ButtonWidget? = null
     private var reportButtonWidget: ButtonWidget? = null
     private var progress: ProgressSliderWidget? = null
@@ -227,7 +228,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             }
 
             override fun applyValue() {
-                if (ds.owner && syncReset != null) {
+                if (ds.canEdit && syncReset != null) {
                     ds.isSync = value
                     syncReset!!.active = !value
                     ds.waitForMFInit { ds.sendSync() }
@@ -235,19 +236,35 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             }
         }
         syncReset = resetButton {
-            if (ds.owner && sync != null) {
+            if (ds.canEdit && sync != null) {
                 sync!!.updateValue(false)
                 ds.waitForMFInit { ds.sendSync() }
             }
         }
-        sync!!.active = ds.owner
-        brightness?.let { it.active = !ds.isSync || ds.owner }
+        sync!!.active = ds.canEdit
+        brightness?.let { it.active = !ds.isSync || ds.canEdit }
 
         val red = WidgetSprites(
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button"),
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button_disabled"),
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/red_button_highlighted")
         )
+
+        lockButtonWidget = object : ButtonWidget(
+            0, 0, 0, 0, 24, 24,
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, if (ds.isLocked == false) "unlock" else "lock"), 2
+        ) {
+            override fun onPress() {
+                val cur = displayScreen ?: return
+                if (cur.isLocked == null) return
+                val newLocked = cur.isLocked != true
+                cur.isLocked = newLocked
+                Initializer.sendPacket(Packets.SetLocked(cur.uuid, newLocked))
+                setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, if (newLocked) "lock" else "unlock"))
+            }
+        }
+        lockButtonWidget!!.active = ds.owner
+        lockButtonWidget!!.visible = ds.isLocked != null
 
         deleteButtonWidget = object : ButtonWidget(
             0, 0, 0, 0, 64, 64,
@@ -291,6 +308,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         addRenderableWidget(volumeReset!!)
         addRenderableWidget(sync!!)
         addRenderableWidget(syncReset!!)
+        addRenderableWidget(lockButtonWidget!!)
         addRenderableWidget(deleteButtonWidget!!)
         reportButtonWidget?.let { addRenderableWidget(it) }
 
@@ -341,7 +359,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
 
         val videoReady = ds.isVideoStarted && !ds.errored
         val popoutLocked = ds.isPopoutActive
-        syncReset?.active = videoReady && ds.owner && ds.isSync
+        syncReset?.active = videoReady && ds.canEdit && ds.isSync
         renderDReset?.active = videoReady && !popoutLocked && ds.renderDistance != Initializer.config.defaultDistance
         qualityReset?.active = videoReady && ds.quality != "720"
         brightness?.let { brightnessReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
@@ -350,10 +368,18 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         volume?.active = videoReady
         renderD?.active = videoReady && !popoutLocked
         quality?.active = videoReady
-        brightness?.active = videoReady && (!ds.isSync || ds.owner)
-        sync?.active = videoReady && ds.owner
+        brightness?.active = videoReady && (!ds.isSync || ds.canEdit)
+        sync?.active = videoReady && ds.canEdit
         deleteButtonWidget?.active = ds.owner
-        progress?.active = videoReady && ds.canSeek() && !ds.isLive && (!ds.isSync || ds.owner)
+        lockButtonWidget?.let {
+            val locked = ds.isLocked
+            it.visible = locked != null
+            if (locked != null) {
+                it.active = ds.owner
+                it.setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, if (locked) "lock" else "unlock"))
+            }
+        }
+        progress?.active = videoReady && ds.canSeek() && !ds.isLive && (!ds.isSync || ds.canEdit)
 
         if (ds.errored) {
             popoutDropdownVisible = false
@@ -468,7 +494,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         listOf(
             backButtonWidget, forwardButtonWidget, pauseButtonWidget,
             renderDReset, qualityReset, brightnessReset, volumeReset, syncReset, muteButtonWidget,
-            popoutButtonWidget
+            popoutButtonWidget, lockButtonWidget
         ).forEach { w ->
             w?.active = false; w?.visible = false
         }
@@ -559,7 +585,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
 
         renderTitleOverlay(g, scr, innerX, innerY + previewMaxH, innerW)
 
-        val canSeek = !(scr.isSync && !scr.owner) && scr.canSeek()
+        val canSeek = !(scr.isSync && !scr.canEdit) && scr.canSeek()
         backButtonWidget?.let {
             it.x = innerX; it.y = controlsRowY
             it.width = CTRL_BTN; it.height = CTRL_BTN
@@ -603,7 +629,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         pauseButtonWidget?.let {
             it.x = controlsRight - CTRL_BTN; it.y = controlsRowY
             it.width = CTRL_BTN; it.height = CTRL_BTN
-            it.active = !(scr.isSync && !scr.owner)
+            it.active = !(scr.isSync && !scr.canEdit)
             it.setIconTextureId(
                 Identifier.fromNamespaceAndPath(
                     Initializer.MOD_ID,
@@ -764,6 +790,13 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
         deleteButtonWidget?.let {
             it.x = rightEdge - btn; it.y = yEdge; it.width = btn; it.height = btn
+            rightEdge -= btn + 4
+        }
+        lockButtonWidget?.let {
+            if (it.visible) {
+                it.x = rightEdge - btn; it.y = yEdge; it.width = btn; it.height = btn
+                rightEdge -= btn + 4
+            }
         }
     }
 
@@ -895,6 +928,19 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             )
         }
 
+        lockButtonWidget?.let {
+            val locked = displayScreen?.isLocked
+            if (locked != null && hovered(mouseX, mouseY, it)) {
+                g.setComponentTooltipForNextFrame(
+                    font, listOf(
+                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.1" else "dreamdisplays.button.unlock.tooltip.1")
+                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
+                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.2" else "dreamdisplays.button.unlock.tooltip.2")
+                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
+                    ), mouseX, mouseY
+                )
+            }
+        }
         deleteButtonWidget?.let {
             if (hovered(mouseX, mouseY, it)) {
                 g.setComponentTooltipForNextFrame(

@@ -43,6 +43,7 @@ class DisplayData(
     var url: String = ""
     var lang: String = ""
     var isSync: Boolean = false
+    var isLocked: Boolean = true
     var duration: Long? = null
 
     val minX = minOf(pos1.x, pos2.x)

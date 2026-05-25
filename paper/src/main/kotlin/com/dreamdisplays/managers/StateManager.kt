@@ -35,7 +35,7 @@ object StateManager {
             return
         }
 
-        if (data.ownerId != player.uniqueId) {
+        if (data.isLocked && data.ownerId != player.uniqueId) {
             return
         }
 

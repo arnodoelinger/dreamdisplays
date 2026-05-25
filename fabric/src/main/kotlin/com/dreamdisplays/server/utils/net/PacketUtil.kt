@@ -33,7 +33,8 @@ object PacketUtil {
             url = display.url,
             facingUtil = facing,
             isSync = display.isSync,
-            lang = display.lang
+            lang = display.lang,
+            isLocked = display.isLocked,
         )
         players.forEach { player ->
             runCatching { ServerPlayNetworking.send(player, packet) }

@@ -59,6 +59,7 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
             "dreamdisplays:version" -> handleVersion(player, message)
             "dreamdisplays:display_enabled" -> handleDisplayEnabled(player, message)
             "dreamdisplays:set_video" -> handleSetVideo(player, message)
+            "dreamdisplays:set_locked" -> handleSetLocked(player, message)
         }
     }
 
@@ -250,7 +251,8 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
                 display.url,
                 display.lang,
                 display.facing,
-                display.isSync
+                display.isSync,
+                display.isLocked
             )
         }
     }
@@ -265,7 +267,8 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
                 val displayData = getDisplayData(displayId)
                     ?: return@runCatching
 
-                if (displayData.ownerId != player.uniqueId &&
+                if (displayData.isLocked &&
+                    displayData.ownerId != player.uniqueId &&
                     !player.hasPermission(config.permissions.delete)
                 ) return@runCatching
 
@@ -279,6 +282,29 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
             }
         }.onFailure { error ->
             warn("[PacketReceiver] Failed to decode set_video packet", error)
+        }
+    }
+
+    private fun handleSetLocked(player: Player, message: ByteArray) {
+        runCatching {
+            DataInputStream(ByteArrayInputStream(message)).use { input ->
+                val displayId = input.readUUID()
+                val locked = input.readBoolean()
+
+                val displayData = getDisplayData(displayId)
+                    ?: return@runCatching
+
+                if (displayData.ownerId != player.uniqueId &&
+                    !player.hasPermission(config.permissions.delete)
+                ) return@runCatching
+
+                displayData.isLocked = locked
+
+                val receivers = getReceivers(displayData)
+                sendUpdate(displayData, receivers)
+            }
+        }.onFailure { error ->
+            warn("[PacketReceiver] Failed to decode set_locked packet", error)
         }
     }
 

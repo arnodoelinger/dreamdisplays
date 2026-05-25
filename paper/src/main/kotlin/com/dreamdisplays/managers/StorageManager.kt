@@ -75,6 +75,14 @@ class StorageManager(var plugin: Main) {
                 )
             }
         }
+        meta.getColumns(null, null, tablePrefix + "displays", "isLocked").use { cols ->
+            if (!cols.next()) {
+                conn.executeUpdate(
+                    "ALTER TABLE " + tablePrefix + "displays " +
+                            "ADD COLUMN isLocked BOOLEAN NOT NULL DEFAULT 1"
+                )
+            }
+        }
         register(this.allDisplays.filterNotNull())
     }
 
@@ -116,8 +124,8 @@ class StorageManager(var plugin: Main) {
         }
 
         val sql = "REPLACE INTO " + tablePrefix + "displays " +
-                "(id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang) " +
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?)"
+                "(id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang, isLocked) " +
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)"
 
         try {
             conn.executeUpdate(
@@ -140,7 +148,8 @@ class StorageManager(var plugin: Main) {
                 data.facing.ordinal.toByte(),
                 data.isSync,
                 data.duration,
-                data.lang
+                data.lang,
+                data.isLocked
             )
         } catch (e: SQLException) {
             error("[StorageManager] Could not save display to database", e)
@@ -157,7 +166,7 @@ class StorageManager(var plugin: Main) {
             }
 
             val sql =
-                "SELECT id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang " +
+                "SELECT id, ownerId, videoCode, world, pos1, pos2, size, facing, isSync, duration, lang, isLocked " +
                         "FROM " + tablePrefix + "displays"
             val list: MutableList<DisplayData?> = ArrayList()
 
@@ -240,6 +249,8 @@ class StorageManager(var plugin: Main) {
                         }
 
                         data.lang = rs.getString("lang") ?: ""
+                        val isLockedVal = rs.getBoolean("isLocked")
+                        data.isLocked = if (rs.wasNull()) true else isLockedVal
 
                         list.add(data)
                     }

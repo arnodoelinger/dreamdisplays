@@ -37,7 +37,7 @@ object StateManager {
         }
 
         // Fabric server start
-        if (data.ownerId != player.uuid) return
+        if (data.isLocked && data.ownerId != player.uuid) return
         // Fabric server end
 
         if (packet.currentTime < 0 || packet.limitTime < 0

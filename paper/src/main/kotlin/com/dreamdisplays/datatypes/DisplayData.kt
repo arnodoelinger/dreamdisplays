@@ -39,6 +39,7 @@ class DisplayData(
     var url: String = ""
     var lang: String = ""
     var isSync: Boolean = false
+    var isLocked: Boolean = true
     var duration: Long? = null
 
     val box: BoundingBox = BoundingBox(

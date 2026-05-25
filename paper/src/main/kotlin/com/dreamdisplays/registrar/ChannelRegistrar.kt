@@ -17,7 +17,8 @@ object ChannelRegistrar {
         "dreamdisplays:report",
         "dreamdisplays:version",
         "dreamdisplays:display_enabled",
-        "dreamdisplays:set_video"
+        "dreamdisplays:set_video",
+        "dreamdisplays:set_locked"
     )
 
     private val outgoingChannels = listOf(

@@ -119,7 +119,8 @@ object DisplayManager {
             display.url,
             display.lang,
             display.facing,
-            display.isSync
+            display.isSync,
+            display.isLocked
         )
     }
 

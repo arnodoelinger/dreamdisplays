@@ -42,7 +42,9 @@ class DisplayScreen(
     private val savedSettings = DisplaySettings.getSettings(uuid)
 
     var owner: Boolean = Minecraft.getInstance().player?.gameProfile?.id?.toString() == ownerUuid.toString()
+    var isLocked: Boolean? = null
     var errored: Boolean = false
+    val canEdit: Boolean get() = owner || isLocked != true
     var muted: Boolean = savedSettings.muted
     var texture: DynamicTexture? = null
     var textureId: Identifier? = null
@@ -179,6 +181,7 @@ class DisplayScreen(
         width = packet.width
         height = packet.height
         isSync = packet.isSync
+        isLocked = packet.isLocked
         owner = Minecraft.getInstance().player?.gameProfile?.id?.toString() == packet.ownerUuid.toString()
 
         if (videoUrl != packet.url || lang != packet.lang) {

@@ -173,9 +173,8 @@ object ServerPacketHandler {
                 val displayId = payload.uuid
                 val displayData = DisplayManager.getDisplayData(displayId) ?: return@registerGlobalReceiver
 
-                val config = Server.config
                 // Fabric server start
-                if (displayData.ownerId != player.uuid && !isOpLevel2(player)) return@registerGlobalReceiver
+                if (displayData.isLocked && displayData.ownerId != player.uuid && !isOpLevel2(player)) return@registerGlobalReceiver
                 // Fabric server end
 
                 val wasSync = displayData.isSync
@@ -187,6 +186,29 @@ object ServerPacketHandler {
                 if (wasSync) StateManager.resetAndBroadcast(displayId, receivers)
             }.onFailure { e ->
                 logger.warn("[PacketReceiver] Failed to handle set_video packet", e)
+            }
+        }
+
+        ServerPlayNetworking.registerGlobalReceiver(Packets.SetLocked.PACKET_ID) { payload, context ->
+            val player = context.player()
+            runCatching {
+                val displayData = DisplayManager.getDisplayData(payload.uuid)
+                    ?: return@registerGlobalReceiver MessageUtil.sendMessage(player, "noDisplay")
+
+                // Fabric server start
+                if (displayData.ownerId != player.uuid && !isOpLevel2(player)) {
+                // Fabric server end
+                    MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+                    return@registerGlobalReceiver
+                }
+
+                displayData.isLocked = payload.locked
+                Server.storage?.saveDisplay(displayData)
+
+                val receivers = DisplayManager.getReceivers(displayData, context.server())
+                PacketUtil.sendDisplayInfo(receivers, displayData)
+            }.onFailure { e ->
+                logger.warn("[PacketReceiver] Failed to handle set_locked packet", e)
             }
         }
     }

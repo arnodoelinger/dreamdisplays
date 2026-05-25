@@ -45,6 +45,7 @@ object PacketUtil {
         lang: String,
         facing: BlockFace,
         isSync: Boolean,
+        isLocked: Boolean = true,
     ) {
         runCatching {
             val packet = buildPacket { output ->
@@ -59,6 +60,7 @@ object PacketUtil {
                 output.writeByte(facing.toPacketByte().toInt())
                 output.writeBoolean(isSync)
                 output.writeString(lang)
+                output.writeBoolean(isLocked)
             }
 
             sendPacket(players, CHANNEL_DISPLAY_INFO, packet)
