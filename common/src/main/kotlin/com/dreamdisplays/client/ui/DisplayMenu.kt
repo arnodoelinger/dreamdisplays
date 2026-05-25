@@ -51,6 +51,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
     private var progress: ProgressSliderWidget? = null
     private var suggestions: SuggestionsPanelWidget? = null
     private var lastSuggestedVideoId: String? = null
+    private var prevQualityListSize = 0
 
     private var popoutDropdownVisible = false
     private var ddX = 0; private var ddY = 0; private val ddW = 80; private val ddItemH = 18
@@ -165,11 +166,14 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             qualityFraction(ds.quality)
         ) {
             override fun updateMessage() {
-                message = Component.literal("${qualityFromFraction(value)}p")
+                message = Component.literal(
+                    if (ds.qualityList.isNotEmpty()) "${qualityFromFraction(value)}p"
+                    else "${ds.quality}p"
+                )
             }
 
             override fun applyValue() {
-                ds.quality = qualityFromFraction(value)
+                if (ds.qualityList.isNotEmpty()) ds.quality = qualityFromFraction(value)
             }
         }
 
@@ -365,9 +369,18 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         brightness?.let { brightnessReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
         volume?.let { volumeReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
 
+        val qualityList = ds.qualityList
+        if (qualityList.size != prevQualityListSize) {
+            prevQualityListSize = qualityList.size
+            if (qualityList.isNotEmpty()) {
+                quality?.value = qualityFraction(ds.quality)
+                quality?.updateMessage()
+            }
+        }
+
         volume?.active = videoReady
         renderD?.active = videoReady && !popoutLocked
-        quality?.active = videoReady
+        quality?.active = videoReady && qualityList.isNotEmpty()
         brightness?.active = videoReady && (!ds.isSync || ds.canEdit)
         sync?.active = videoReady && ds.canEdit
         deleteButtonWidget?.active = ds.owner || ds.isAdmin

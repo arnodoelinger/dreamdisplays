@@ -91,7 +91,7 @@ abstract class SliderWidget(
         updateMessage()
     }
 
-    protected abstract fun updateMessage()
+    abstract fun updateMessage()
     protected abstract fun applyValue()
 
     companion object {
