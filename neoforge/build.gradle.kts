@@ -31,6 +31,9 @@ tasks.processResources {
     filesMatching("META-INF/neoforge.mods.toml") {
         expand(mapOf("version" to projectVersion))
     }
+    filesMatching("assets/dreamdisplays/version.txt") {
+        expand(mapOf("version" to projectVersion))
+    }
 }
 
 java {

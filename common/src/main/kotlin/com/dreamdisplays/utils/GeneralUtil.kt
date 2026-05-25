@@ -8,8 +8,6 @@ import java.util.*
 /** General utility functions for the mod. */
 object GeneralUtil {
     private val DIRECT_ID = Regex("[a-zA-Z0-9_-]{11}")
-    private val FABRIC_VERSION = Regex("\"version\"\\s*:\\s*\"([^\"]+)\"")
-    private val NEOFORGE_VERSION = Regex("version\\s*=\\s*\"([^\"]+)\"")
 
     fun detectPlatform(): String {
         val os = System.getProperty("os.name").lowercase(Locale.ENGLISH)
@@ -65,15 +63,7 @@ object GeneralUtil {
         return stream.bufferedReader().use { it.readText() }
     }
 
-    fun getModVersion(): String {
-        runCatching {
-            FABRIC_VERSION.find(readResource("/fabric.mod.json"))?.groupValues?.get(1)?.trim()
-        }.getOrNull()?.let { return it }
-
-        runCatching {
-            NEOFORGE_VERSION.find(readResource("/META-INF/neoforge.mods.toml"))?.groupValues?.get(1)?.trim()
-        }.getOrNull()?.let { return it }
-
-        return "unknown"
-    }
+    fun getModVersion(): String =
+        runCatching { readResource("/assets/dreamdisplays/version.txt").trim() }
+            .getOrDefault("unknown")
 }
