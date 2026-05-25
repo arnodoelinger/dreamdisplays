@@ -64,20 +64,13 @@ object YtDlp {
             override fun removeEldestEntry(eldest: Map.Entry<K, V>) = size > maxSize
         })
 
-    @Volatile
-    private var resolvedBinary: String? = null
-
-    @Volatile
-    private var resolvedCookieBrowser: String? = null
-
-    @Volatile
-    private var cookieBrowserResolved: Boolean = false
-
-    @Volatile
-    private var cachedCookieHeader: String? = null
-
-    @Volatile
-    private var cookieHeaderExportedAt: Long = 0
+    @Volatile private var resolvedBinary: String? = null
+    @Volatile private var resolvedCookieBrowser: String? = null
+    @Volatile private var cookieBrowserResolved: Boolean = false
+    private const val COOKIE_BROWSER_RETRY_MS: Long = 60L * 60L * 1_000L
+    @Volatile private var cachedCookieHeader: String? = null
+    @Volatile private var cookieHeaderExportedAt: Long = 0
+    @Volatile private var cookieBrowserResolvedAt: Long = 0
 
     @Throws(IOException::class)
     fun fetch(videoUrl: String): List<YtStream> {
@@ -324,7 +317,7 @@ object YtDlp {
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }
         if (!hasCookieArg) {
-            val clients = if (attempt == 0) "tv_embedded,mweb" else "ios,android,mweb"
+            val clients = if (attempt == 0) "web,ios,mweb" else "android,tv_embedded,mweb"
             cmd.addAll(listOf("--extractor-args", "youtube:player_client=$clients"))
         }
 
@@ -639,9 +632,12 @@ object YtDlp {
     }
 
     private fun resolveCookieBrowser(): String? {
-        if (cookieBrowserResolved) return resolvedCookieBrowser
+        val now = System.currentTimeMillis()
+        if (cookieBrowserResolved && resolvedCookieBrowser != null) return resolvedCookieBrowser
+        if (cookieBrowserResolved && (now - cookieBrowserResolvedAt) < COOKIE_BROWSER_RETRY_MS) return null
         synchronized(this) {
-            if (cookieBrowserResolved) return resolvedCookieBrowser
+            if (cookieBrowserResolved && resolvedCookieBrowser != null) return resolvedCookieBrowser
+            if (cookieBrowserResolved && (now - cookieBrowserResolvedAt) < COOKIE_BROWSER_RETRY_MS) return null
             var configured = Initializer.config.ytdlpCookiesFromBrowser
             configured = configured.trim().lowercase(Locale.ENGLISH)
 
@@ -672,6 +668,7 @@ object YtDlp {
                     LoggingManager.info("[yt-dlp] Using cookies from browser: $browser.")
                     resolvedCookieBrowser = browser
                     cookieBrowserResolved = true
+                    cookieBrowserResolvedAt = System.currentTimeMillis()
                     return browser
                 }
             }
@@ -682,6 +679,7 @@ object YtDlp {
                             "Set 'ytdlp-cookies-from-browser' to 'none' to disable."
                 )
             }
+            cookieBrowserResolvedAt = System.currentTimeMillis()
             cookieBrowserResolved = true
             return null
         }
@@ -698,8 +696,7 @@ object YtDlp {
                 binary,
                 "--cookies-from-browser", browser,
                 "--cookies", testCookieFile.toString(),
-                "--simulate", "--quiet", "--no-warnings", "--skip-download",
-                "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+                "--dump-user-agent", "--quiet", "--no-warnings",
             )
             pb.redirectErrorStream(true)
             val p = pb.start()
@@ -708,14 +705,16 @@ object YtDlp {
             } catch (_: IOException) {
             }
             p.inputStream.use { it.readAllBytes() }
-            if (!p.waitFor(15, TimeUnit.SECONDS)) {
+            if (!p.waitFor(10, TimeUnit.SECONDS)) {
                 p.destroyForcibly()
                 return false
             }
-            if (!Files.exists(testCookieFile)) return false
+            if (!Files.exists(testCookieFile)) {
+                return p.exitValue() == 0
+            }
             val lines = Files.readAllLines(testCookieFile, StandardCharsets.UTF_8)
             Files.deleteIfExists(testCookieFile)
-            lines.any { !it.startsWith("#") && "youtube" in it }
+            lines.any { !it.startsWith("#") && it.count { c -> c == '\t' } >= 6 }
         } catch (_: Exception) {
             false
         }
