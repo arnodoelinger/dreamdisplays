@@ -284,7 +284,8 @@ class DisplayScreen(
         val tex = texture ?: return
         try {
             mp.updateFrame(tex.getTexture())
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            LoggingManager.warn("[DisplayScreen $uuid] fitTexture failed: ${e.message}")
         }
         popoutWindow?.renderFrame()
     }
