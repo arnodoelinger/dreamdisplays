@@ -83,24 +83,24 @@ jobs:
 
       # Snapshot versions
       # Remove creation of pre-release if releasing snapshot
-#      - name: Create pre-release
-#        if: contains(needs.build.outputs.version, '-SNAPSHOT')
-#        run: |
-#          VERSION=${{ needs.build.outputs.version }}
-#          TAG="v${VERSION}"
-#
-#          gh release create "$TAG" \
-#            --title "$VERSION" \
-#            --prerelease \
-#            build/libs/dreamdisplays-*.jar \
-#          || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --clobber
-#        env:
-#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create pre-release
+        if: contains(needs.build.outputs.version, '-SNAPSHOT')
+        run: |
+          VERSION=${{ needs.build.outputs.version }}
+          TAG="v${VERSION}"
+
+          gh release create "$TAG" \
+            --title "$VERSION" \
+            --prerelease \
+            build/libs/dreamdisplays-*.jar \
+          || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # Beta versions
       - name: Extract changelogs
         # Remove if snapshot
-        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         id: changelog
         run: |
           VERSION=${{ needs.build.outputs.version }}
@@ -122,7 +122,7 @@ jobs:
 
       - name: Publish Fabric
         # Remove if snapshot
-        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Fabric 26.1.2] Dream Displays ${{ needs.build.outputs.version }}'
@@ -150,7 +150,7 @@ jobs:
 
       - name: Publish NeoForge
         # Remove if snapshot
-        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[NeoForge 26.1.2] Dream Displays ${{ needs.build.outputs.version }}'
@@ -173,7 +173,7 @@ jobs:
 
       - name: Publish Paper
         # Remove if snapshot
-        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Paper 26.x] Dream Displays ${{ needs.build.outputs.version }}'
@@ -199,13 +199,13 @@ jobs:
 
       - name: Create GitHub Release
         # Remove if snapshot
-        #if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
+        # if: "!contains(needs.build.outputs.version, '-SNAPSHOT')"
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: v${{ needs.build.outputs.version }}
           # Add if snapshot
-          github-prerelease: ${{ contains(needs.build.outputs.version, '-SNAPSHOT') }}
+          # github-prerelease: ${{ contains(needs.build.outputs.version, '-SNAPSHOT') }}
 
           github-generate-changelog: false
           github-draft: false
