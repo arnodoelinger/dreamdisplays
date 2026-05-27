@@ -13,7 +13,7 @@
       "com.dreamdisplays.Client"
     ],
     "main": [
-      "com.dreamdisplays.Server"
+      "com.dreamdisplays.server.Server"
     ]
   },
   "mixins": [

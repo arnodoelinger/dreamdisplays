@@ -7,11 +7,23 @@ plugins {
 
 kotlin { jvmToolchain(25) }
 
+sourceSets.main {
+    kotlin.srcDir("../server/src/main/kotlin")
+}
+
 loom {
     accessWidenerPath.set(project(":common").file("src/main/resources/dreamdisplays.classtweaker"))
 }
 
 dependencies {
+    compileOnly(libs.ofratAnnotations)
+    "kotlinCompilerPluginClasspath"(libs.ofratPlugin)
+    compileOnly("io.papermc.paper:paper-api:26.1.2.build.65-stable")
+    compileOnly("org.bstats:bstats-bukkit:3.2.1")
+    compileOnly("me.inotsleep:utils:1.4.10")
+    compileOnly("com.moandjiezana.toml:toml4j:0.7.2")
+    compileOnly("com.github.zafarkhaja:java-semver:0.10.2")
+
     minecraft(libs.fabricMinecraft)
     implementation(libs.fabricLoader)
     implementation(libs.fabricApi)
@@ -45,6 +57,12 @@ java {
 
 tasks.withType<JavaCompile>().configureEach {
     options.encoding = Charsets.UTF_8.name()
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions.freeCompilerArgs.addAll(
+        "-P", "plugin:io.github.arsmotorin.ofrat:platform=fabric"
+    )
 }
 
 tasks.jar {

@@ -20,7 +20,7 @@ class Client : ClientModInitializer, Mod {
     override fun onInitializeClient() {
         Initializer.onModInit(this)
 
-        // Note: PayloadTypeRegistry registrations are done in Server (it's a main entrypoint)
+        // Note: PayloadTypeRegistry registrations are done in server/ (it's a main entrypoint)
         // which runs on both integrated and dedicated servers, before the client entrypoint.
 
         ClientPlayNetworking.registerGlobalReceiver(Packets.Info.PACKET_ID) { payload, _ ->

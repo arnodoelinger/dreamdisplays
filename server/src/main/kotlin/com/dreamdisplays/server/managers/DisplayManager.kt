@@ -1,0 +1,356 @@
+package com.dreamdisplays.server.managers
+
+import io.github.arsmotorin.ofrat.FabricOnly
+import io.github.arsmotorin.ofrat.PaperOnly
+
+import com.dreamdisplays.server.Main.Companion.config
+import com.dreamdisplays.server.Main.Companion.getInstance
+import com.dreamdisplays.server.Server
+import com.dreamdisplays.server.datatypes.DisplayData
+import com.dreamdisplays.server.datatypes.FabricDisplayData
+import com.dreamdisplays.server.datatypes.FabricSelectionData
+import com.dreamdisplays.server.datatypes.PaperDisplayData
+import com.dreamdisplays.server.datatypes.PaperSelectionData
+import com.dreamdisplays.server.meta.Scheduler.runAsync
+import com.dreamdisplays.server.meta.Scheduler.runSync
+import com.dreamdisplays.server.utils.MessageUtil
+import com.dreamdisplays.server.utils.RegionUtil
+import com.dreamdisplays.server.utils.RegionUtil.calculateRegion
+import com.dreamdisplays.server.utils.ReporterUtil
+import com.dreamdisplays.server.utils.ReporterUtil.sendReport
+import com.dreamdisplays.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.server.utils.net.PacketUtil
+import com.dreamdisplays.server.utils.net.PacketUtil.sendDelete
+import net.minecraft.core.BlockPos
+import net.minecraft.core.registries.BuiltInRegistries
+import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerPlayer
+import org.bukkit.Bukkit.getOfflinePlayer
+import org.bukkit.Location
+import org.bukkit.entity.Player
+import org.bukkit.util.BoundingBox
+import org.jspecify.annotations.NullMarked
+import java.lang.System.currentTimeMillis
+import java.util.*
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ConcurrentHashMap
+import java.util.function.Consumer
+
+/**
+ * Manages all displays on the server. Handles registration, deletion, overlap detection,
+ * receiver lookup, and report rate-limiting.
+ */
+@NullMarked object DisplayManager {
+    private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
+    private val reportTime: MutableMap<UUID, Long> = ConcurrentHashMap()
+
+    /** Returns the display registered under [id], or null if none exists. */
+    @JvmStatic fun getDisplayData(id: UUID?): DisplayData? = displays[id]
+
+    /** Returns a snapshot list of all currently registered displays. */
+    fun getDisplays(): List<DisplayData> = displays.values.toList()
+
+    /** Bulk-registers displays loaded from storage without sending any updates. */
+    fun register(list: List<DisplayData>) {
+        list.forEach { displays[it.id] = it }
+    }
+
+    /** Removes the display referenced by [id], if it exists. */
+    @JvmStatic fun delete(id: UUID) {
+        val data = displays[id] ?: return
+        when (data) {
+            is PaperDisplayData -> delete(data)
+            is FabricDisplayData -> delete(data)
+        }
+    }
+
+    /** Returns the first display whose bounding box contains [location], or null. */
+    @PaperOnly fun isContains(location: Location): PaperDisplayData? {
+        return displays.values.filterIsInstance<PaperDisplayData>().firstOrNull { d ->
+            d.pos1.world == location.world && d.box.contains(location.toVector())
+        }
+    }
+
+    /** Returns true if the selection [data] intersects any existing display. */
+    @PaperOnly fun isOverlaps(data: PaperSelectionData): Boolean {
+        val pos1 = data.pos1 ?: return false
+        val pos2 = data.pos2 ?: return false
+        val selWorld = pos1.world
+        val region = calculateRegion(pos1, pos2)
+        val box = BoundingBox(
+            region.minX.toDouble(), region.minY.toDouble(), region.minZ.toDouble(),
+            (region.maxX + 1).toDouble(), (region.maxY + 1).toDouble(), (region.maxZ + 1).toDouble(),
+        )
+        return displays.values.filterIsInstance<PaperDisplayData>().any { d ->
+            d.pos1.world == selWorld && box.overlaps(d.box)
+        }
+    }
+
+    /** Registers a new display and broadcasts an update to nearby players. */
+    @PaperOnly fun register(data: PaperDisplayData) {
+        displays[data.id] = data
+        sendUpdate(data, getReceivers(data))
+    }
+
+    /** Returns the players currently in range of [display] in its world. */
+    @PaperOnly fun getReceivers(display: PaperDisplayData): List<Player> =
+        display.pos1.world?.players?.filter { it.location.isInRange(display) } ?: emptyList()
+
+    /** Returns true if this location lies within `maxRenderDistance` of the [display]'s box. */
+    @PaperOnly private fun Location.isInRange(display: PaperDisplayData): Boolean {
+        val maxRender = config.settings.maxRenderDistance
+        val clampedX = blockX.coerceIn(display.box.minX.toInt(), display.box.maxX.toInt())
+        val clampedY = blockY.coerceIn(display.box.minY.toInt(), display.box.maxY.toInt())
+        val clampedZ = blockZ.coerceIn(display.box.minZ.toInt(), display.box.maxZ.toInt())
+        val dx = blockX - clampedX
+        val dy = blockY - clampedY
+        val dz = blockZ - clampedZ
+        return dx * dx + dy * dy + dz * dz <= maxRender * maxRender
+    }
+
+    /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
+    @PaperOnly fun sendUpdate(display: PaperDisplayData, players: List<Player>) {
+        @Suppress("UNCHECKED_CAST")
+        PacketUtil.sendDisplayInfo(
+            players as MutableList<Player?>,
+            display.id, display.ownerId, display.box.min, display.width, display.height,
+            display.url, display.lang, display.facing, display.isSync, display.isLocked,
+        )
+    }
+
+    /** Sends a refresh packet for every display to in-range players in their respective worlds. */
+    @PaperOnly fun updateAllDisplays() {
+        val papers = displays.values.filterIsInstance<PaperDisplayData>()
+        val playersByWorld = papers.mapNotNull { it.pos1.world }.distinct()
+            .associateWith { it.players.toMutableList() }
+
+        papers.forEach { display ->
+            val world = display.pos1.world ?: return@forEach
+            val worldPlayers = playersByWorld[world] ?: mutableListOf()
+            val receivers = worldPlayers.filter { it.location.isInRange(display) }
+            sendUpdate(display, receivers)
+        }
+    }
+
+    /** Removes [displayData] from storage and the registry and notifies nearby clients. */
+    @PaperOnly fun delete(displayData: PaperDisplayData) {
+        runAsync { getInstance().storage.deleteDisplay(displayData) }
+        @Suppress("UNCHECKED_CAST")
+        sendDelete(getReceivers(displayData) as MutableList<Player?>, displayData.id)
+        displays.remove(displayData.id)
+    }
+
+    /**
+     * Posts a report about display [id] to the configured webhook, respecting per-display cooldown
+     * and informing [player] about the outcome.
+     */
+    @PaperOnly @JvmStatic fun report(id: UUID, player: Player) {
+        val displayData = displays[id] as? PaperDisplayData ?: return
+        val lastReport = reportTime.getOrPut(id) { 0L }
+
+        if (currentTimeMillis() - lastReport < config.settings.reportCooldown) {
+            MessageUtil.sendMessage(player, "reportTooQuickly")
+            return
+        }
+
+        reportTime[id] = currentTimeMillis()
+
+        runAsync {
+            try {
+                if (config.settings.webhookUrl.isEmpty()) return@runAsync
+                sendReport(
+                    displayData.pos1, displayData.url, displayData.id, player,
+                    config.settings.webhookUrl, getOfflinePlayer(displayData.ownerId).name,
+                )
+                runSync { MessageUtil.sendMessage(player, "reportSent") }
+            } catch (e: Exception) {
+                getInstance().logger.warning("Exception while sending report: ${e.message}")
+                runSync { MessageUtil.sendMessage(player, "reportFailed") }
+            }
+        }
+    }
+
+    /** Invokes [saveDisplay] for every currently registered display (used by storage flush). */
+    @PaperOnly fun save(saveDisplay: Consumer<PaperDisplayData>) {
+        displays.values.filterIsInstance<PaperDisplayData>().forEach(saveDisplay)
+    }
+
+    /**
+     * Scans every display's bounding box for the configured base material; displays with none
+     * are removed from disk and memory. Returns the UUIDs of removed displays.
+     */
+    @PaperOnly fun validateDisplaysAndCleanup(): List<UUID> {
+        val baseMaterial = config.settings.baseMaterial
+        val invalidDisplays = mutableListOf<PaperDisplayData>()
+
+        displays.values.filterIsInstance<PaperDisplayData>().forEach { display ->
+            val world = display.pos1.world
+            if (world == null) { invalidDisplays.add(display); return@forEach }
+
+            var hasBaseMaterial = false
+            val minX = display.box.minX.toInt()
+            val minY = display.box.minY.toInt()
+            val minZ = display.box.minZ.toInt()
+            val maxX = display.box.maxX.toInt()
+            val maxY = display.box.maxY.toInt()
+            val maxZ = display.box.maxZ.toInt()
+
+            outerLoop@ for (x in minX until maxX) {
+                for (y in minY until maxY) {
+                    for (z in minZ until maxZ) {
+                        if (world.getBlockAt(x, y, z).type == baseMaterial) {
+                            hasBaseMaterial = true
+                            break@outerLoop
+                        }
+                    }
+                }
+            }
+            if (!hasBaseMaterial) invalidDisplays.add(display)
+        }
+
+        val removedUuids = mutableListOf<UUID>()
+        if (invalidDisplays.isNotEmpty()) {
+            invalidDisplays.forEach { display ->
+                runAsync { getInstance().storage.deleteDisplay(display) }
+                displays.remove(display.id)
+                removedUuids.add(display.id)
+            }
+        }
+        return removedUuids
+    }
+
+    /** Returns the first display whose bounding box contains [blockPos] in [worldKey]. */
+    @FabricOnly fun isContains(worldKey: String, blockPos: BlockPos): FabricDisplayData? {
+        return displays.values.filterIsInstance<FabricDisplayData>().firstOrNull { d ->
+            d.worldKey == worldKey &&
+                d.box.contains(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5)
+        }
+    }
+
+    /** Returns true if the selection [sel] intersects any existing display. */
+    @FabricOnly fun isOverlaps(sel: FabricSelectionData): Boolean {
+        val selBox = sel.selectionBox() ?: return false
+        val wk = sel.worldKey ?: return false
+        return displays.values.filterIsInstance<FabricDisplayData>().any { d ->
+            d.worldKey == wk && d.box.intersects(selBox)
+        }
+    }
+
+    /** Registers a new display. Caller is responsible for broadcasting. */
+    @FabricOnly fun register(data: FabricDisplayData) {
+        displays[data.id] = data
+    }
+
+    /** Returns the players currently in range of [display] in its world. */
+    @FabricOnly fun getReceivers(display: FabricDisplayData, server: MinecraftServer): List<ServerPlayer> {
+        return server.playerList.players.filter { p ->
+            p.level().dimension().identifier().toString() == display.worldKey &&
+                p.blockPosition().isInRange(display)
+        }
+    }
+
+    /** Returns true if this block position lies within `maxRenderDistance` of the [display]'s box. */
+    @FabricOnly private fun BlockPos.isInRange(display: FabricDisplayData): Boolean {
+        val maxRender = Server.config.settings.maxRenderDistance
+        val clampedX = x.coerceIn(display.minX, display.maxX)
+        val clampedY = y.coerceIn(display.minY, display.maxY)
+        val clampedZ = z.coerceIn(display.minZ, display.maxZ)
+        val dx = x - clampedX
+        val dy = y - clampedY
+        val dz = z - clampedZ
+        return dx * dx + dy * dy + dz * dz <= maxRender * maxRender
+    }
+
+    /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
+    @FabricOnly fun sendUpdate(display: FabricDisplayData, players: List<ServerPlayer>) {
+        FabricPacketUtil.sendDisplayInfo(players, display)
+    }
+
+    /** Sends a refresh packet for every display to in-range players. */
+    @FabricOnly fun updateAllDisplays(server: MinecraftServer) {
+        displays.values.filterIsInstance<FabricDisplayData>().forEach { display ->
+            val receivers = getReceivers(display, server)
+            if (receivers.isNotEmpty()) sendUpdate(display, receivers)
+        }
+    }
+
+    /** Removes [data] from storage and the registry. */
+    @FabricOnly fun delete(data: FabricDisplayData) {
+        displays.remove(data.id)
+        Server.storage?.deleteDisplay(data)
+    }
+
+    /**
+     * Posts a report about display [id] to the configured webhook, respecting per-display cooldown
+     * and informing [player] about the outcome.
+     */
+    @FabricOnly fun report(id: UUID, player: ServerPlayer, server: MinecraftServer) {
+        val displayData = displays[id] as? FabricDisplayData ?: return
+        val lastReport = reportTime.getOrPut(id) { 0L }
+        val cfg = Server.config
+
+        if (System.currentTimeMillis() - lastReport < cfg.settings.reportCooldown) {
+            MessageUtil.sendMessage(player, "reportTooQuickly")
+            return
+        }
+        reportTime[id] = System.currentTimeMillis()
+        if (cfg.settings.webhookUrl.isEmpty()) return
+
+        val ownerName = server.playerList.players.find { it.uuid == displayData.ownerId }?.name?.string ?: "Unknown"
+        val locationStr = "${displayData.worldKey} (x=${displayData.minX}, y=${displayData.minY}, z=${displayData.minZ})"
+
+        CompletableFuture.runAsync {
+            runCatching {
+                ReporterUtil.sendReport(
+                    locationStr, displayData.url, displayData.id, player.name.string, ownerName, cfg.settings.webhookUrl,
+                )
+                server.execute { MessageUtil.sendMessage(player, "reportSent") }
+            }.onFailure {
+                server.execute { MessageUtil.sendMessage(player, "reportFailed") }
+            }
+        }
+    }
+
+    /** Invokes [saveDisplay] for every currently registered display (used by storage flush). */
+    @FabricOnly fun save(saveDisplay: (FabricDisplayData) -> Unit) {
+        displays.values.filterIsInstance<FabricDisplayData>().forEach(saveDisplay)
+    }
+
+    /**
+     * Scans every display's bounding box for the configured base material; displays with none
+     * are removed from disk and memory. Returns the UUIDs of removed displays.
+     */
+    @FabricOnly fun validateDisplaysAndCleanup(server: MinecraftServer): List<UUID> {
+        val cfg = Server.config
+        val baseMaterialKey = cfg.settings.baseMaterial
+        val invalidDisplays = mutableListOf<FabricDisplayData>()
+
+        displays.values.filterIsInstance<FabricDisplayData>().forEach { display ->
+            val level = RegionUtil.getLevelByKey(server, display.worldKey) ?: run {
+                invalidDisplays.add(display); return@forEach
+            }
+            var hasBaseMaterial = false
+            outerLoop@ for (x in display.minX..display.maxX) {
+                for (y in display.minY..display.maxY) {
+                    for (z in display.minZ..display.maxZ) {
+                        val state = level.getBlockState(BlockPos(x, y, z))
+                        val regName = BuiltInRegistries.BLOCK.getKey(state.block).toString()
+                        if (regName == baseMaterialKey) {
+                            hasBaseMaterial = true
+                            break@outerLoop
+                        }
+                    }
+                }
+            }
+            if (!hasBaseMaterial) invalidDisplays.add(display)
+        }
+
+        val removedUuids = mutableListOf<UUID>()
+        invalidDisplays.forEach { display ->
+            displays.remove(display.id)
+            Server.storage?.deleteDisplay(display)
+            removedUuids.add(display.id)
+        }
+        return removedUuids
+    }
+}

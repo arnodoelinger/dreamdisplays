@@ -7,6 +7,7 @@ pluginManagement {
         maven("https://maven.fabricmc.net/")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://maven.quiltmc.org/repository/snapshot/")
+        maven("https://repo.papermc.io/repository/maven-public/")
     }
     plugins {
         kotlin("jvm") version "2.4.0-RC"
@@ -20,5 +21,5 @@ plugins {
 rootProject.name = "displays"
 include(":common")
 include(":fabric")
-include(":neoforge") // Comment NeoForge out when working with Gradle in IDE
-include(":paper")
+// include(":neoforge") // Comment NeoForge out when working with Gradle in IDE
+include(":server")

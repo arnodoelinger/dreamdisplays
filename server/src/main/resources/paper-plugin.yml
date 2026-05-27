@@ -1,0 +1,20 @@
+name: DreamDisplays
+version: '${version}'
+main: com.dreamdisplays.server.Main
+api-version: '26.1.2'
+description: 'Plugin for the Dream Displays mod.'
+authors:
+  - arsmotorin
+  - INotSleep
+  - Kolyakot33
+  - Toffikk
+folia-supported: true
+permissions:
+  dreamdisplays.create:
+    default: true
+  dreamdisplays.video:
+    default: true
+  dreamdisplays.info:
+    default: true
+  dreamdisplays.toggle.others:
+    default: op

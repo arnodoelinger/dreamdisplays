@@ -3,6 +3,7 @@
 [versions]
 # Common
 jspecify = "1.0.0"
+ofrat = "1.0.0"
 utils = "1.4.10"
 
 # Plugin versions
@@ -23,6 +24,8 @@ neoforge = "26.1.2.59-beta"
 [libraries]
 # Common
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
+ofratAnnotations = { module = "com.github.arsmotorin.ofrat:ofrat-annotations", version.ref = "ofrat" }
+ofratPlugin = { module = "com.github.arsmotorin.ofrat:ofrat-plugin", version.ref = "ofrat" }
 utils = { module = "me.inotsleep:utils", version.ref = "utils" }
 kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 
