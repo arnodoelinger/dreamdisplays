@@ -61,51 +61,38 @@ jobs:
           path: build/libs/*.jar
           if-no-files-found: warn
 
-  dev:
-    name: Dev
+  prerelease:
+    name: Pre-release
     runs-on: ubuntu-24.04
     needs: build
-    if: github.event_name == 'push' && contains(needs.build.outputs.version, '-DEV')
+    if: |
+      github.event_name == 'push' &&
+      (contains(needs.build.outputs.version, '-DEV') || contains(needs.build.outputs.version, '-SNAPSHOT.'))
     permissions:
       contents: write
 
     steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
           name: build-jars
           path: build/libs
 
-      - name: Update dev tag
+      - name: Publish pre-release
         run: |
-          VERSION=${{ needs.build.outputs.version }}
+          VERSION="${{ needs.build.outputs.version }}"
           TAG="v${VERSION}"
-          gh release delete "$TAG" --yes 2>/dev/null || true
-          gh release create "$TAG" --title "$VERSION" --prerelease --notes "" build/libs/dreamdisplays-*.jar
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  snapshot:
-    name: Snapshot
-    runs-on: ubuntu-24.04
-    needs: build
-    if: github.event_name == 'push' && contains(needs.build.outputs.version, '-SNAPSHOT.')
-    permissions:
-      contents: write
-
-    steps:
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: build-jars
-          path: build/libs
-
-      - name: Create pre-release
-        run: |
-          VERSION=${{ needs.build.outputs.version }}
-          TAG="v${VERSION}"
-          gh release create "$TAG" --title "$VERSION" --prerelease build/libs/dreamdisplays-*.jar \
-          || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --clobber
+          if [[ "$VERSION" == *"-DEV"* ]]; then
+            gh release delete "$TAG" --yes 2>/dev/null || true
+            gh release create "$TAG" --title "$VERSION" --prerelease --notes "" build/libs/dreamdisplays-*.jar
+          else
+            gh release create "$TAG" --title "$VERSION" --prerelease build/libs/dreamdisplays-*.jar \
+            || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --clobber
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -139,7 +126,6 @@ jobs:
           echo "mc_minor=${MC%.*}" >> $GITHUB_OUTPUT
 
       - name: Extract changelog
-        id: changelog
         run: |
           python3 - <<'EOF'
           import re, sys
