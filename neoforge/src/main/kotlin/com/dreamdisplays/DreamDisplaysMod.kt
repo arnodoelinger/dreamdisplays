@@ -19,7 +19,6 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 @Suppress("UNUSED")
 @Mod(value = Initializer.MOD_ID, dist = [Dist.CLIENT])
 class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
-
     init {
         Initializer.onModInit(this)
         modEventBus.addListener(::registerPayloads)
@@ -58,8 +57,7 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         registrar.playToServer(Packets.SetVideo.PACKET_ID, Packets.SetVideo.PACKET_CODEC) { _, _ -> }
     }
 
-    @SubscribeEvent
-    fun onLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
+    @SubscribeEvent fun onLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
         val mc = Minecraft.getInstance()
         if (mc.level != null && mc.player != null) {
             val serverId = if (mc.hasSingleplayerServer()) "singleplayer"
@@ -68,34 +66,28 @@ class DreamDisplaysMod(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         }
     }
 
-    @SubscribeEvent
-    fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
+    @SubscribeEvent fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
         DisplayManager.saveAllScreens()
         DisplayManager.unloadAll()
         Initializer.onStop()
     }
 
-    @SubscribeEvent
-    fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
+    @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
         ScreenRenderer.render(event.getPoseStack(), mc.gameRenderer.mainCamera)
     }
 
-    @SubscribeEvent
-    fun onEndTick(event: ClientTickEvent.Post) {
+    @SubscribeEvent fun onEndTick(event: ClientTickEvent.Post) {
         Initializer.onEndTick(Minecraft.getInstance())
     }
-
-    @SubscribeEvent
-    fun onRenderGui(event: RenderGuiEvent.Post) {
+    @SubscribeEvent fun onRenderGui(event: RenderGuiEvent.Post) {
         Initializer.onRenderHud(
             Minecraft.getInstance(),
             event.guiGraphics,
             event.partialTick.getGameTimeDeltaPartialTick(false)
         )
     }
-
     override fun sendPacket(packet: CustomPacketPayload) {
         Minecraft.getInstance().connection?.send(packet)
     }

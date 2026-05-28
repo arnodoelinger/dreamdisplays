@@ -9,16 +9,6 @@ import java.util.*
 object GeneralUtil {
     private val DIRECT_ID = Regex("[a-zA-Z0-9_-]{11}")
 
-    fun detectPlatform(): String {
-        val os = System.getProperty("os.name").lowercase(Locale.ENGLISH)
-        return when {
-            "win" in os -> "windows"
-            "mac" in os -> "macos"
-            "nux" in os || "nix" in os || "aix" in os -> "linux"
-            else -> throw UnsupportedOperationException("Unsupported OS: $os")
-        }
-    }
-
     fun extractVideoId(youtubeUrl: String): String? {
         if (youtubeUrl.isEmpty()) return null
 

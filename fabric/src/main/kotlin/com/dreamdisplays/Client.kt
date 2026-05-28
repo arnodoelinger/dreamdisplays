@@ -16,7 +16,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 @Suppress("UNUSED")
 class Client : ClientModInitializer, Mod {
-
     override fun onInitializeClient() {
         Initializer.onModInit(this)
 
