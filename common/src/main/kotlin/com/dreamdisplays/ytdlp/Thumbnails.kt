@@ -29,7 +29,6 @@ import javax.imageio.ImageIO
  * are performed asynchronously to avoid blocking the main thread.
  */
 object Thumbnails {
-
     private val READY = ConcurrentHashMap<String, Identifier>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
     private val COUNTER = AtomicInteger()

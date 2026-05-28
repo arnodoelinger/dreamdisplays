@@ -12,14 +12,9 @@ import java.nio.charset.StandardCharsets
 object UpdateCheck {
     private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
 
-    @Volatile
-    private var checked = false
-
-    @Volatile
-    private var updateAvailable = false
-
-    @Volatile
-    private var latestVersion: String? = null
+    @Volatile private var checked = false
+    @Volatile private var updateAvailable = false
+    @Volatile private var latestVersion: String? = null
 
     fun isUpdateAvailable(): Boolean {
         if (!checked) startCheck()
@@ -34,8 +29,7 @@ object UpdateCheck {
 
     fun latestVersion(): String = latestVersion ?: GeneralUtil.getModVersion()
 
-    @Synchronized
-    private fun startCheck() {
+    @Synchronized private fun startCheck() {
         if (checked) return
         checked = true
         Thread(::doCheck, "dreamdisplays-update-check").apply { isDaemon = true }.start()

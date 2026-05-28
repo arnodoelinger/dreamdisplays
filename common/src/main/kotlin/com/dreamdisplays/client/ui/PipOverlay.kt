@@ -14,11 +14,10 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 
-// Test
-// TODO: remove in 1.7.0
 enum class PipCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
 
 /** 8 magnetic snap zones around the screen edges. */
+// TODO: rewrite this class entirely in 1.8.0
 enum class PipAnchor {
     TOP_LEFT, TOP_CENTER, TOP_RIGHT,
     MIDDLE_LEFT, MIDDLE_RIGHT,

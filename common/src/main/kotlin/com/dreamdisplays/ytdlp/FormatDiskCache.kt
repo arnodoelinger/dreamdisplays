@@ -21,7 +21,6 @@ import java.util.concurrent.Executors
  * Persistent on-disk cache for resolved YouTube format URLs.
  */
 object FormatDiskCache {
-
     private val CACHE_DIR: Path = Path.of("config", "dreamdisplays", "yt-cache")
     private val GSON: Gson = GsonBuilder().create()
     private val STREAM_LIST_TYPE = object : TypeToken<List<YtStream>>() {}.type
@@ -31,7 +30,6 @@ object FormatDiskCache {
     private val WRITER = Executors.newSingleThreadExecutor { r ->
         Thread(r, "DD-FormatCache-writer").apply { isDaemon = true }
     }
-
 
     fun load(videoUrl: String, maxAgeMs: Long): List<YtStream>? {
         val f = fileFor(videoUrl)
@@ -56,7 +54,6 @@ object FormatDiskCache {
             null
         }
     }
-
 
     fun saveAsync(videoUrl: String, streams: List<YtStream>) {
         if (streams.isEmpty()) return
@@ -84,13 +81,11 @@ object FormatDiskCache {
         }
     }
 
-
     fun deleteEntry(videoUrl: String) {
         WRITER.submit {
             runCatching { Files.deleteIfExists(fileFor(videoUrl).toPath()) }
         }
     }
-
 
     fun sweepExpired(maxAgeMs: Long = DEFAULT_TTL_MS) {
         try {

@@ -7,9 +7,7 @@ enum class FacingUtil {
     fun toPacket(): Byte = ordinal.toByte()
 
     companion object {
-
-        @JvmStatic
-        fun fromPacket(data: Byte): FacingUtil {
+        @JvmStatic fun fromPacket(data: Byte): FacingUtil {
             val values = entries
             require(data in values.indices) { "Invalid facing ID: $data" }
             return values[data.toInt()]

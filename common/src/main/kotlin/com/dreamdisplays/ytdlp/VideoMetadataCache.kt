@@ -9,13 +9,11 @@ import java.util.concurrent.Executors
  * calls to `yt-dlp`
  */
 object VideoMetadataCache {
-
     private val CACHE = ConcurrentHashMap<String, YtVideoInfo>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
     private val EXEC = Executors.newSingleThreadExecutor { r ->
         Thread(r, "DD-VideoMeta").apply { isDaemon = true }
     }
-
 
     fun put(videoId: String, info: YtVideoInfo) {
         if (videoId.isEmpty()) return
@@ -23,9 +21,7 @@ object VideoMetadataCache {
         VideoTitleCache.put(videoId, info.title)
     }
 
-
     fun get(videoId: String): YtVideoInfo? = CACHE[videoId]
-
 
     fun requestAsync(videoId: String) {
         if (videoId.isEmpty()) return

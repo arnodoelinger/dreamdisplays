@@ -17,8 +17,7 @@ object FFmpegBinary {
     private const val CACHE_ROOT = "./dreamdisplays/ffmpeg"
     private const val BTBN_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
 
-    @Volatile
-    private var cachedPath: String? = null
+    @Volatile private var cachedPath: String? = null
 
     fun getPath(): String? {
         cachedPath?.let { return it }
