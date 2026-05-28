@@ -20,6 +20,7 @@
 - Reduce maximum brightness from 200% to 100%
 - Deprecate `/display` command (will be replaced by direct interaction with displays in future versions)
 - Add dynamic material messages
+- Update dependencies and replace some of them with better alternatives
 
 ### Fixes
 - Fix cropping at display edges
@@ -27,6 +28,7 @@
 - Fix admins can't delete displays through the menu
 - Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
 - Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
+- Fix version semantic versioning parsing for mod updates
 - Fix tiled thumbnail rendering in the menu
 - Fix texture race crash in some rare cases
 - Fix a locked quality bug ([#80](https://github.com/arsmotorin/dreamdisplays/issues/80))
@@ -44,24 +46,7 @@
 - Preserve sync mode when switching videos
 - Broadcast synced display state every 2 seconds
 - Add dynamic material messages
-
-# Version 1.7.0-SNAPSHOT.5
-
-## Client
-
-### Features
-- Support YouTube shorts
-- Show max 72 recommended videos based on the current video instead of 24
-- Add dynamic material messages
-
-### Fixes
-- Reimplement fix of the "You have to look at the display block" error when there is actually a display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
-
-## Server
-
-### Features
-- Support `Fabric` servers via `OFRAT` merge
-- Add dynamic material messages
+- Update dependencies and replace some of them with better alternatives
 
 # Version 1.7.0-SNAPSHOT.4
 
