@@ -12,8 +12,6 @@ import java.net.http.HttpResponse
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
-
-// PaperOnly imports — resolved at compile time, stripped from Fabric JAR
 import org.bukkit.Location
 import org.bukkit.entity.Player
 

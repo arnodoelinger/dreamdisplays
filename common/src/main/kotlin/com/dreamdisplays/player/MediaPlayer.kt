@@ -50,7 +50,8 @@ class MediaPlayer(
         internal val framesDropped = AtomicLong()
         private const val STOP_WAIT_TIMEOUT_SECONDS = 3L
         private const val MAX_FETCH_RETRIES = 3
-        /** Hwaccel failures show up within the first few seconds — past this window assume the stream is just unreliable. */
+
+        /** Hwaccel failures show up within the first few seconds, past this window assume the stream is just unreliable. */
         private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
         private val INIT_THREAD_COUNTER = AtomicInteger()
         private val INIT_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(
@@ -344,7 +345,7 @@ class MediaPlayer(
      */
     private fun scheduleRetry(invalidateCache: Boolean) {
         val delayMs = retryPolicy.nextDelay()
-        LoggingManager.warn("[MediaPlayer $debugLabel] ${if (invalidateCache) "Cache invalidated" else "Transient error"} — retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs}ms.")
+        LoggingManager.warn("[MediaPlayer $debugLabel] ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs} ms.")
         if (invalidateCache) YtDlp.invalidateCache(youtubeUrl)
         state.set(PlaybackState.RESTARTING)
         INIT_EXECUTOR.submit {

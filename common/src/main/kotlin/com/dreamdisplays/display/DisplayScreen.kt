@@ -75,9 +75,6 @@ class DisplayScreen(
     var renderDistance: Int = 64
     var savedTimeNanos: Long = 0
     @Volatile private var serverSyncReceivedAt: Long = 0L
-    // Tracking for sync-seek throttling: only seek when the server's reported time JUMPS (owner
-    // did a real seek), not when it merely advances at wall-clock speed (owner just playing,
-    // local client is slightly behind due to FFmpeg buffering — seeking won't fix that).
     @Volatile private var lastSyncTargetNs: Long = -1L
     @Volatile private var lastSyncRecvWallNs: Long = 0L
     private var mediaPlayer: MediaPlayer? = null
@@ -235,14 +232,9 @@ class DisplayScreen(
             if (desiredPaused && !paused) setPaused(true)
             val mp = mediaPlayer
             val clockRunning = mp?.isClockRunning() == true
-            // Decide whether targetTime is a genuine jump (owner seeked) vs natural progression
-            // (owner is just playing and we're slightly behind). If the new target lines up with
-            // the previous one extrapolated by wall-clock elapsed, it's the latter — do NOT seek,
-            // because seeking won't make us catch up (FFmpeg pipeline lag re-creates the drift
-            // immediately and we'd loop into permanent restarts).
             val recvWallNs = System.nanoTime()
             val ownerSeeked = if (lastSyncTargetNs < 0) {
-                true // first sync packet ever for this video — adopt server time
+                true
             } else {
                 val elapsed = recvWallNs - lastSyncRecvWallNs
                 abs(targetTime - (lastSyncTargetNs + elapsed)) > SYNC_JUMP_THRESHOLD_NS
