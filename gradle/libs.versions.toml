@@ -6,10 +6,9 @@ jspecify = "1.0.0"
 ofrat = "1.0.0"
 utils = "1.4.10"
 commonsCompress = "1.28.0"
-xz = "1.12"
-toml4j = "0.7.2"
-semver = "0.10.2"
-sqliteJdbc = "3.49.1.0"
+toml4j = "0.7.2" # tomlj
+semver = "0.10.2" # semver4j
+sqliteJdbc = "3.49.1.0" # SQLite + HikariCP + Exposed
 bstats = "3.2.1"
 
 # Plugin versions
@@ -39,7 +38,6 @@ ofratPlugin = { module = "com.github.arsmotorin.ofrat:ofrat-plugin", version.ref
 utils = { module = "me.inotsleep:utils", version.ref = "utils" }
 kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 commonsCompress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
-xz = { module = "org.tukaani:xz", version.ref = "xz" }
 toml4j = { module = "com.moandjiezana.toml:toml4j", version.ref = "toml4j" }
 semver = { module = "com.github.zafarkhaja:java-semver", version.ref = "semver" }
 sqliteJdbc = { module = "org.xerial:sqlite-jdbc", version.ref = "sqliteJdbc" }

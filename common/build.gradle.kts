@@ -7,7 +7,6 @@ dependencies {
     api(libs.utils)
     api(libs.jspecify)
     api(libs.commonsCompress)
-    api(libs.xz)
     compileOnly(libs.kotlinStdlib)
 }
 
