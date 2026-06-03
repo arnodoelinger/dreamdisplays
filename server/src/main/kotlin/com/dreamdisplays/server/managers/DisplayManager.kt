@@ -30,7 +30,6 @@ import org.bukkit.Location
 import org.bukkit.entity.Player
 import org.bukkit.util.BoundingBox
 import org.jspecify.annotations.NullMarked
-import java.lang.System.currentTimeMillis
 import java.util.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
@@ -61,6 +60,43 @@ import java.util.function.Consumer
         when (data) {
             is PaperDisplayData -> delete(data)
             is FabricDisplayData -> delete(data)
+        }
+    }
+
+    /** Returns true when [x,y,z] is within [maxRender] blocks of the axis-aligned box defined by the given bounds. */
+    private fun isInRangeImpl(
+        x: Int, y: Int, z: Int,
+        minX: Int, minY: Int, minZ: Int,
+        maxX: Int, maxY: Int, maxZ: Int,
+        maxRender: Double,
+    ): Boolean {
+        val dx = x - x.coerceIn(minX, maxX)
+        val dy = y - y.coerceIn(minY, maxY)
+        val dz = z - z.coerceIn(minZ, maxZ)
+        return dx * dx + dy * dy + dz * dz <= maxRender * maxRender
+    }
+
+    /**
+     * Checks whether the report cooldown for [id] is still active. If not, records the current
+     * time as the latest report timestamp and returns false (caller may proceed). Returns true
+     * when the request should be silently dropped.
+     */
+    private fun isReportThrottled(id: UUID, cooldownMs: Long): Boolean {
+        val lastReport = reportTime.getOrPut(id) { 0L }
+        if (System.currentTimeMillis() - lastReport < cooldownMs) return true
+        reportTime[id] = System.currentTimeMillis()
+        return false
+    }
+
+    /**
+     * Removes every display in [toRemove] from the in-memory registry, invokes [delete] for each,
+     * and returns the list of removed UUIDs.
+     */
+    private fun removeDisplays(toRemove: List<DisplayData>, delete: (DisplayData) -> Unit): List<UUID> {
+        return toRemove.map { display ->
+            displays.remove(display.id)
+            delete(display)
+            display.id
         }
     }
 
@@ -97,16 +133,13 @@ import java.util.function.Consumer
         display.pos1.world?.players?.filter { it.location.isInRange(display) } ?: emptyList()
 
     /** Returns true if this location lies within `maxRenderDistance` of the [display]'s box. */
-    @PaperOnly private fun Location.isInRange(display: PaperDisplayData): Boolean {
-        val maxRender = config.settings.maxRenderDistance
-        val clampedX = blockX.coerceIn(display.box.minX.toInt(), display.box.maxX.toInt())
-        val clampedY = blockY.coerceIn(display.box.minY.toInt(), display.box.maxY.toInt())
-        val clampedZ = blockZ.coerceIn(display.box.minZ.toInt(), display.box.maxZ.toInt())
-        val dx = blockX - clampedX
-        val dy = blockY - clampedY
-        val dz = blockZ - clampedZ
-        return dx * dx + dy * dy + dz * dz <= maxRender * maxRender
-    }
+    @PaperOnly private fun Location.isInRange(display: PaperDisplayData): Boolean =
+        isInRangeImpl(
+            blockX, blockY, blockZ,
+            display.box.minX.toInt(), display.box.minY.toInt(), display.box.minZ.toInt(),
+            display.box.maxX.toInt(), display.box.maxY.toInt(), display.box.maxZ.toInt(),
+            config.settings.maxRenderDistance,
+        )
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly fun sendUpdate(display: PaperDisplayData, players: List<Player>) {
@@ -146,15 +179,10 @@ import java.util.function.Consumer
      */
     @PaperOnly @JvmStatic fun report(id: UUID, player: Player) {
         val displayData = displays[id] as? PaperDisplayData ?: return
-        val lastReport = reportTime.getOrPut(id) { 0L }
-
-        if (currentTimeMillis() - lastReport < config.settings.reportCooldown) {
+        if (isReportThrottled(id, config.settings.reportCooldown.toLong())) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
-
-        reportTime[id] = currentTimeMillis()
-
         runAsync {
             try {
                 if (config.settings.webhookUrl.isEmpty()) return@runAsync
@@ -208,15 +236,9 @@ import java.util.function.Consumer
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        val removedUuids = mutableListOf<UUID>()
-        if (invalidDisplays.isNotEmpty()) {
-            invalidDisplays.forEach { display ->
-                runAsync { getInstance().storage.deleteDisplay(display) }
-                displays.remove(display.id)
-                removedUuids.add(display.id)
-            }
+        return removeDisplays(invalidDisplays) { display ->
+            runAsync { getInstance().storage.deleteDisplay(display as PaperDisplayData) }
         }
-        return removedUuids
     }
 
     /** Returns the first display whose bounding box contains [blockPos] in [worldKey]. */
@@ -250,16 +272,13 @@ import java.util.function.Consumer
     }
 
     /** Returns true if this block position lies within `maxRenderDistance` of the [display]'s box. */
-    @FabricOnly private fun BlockPos.isInRange(display: FabricDisplayData): Boolean {
-        val maxRender = Server.config.settings.maxRenderDistance
-        val clampedX = x.coerceIn(display.minX, display.maxX)
-        val clampedY = y.coerceIn(display.minY, display.maxY)
-        val clampedZ = z.coerceIn(display.minZ, display.maxZ)
-        val dx = x - clampedX
-        val dy = y - clampedY
-        val dz = z - clampedZ
-        return dx * dx + dy * dy + dz * dz <= maxRender * maxRender
-    }
+    @FabricOnly private fun BlockPos.isInRange(display: FabricDisplayData): Boolean =
+        isInRangeImpl(
+            x, y, z,
+            display.minX, display.minY, display.minZ,
+            display.maxX, display.maxY, display.maxZ,
+            Server.config.settings.maxRenderDistance,
+        )
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @FabricOnly fun sendUpdate(display: FabricDisplayData, players: List<ServerPlayer>) {
@@ -286,14 +305,11 @@ import java.util.function.Consumer
      */
     @FabricOnly fun report(id: UUID, player: ServerPlayer, server: MinecraftServer) {
         val displayData = displays[id] as? FabricDisplayData ?: return
-        val lastReport = reportTime.getOrPut(id) { 0L }
         val cfg = Server.config
-
-        if (System.currentTimeMillis() - lastReport < cfg.settings.reportCooldown) {
+        if (isReportThrottled(id, cfg.settings.reportCooldown)) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
-        reportTime[id] = System.currentTimeMillis()
         if (cfg.settings.webhookUrl.isEmpty()) return
 
         val ownerName = server.playerList.players.find { it.uuid == displayData.ownerId }?.name?.string ?: "Unknown"
@@ -345,12 +361,8 @@ import java.util.function.Consumer
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        val removedUuids = mutableListOf<UUID>()
-        invalidDisplays.forEach { display ->
-            displays.remove(display.id)
-            Server.storage?.deleteDisplay(display)
-            removedUuids.add(display.id)
+        return removeDisplays(invalidDisplays) { display ->
+            Server.storage?.deleteDisplay(display as FabricDisplayData)
         }
-        return removedUuids
     }
 }
