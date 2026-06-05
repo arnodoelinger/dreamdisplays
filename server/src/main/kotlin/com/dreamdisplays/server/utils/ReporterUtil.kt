@@ -97,7 +97,7 @@ object ReporterUtil {
             .build()
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         if (response.statusCode() / 100 != 2) {
-            throw IOException("[ReporterUtil] Discord webhook failed: ${response.statusCode()} - ${response.body()}")
+            throw IOException("Discord webhook failed: ${response.statusCode()} - ${response.body()}.")
         }
     }
 }

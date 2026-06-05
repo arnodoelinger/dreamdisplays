@@ -2,7 +2,6 @@ package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.Initializer
 import com.mojang.blaze3d.platform.NativeImage
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
@@ -16,6 +15,7 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -29,6 +29,7 @@ import javax.imageio.ImageIO
  * are performed asynchronously to avoid blocking the main thread.
  */
 object Thumbnails {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/Thumbnails")
     private val READY = ConcurrentHashMap<String, Identifier>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
     private val COUNTER = AtomicInteger()
@@ -45,7 +46,7 @@ object Thumbnails {
         try {
             ImageIO.scanForPlugins()
         } catch (t: Throwable) {
-            LoggingManager.warn("[Thumbnails] ImageIO.scanForPlugins failed: ${t.message}. This should never happen.")
+            logger.warn("ImageIO.scanForPlugins failed: ${t.message}. This should never happen.")
         }
     }
 
@@ -71,7 +72,7 @@ object Thumbnails {
             writeDiskCacheAsync(videoId, bytes)
             Minecraft.getInstance().execute { register(videoId, bytes) }
         } catch (e: Exception) {
-            LoggingManager.warn("[Thumbnails] Fetch failed for $videoId: ${e.message}")
+            logger.warn("Fetch failed for $videoId: ${e.message}")
             IN_FLIGHT.remove(videoId)
         }
     }
@@ -124,7 +125,7 @@ object Thumbnails {
             Minecraft.getInstance().textureManager.register(id, tex)
             READY[videoId] = id
         } catch (e: IOException) {
-            LoggingManager.warn("[Thumbnails] Decode failed for $videoId: ${e.message}")
+            logger.warn("Decode failed for $videoId: ${e.message}")
         } finally {
             IN_FLIGHT.remove(videoId)
         }
@@ -141,7 +142,7 @@ object Thumbnails {
                     bytes[2].toInt() and 0xFF, bytes[3].toInt() and 0xFF
                 )
             else "<empty>"
-            throw IOException("[Thumbnails] Unsupported image format (first bytes: $head, size=${bytes.size}).")
+            throw IOException("Unsupported image format (first bytes: $head, size=${bytes.size}).")
         }
         val w = src.width
         val h = src.height

@@ -4,7 +4,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.tomlj.Toml
 import org.tomlj.TomlTable
-import me.inotsleep.utils.logging.LoggingManager
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.server.level.ServerPlayer
 import io.github.arsmotorin.ofrat.*
@@ -21,6 +20,7 @@ import java.nio.file.StandardCopyOption
  */
 @PaperOnly @NullMarked class Config(private val plugin: Main) {
     private val configFile = File(plugin.dataFolder, "config.toml")
+    private val logger = LoggerFactory.getLogger("DreamDisplays/Config")
 
     lateinit var language: LanguageSection
         private set
@@ -53,7 +53,7 @@ import java.nio.file.StandardCopyOption
     /** Parses `config.toml`, falling back to defaults when sections are missing or malformed. */
     private fun load() {
         val t: TomlTable? = runCatching { Toml.parse(configFile.toPath()) }
-            .onFailure { LoggingManager.error("[Config] Failed to parse config.toml", it) }
+            .onFailure { logger.error("Failed to parse config.toml", it) }
             .getOrNull()
 
         language = LanguageSection(
@@ -154,7 +154,7 @@ import java.nio.file.StandardCopyOption
                     )
                     languages[langCode] = msgs
                 }.onFailure {
-                    LoggingManager.error("[Config] Error loading language file: $fileName.", it)
+                    logger.error("Error loading language file: $fileName.", it)
                 }
             }
         }
@@ -380,7 +380,7 @@ import java.nio.file.StandardCopyOption
 
     private fun load() {
         val t: TomlTable? = runCatching { Toml.parse(configFile.toPath()) }
-            .onFailure { logger.error("[Config] Failed to parse config.toml", it) }
+            .onFailure { logger.error("Failed to parse config.toml", it) }
             .getOrNull()
 
         language = LanguageSection(
@@ -447,7 +447,7 @@ import java.nio.file.StandardCopyOption
     private fun extractLangFiles(overwrite: Boolean) {
         val langFolder = File(configDir, "lang")
         if (!langFolder.exists() && !langFolder.mkdirs()) {
-            logger.warn("[Config] Could not create lang folder")
+            logger.warn("Could not create lang folder")
             return
         }
 
@@ -464,7 +464,7 @@ import java.nio.file.StandardCopyOption
                     }
                 }
             }.onFailure {
-                logger.warn("[Config] Could not extract $fileName: ${it.message}")
+                logger.warn("Could not extract $fileName: ${it.message}")
             }
         }
     }
@@ -482,7 +482,7 @@ import java.nio.file.StandardCopyOption
                     )
                     languages[langCode] = msgs
                 }.onFailure {
-                    logger.error("[Config] Error loading language file: $fileName", it)
+                    logger.error("Error loading language file: $fileName", it)
                 }
             }
         }

@@ -12,7 +12,6 @@ import com.dreamdisplays.utils.GeneralUtil
 import com.dreamdisplays.utils.RayCastingUtil
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.multiplayer.ClientLevel
@@ -30,6 +29,7 @@ import kotlin.math.sqrt
 /** Main mod initializer. */
 object Initializer {
     const val MOD_ID: String = "dreamdisplays"
+    private val logger = LoggerFactory.getLogger("DreamDisplays/Initializer")
 
     private var wasPressed = false
     private var wasInMultiplayer = false
@@ -66,8 +66,7 @@ object Initializer {
     /** Called once during mod startup; initializes config, `yt-dlp`, `FFmpeg`, disk cache, and the focuser thread. */
     fun onModInit(dreamDisplaysMod: Mod) {
         mod = dreamDisplaysMod
-        LoggingManager.setLogger(LoggerFactory.getLogger(MOD_ID))
-        LoggingManager.info("[Initializer] Starting Dream Displays...")
+        logger.info("Starting Dream Displays...")
         config.reload()
 
         DisplaySettings.load()
@@ -186,7 +185,7 @@ object Initializer {
         try {
             sendPacket(Packets.Version(GeneralUtil.getModVersion()))
         } catch (e: Exception) {
-            LoggingManager.error("[Initializer] Unable to get version", e)
+            logger.error("Unable to get version", e)
         }
     }
 
@@ -297,7 +296,7 @@ object Initializer {
         DisplayManager.screens[packet.uuid]?.let { DisplayManager.unregisterScreen(it) }
         DisplayManager.unloadedScreens.remove(packet.uuid)
         DisplaySettings.removeDisplay(packet.uuid)
-        LoggingManager.info("[Initializer] Display deleted and removed from saved data: ${packet.uuid}")
+        logger.info("Display deleted and removed from saved data: ${packet.uuid}.")
     }
 
     /** Saves screen data to disk, stops all players, and interrupts background threads on mod shutdown. */

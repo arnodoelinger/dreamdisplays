@@ -2,12 +2,13 @@ package com.dreamdisplays.display
 
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.io.*
 import java.util.*
 
 /** Manages loading and saving of display settings and data. */
 object DisplaySettings {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/DisplaySettings")
     private val SETTINGS_DIR = File("./config/dreamdisplays")
     private val GSON = GsonBuilder().setPrettyPrinting().create()
     private val displaySettings = HashMap<UUID, ClientDisplaySettings>()
@@ -17,7 +18,7 @@ object DisplaySettings {
     /** Loads per-display client settings from `client-display-settings.json` into the in-memory map. */
     fun load() {
         if (!SETTINGS_DIR.exists() && !SETTINGS_DIR.mkdirs()) {
-            LoggingManager.error("[DisplaySettings] Failed to create settings directory.")
+            logger.error("Failed to create settings directory.")
             return
         }
         val clientSettingsFile = File(SETTINGS_DIR, "client-display-settings.json")
@@ -29,13 +30,13 @@ object DisplaySettings {
                     displaySettings.clear()
                     loaded.forEach { (key, value) ->
                         runCatching { displaySettings[UUID.fromString(key)] = value }
-                            .onFailure { LoggingManager.error("[DisplaySettings] Invalid UUID in client display settings: $key.") }
+                            .onFailure { logger.error("Invalid UUID in client display settings: $key.") }
                     }
                 }
             }
         } catch (_: FileNotFoundException) {
         } catch (e: IOException) {
-            LoggingManager.error("[DisplaySettings] Failed to load client display settings", e)
+            logger.error("Failed to load client display settings", e)
         }
     }
 
@@ -50,15 +51,15 @@ object DisplaySettings {
                 val displays = HashMap<UUID, FullDisplayData>()
                 loaded?.forEach { (key, value) ->
                     runCatching { displays[UUID.fromString(key)] = value }
-                        .onFailure { LoggingManager.error("[DisplaySettings] Invalid UUID in server displays: $key.") }
+                        .onFailure { logger.error("Invalid UUID in server displays: $key.") }
                 }
                 serverDisplays[serverId] = displays
-                LoggingManager.info("[DisplaySettings] Loaded ${displays.size} displays for server: $serverId.")
+                logger.info("Loaded ${displays.size} displays for server: $serverId.")
             }
         } catch (_: FileNotFoundException) {
             serverDisplays[serverId] = HashMap()
         } catch (e: IOException) {
-            LoggingManager.error("[DisplaySettings] Failed to load server displays for $serverId", e)
+            logger.error("Failed to load server displays for $serverId", e)
             serverDisplays[serverId] = HashMap()
         }
     }
@@ -67,7 +68,7 @@ object DisplaySettings {
     fun save() {
         try {
             if (!SETTINGS_DIR.exists() && !SETTINGS_DIR.mkdirs()) {
-                LoggingManager.error("[DisplaySettings] Failed to create settings directory.")
+                logger.error("Failed to create settings directory.")
                 return
             }
             val toSave = displaySettings.entries.associate { (k, v) -> k.toString() to v }
@@ -75,7 +76,7 @@ object DisplaySettings {
                 GSON.toJson(toSave, writer)
             }
         } catch (e: IOException) {
-            LoggingManager.error("[DisplaySettings] Failed to save client display settings", e)
+            logger.error("Failed to save client display settings", e)
         }
     }
 
@@ -83,7 +84,7 @@ object DisplaySettings {
     fun saveServerDisplays(serverId: String) {
         try {
             if (!SETTINGS_DIR.exists() && !SETTINGS_DIR.mkdirs()) {
-                LoggingManager.error("[DisplaySettings] Failed to create settings directory.")
+                logger.error("Failed to create settings directory.")
                 return
             }
             val displays = serverDisplays[serverId] ?: HashMap()
@@ -92,7 +93,7 @@ object DisplaySettings {
                 GSON.toJson(toSave, writer)
             }
         } catch (e: IOException) {
-            LoggingManager.error("[DisplaySettings] Failed to save server displays for $serverId", e)
+            logger.error("Failed to save server displays for $serverId", e)
         }
     }
 

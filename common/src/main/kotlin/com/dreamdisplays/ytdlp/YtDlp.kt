@@ -4,7 +4,7 @@ import com.dreamdisplays.Initializer
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URI
@@ -25,6 +25,7 @@ import kotlin.math.round
  * videos.
  */
 object YtDlp {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/yt-dlp")
 
     private val CANDIDATE_PATHS = arrayOf(
         "yt-dlp",
@@ -93,9 +94,9 @@ object YtDlp {
         try {
             return future.get()
         } catch (e: CompletionException) {
-            throw (e.cause as? IOException) ?: IOException("[yt-dlp] Fetch failed for url: $videoUrl", e.cause ?: e)
+            throw (e.cause as? IOException) ?: IOException("Fetch failed for url: $videoUrl", e.cause ?: e)
         } catch (e: Exception) {
-            throw (e.cause as? IOException) ?: IOException("[yt-dlp] Fetch failed for url: $videoUrl", e.cause ?: e)
+            throw (e.cause as? IOException) ?: IOException("Fetch failed for url: $videoUrl", e.cause ?: e)
         } finally {
             IN_FLIGHT_FETCHES.remove(videoUrl, future)
         }
@@ -110,7 +111,7 @@ object YtDlp {
                 resolveCookieBrowser()
                 getCookieHeader()
             } catch (e: IOException) {
-                LoggingManager.warn("[yt-dlp] Failed to prewarm yt-dlp", e)
+                logger.warn("Failed to prewarm yt-dlp", e)
             }
         }
     }
@@ -158,7 +159,7 @@ object YtDlp {
                 } catch (e: Exception) {
                     throw e as? CompletionException
                         ?: CompletionException(
-                            e as? IOException ?: IOException("[yt-dlp] InnerTube search failed", e)
+                            e as? IOException ?: IOException("InnerTube search failed", e)
                         )
                 }
             }, SEARCH_EXECUTOR)
@@ -194,7 +195,7 @@ object YtDlp {
                 } catch (e: Exception) {
                     throw e as? CompletionException
                         ?: CompletionException(
-                            e as? IOException ?: IOException("[yt-dlp] InnerTube related failed", e)
+                            e as? IOException ?: IOException("InnerTube related failed", e)
                         )
                 }
             }, SEARCH_EXECUTOR)
@@ -251,7 +252,7 @@ object YtDlp {
                 Files.copy(cookieFile, target, StandardCopyOption.REPLACE_EXISTING)
                 target
             } catch (e: IOException) {
-                LoggingManager.warn("[yt-dlp] Failed to create temp cookies copy, using master file: ${e.message}")
+                logger.warn("Failed to create temp cookies copy, using master file: ${e.message}")
                 null
             }
             args.add("--cookies")
@@ -304,18 +305,18 @@ object YtDlp {
                     try {
                         exportCookieHeader()
                     } catch (e: Exception) {
-                        LoggingManager.warn("[yt-dlp] Synchronous cookie export failed: ${e.message}")
+                        logger.warn("Synchronous cookie export failed: ${e.message}")
                     }
                     if (!Files.exists(cookieFile)) {
                         cookiesUnavailableThisSession = true
-                        LoggingManager.warn(
-                            "[yt-dlp] Cookie export produced no file. Disabling browser cookie lookups for this session. Public videos will still work."
+                        logger.warn(
+                            "Cookie export produced no file. Disabling browser cookie lookups for this session. Public videos will still work."
                         )
                     }
                 }
             }
         } catch (e: Exception) {
-            LoggingManager.warn("[yt-dlp] Could not acquire cookie export lock: ${e.message}")
+            logger.warn("Could not acquire cookie export lock: ${e.message}")
         }
     }
 
@@ -344,9 +345,9 @@ object YtDlp {
         try {
             return future.get(30, TimeUnit.SECONDS)
         } catch (e: CompletionException) {
-            throw (e.cause as? IOException) ?: IOException("[yt-dlp] $tag failed", e.cause ?: e)
+            throw (e.cause as? IOException) ?: IOException("$tag failed", e.cause ?: e)
         } catch (e: Exception) {
-            throw (e.cause as? IOException) ?: IOException("[yt-dlp] $tag failed", e.cause ?: e)
+            throw (e.cause as? IOException) ?: IOException("$tag failed", e.cause ?: e)
         } finally {
             cleanup()
         }
@@ -362,7 +363,7 @@ object YtDlp {
                     Thread.sleep(2_000)
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt()
-                    throw IOException("[yt-dlp] Interrupted before yt-dlp retry", ie)
+                    throw IOException("Interrupted before yt-dlp retry", ie)
                 }
             }
             try {
@@ -425,20 +426,20 @@ object YtDlp {
                 process.destroyForcibly()
                 stdoutReader.join(2_000)
                 stderrReader.join(2_000)
-                LoggingManager.warn(
-                    "[yt-dlp] Fetch timeout after 60s for $videoUrl " +
+                logger.warn(
+                    "Fetch timeout after 60s for $videoUrl " +
                             "(pid=$pid, alive=$alive, stdoutBytes=${stdout.length}, stderrBytes=${stderr.length}, " +
                             "stderrTail=${stderr.takeLast(500).trim()}, " +
                             "stdoutTail=${stdout.takeLast(200).trim()})"
                 )
-                throw IOException("[yt-dlp] Timed out for url: $videoUrl.")
+                throw IOException("Timed out for url: $videoUrl.")
             }
             stdoutReader.join(5_000)
             stderrReader.join(5_000)
         } catch (e: InterruptedException) {
             process.destroyForcibly()
             Thread.currentThread().interrupt()
-            throw IOException("[yt-dlp] Interrupted while waiting for yt-dlp", e)
+            throw IOException("Interrupted while waiting for yt-dlp", e)
         } finally {
             if (tempCookies != null) try {
                 Files.deleteIfExists(tempCookies)
@@ -446,7 +447,7 @@ object YtDlp {
             }
         }
         if (process.exitValue() != 0) {
-            throw IOException("[yt-dlp] Exited with code ${process.exitValue()}: ${stderr.toString().trim()}.")
+            throw IOException("Exited with code ${process.exitValue()}: ${stderr.toString().trim()}.")
         }
         return parseFormats(stdout.toString())
     }
@@ -492,7 +493,7 @@ object YtDlp {
                 cookieHeaderExportedAt = System.currentTimeMillis()
                 header
             } catch (e: Exception) {
-                LoggingManager.warn("[yt-dlp] Cookie export failed: ${e.message}")
+                logger.warn("Cookie export failed: ${e.message}")
                 cachedCookieHeader
             }
         }
@@ -526,12 +527,12 @@ object YtDlp {
             if (!p.waitFor(15, TimeUnit.SECONDS)) {
                 p.destroyForcibly()
                 cookiesUnavailableThisSession = true
-                throw IOException("[yt-dlp] Cookie export timed out")
+                throw IOException("Cookie export timed out.")
             }
         } catch (e: InterruptedException) {
             p.destroyForcibly()
             Thread.currentThread().interrupt()
-            throw IOException("[yt-dlp] Interrupted", e)
+            throw IOException("Interrupted", e)
         }
         try { drainer.join(500) } catch (_: InterruptedException) {}
 
@@ -549,7 +550,7 @@ object YtDlp {
         }
         val result = sb.toString()
         if (result.isEmpty()) return null
-        LoggingManager.info("[yt-dlp] Exported ${lines.size} cookie lines, header ${result.length} chars.")
+        logger.info("Exported ${lines.size} cookie lines, header ${result.length} chars.")
         return result
     }
 
@@ -560,9 +561,9 @@ object YtDlp {
         val root: JsonElement = try {
             JsonParser.parseString(json)
         } catch (e: Exception) {
-            throw IOException("[yt-dlp] Failed to parse yt-dlp JSON output", e)
+            throw IOException("Failed to parse yt-dlp JSON output", e)
         }
-        if (!root.isJsonObject) throw IOException("[yt-dlp] Returned unexpected JSON shape.")
+        if (!root.isJsonObject) throw IOException("Returned unexpected JSON shape.")
         val obj = root.asJsonObject
         val live = isLive(obj)
         val durationNanos = getDurationNanos(obj)
@@ -742,7 +743,7 @@ object YtDlp {
             if (configured == "none" || configured == "off" || configured == "disabled" || configured.isEmpty()) {
                 cookieBrowserResolved = true
                 resolvedCookieBrowser = null
-                LoggingManager.info("[yt-dlp] Cookies-from-browser disabled via config.")
+                logger.info("Cookies-from-browser disabled via config.")
                 return null
             }
 
@@ -763,7 +764,7 @@ object YtDlp {
             }
             for (browser in candidates) {
                 if (testCookieBrowser(binary, browser)) {
-                    LoggingManager.info("[yt-dlp] Using cookies from browser: $browser.")
+                    logger.info("Using cookies from browser: $browser...")
                     resolvedCookieBrowser = browser
                     cookieBrowserResolved = true
                     cookieBrowserResolvedAt = System.currentTimeMillis()
@@ -771,8 +772,8 @@ object YtDlp {
                 }
             }
             if (configured != "auto") {
-                LoggingManager.warn(
-                    "[yt-dlp] Browser '$configured' not found or has no YouTube cookies. " +
+                logger.warn(
+                    "Browser '$configured' not found or has no YouTube cookies. " +
                             "YouTube may rate-limit or refuse requests. " +
                             "Set 'ytdlp-cookies-from-browser' to 'none' to disable."
                 )
@@ -842,7 +843,7 @@ object YtDlp {
         Files.createDirectories(target.parent)
         val tmp = target.resolveSibling("${target.fileName}.part")
         val url = DOWNLOAD_BASE + downloadAssetName()
-        LoggingManager.info("[yt-dlp] Downloading yt-dlp from $url...")
+        logger.info("Downloading yt-dlp from $url...")
 
         val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
         conn.instanceFollowRedirects = true
@@ -875,7 +876,7 @@ object YtDlp {
         }
 
         val path = target.toString()
-        LoggingManager.info("[yt-dlp] Ready to work.")
+        logger.info("Ready to work.")
         return path
     }
 

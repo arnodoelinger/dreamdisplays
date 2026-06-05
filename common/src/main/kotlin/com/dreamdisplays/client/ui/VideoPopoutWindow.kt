@@ -1,10 +1,10 @@
 package com.dreamdisplays.client.ui
 
 import com.dreamdisplays.render.AsyncTextureUploader
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
+import org.slf4j.LoggerFactory
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
 import org.lwjgl.opengl.GL20
@@ -148,7 +148,7 @@ class VideoPopoutWindow(private val onClose: () -> Unit) {
         // Separate context
         val handle = GLFW.glfwCreateWindow(w, h, "Dream Displays", 0L, 0L)
         if (handle == 0L) {
-            LoggingManager.warn("[VideoPopoutWindow] glfwCreateWindow failed")
+            logger.warn("glfwCreateWindow failed")
             return
         }
 
@@ -208,6 +208,7 @@ class VideoPopoutWindow(private val onClose: () -> Unit) {
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
         const val isAvailable: Boolean = true
         private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
     }

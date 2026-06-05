@@ -1,7 +1,7 @@
 package com.dreamdisplays.player.managers
 
 import com.dreamdisplays.player.util.daemon
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -19,6 +19,8 @@ internal class StatsReporter(
     private val getPositionMs: () -> Long,
     private val isLive: () -> Boolean,
 ) {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/StatsReporter")
+
     /** Raw counter values sampled at one reporting interval. */
     data class Snapshot(val samplesIn: Long, val framesToGpu: Long, val framesDropped: Long)
 
@@ -40,7 +42,7 @@ internal class StatsReporter(
         runCatching {
             val (inN, outN, dropN) = pollCounters()
             val sec = intervalMs / 1000.0
-            LoggingManager.info("[MediaPlayer $debugLabel] decode=%.1ffps gpu=%.1ffps dropped=%.1f/s pos=%dms live=%s"
+            logger.info("$debugLabel decode=%.1ffps gpu=%.1ffps dropped=%.1f/s pos=%dms live=%s"
                 .format(inN / sec, outN / sec, dropN / sec, getPositionMs(), isLive()))
         }
     }

@@ -11,7 +11,6 @@ import org.semver4j.Semver
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
-import me.inotsleep.utils.logging.LoggingManager.warn
 import org.slf4j.LoggerFactory
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -25,6 +24,7 @@ import java.time.Duration
  * Checks for updates of the `Paper` plugin and mod from GitHub releases.
  */
 @PaperOnly object Updater {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
 
     /**
      * Fetches GitHub releases and stores the latest mod and plugin versions in `Main`.
@@ -35,7 +35,7 @@ import java.time.Duration
             val releases = GitHubFetcherUtil.fetchReleases(repoOwner, repoName)
 
             if (releases.isEmpty()) {
-                warn("[Updater] No releases found on GitHub. This may be due to network issues or API problems.")
+                logger.warn("No releases found on GitHub. This may be due to network issues or API problems.")
                 return
             }
 
@@ -52,13 +52,13 @@ import java.time.Duration
                 .maxOrNull() ?: modVersion?.toString()
 
         } catch (_: UnknownHostException) {
-            warn("[Updater] Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain.")
+            logger.warn("Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain.")
         } catch (_: ConnectException) {
-            warn("[Updater] Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed.")
+            logger.warn("Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed.")
         } catch (_: SocketTimeoutException) {
-            warn("[Updater] GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection.")
+            logger.warn("GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection.")
         } catch (e: Exception) {
-            warn("[Updater] Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
+            logger.warn("Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 
@@ -83,7 +83,7 @@ import java.time.Duration
         try {
             val releases = fetchReleases(repoOwner, repoName)
             if (releases.isEmpty()) {
-                logger.warn("[Updater] No releases found on GitHub.")
+                logger.warn("No releases found on GitHub.")
                 return
             }
 
@@ -100,13 +100,13 @@ import java.time.Duration
                 .maxOrNull() ?: Server.modLatestVersion?.toString()
 
         } catch (_: UnknownHostException) {
-            logger.warn("[Updater] Cannot reach GitHub (DNS resolution failed).")
+            logger.warn("Cannot reach GitHub (DNS resolution failed).")
         } catch (_: ConnectException) {
-            logger.warn("[Updater] Cannot connect to GitHub.")
+            logger.warn("Cannot connect to GitHub.")
         } catch (_: SocketTimeoutException) {
-            logger.warn("[Updater] GitHub connection timed out.")
+            logger.warn("GitHub connection timed out.")
         } catch (e: Exception) {
-            logger.warn("[Updater] Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
+            logger.warn("Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
         }
     }
 

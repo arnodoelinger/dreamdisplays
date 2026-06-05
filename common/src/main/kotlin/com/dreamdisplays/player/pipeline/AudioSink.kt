@@ -4,7 +4,7 @@ import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.player.util.MediaBufferEffects
 import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.OutputStream
 import java.util.concurrent.atomic.AtomicBoolean
@@ -12,6 +12,7 @@ import javax.sound.sampled.*
 
 /** Manages the `javax.sound` PCM pipeline for one `FFmpeg` audio process. */
 internal class AudioSink(private val debugLabel: String) {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/AudioSink")
     companion object {
         const val SAMPLE_RATE = 44100
         private const val CHUNK_BYTES = SAMPLE_RATE * 2 * 2 / 20
@@ -59,7 +60,7 @@ internal class AudioSink(private val debugLabel: String) {
                 )
                 val info = DataLine.Info(SourceDataLine::class.java, fmt)
                 if (!AudioSystem.isLineSupported(info)) {
-                    LoggingManager.warn("[AudioSink $debugLabel] PCM line not supported.")
+                    logger.warn("$debugLabel PCM line not supported.")
                     return
                 }
                 ln = openLine(info, fmt) ?: return
@@ -82,11 +83,11 @@ internal class AudioSink(private val debugLabel: String) {
             }
         } catch (e: IOException) {
             if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
-                LoggingManager.warn("[AudioSink $debugLabel] Read: ${e.message}.")
+                logger.warn("$debugLabel Read: ${e.message}.")
             }
         } catch (e: Exception) {
             if (!terminated.get() && !stopFlag.get()) {
-                LoggingManager.warn("[AudioSink $debugLabel] Pipeline: ${e.message}.")
+                logger.warn("$debugLabel Pipeline: ${e.message}.")
             }
         } finally {
             ln?.let {
@@ -106,7 +107,7 @@ internal class AudioSink(private val debugLabel: String) {
                 return (AudioSystem.getLine(info) as SourceDataLine).also { it.open(fmt, LINE_BUFFER_BYTES) }
             } catch (e: LineUnavailableException) {
                 if (attempt == OPEN_RETRIES - 1) {
-                    LoggingManager.warn("[AudioSink $debugLabel] Line unavailable: ${e.message}.")
+                    logger.warn("$debugLabel Line unavailable: ${e.message}.")
                     return null
                 }
                 try {

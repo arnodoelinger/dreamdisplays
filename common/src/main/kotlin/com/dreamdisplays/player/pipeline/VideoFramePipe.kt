@@ -6,8 +6,8 @@ import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.render.AsyncTextureUploader
 import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.textures.GpuTexture
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
+import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
@@ -26,6 +26,7 @@ import java.util.concurrent.atomic.AtomicReference
  * the render thread reads from [readyBufferRef] without blocking the reader.
  */
 internal class VideoFramePipe(private val debugLabel: String) {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/VideoFramePipe")
     companion object {
         /** Default frame rate when the source doesn't report one or reports an invalid one. */
         private const val DEFAULT_FPS = 30.0
@@ -89,7 +90,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
             MediaPlayer.framesToGpu.incrementAndGet()
             if (++uploadCount >= 60) {
                 val avgMs = uploadTotalNs / 60 / 1_000_000.0
-                LoggingManager.info("[VideoFramePipe $debugLabel] Upload avg. ${String.format("%.3f", avgMs)} ms / frame")
+                logger.info("$debugLabel Upload avg. ${String.format("%.3f", avgMs)} ms / frame")
                 uploadTotalNs = 0L; uploadCount = 0
             }
         }
@@ -154,7 +155,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
                     r.lineSequence().forEach { line ->
                         synchronized(stderrBuf) { stderrBuf.append(line).append('\n') }
                         if (MediaUtil.isInterestingStderr(line)) {
-                            LoggingManager.warn("[FFmpeg[V] $debugLabel] $line")
+                            logger.warn("$debugLabel FFmpeg[V] $line")
                         }
                     }
                 }
@@ -172,7 +173,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
                     val ph = readAsciiInt(input)
                     val maxVal = readAsciiInt(input)
                     if (pw != w || ph != h || maxVal != 255) {
-                        LoggingManager.warn("[VideoFramePipe $debugLabel] PPM header mismatch: ${pw}x$ph max=$maxVal (expected ${w}x$h max=255)")
+                        logger.warn("$debugLabel PPM header mismatch: ${pw}x$ph max=$maxVal (expected ${w}x$h max=255).")
                         val skip = pw.toLong() * ph * 3
                         if (pw <= 0 || ph <= 0 || skip <= 0 || !skipBytes(input, skip)) { normalEos = true; break }
                         continue
@@ -185,7 +186,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
                     if (!firstFrame) {
                         firstFrame = true
                         onFirstFrame()
-                        if (MediaPlayer.DEBUG) LoggingManager.info("[VideoFramePipe $debugLabel] First frame ${w}x${h}.")
+                        if (MediaPlayer.DEBUG) logger.info("$debugLabel First frame ${w}x${h}.")
                     }
 
                     val audioClock = getAudioClock()
@@ -224,7 +225,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
             }
         } catch (e: IOException) {
             if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
-                LoggingManager.warn("[VideoFramePipe $debugLabel] Read: ${e.message}")
+                logger.warn("$debugLabel Read: ${e.message}")
             }
         }
 

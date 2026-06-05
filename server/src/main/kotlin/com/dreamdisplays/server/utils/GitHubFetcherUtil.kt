@@ -5,9 +5,8 @@ import io.github.arsmotorin.ofrat.PaperOnly
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
 import com.google.gson.reflect.TypeToken
-import me.inotsleep.utils.logging.LoggingManager.error
-import me.inotsleep.utils.logging.LoggingManager.warn
 import org.jspecify.annotations.NullMarked
+import org.slf4j.LoggerFactory
 import java.net.URI
 import java.net.http.HttpClient
 import java.net.http.HttpClient.newHttpClient
@@ -19,6 +18,7 @@ import java.time.Duration
  * GitHub version fetcher. Uses the GitHub API to fetch the latest release of the mod and plugin.
  */
 @PaperOnly @NullMarked object GitHubFetcherUtil {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/GitHubFetcher")
     private val gson = Gson()
     private val client: HttpClient = newHttpClient()
 
@@ -40,7 +40,7 @@ import java.time.Duration
         val response = try {
             client.send(request, ofString())
         } catch (e: Exception) {
-            error("[Fetcher] Failed to connect to GitHub API: ${e.message}")
+            logger.error("Failed to connect to GitHub API: ${e.message}")
             throw e
         }
 
@@ -50,8 +50,8 @@ import java.time.Duration
                 500, 502, 503 -> "GitHub servers are experiencing issues"
                 else -> "Unexpected error"
             }
-            error("[Fetcher] GitHub API returned status ${response.statusCode()}: $errorMsg")
-            warn("[Fetcher] Response body: ${response.body().take(200)}")
+            logger.error("GitHub API returned status ${response.statusCode()}: $errorMsg")
+            logger.warn("Response body: ${response.body().take(200)}")
             return emptyList()
         }
 

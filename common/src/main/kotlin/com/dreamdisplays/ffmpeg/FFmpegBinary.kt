@@ -1,8 +1,8 @@
 package com.dreamdisplays.ffmpeg
 
-import me.inotsleep.utils.logging.LoggingManager
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
+import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URI
@@ -14,6 +14,7 @@ import java.util.zip.ZipInputStream
 
 /** `FFmpeg` binary downloader. **/
 object FFmpegBinary {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/FFmpeg")
     private const val CACHE_ROOT = "./dreamdisplays/ffmpeg"
     private const val BTBN_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
 
@@ -35,7 +36,7 @@ object FFmpegBinary {
             try {
                 getPath()
             } catch (e: Exception) {
-                LoggingManager.warn("[FFmpeg] prewarm failed", e)
+                logger.warn("Prewarm failed", e)
             }
         }, "FFmpeg-prewarm").apply { isDaemon = true }.start()
     }
@@ -46,7 +47,7 @@ object FFmpegBinary {
      */
     private fun resolve(): String? {
         val p = detectPlatform() ?: run {
-            LoggingManager.warn("[FFmpeg] No bundled binary URL for this OS / arch; trying system FFmpeg.")
+            logger.warn("No bundled binary URL for this OS / arch; trying system FFmpeg.")
             return findSystemFfmpeg()
         }
 
@@ -54,24 +55,24 @@ object FFmpegBinary {
         val binary = File(cacheDir, p.binaryName)
 
         if (binary.isFile && binary.length() > 0 && binary.canExecute()) {
-            LoggingManager.info("[FFmpeg] Using binary: ${binary.absolutePath}.")
+            logger.info("Using binary: ${binary.absolutePath}.")
             return binary.absolutePath
         }
 
         return try {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
-                throw IOException("[FFmpeg] Cannot create cache dir: $cacheDir.")
+                throw IOException("Cannot create cache dir: $cacheDir.")
             }
             downloadAndExtract(p, binary)
             if (!binary.isFile || binary.length() == 0L) {
-                throw IOException("[FFmpeg] Extracted binary is missing or empty.")
+                throw IOException("Extracted binary is missing or empty.")
             }
             markExecutable(binary)
             removeMacQuarantine(binary)
-            LoggingManager.info("[FFmpeg] Ready to work.")
+            logger.info("Ready to work.")
             binary.absolutePath
         } catch (e: Exception) {
-            LoggingManager.error("[FFmpeg] Download failed, falling back to system ffmpeg", e)
+            logger.error("Download failed, falling back to system ffmpeg", e)
             findSystemFfmpeg()
         }
     }
@@ -79,12 +80,12 @@ object FFmpegBinary {
     /** Downloads the archive for [p] to a temp file, extracts the binary to [destBinary], and cleans up the temp file. */
     @Throws(IOException::class)
     private fun downloadAndExtract(p: Platform, destBinary: File) {
-        LoggingManager.info("[FFmpeg] Downloading ${p.url}...")
+        logger.info("Downloading ${p.url}...")
         val parent = destBinary.parentFile
         val tempArchive = File(parent, "_download" + if (p.isTarXz) ".tar.xz" else ".zip")
         try {
             downloadWithRedirects(p.url, tempArchive)
-            LoggingManager.info("[Ffmpeg] Downloaded ${tempArchive.length()} bytes, extracting '${p.entrySuffix}'...")
+            logger.info("Downloaded ${tempArchive.length()} bytes, extracting '${p.entrySuffix}'...")
             if (p.isTarXz) extractFromTarXz(tempArchive, p.entrySuffix, destBinary)
             else extractFromZip(tempArchive, p.entrySuffix, destBinary)
         } finally {
@@ -106,13 +107,13 @@ object FFmpegBinary {
             if (status in 300..399) {
                 val loc = conn.getHeaderField("Location")
                 conn.disconnect()
-                if (loc == null) throw IOException("[FFmpeg] Redirect without Location at $currentUrl.")
+                if (loc == null) throw IOException("Redirect without Location at $currentUrl.")
                 currentUrl = loc
                 continue
             }
             if (status != 200) {
                 conn.disconnect()
-                throw IOException("[FFmpeg] HTTP $status for $currentUrl.")
+                throw IOException("HTTP $status for $currentUrl.")
             }
             try {
                 conn.inputStream.use { input ->
@@ -123,7 +124,7 @@ object FFmpegBinary {
             }
             return
         }
-        throw IOException("[FFmpeg] Too many redirects: $url.")
+        throw IOException("Too many redirects: $url.")
     }
 
     /** Extracts the first ZIP entry whose name ends with [suffix] from [archive] to [dest]. */
@@ -140,7 +141,7 @@ object FFmpegBinary {
                 e = zis.nextEntry
             }
         }
-        throw IOException("[FFmpeg] '$suffix' not found in ${archive.name}.")
+        throw IOException("'$suffix' not found in ${archive.name}.")
     }
 
     /** Extracts the first tar.xz entry whose name ends with [suffix] from [archive] to [dest]. */
@@ -160,7 +161,7 @@ object FFmpegBinary {
                 }
             }
         }
-        throw IOException("[FFmpeg] '$suffix' not found in ${archive.name}")
+        throw IOException("'$suffix' not found in ${archive.name}.")
     }
 
     /** Sets the executable bit on [binary] using POSIX permissions when available, falling back to `setExecutable`. */
@@ -200,14 +201,14 @@ object FFmpegBinary {
                     }
                 }.apply { isDaemon = true }.start()
                 if (p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0) {
-                    LoggingManager.info("[FFmpeg] Using system ffmpeg: $candidate.")
+                    logger.info("Using system ffmpeg: $candidate...")
                     return candidate
                 }
                 p.destroyForcibly()
             } catch (_: Exception) {
             }
         }
-        LoggingManager.error("[FFmpeg] FFmpeg not found (no download succeeded, no system binary).")
+        logger.error("FFmpeg not found (no download succeeded, no system binary).")
         return null
     }
 

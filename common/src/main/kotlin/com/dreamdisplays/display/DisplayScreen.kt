@@ -9,7 +9,6 @@ import com.dreamdisplays.client.ui.VideoPopoutWindow
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.ytdlp.YtDlp
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.rendertype.RenderSetup
@@ -18,6 +17,7 @@ import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
+import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
 import kotlin.math.abs
@@ -291,7 +291,7 @@ class DisplayScreen(
         try {
             mp.updateFrame(tex.getTexture())
         } catch (e: Exception) {
-            LoggingManager.warn("[DisplayScreen $uuid] fitTexture failed: ${e.message}")
+            logger.warn("$uuid fitTexture failed: ${e.message}")
         }
         popoutWindow?.renderFrame()
     }
@@ -321,7 +321,7 @@ class DisplayScreen(
             mp.setPopoutSink { buf, fw, fh -> newWin.updateFrame(buf, fw, fh) }
             newWin.open(w, h)
         } catch (e: Exception) {
-            LoggingManager.warn("[DisplayScreen] Could not open window: ${e.message}")
+            logger.warn("Could not open window: ${e.message}.")
         }
     }
 
@@ -336,7 +336,7 @@ class DisplayScreen(
             pipOverlay = overlay
             mp.setPopoutSink { buf, fw, fh -> overlay.updateFrame(buf, fw, fh) }
         } else {
-            LoggingManager.warn("[DisplayScreen] No PiP corners available (max 4).")
+            logger.warn("No PiP corners available (max 4).")
         }
     }
 
@@ -512,7 +512,7 @@ class DisplayScreen(
         val parsed = quality.replace("p", "").toInt()
         if (parsed > 0) parsed else DEFAULT_QUALITY
     } catch (_: NumberFormatException) {
-        LoggingManager.warn("[DisplayScreen] Invalid quality value '$quality' for display $uuid, using ${DEFAULT_QUALITY}p.")
+        logger.warn("Invalid quality value '$quality' for display $uuid, using ${DEFAULT_QUALITY}p.")
         DEFAULT_QUALITY
     }
 
@@ -528,6 +528,7 @@ class DisplayScreen(
     }
 
     companion object {
+        private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayScreen")
         private const val DEFAULT_QUALITY = 720
         private const val SYNC_SEEK_TOLERANCE_NS = 750_000_000L
         private const val SYNC_JUMP_THRESHOLD_NS = 1_500_000_000L

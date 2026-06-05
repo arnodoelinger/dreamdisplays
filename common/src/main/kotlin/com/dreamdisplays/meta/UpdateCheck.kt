@@ -3,14 +3,15 @@ package com.dreamdisplays.meta
 import com.dreamdisplays.utils.GeneralUtil
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
-import me.inotsleep.utils.logging.LoggingManager
 import org.semver4j.Semver
+import org.slf4j.LoggerFactory
 import java.net.HttpURLConnection
 import java.net.URI
 import java.nio.charset.StandardCharsets
 
 /** Checks mod updates against the latest stable GitHub release. **/
 object UpdateCheck {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/UpdateCheck")
     private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
 
     @Volatile private var checked = false
@@ -82,7 +83,7 @@ object UpdateCheck {
                 updateAvailable = true
             }
         } catch (e: Exception) {
-            LoggingManager.warn("[UpdateChecker] Update check failed: ${e.message}")
+            logger.warn("Update check failed: ${e.message}")
         } finally {
             conn?.disconnect()
         }

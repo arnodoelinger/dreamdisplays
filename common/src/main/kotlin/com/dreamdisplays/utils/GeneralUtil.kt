@@ -51,7 +51,7 @@ object GeneralUtil {
     @Throws(IOException::class)
     fun readResource(resourcePath: String): String {
         val stream = GeneralUtil::class.java.getResourceAsStream(resourcePath)
-            ?: throw IOException("[GeneralUtil] Can't find the resource: $resourcePath.")
+            ?: throw IOException("Can't find the resource: $resourcePath.")
         return stream.bufferedReader().use { it.readText() }
     }
 

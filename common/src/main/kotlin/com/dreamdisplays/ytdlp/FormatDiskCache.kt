@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.nio.charset.StandardCharsets
@@ -21,6 +21,7 @@ import java.util.concurrent.Executors
  * Persistent on-disk cache for resolved YouTube format URLs.
  */
 object FormatDiskCache {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/FormatDiskCache")
     private val CACHE_DIR: Path = Path.of("config", "dreamdisplays", "yt-cache")
     private val GSON: Gson = GsonBuilder().create()
     private val STREAM_LIST_TYPE = object : TypeToken<List<YtStream>>() {}.type
@@ -80,7 +81,7 @@ object FormatDiskCache {
                 StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE
             )
         } catch (e: IOException) {
-            LoggingManager.warn("[FormatDiskCache] Write failed: ${e.message}")
+            logger.warn("Write failed: ${e.message}")
         }
     }
 

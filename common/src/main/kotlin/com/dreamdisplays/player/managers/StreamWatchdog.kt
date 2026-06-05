@@ -1,6 +1,6 @@
 package com.dreamdisplays.player.managers
 
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
@@ -17,6 +17,8 @@ internal class StreamWatchdog(
     private val checkIntervalMs: Long = 1_000L,
     private val onStall: () -> Unit,
 ) {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/StreamWatchdog")
+
     @Volatile private var executor: ScheduledExecutorService? = null
 
     /** Start watchdog. */
@@ -40,7 +42,7 @@ internal class StreamWatchdog(
         if (!isActive()) return
         val silenceMs = (System.nanoTime() - getLastFrameNanos()) / 1_000_000L
         if (silenceMs >= stallThresholdMs) {
-            LoggingManager.warn("[Watchdog $debugLabel] No frames for ${silenceMs} ms. Restarting...")
+            logger.warn("$debugLabel No frames for ${silenceMs} ms. Restarting...")
             onStall()
         }
     } }

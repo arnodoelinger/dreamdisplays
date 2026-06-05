@@ -17,8 +17,8 @@ import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.ytdlp.YtDlp
 import com.mojang.blaze3d.textures.GpuTexture
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.core.BlockPos
+import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
@@ -42,6 +42,7 @@ class MediaPlayer(
     private val displayScreen: DisplayScreen,
 ) {
     companion object {
+        private val logger = LoggerFactory.getLogger("DreamDisplays/MediaPlayer")
         val DEBUG: Boolean = System.getProperty("dreamdisplays.debug")?.toBoolean() == true
                 || System.getenv("DREAMDISPLAYS_DEBUG").let { it == "1" || it.equals("true", ignoreCase = true) }
         var captureSamples: Boolean = true
@@ -251,15 +252,15 @@ class MediaPlayer(
             retryPolicy.reset()
 
             if (DEBUG) {
-                LoggingManager.info("[MediaPlayer $debugLabel] video=${prepared.streamSet.currentVideo} audio=${prepared.streamSet.currentAudio}")
-                LoggingManager.info("[MediaPlayer $debugLabel] live=$liveStream seekable=$seekable dur=$durationHintNanos")
+                logger.info("$debugLabel video=${prepared.streamSet.currentVideo} audio=${prepared.streamSet.currentAudio}")
+                logger.info("$debugLabel live=$liveStream seekable=$seekable dur=$durationHintNanos")
                 stats.start()
             }
             success = true
             val ss = prepared.streamSet
             safeExecute { if (!terminated.get()) startStreams(ss, 0) }
         } catch (e: Exception) {
-            LoggingManager.error("[MediaPlayer $debugLabel] Initialization failed: ${e.message}")
+            logger.error("$debugLabel Initialization failed: ${e.message}")
             state.set(PlaybackState.ERROR)
             displayScreen.errored = true
         } finally {
@@ -304,7 +305,7 @@ class MediaPlayer(
             && HwAccelBackend.looksLikeHwAccelFailure(stderr)
         ) {
             hwAccelDisabled = true
-            LoggingManager.warn("[MediaPlayer $debugLabel] Hardware decode failed for this stream. Falling back to software. Stderr: ${MediaUtil.truncate(stderr)}")
+            logger.warn("$debugLabel Hardware decode failed for this stream. Falling back to software. Stderr: ${MediaUtil.truncate(stderr)}.")
             val ss = streams
             if (ss != null) safeExecute { if (!terminated.get()) startStreams(ss, 0) }
             return
@@ -333,7 +334,7 @@ class MediaPlayer(
         }
 
         if (stderr.isNotEmpty()) {
-            LoggingManager.error("[MediaPlayer $debugLabel] Unrecoverable: ${MediaUtil.truncate(stderr)}.")
+            logger.error("$debugLabel Unrecoverable: ${MediaUtil.truncate(stderr)}.")
         }
         state.set(PlaybackState.ERROR)
         displayScreen.errored = true
@@ -345,7 +346,7 @@ class MediaPlayer(
      */
     private fun scheduleRetry(invalidateCache: Boolean) {
         val delayMs = retryPolicy.nextDelay()
-        LoggingManager.warn("[MediaPlayer $debugLabel] ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs} ms.")
+        logger.warn("$debugLabel ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs} ms.")
         if (invalidateCache) YtDlp.invalidateCache(youtubeUrl)
         state.set(PlaybackState.RESTARTING)
         INIT_EXECUTOR.submit {

@@ -14,7 +14,6 @@ import com.dreamdisplays.server.utils.YouTubeUtil
 import io.github.arsmotorin.ofrat.*
 import org.semver4j.Semver
 import com.google.gson.Gson
-import me.inotsleep.utils.logging.LoggingManager.*
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.kyori.adventure.text.TextReplacementConfig
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer
@@ -33,6 +32,7 @@ import java.util.*
  * Handles incoming channels from clients. This is the main entry point for all packet handling.
  */
 @PaperOnly @NullMarked class PacketReceiver(private val plugin: Main) : PluginMessageListener {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
     private val gson by lazy { Gson() }
     private val maxVersionBytes = 128
 
@@ -63,8 +63,8 @@ import java.util.*
                 )
                 StateManager.processSyncPacket(syncData, player)
             }
-        }.onFailure { error ->
-            warn("[PacketReceiver] Failed to decode sync packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to decode sync packet", e)
         }
     }
 
@@ -104,12 +104,12 @@ import java.util.*
     private fun handleVersion(player: Player, message: ByteArray) {
         runCatching {
             val version = readVersionString(message)
-            log("[PacketReceiver] ${player.name} joined with Dream Displays $version.")
+            logger.info("${player.name} joined with Dream Displays $version.")
 
             initializePlayer(player, version)
             checkForUpdates(player, version)
-        }.onFailure { error ->
-            warn("[PacketReceiver] Failed to process version packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to process version packet", e)
         }
     }
 
@@ -120,8 +120,8 @@ import java.util.*
                 val enabled = input.readBoolean()
                 PlayerManager.setDisplaysEnabled(player, enabled)
             }
-        }.onFailure { error ->
-            warn("[PacketReceiver] Failed to decode display enabled packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to decode display enabled packet", e)
         }
     }
 
@@ -290,8 +290,8 @@ import java.util.*
                 DisplayManager.sendUpdate(displayData, receivers)
                 if (wasSync) StateManager.resetAndBroadcast(displayData.id, receivers)
             }
-        }.onFailure { error ->
-            warn("[PacketReceiver] Failed to decode set_video packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to decode set_video packet", e)
         }
     }
 
@@ -314,8 +314,8 @@ import java.util.*
                 val receivers = DisplayManager.getReceivers(displayData)
                 DisplayManager.sendUpdate(displayData, receivers)
             }
-        }.onFailure { error ->
-            warn("[PacketReceiver] Failed to decode set_locked packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to decode set_locked packet", e)
         }
     }
 
@@ -325,8 +325,8 @@ import java.util.*
             DataInputStream(ByteArrayInputStream(message)).use { input ->
                 input.readUUID()
             }
-        }.onFailure { error ->
-            error("[PacketReceiver] Failed to decode UUID packet", error)
+        }.onFailure { e ->
+            logger.error("Failed to decode UUID packet", e)
         }.getOrNull()
     }
 
@@ -335,10 +335,10 @@ import java.util.*
         return DataInputStream(ByteArrayInputStream(message)).use { input ->
             val length = input.readVarInt()
             require(length in 1..maxVersionBytes) {
-                "[PacketReceiver] Invalid version packet length: $length."
+                "Invalid version packet length: $length."
             }
             require(length <= input.available()) {
-                "[PacketReceiver] Invalid version packet size: declared = $length, but available = ${input.available()}."
+                "Invalid version packet size: declared = $length, but available = ${input.available()}."
             }
             val data = ByteArray(length)
             input.readFully(data)
@@ -378,11 +378,11 @@ import java.util.*
         ServerPlayNetworking.registerGlobalReceiver(Packets.Version.PACKET_ID) { payload, context ->
             val player = context.player()
             val server = context.server()
-            val versionString = payload.version
-            logger.info("[PacketReceiver] ${player.name.string} joined with Dream Displays $versionString")
+            val version = payload.version
+            logger.info("${player.name.string} joined with Dream Displays $version.")
 
             runCatching {
-                val version = parseVersionOrNull(versionString)
+                val version = parseVersionOrNull(version)
                 PlayerManager.setVersion(player, version)
 
                 val config = Server.config
@@ -438,7 +438,7 @@ import java.util.*
                     }
                 }
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to process version packet", e)
+                logger.warn("Failed to process version packet", e)
             }
         }
 
@@ -455,7 +455,7 @@ import java.util.*
             runCatching {
                 StateManager.processSyncPacket(syncData, player, server)
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle sync packet", e)
+                logger.warn("Failed to handle sync packet", e)
             }
         }
 
@@ -463,7 +463,7 @@ import java.util.*
             runCatching {
                 StateManager.sendSyncPacket(payload.uuid, context.player())
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle request_sync packet", e)
+                logger.warn("Failed to handle request_sync packet", e)
             }
         }
 
@@ -485,7 +485,7 @@ import java.util.*
                 FabricPacketUtil.sendDelete(receivers, displayId)
                 MessageUtil.sendMessage(player, "displayDeleted")
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle delete packet", e)
+                logger.warn("Failed to handle delete packet", e)
             }
         }
 
@@ -493,7 +493,7 @@ import java.util.*
             runCatching {
                 DisplayManager.report(payload.uuid, context.player(), context.server())
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle report packet", e)
+                logger.warn("Failed to handle report packet", e)
             }
         }
 
@@ -501,7 +501,7 @@ import java.util.*
             runCatching {
                 PlayerManager.setDisplaysEnabled(context.player(), payload.enabled)
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle display_enabled packet", e)
+                logger.warn("Failed to handle display_enabled packet", e)
             }
         }
 
@@ -522,7 +522,7 @@ import java.util.*
                 FabricPacketUtil.sendDisplayInfo(receivers, displayData)
                 if (wasSync) StateManager.resetAndBroadcast(displayId, receivers)
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle set_video packet", e)
+                logger.warn("Failed to handle set_video packet", e)
             }
         }
 
@@ -543,7 +543,7 @@ import java.util.*
                 val receivers = DisplayManager.getReceivers(displayData, context.server())
                 FabricPacketUtil.sendDisplayInfo(receivers, displayData)
             }.onFailure { e ->
-                logger.warn("[PacketReceiver] Failed to handle set_locked packet", e)
+                logger.warn("Failed to handle set_locked packet", e)
             }
         }
     }

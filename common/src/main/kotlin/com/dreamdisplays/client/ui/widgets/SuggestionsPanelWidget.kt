@@ -5,7 +5,6 @@ import com.dreamdisplays.ytdlp.Thumbnails
 import com.dreamdisplays.ytdlp.YouTubeInnerTube
 import com.dreamdisplays.ytdlp.YtDlp
 import com.dreamdisplays.ytdlp.YtVideoInfo
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -21,6 +20,7 @@ import net.minecraft.network.chat.Component
 import net.minecraft.resources.Identifier
 import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
+import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.function.Consumer
@@ -128,7 +128,7 @@ class SuggestionsPanelWidget(
                         ), null
                     )
                 } catch (e: Exception) {
-                    LoggingManager.warn("[Suggestions] URL meta fetch failed: ${e.message}")
+                    logger.warn("URL meta fetch failed: ${e.message}")
                     publish(
                         seq2, listOf(
                             YtVideoInfo(
@@ -148,7 +148,7 @@ class SuggestionsPanelWidget(
                 val r = YtDlp.search(q, RESULT_LIMIT)
                 publish(seq, r, null)
             } catch (e: Exception) {
-                LoggingManager.warn("[Suggestions] Search failed '$q': ${e.message}")
+                logger.warn("Search failed '$q': ${e.message}")
                 publish(seq, null, "dreamdisplays.suggestions.error")
             }
         }
@@ -162,7 +162,7 @@ class SuggestionsPanelWidget(
                 val r = YtDlp.related(videoId, RESULT_LIMIT)
                 publish(seq, r, null)
             } catch (e: Exception) {
-                LoggingManager.warn("[Suggestions] Related failed $videoId: ${e.message}")
+                logger.warn("Related failed $videoId: ${e.message}")
                 publish(seq, null, "dreamdisplays.suggestions.error")
             }
         }
@@ -483,6 +483,7 @@ class SuggestionsPanelWidget(
         private const val ACTION_W = SEARCH_H
         private const val ACTION_GAP = 4
 
+        private val logger = LoggerFactory.getLogger("DreamDisplays/Suggestions")
         private val EXECUTOR = Executors.newFixedThreadPool(2) { r ->
             Thread(r, "DD-Suggestions").apply { isDaemon = true }
         }

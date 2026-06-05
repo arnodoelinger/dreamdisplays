@@ -11,8 +11,8 @@ import com.dreamdisplays.player.stream.MediaStreamSelector
 import com.dreamdisplays.player.stream.StreamSet
 import com.dreamdisplays.player.util.joinSafely
 import com.mojang.blaze3d.textures.GpuTexture
-import me.inotsleep.utils.logging.LoggingManager
 import net.minecraft.client.Minecraft
+import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -37,6 +37,8 @@ internal class PlaybackSessionManager(
     /** Invoked by [VideoFramePipe] when the stream ends or errors. Called on the reader thread. */
     private val onStreamEnd: (stderr: String, normalEos: Boolean) -> Unit,
 ) {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/PlaybackSession")
+
     private data class Session(
         val videoProcess: Process,
         val audioProcess: Process,
@@ -88,7 +90,7 @@ internal class PlaybackSessionManager(
         if (terminated.get()) return
 
         val ffmpeg = FFmpegBinary.getPath() ?: run {
-            LoggingManager.error("[PlaybackSessionManager $debugLabel] FFmpeg binary not available.")
+            logger.error("$debugLabel FFmpeg binary not available.")
             events.onError(); return
         }
         clock.reset(offsetNanos)
@@ -115,7 +117,7 @@ internal class PlaybackSessionManager(
             session = Session(vp, ap, vt, at, vStop, aStop)
             isPlaying = true
         } catch (e: IOException) {
-            LoggingManager.error("[PlaybackSessionManager $debugLabel] Failed to start FFmpeg", e)
+            logger.error("$debugLabel Failed to start FFmpeg", e)
             events.onError()
         }
     }

@@ -19,7 +19,6 @@ import com.dreamdisplays.server.utils.net.ServerPacketHandler
 import io.github.arsmotorin.ofrat.*
 import org.semver4j.Semver
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
-import me.inotsleep.utils.logging.LoggingManager
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
@@ -70,7 +69,7 @@ import org.slf4j.LoggerFactory
     /** Initializes scheduler, storage, listeners, channels, and metrics. Safe to call from a reload. */
     fun doEnable() {
         @Suppress("DEPRECATION")
-        LoggingManager.log("[Dream Displays] Enabling Dream Displays ${description.version}...")
+        logger.info("Enabling Dream Displays ${description.version}...")
 
         Scheduler.init(this)
 
@@ -92,7 +91,7 @@ import org.slf4j.LoggerFactory
 
     /** Persists state and tears down resources. Safe to call from a reload. */
     fun doDisable() {
-        LoggingManager.log("[Dream Displays] Disabling Dream Displays ${pluginMeta.version}...")
+        logger.info("Disabling Dream Displays ${pluginMeta.version}...")
         if (::storage.isInitialized) {
             DisplayManager.save { data: PaperDisplayData -> storage.saveDisplay(data) }
             storage.disconnect()
@@ -100,6 +99,7 @@ import org.slf4j.LoggerFactory
     }
 
     companion object {
+        val logger = LoggerFactory.getLogger("DreamDisplays/Plugin")
         lateinit var config: Config
         var modVersion: Semver? = null
         var pluginLatestVersion: String? = null
@@ -128,7 +128,7 @@ import org.slf4j.LoggerFactory
      * This method is called by the `Fabric` loader when the mod is loaded.
      */
     override fun onInitialize() {
-        logger.info("[Dream Displays] Initializing server-side mod...")
+        logger.info("Initializing server-side mod...")
 
         configInstance = FabricConfig()
 
@@ -151,17 +151,17 @@ import org.slf4j.LoggerFactory
             )
             storageInstance!!.createSchema()
             DisplayManager.register(storageInstance!!.loadAllFabricDisplays())
-            logger.info("[Dream Displays] Server started. Storage connected.")
+            logger.info("Server started. Storage connected.")
             startRepeatingTasks(server)
         }
 
         ServerLifecycleEvents.SERVER_STOPPING.register { _ ->
-            logger.info("[Dream Displays] Server stopping. Saving displays...")
+            logger.info("Server stopping. Saving displays...")
             DisplayManager.save { storageInstance?.saveDisplay(it) }
             storageInstance?.disconnect()
         }
 
-        logger.info("[Dream Displays] Server-side initialization complete.")
+        logger.info("Server-side initialization complete.")
     }
 
     /** Registers all custom payload types for clientbound and serverbound play channels. */
@@ -189,7 +189,7 @@ import org.slf4j.LoggerFactory
                 register(Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
             }
         } catch (e: Exception) {
-            logger.error("[Dream Displays] Failed to register payload types", e)
+            logger.error("Failed to register payload types", e)
             throw e
         }
     }

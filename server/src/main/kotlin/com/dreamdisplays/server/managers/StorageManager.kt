@@ -95,7 +95,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     /** Upserts the full row for [data] into the displays table. */
     @PaperOnly fun saveDisplay(data: PaperDisplayData) {
         val worldName = data.pos1.world?.name ?: run {
-            logger.error("[Storage] Cannot save display ${data.id}: world is null")
+            logger.error("Cannot save display ${data.id}: world is null")
             return
         }
         upsert(data, worldName,
@@ -118,7 +118,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         val world = Bukkit.getWorld(worldName)
             ?: runCatching { UUID.fromString(worldName) }.getOrNull()?.let { Bukkit.getWorld(it) }
         if (world == null) {
-            logger.warn("[Storage] Skipping display $id: world '$worldName' not found")
+            logger.warn("Skipping display $id: world '$worldName' not found")
             return null
         }
         val (x1, y1, z1) = unpackPos(row[table.pos1])

@@ -8,7 +8,6 @@ import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.datatypes.FabricDisplayData
 import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.utils.FacingUtil
-import me.inotsleep.utils.logging.LoggingManager
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer
@@ -17,6 +16,7 @@ import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import org.joml.Vector3i
 import org.jspecify.annotations.NullMarked
+import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
@@ -31,6 +31,7 @@ import java.util.*
  * including display info, sync data, delete commands, and settings updates.
  */
 @PaperOnly @NullMarked object PacketUtil {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/PacketUtil")
     private const val CHANNEL_DISPLAY_INFO = "dreamdisplays:display_info"
     private const val CHANNEL_SYNC = "dreamdisplays:sync"
     private const val CHANNEL_DELETE = "dreamdisplays:delete"
@@ -73,8 +74,8 @@ import java.util.*
             }
 
             sendPacket(players, CHANNEL_DISPLAY_INFO, packet)
-        }.onFailure { error ->
-            LoggingManager.warn("[PacketUtil] Failed to send display info packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to send display info packet", e)
         }
     }
 
@@ -92,8 +93,8 @@ import java.util.*
             }
 
             sendPacket(players, CHANNEL_SYNC, packet)
-        }.onFailure { error ->
-            LoggingManager.warn("[PacketUtil] Failed to send sync packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to send sync packet", e)
         }
     }
 
@@ -105,8 +106,8 @@ import java.util.*
             }
 
             sendPacket(players, CHANNEL_DELETE, packet)
-        }.onFailure { error ->
-            LoggingManager.warn("[PacketUtil] Failed to send delete packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to send delete packet", e)
         }
     }
 
@@ -143,8 +144,8 @@ import java.util.*
             }
 
             sendPacket(players, CHANNEL_CLEAR_CACHE, packet)
-        }.onFailure { error ->
-            LoggingManager.warn("[PacketUtil] Failed to send clear cache packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to send clear cache packet", e)
         }
     }
 
@@ -155,8 +156,8 @@ import java.util.*
                 output.writeBoolean(value)
             }
             player.sendPluginMessage(plugin, channel, packet)
-        }.onFailure { error ->
-            LoggingManager.warn("[PacketUtil] Failed to send $channel packet", error)
+        }.onFailure { e ->
+            logger.warn("Failed to send $channel packet", e)
         }
     }
 
@@ -234,7 +235,7 @@ import java.util.*
         var byte: Int
 
         do {
-            if (shift >= 35) throw IOException("[PacketUtil] VarInt too big")
+            if (shift >= 35) throw IOException("VarInt is too big.")
 
             byte = readUnsignedByte()
             result = result or ((byte and 0x7F) shl shift)
@@ -251,7 +252,7 @@ import java.util.*
         var byte: Byte
 
         do {
-            if (shift >= 70) throw RuntimeException("[PacketUtil] VarLong too big.")
+            if (shift >= 70) throw RuntimeException("VarLong is too big.")
 
             byte = readByte()
             result = result or ((byte.toInt() and 0x7F).toLong() shl shift)

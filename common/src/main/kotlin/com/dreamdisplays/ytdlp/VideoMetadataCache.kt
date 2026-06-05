@@ -1,6 +1,6 @@
 package com.dreamdisplays.ytdlp
 
-import me.inotsleep.utils.logging.LoggingManager
+import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
 
@@ -9,6 +9,7 @@ import java.util.concurrent.Executors
  * calls to `yt-dlp`
  */
 object VideoMetadataCache {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/VideoMetadataCache")
     private val CACHE = ConcurrentHashMap<String, YtVideoInfo>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
     private val EXEC = Executors.newSingleThreadExecutor { r ->
@@ -38,7 +39,7 @@ object VideoMetadataCache {
         try {
             YouTubeInnerTube.metadata(videoId)?.let { put(videoId, it) }
         } catch (e: Exception) {
-            LoggingManager.warn("[VideoMetadataCache] Metadata fetch failed for $videoId: ${e.message}")
+            logger.warn("Metadata fetch failed for $videoId: ${e.message}")
         } finally {
             IN_FLIGHT.remove(videoId)
         }
