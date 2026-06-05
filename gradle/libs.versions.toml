@@ -3,7 +3,7 @@
 [versions]
 # Common
 jspecify = "1.0.0"
-ofrat = "1.0.0"
+ofrat = "1.1.0"
 utils = "1.4.10"
 commonsCompress = "1.28.0"
 tomlj = "1.1.1"
@@ -17,7 +17,7 @@ bstats = "3.2.1"
 loom = "1.16.0-alpha.13"
 moddev = "2.0.141"
 shadow = "9.4.1"
-kotlin = "2.4.0-RC"
+kotlin = "2.4.0"
 paperweight = "2.0.0-beta.21"
 
 # Fabric
