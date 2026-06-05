@@ -6,7 +6,7 @@ plugins {
 }
 
 sourceSets.main {
-    kotlin.srcDir("../server/src/main/kotlin")
+    kotlin.srcDir(project(":server").file("src/main/kotlin"))
 }
 
 loom {
@@ -17,17 +17,19 @@ dependencies {
     compileOnly(libs.ofratAnnotations)
     "kotlinCompilerPluginClasspath"(libs.ofratPlugin)
     compileOnly(libs.paperApi)
-    compileOnly(libs.bstats)
-    compileOnly(libs.utils)
-    compileOnly(libs.tomlj)
-    compileOnly(libs.semver4j)
-    compileOnly(libs.exposedCore)
-    compileOnly(libs.exposedJdbc)
-    compileOnly(libs.hikari)
+    implementation(libs.bstats)
+    implementation(libs.utils)
+    implementation(libs.tomlj)
+    implementation(libs.semver4j)
+    implementation(libs.exposedCore)
+    implementation(libs.exposedJdbc)
+    implementation(libs.hikari)
+    runtimeOnly(libs.sqliteJdbc)
 
     minecraft(libs.fabricMinecraft)
     implementation(libs.fabricLoader)
     implementation(libs.fabricApi)
+    implementation(project(":common"))
     shadow(project(":common"))
     shadow(libs.kotlinStdlib)
     shadow(libs.tomlj)
@@ -39,6 +41,7 @@ dependencies {
 }
 
 tasks.processResources {
+    from(project(":common").file("src/main/resources/dreamdisplays.classtweaker"))
     val projectVersion = project.version.toString()
     inputs.property("version", projectVersion)
     filesMatching("fabric.mod.json") {
