@@ -105,7 +105,7 @@ jobs:
           with open("gradle/libs.versions.toml") as f:
               content = f.read()
 
-          mc = re.search(r'fabricMinecraft\s*=\s*"([^"]+)"', content).group(1)
+          mc = re.search(r'^minecraft\s*=\s*"([^"]+)"', content, re.MULTILINE).group(1)
           parts = mc.split(".")
           base = f"{parts[0]}.{parts[1]}"
           patch = int(parts[2]) if len(parts) > 2 else 0
