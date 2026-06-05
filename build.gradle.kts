@@ -18,6 +18,11 @@ subprojects {
     tasks.withType<ProcessResources>().configureEach {
         filteringCharset = Charsets.UTF_8.name()
     }
+
+    tasks.withType<Test>().configureEach {
+        failOnNoDiscoveredTests = false
+    }
+
     repositories {
         mavenCentral()
         maven("https://maven.fabricmc.net/")

@@ -1,19 +1,29 @@
 plugins {
     java
+    idea
     id("com.gradleup.shadow") version libs.versions.shadow
     kotlin("jvm")
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
 }
 
+buildscript {
+    repositories {
+        maven("https://jitpack.io")
+    }
+    dependencies {
+        classpath(libs.ofratPlugin)
+    }
+}
+
+apply(plugin = "io.github.arsmotorin.ofrat")
+
+configure<io.github.arsmotorin.ofrat.gradle.OfratExtension> {
+    target = "paper"
+}
+
 dependencies {
     compileOnly(libs.ofratAnnotations)
     "kotlinCompilerPluginClasspath"(libs.ofratPlugin)
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:io.github.arsmotorin.ofrat:platform=paper"
-    )
 }
 
 dependencies {
@@ -108,4 +118,13 @@ tasks.shadowJar {
     exclude("org/sqlite/native/Windows/x86/**")
     exclude("org/sqlite/native/Windows/armv7/**")
     exclude("org/sqlite/native/Windows/aarch64/**")
+}
+
+idea {
+    module {
+        // Exclude chameleons: @Chameleon val declarations are not valid Kotlin that the IDE understands.
+        // ide-stubs provides proper typealiases that mirror what OFRAT KCP generates at compile time.
+        excludeDirs.add(file("src/main/chameleons"))
+        sourceDirs.add(file("src/ide-stubs"))
+    }
 }

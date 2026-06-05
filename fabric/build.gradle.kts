@@ -1,8 +1,25 @@
 plugins {
+    idea
     id("net.fabricmc.fabric-loom") version libs.versions.loom
     id("maven-publish")
     id("com.gradleup.shadow") version libs.versions.shadow
     kotlin("jvm") version libs.versions.kotlin
+}
+
+buildscript {
+    repositories {
+        maven("https://jitpack.io")
+    }
+    dependencies {
+        classpath(libs.ofratPlugin)
+    }
+}
+
+apply(plugin = "io.github.arsmotorin.ofrat")
+
+configure<io.github.arsmotorin.ofrat.gradle.OfratExtension> {
+    target = "fabric"
+    chameleonsDir = "../server/src/main/chameleons"
 }
 
 kotlin { jvmToolchain(providers.gradleProperty("java.version").get().toInt()) }
@@ -63,12 +80,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = Charsets.UTF_8.name()
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:io.github.arsmotorin.ofrat:platform=fabric"
-    )
-}
-
 tasks.jar {
     from(rootProject.file("LICENSE"))
 }
@@ -77,6 +88,13 @@ tasks.jar {
 // official namespaces, so we have to disable the validation until it's fixed.
 // TODO: when a stable Loom for 26.1.2/26.2 is released, this should be removed
 tasks.named("validateAccessWidener") { enabled = false }
+
+idea {
+    module {
+        excludeDirs.add(rootProject.file("server/src/main/chameleons"))
+        sourceDirs.add(file("src/ide-stubs"))
+    }
+}
 
 tasks.shadowJar {
     configurations = listOf(project.configurations.getByName("shadow"))
