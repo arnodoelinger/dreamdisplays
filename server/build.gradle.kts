@@ -1,7 +1,6 @@
 plugins {
-    java
-    id("com.gradleup.shadow") version libs.versions.shadow
-    kotlin("jvm")
+    id("dreamdisplays.kotlin-conventions")
+    id("dreamdisplays.shadow-conventions")
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
 }
 
@@ -34,16 +33,8 @@ dependencies {
     implementation(libs.bstats)
 }
 
-val javaVersion = providers.gradleProperty("java.version").get().toInt()
-java {
-    toolchain {
-        languageVersion.set(JavaLanguageVersion.of(javaVersion))
-    }
-}
-
 tasks.withType<JavaCompile>().configureEach {
-    options.encoding = Charsets.UTF_8.name()
-    options.release.set(javaVersion)
+    options.release.set(providers.gradleProperty("java.version").get().toInt())
 }
 
 tasks.processResources {
@@ -65,8 +56,6 @@ tasks.build {
 }
 
 tasks.shadowJar {
-    archiveClassifier.set("")
-    destinationDirectory.set(rootProject.layout.buildDirectory.dir("libs"))
     archiveBaseName.set("dreamdisplays-paper")
     archiveVersion.set(rootProject.version.toString())
     manifest {
@@ -91,11 +80,6 @@ tasks.shadowJar {
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
-    mergeServiceFiles()
-    exclude("META-INF/versions/9/module-info.class")
-    exclude("META-INF/maven/**")
-    exclude("META-INF/proguard/**")
-    exclude("META-INF/*.kotlin_module")
     exclude("org/sqlite/native/Linux-Android/**")
     exclude("org/sqlite/native/Linux-Musl/x86/**")
     // exclude("org/sqlite/native/FreeBSD/**")

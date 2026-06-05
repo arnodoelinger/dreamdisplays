@@ -1,15 +1,4 @@
-plugins {
-    java
-}
-
 subprojects {
-    apply(plugin = "java")
-    val javaVersion = providers.gradleProperty("java.version").get().toInt()
-    java {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(javaVersion))
-        }
-    }
     tasks.withType<AbstractArchiveTask>().configureEach {
         isPreserveFileTimestamps = false
         isReproducibleFileOrder = true

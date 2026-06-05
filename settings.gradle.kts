@@ -1,4 +1,5 @@
 pluginManagement {
+    includeBuild("gradle")
     repositories {
         gradlePluginPortal()
         mavenCentral()
@@ -6,11 +7,7 @@ pluginManagement {
         maven("https://maven.neoforged.net/releases")
         maven("https://maven.fabricmc.net/")
         maven("https://maven.quiltmc.org/repository/release/")
-        maven("https://maven.quiltmc.org/repository/snapshot/")
         maven("https://repo.papermc.io/repository/maven-public/")
-    }
-    plugins {
-        kotlin("jvm") version "2.4.0-RC"
     }
 }
 
@@ -18,7 +15,7 @@ plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
-rootProject.name = "displays"
+rootProject.name = "dreamdisplays"
 include(":common")
 include(":client")
 include(":client:fabric")

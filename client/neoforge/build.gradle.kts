@@ -1,11 +1,9 @@
 plugins {
     id("net.neoforged.moddev") version libs.versions.moddev
     id("maven-publish")
-    id("com.gradleup.shadow") version libs.versions.shadow
-    kotlin("jvm") version libs.versions.kotlin
+    id("dreamdisplays.kotlin-conventions")
+    id("dreamdisplays.shadow-conventions")
 }
-
-kotlin { jvmToolchain(providers.gradleProperty("java.version").get().toInt()) }
 
 dependencies {
     implementation(project(":common"))
@@ -38,22 +36,11 @@ tasks.processResources {
 
 java {
     withSourcesJar()
-    toolchain { languageVersion.set(JavaLanguageVersion.of(providers.gradleProperty("java.version").get().toInt())) }
-}
-
-tasks.withType<JavaCompile>().configureEach {
-    options.encoding = Charsets.UTF_8.name()
-}
-
-tasks.jar {
-    from(rootProject.file("LICENSE"))
 }
 
 tasks.shadowJar {
     configurations = listOf(project.configurations.getByName("shadow"))
     archiveBaseName = "dreamdisplays-neoforge"
-    archiveClassifier = ""
-    destinationDirectory.set(rootProject.layout.buildDirectory.dir("libs"))
     dependencies {
         include(project(":common"))
         include(dependency("me.inotsleep:utils"))
@@ -74,9 +61,4 @@ tasks.shadowJar {
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
-    mergeServiceFiles()
-    exclude("META-INF/versions/9/module-info.class")
-    exclude("META-INF/maven/**")
-    exclude("META-INF/proguard/**")
-    exclude("META-INF/*.kotlin_module")
 }
