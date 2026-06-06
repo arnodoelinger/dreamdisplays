@@ -69,20 +69,31 @@ jobs:
           rm -rf artifacts
           mkdir -p artifacts
           python3 - <<'EOF'
-          import json, os
+          import json, os, glob, shutil, subprocess
+
           versions = json.loads(os.environ["STONECUTTER_VERSIONS"])
           for version in versions:
               with open("versions/active.txt", "w") as f:
                   f.write(version + "\n")
               print(f"::group::Build {version}", flush=True)
-              code = os.system("./gradlew clean build --no-daemon --parallel --build-cache")
+              result = subprocess.run([
+                  "./gradlew", "clean",
+                  ":client:fabric:shadowJar",
+                  ":client:neoforge:shadowJar",
+                  ":server:shadowJar",
+                  "--no-daemon", "--parallel", "--rerun-tasks",
+              ])
               print("::endgroup::", flush=True)
-              if code != 0:
-                  raise SystemExit(code)
-              os.system("cp build/libs/dreamdisplays-*.jar artifacts/")
+              if result.returncode != 0:
+                  raise SystemExit(result.returncode)
+              jars = glob.glob("build/libs/dreamdisplays-*.jar")
+              if not jars:
+                  raise SystemExit(f"No JARs found in build/libs/ for version {version}")
+              for jar in jars:
+                  shutil.copy(jar, "artifacts/")
           EOF
         env:
-          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Xmx4G
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
           STONECUTTER_VERSIONS: ${{ steps.stonecutter_versions.outputs.versions_json }}
 
       - name: Get version
@@ -109,7 +120,7 @@ jobs:
         with:
           name: build-jars
           path: artifacts/*.jar
-          if-no-files-found: warn
+          if-no-files-found: error
 
   github-prerelease:
     name: Publish GitHub pre-release
@@ -185,7 +196,8 @@ jobs:
           publish_mc = "26.2" if mc.startswith("26.2") else props.get("fabric.minecraft.dependency", mc)
 
           paper_1_21 = ["1.21"] + [f"1.21.{p}" for p in range(1, 12)]
-          paper_versions = paper_1_21 + ["26.1.2", "26.2"]
+          paper_26_1 = ["26.1", "26.1.1", "26.1.2"]
+          paper_versions = paper_1_21 + paper_26_1 + ["26.2"]
 
           out = os.environ["GITHUB_OUTPUT"]
           with open(out, "a") as f:
@@ -200,18 +212,24 @@ jobs:
           EOF
 
       - name: Extract changelog
-        if: needs.build.outputs.is_release == 'true'
+        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
         run: |
           python3 - <<'EOF'
-          import re, sys
+          import re, sys, os
 
           with open("CHANGELOG.md") as f:
               content = f.read()
 
           version = "${{ needs.build.outputs.version }}"
+          is_snapshot = "${{ needs.build.outputs.is_snapshot }}" == "true"
+
           pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
           match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
           if not match:
+              if is_snapshot:
+                  with open("changelog.md", "w") as f:
+                      f.write("")
+                  sys.exit(0)
               sys.exit(f"Version {version} not found in CHANGELOG.md")
 
           block = match.group(1)
@@ -233,12 +251,12 @@ jobs:
           EOF
 
       - name: Publish Fabric
-        if: needs.build.outputs.is_release == 'true'
+        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
           version: fabric-${{ matrix.mc }}-${{ needs.build.outputs.version }}
-          version-type: release
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-fabric-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
@@ -253,12 +271,12 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
 
       - name: Publish NeoForge
-        if: needs.build.outputs.is_release == 'true'
+        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
           version: neoforge-${{ matrix.mc }}-${{ needs.build.outputs.version }}
-          version-type: release
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-neoforge-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
@@ -269,12 +287,12 @@ jobs:
           game-versions: ${{ steps.versions.outputs.mc_versions }}
 
       - name: Publish Paper
-        if: needs.build.outputs.is_release == 'true'
+        if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true') && matrix.mc == needs.build.outputs.primary_stonecutter_version
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Paper] Dream Displays ${{ needs.build.outputs.version }} (${{ steps.versions.outputs.publish_mc }})'
-          version: paper-${{ matrix.mc }}-${{ needs.build.outputs.version }}
-          version-type: release
+          name: '[Paper] Dream Displays ${{ needs.build.outputs.version }}'
+          version: paper-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-paper-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
