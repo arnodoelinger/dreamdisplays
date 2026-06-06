@@ -81,7 +81,7 @@ tasks.build {
 
 tasks.shadowJar {
     archiveBaseName.set("dreamdisplays-paper")
-    archiveVersion.set("${rootProject.file("versions/active.txt").readText().trim()}-${rootProject.version}")
+    archiveVersion.set(rootProject.version.toString())
     manifest {
         attributes(
             "paperweight-mappings-namespace" to "mojang",
@@ -89,8 +89,6 @@ tasks.shadowJar {
     }
     dependencies {
         exclude(dependency("org.jetbrains.kotlin:kotlin-reflect"))
-        exclude(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core"))
-        exclude(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"))
         exclude(dependency("org.checkerframework:checker-qual"))
     }
     val prefix = "com.dreamdisplays.libs"
@@ -118,5 +116,5 @@ tasks.shadowJar {
 }
 
 tasks.withType<AbstractArchiveTask>().configureEach {
-    archiveVersion.set("${rootProject.file("versions/active.txt").readText().trim()}-${rootProject.version}")
+    archiveVersion.set(rootProject.version.toString())
 }

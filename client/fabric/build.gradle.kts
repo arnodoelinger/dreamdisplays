@@ -27,7 +27,6 @@ fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
 
 sourceSets.main {
     kotlin.srcDir(project(":server").file("src/main/kotlin"))
-    kotlin.exclude("com/dreamdisplays/server/utils/net/PacketReceiver.kt")
 }
 
 loom {
