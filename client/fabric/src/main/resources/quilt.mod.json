@@ -29,7 +29,7 @@
       },
       {
         "id": "minecraft",
-        "versions": "26.1.2"
+        "versions": "${minecraftVersion}"
       },
       {
         "id": "java",

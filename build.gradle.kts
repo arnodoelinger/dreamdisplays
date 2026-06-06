@@ -1,7 +1,10 @@
 subprojects {
+    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+
     tasks.withType<AbstractArchiveTask>().configureEach {
         isPreserveFileTimestamps = false
         isReproducibleFileOrder = true
+        archiveVersion.set("${project.version}+mc$activeStonecutterVersion")
     }
 
     tasks.withType<ProcessResources>().configureEach {

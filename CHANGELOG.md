@@ -1,3 +1,36 @@
+# Version 1.7.2
+
+## Client
+
+### Features
+
+- Support 26.2-pre4 version
+- Use `LoggerFactory` for logging
+- Use default config implementation instead of `AbstractConfig`
+- Use `Stonecutter` for the multiversion system
+- A bit fresher mod icon
+
+### Improvements
+
+- Update dependencies
+- Reorganize the project structure
+- Enhance cookie handling and process management
+- Improve `Gradle` configuration
+- Remove INotSleep's utils
+- Improve the publishing system
+
+### Fixes
+
+- Critical `Quilt` entry point crash
+- Ancient bug between `NeoForge` and IntelliJ IDEA
+
+## Server
+
+### Improvements
+
+- Update dependencies
+- Improve `Gradle` configuration
+
 # Version 1.7.1
 
 ## Client

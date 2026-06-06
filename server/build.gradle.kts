@@ -1,7 +1,17 @@
+import java.util.Properties
+
 plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.shadow-conventions")
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
+}
+
+repositories {
+    mavenCentral()
+    maven("https://repo.lostyy.ru/releases")
+    maven("https://repo.papermc.io/repository/maven-public/")
+    maven("https://oss.sonatype.org/content/groups/public/")
+    maven("https://jitpack.io")
 }
 
 dependencies {
@@ -16,11 +26,18 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
-    paperweight.devBundle("io.papermc.paper", libs.versions.paperApi.get())
+    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+    val stonecutterVersions = Properties().apply {
+        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+    }
+    fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
+        ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+
+    paperweight.devBundle("io.papermc.paper", scVersion("paper.api.version"))
     compileOnly(libs.jspecify)
     compileOnly(project(":common"))
-    compileOnly(libs.fabricLoader)
-    compileOnly(libs.fabricApi)
+    compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+    compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
 
     implementation(libs.semver4j)
     implementation(libs.tomlj)
@@ -39,7 +56,14 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.processResources {
     val projectVersion = version.toString()
-    val props = mapOf("version" to projectVersion)
+    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+    val stonecutterVersions = Properties().apply {
+        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+    }
+    val props = mapOf(
+        "version" to projectVersion,
+        "paperMinecraftApi" to stonecutterVersions.getProperty("paper.minecraft.api"),
+    )
     inputs.properties(props)
     filteringCharset = Charsets.UTF_8.name()
     filesMatching("paper-plugin.yml") {
@@ -57,7 +81,7 @@ tasks.build {
 
 tasks.shadowJar {
     archiveBaseName.set("dreamdisplays-paper")
-    archiveVersion.set(rootProject.version.toString())
+    archiveVersion.set("${rootProject.version}+mc${rootProject.file("versions/active.txt").readText().trim()}")
     manifest {
         attributes(
             "paperweight-mappings-namespace" to "mojang",
@@ -91,4 +115,8 @@ tasks.shadowJar {
     exclude("org/sqlite/native/Windows/x86/**")
     exclude("org/sqlite/native/Windows/armv7/**")
     exclude("org/sqlite/native/Windows/aarch64/**")
+}
+
+tasks.withType<AbstractArchiveTask>().configureEach {
+    archiveVersion.set("${rootProject.version}+mc${rootProject.file("versions/active.txt").readText().trim()}")
 }

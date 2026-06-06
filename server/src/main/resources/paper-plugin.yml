@@ -1,7 +1,7 @@
 name: DreamDisplays
 version: '${version}'
 main: com.dreamdisplays.server.Main
-api-version: '26.1.2'
+api-version: '${paperMinecraftApi}'
 description: 'Plugin for the Dream Displays mod.'
 authors:
   - arsmotorin
