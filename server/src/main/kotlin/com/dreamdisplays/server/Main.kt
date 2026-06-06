@@ -167,7 +167,10 @@ import org.slf4j.LoggerFactory
     /** Registers all custom payload types for clientbound and serverbound play channels. */
     private fun registerPayloadTypes() {
         try {
+            //? if >=26 {
             with(PayloadTypeRegistry.clientboundPlay()) {
+            //?} else
+            /*with(PayloadTypeRegistry.playS2C()) {*/
                 register(Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
                 register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
                 register(Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
@@ -178,7 +181,10 @@ import org.slf4j.LoggerFactory
                 register(Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC)
             }
 
+            //? if >=26 {
             with(PayloadTypeRegistry.serverboundPlay()) {
+            //?} else
+            /*with(PayloadTypeRegistry.playC2S()) {*/
                 register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
                 register(Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
                 register(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)

@@ -59,9 +59,14 @@ jobs:
           )
           if not versions:
               raise SystemExit("No Stonecutter versions found")
+          # The Paper jar and the GitHub Release are published only from the primary version.
+          # Prefer the latest year-versioned (26.x+) target; never let a legacy "1.x" target
+          # (e.g. 1.21.11) hijack the release pipeline just because it sorts first alphabetically.
+          modern = [v for v in versions if not v.startswith("1.")]
+          primary_version = (modern or versions)[-1]
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"versions_json={json.dumps(versions)}\n")
-              f.write(f"primary_version={versions[0]}\n")
+              f.write(f"primary_version={primary_version}\n")
           EOF
 
       - name: Build with Gradle

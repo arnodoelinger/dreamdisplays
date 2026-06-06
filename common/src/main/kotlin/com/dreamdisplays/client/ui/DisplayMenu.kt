@@ -12,7 +12,10 @@ import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.ytdlp.*
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.screens.Screen
@@ -350,6 +353,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         suggestions?.setRelatedTo(info.id)
     }
 
+    //? if >=26 {
     override fun extractRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
         extractTransparentBackground(g)
 
@@ -498,7 +502,157 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         super.extractRenderState(g, mouseX, mouseY, delta)
         renderTooltips(g, mouseX, mouseY)
     }
+    //?} else
+    /*override fun render(g: GuiGraphics, mouseX: Int, mouseY: Int, delta: Float) {
+        renderTransparentBackground(g)
 
+        val ds = displayScreen
+        if (ds == null) {
+            super.render(g, mouseX, mouseY, delta)
+            return
+        }
+
+        val titleY = 6
+        renderModLabel(g, PADDING, titleY)
+
+        val videoReady = ds.isVideoStarted && !ds.errored
+        val popoutLocked = ds.isPopoutActive
+        syncReset?.active = videoReady && ds.canEdit && ds.isSync
+        renderDReset?.active = videoReady && !popoutLocked && ds.renderDistance != Initializer.config.defaultDistance
+        qualityReset?.active = videoReady && ds.quality != "720"
+        brightness?.let { brightnessReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
+        volume?.let { volumeReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
+
+        val qualityList = ds.qualityList
+        if (qualityList.size != prevQualityListSize) {
+            prevQualityListSize = qualityList.size
+            if (qualityList.isNotEmpty()) {
+                quality?.value = qualityFraction(ds.quality)
+                quality?.updateMessage()
+            }
+        }
+
+        volume?.active = videoReady
+        renderD?.active = videoReady && !popoutLocked
+        quality?.active = videoReady && qualityList.isNotEmpty()
+        brightness?.active = videoReady && (!ds.isSync || ds.canEdit)
+        sync?.active = videoReady && ds.canEdit
+        deleteButtonWidget?.active = ds.owner || ds.isAdmin
+        lockButtonWidget?.let {
+            val locked = ds.isLocked
+            it.visible = locked != null
+            if (locked != null) {
+                it.active = ds.owner || ds.isAdmin
+                it.setIconTextureId(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, if (locked) "lock" else "unlock"))
+            }
+        }
+        progress?.active = videoReady && ds.canSeek() && !ds.isLive && (!ds.isSync || ds.canEdit)
+
+        if (ds.errored) {
+            popoutDropdownVisible = false
+            renderErroredOverlay(g, mouseX, mouseY, delta)
+            return
+        }
+
+        val contentTop = titleY + font.lineHeight + 8
+        val contentBottom = this.height - PADDING
+        val totalW = this.width - PADDING * 2
+        val totalH = contentBottom - contentTop
+
+        val wide = totalW >= 900 && totalH >= 480
+        val compact = !wide && totalW < 600
+
+        val leftX = PADDING
+        val previewX: Int
+        val previewY: Int
+        val previewW: Int
+        val previewH: Int
+        val settingsX: Int
+        val settingsY: Int
+        val settingsW: Int
+        val settingsH: Int
+        val suggestionsX: Int
+        val suggestionsY: Int
+        val suggestionsW: Int
+        val suggestionsH: Int
+        var suggestionsVertical = false
+
+        if (wide) {
+            val rightColW = max(200, min(280, totalW * 3 / 10))
+            val leftColW = totalW - rightColW - PANEL_GAP
+            val previewSlice = totalH * 6 / 10
+            previewX = leftX; previewY = contentTop; previewW = leftColW; previewH = previewSlice
+            settingsX = leftX; settingsY = contentTop + previewSlice + PANEL_GAP
+            settingsW = leftColW; settingsH = totalH - previewSlice - PANEL_GAP
+            suggestionsX = leftX + leftColW + PANEL_GAP; suggestionsY = contentTop
+            suggestionsW = rightColW; suggestionsH = totalH
+            suggestionsVertical = true
+        } else {
+            val minSh = 120
+            var topRowH = max(220, (totalH * 6) / 10)
+            var sH = totalH - topRowH - PANEL_GAP
+            if (sH < minSh) {
+                sH = minSh; topRowH = totalH - sH - PANEL_GAP
+            }
+            val showSuggestions = topRowH >= 160
+
+            if (compact) {
+                previewW = totalW
+                previewH = min(220, topRowH * 3 / 5)
+                settingsW = totalW
+                settingsH = topRowH - previewH - PANEL_GAP
+                settingsX = leftX
+                settingsY = contentTop + previewH + PANEL_GAP
+            } else {
+                previewW = (totalW * 6) / 10 - PANEL_GAP / 2
+                settingsW = totalW - previewW - PANEL_GAP
+                settingsX = leftX + previewW + PANEL_GAP
+                previewH = topRowH
+                settingsH = topRowH
+                settingsY = contentTop
+            }
+            previewX = leftX
+            previewY = contentTop
+            suggestionsX = leftX
+            suggestionsY = contentTop + topRowH + PANEL_GAP
+            suggestionsW = totalW
+            suggestionsH = if (showSuggestions) sH else 0
+        }
+
+        drawPanel(
+            g, previewX, previewY, previewW, previewH,
+            Component.translatable("dreamdisplays.ui.preview").string
+        )
+        drawPanel(
+            g, settingsX, settingsY, settingsW, settingsH,
+            Component.translatable("dreamdisplays.ui.settings").string
+        )
+
+        renderPreviewSection(g, previewX, previewY, previewW, previewH)
+        renderSettingsSection(g, settingsX, settingsY, settingsW, settingsH)
+
+        suggestions?.let { s ->
+            s.visible = suggestionsH > 0
+            s.setVertical(suggestionsVertical)
+            s.setCompactCards(false)
+            s.x = suggestionsX
+            s.y = suggestionsY
+            s.width = suggestionsW
+            s.height = suggestionsH
+
+            val currentId = YtDlp.extractVideoId(ds.videoUrl)
+            if (currentId != null && currentId != lastSuggestedVideoId) {
+                lastSuggestedVideoId = currentId
+                s.setRelatedTo(currentId)
+            }
+        }
+
+        layoutOwnerActions(settingsX, settingsY, settingsW, settingsH)
+        super.render(g, mouseX, mouseY, delta)
+        renderTooltips(g, mouseX, mouseY)
+    }*/
+
+    //? if >=26 {
     private fun renderErroredOverlay(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, delta: Float) {
         suggestions?.visible = false
         listOf(volume, renderD, quality, brightness).forEach { w ->
@@ -548,7 +702,58 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
         super.extractRenderState(g, mouseX, mouseY, delta)
     }
+    //?} else
+    /*private fun renderErroredOverlay(g: GuiGraphics, mouseX: Int, mouseY: Int, delta: Float) {
+        suggestions?.visible = false
+        listOf(volume, renderD, quality, brightness).forEach { w ->
+            w?.active = false; w?.visible = false
+        }
+        sync?.let { it.active = false; it.visible = false }
+        listOf(
+            backButtonWidget, forwardButtonWidget, pauseButtonWidget,
+            renderDReset, qualityReset, brightnessReset, volumeReset, syncReset, muteButtonWidget,
+            popoutButtonWidget, lockButtonWidget
+        ).forEach { w ->
+            w?.active = false; w?.visible = false
+        }
+        progress?.let { it.active = false; it.visible = false }
 
+        val panelW = min(420, this.width - 40)
+        val panelX = this.width / 2 - panelW / 2
+        val panelY = this.height / 2 - 70
+        drawPanel(
+            g, panelX, panelY, panelW, 130,
+            Component.translatable("dreamdisplays.ui.error").string
+        )
+        val lines = listOf(
+            Component.translatable("dreamdisplays.error.loadingerror.1").withStyle { it.withColor(ChatFormatting.RED) },
+            Component.translatable("dreamdisplays.error.loadingerror.2").withStyle { it.withColor(ChatFormatting.RED) },
+            Component.translatable("dreamdisplays.error.loadingerror.4")
+                .withStyle { it.withColor(ChatFormatting.GRAY) },
+            Component.translatable("dreamdisplays.error.loadingerror.5")
+                .withStyle { it.withColor(ChatFormatting.GRAY) },
+        )
+        var y = panelY + headerHeight() + 8
+        for (line in lines) {
+            g.drawString(font, line, this.width / 2 - font.width(line) / 2, y, 0xFFFFFFFF.toInt(), false)
+            y += font.lineHeight + 4
+        }
+        deleteButtonWidget?.let {
+            it.x = panelX + panelW / 2 - 22
+            it.y = panelY + 130 - 24
+            it.width = 20
+            it.height = 20
+        }
+        reportButtonWidget?.let {
+            it.x = panelX + panelW / 2 + 2
+            it.y = panelY + 130 - 24
+            it.width = 20
+            it.height = 20
+        }
+        super.render(g, mouseX, mouseY, delta)
+    }*/
+
+    //? if >=26 {
     private fun renderPreviewSection(g: GuiGraphicsExtractor, px: Int, py: Int, pw: Int, ph: Int) {
         val scr = displayScreen ?: return
         val innerX = px + PANEL_PADDING_X
@@ -659,7 +864,119 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             it.width = progW; it.height = CTRL_BTN
         }
     }
+    //?} else
+    /*private fun renderPreviewSection(g: GuiGraphics, px: Int, py: Int, pw: Int, ph: Int) {
+        val scr = displayScreen ?: return
+        val innerX = px + PANEL_PADDING_X
+        val innerY = py + headerHeight()
+        val innerW = pw - PANEL_PADDING_X * 2
 
+        val controlsRowY = py + ph - PANEL_PADDING_Y - CTRL_BTN
+        val controlsRight = innerX + innerW
+
+        val previewMaxH = controlsRowY - innerY - 6
+        g.fill(innerX, innerY, innerX + innerW, innerY + previewMaxH, 0xFF000000.toInt())
+
+        val ratio = scr.width / max(1f, scr.height.toFloat())
+        val videoW: Int
+        val videoH: Int
+        if (innerW / previewMaxH.toFloat() > ratio) {
+            videoH = previewMaxH; videoW = (videoH * ratio).toInt()
+        } else {
+            videoW = innerW; videoH = (videoW / ratio).toInt()
+        }
+        val videoX = innerX + (innerW - videoW) / 2
+        val videoY = innerY + (previewMaxH - videoH) / 2
+
+        val texId = scr.textureId
+        if (scr.isVideoStarted && scr.texture != null && texId != null) {
+            scr.fitTexture()
+            g.blit(
+                RenderPipelines.GUI_TEXTURED, texId,
+                videoX, videoY, 0f, 0f, videoW, videoH,
+                videoW, videoH,
+            )
+        } else {
+            currentThumbnail()?.let { thumb ->
+                g.blit(
+                    RenderPipelines.GUI_TEXTURED, thumb,
+                    videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH
+                )
+                g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
+            }
+            val waiting = Component.translatable("dreamdisplays.ui.waiting").string
+            g.drawString(
+                font, waiting,
+                innerX + innerW / 2 - font.width(waiting) / 2,
+                innerY + previewMaxH / 2 - font.lineHeight / 2,
+                0xFFCCCCCC.toInt(), true
+            )
+        }
+
+        renderTitleOverlay(g, scr, innerX, innerY + previewMaxH, innerW)
+
+        val canSeek = !(scr.isSync && !scr.canEdit) && scr.canSeek()
+        backButtonWidget?.let {
+            it.x = innerX; it.y = controlsRowY
+            it.width = CTRL_BTN; it.height = CTRL_BTN
+            it.active = canSeek
+        }
+        forwardButtonWidget?.let {
+            it.x = innerX + CTRL_BTN + 4; it.y = controlsRowY
+            it.width = CTRL_BTN; it.height = CTRL_BTN
+            it.active = canSeek
+        }
+        muteButtonWidget?.let {
+            it.x = innerX + CTRL_BTN * 2 + 8; it.y = controlsRowY
+            it.width = CTRL_BTN; it.height = CTRL_BTN
+            it.active = scr.isVideoStarted && !scr.errored
+            it.setIconTextureId(
+                Identifier.fromNamespaceAndPath(
+                    Initializer.MOD_ID,
+                    if (scr.muted) "mute" else "sound"
+                )
+            )
+        }
+        popoutButtonWidget?.let {
+            it.x = innerX + CTRL_BTN * 3 + 12; it.y = controlsRowY
+            it.width = CTRL_BTN; it.height = CTRL_BTN
+            it.active = scr.isVideoStarted && !scr.errored
+            if (popoutDropdownVisible) {
+                val bx = it.x; val by = it.y
+                val dTop = by - ddItemH * 2 - 2
+                ddX = bx; ddY = dTop
+                g.fill(ddX, ddY, ddX + ddW, ddY + ddItemH * 2, 0xFF1C1C1C.toInt())
+                g.fill(ddX, ddY, ddX + ddW, ddY + 1, 0xFF555555.toInt())
+                g.fill(ddX, ddY + ddItemH, ddX + ddW, ddY + ddItemH + 1, 0xFF333333.toInt())
+                g.fill(ddX, ddY + ddItemH * 2 - 1, ddX + ddW, ddY + ddItemH * 2, 0xFF555555.toInt())
+                g.fill(ddX, ddY, ddX + 1, ddY + ddItemH * 2, 0xFF555555.toInt())
+                g.fill(ddX + ddW - 1, ddY, ddX + ddW, ddY + ddItemH * 2, 0xFF555555.toInt())
+                val fy = ddY + (ddItemH - font.lineHeight) / 2
+                g.drawString(font, "Window", ddX + 6, fy, 0xFFFFFFFF.toInt(), false)
+                g.drawString(font, "In-game", ddX + 6, fy + ddItemH, 0xFFDDDDDD.toInt(), false)
+            }
+        }
+        pauseButtonWidget?.let {
+            it.x = controlsRight - CTRL_BTN; it.y = controlsRowY
+            it.width = CTRL_BTN; it.height = CTRL_BTN
+            it.active = !(scr.isSync && !scr.canEdit)
+            it.setIconTextureId(
+                Identifier.fromNamespaceAndPath(
+                    Initializer.MOD_ID,
+                    if (scr.isPaused) "play" else "pause"
+                )
+            )
+        }
+        progress?.let {
+            val progX = innerX + CTRL_BTN * 4 + 16
+            val progRight = controlsRight - CTRL_BTN - 4
+            val progW = max(40, progRight - progX)
+            it.x = progX; it.y = controlsRowY
+            it.width = progW; it.height = CTRL_BTN
+        }
+    }*/
+
+    //? if >=26 {
     private fun renderTitleOverlay(g: GuiGraphicsExtractor, scr: DisplayScreen, x: Int, y: Int, w: Int) {
         val videoId = YtDlp.extractVideoId(scr.videoUrl)
         val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
@@ -715,6 +1032,62 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         val metaShown = trimToWidth(meta2.toString(), textW)
         g.text(font, metaShown, x + padX, boxY + padY + font.lineHeight + padY, 0xFFAAAAAA.toInt(), false)
     }
+    //?} else
+    /*private fun renderTitleOverlay(g: GuiGraphics, scr: DisplayScreen, x: Int, y: Int, w: Int) {
+        val videoId = YtDlp.extractVideoId(scr.videoUrl)
+        val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
+        if (videoId != null && meta == null) VideoMetadataCache.requestAsync(videoId)
+
+        var title: String? = meta?.title
+        if (title.isNullOrEmpty() && videoId != null) title = VideoTitleCache.get(videoId)
+        if (title.isNullOrEmpty()) title = scr.videoUrl
+        if (title == null) title = "—"
+
+        val channel = meta?.uploader
+        val views = meta?.formatViews() ?: ""
+        val likes = meta?.formatLikes() ?: ""
+        val published = meta?.publishedText
+        val isNew = meta?.isRecent(7) == true
+
+        val padX = 4
+        val padY = 3
+        val textW = w - padX * 2
+        var shown = trimToWidth(title, textW)
+
+        val boxH = font.lineHeight * 2 + padY * 3
+        val boxY = y - boxH
+        g.fill(x, boxY, x + w, y, 0xC0000000.toInt())
+
+        var titleX = x + padX
+        val titleY = boxY + padY
+        if (isNew) {
+            val tag = Component.translatable("dreamdisplays.ui.new").string
+            val tw = font.width(tag) + 6
+            val th = font.lineHeight
+            g.fill(titleX, titleY - 1, titleX + tw, titleY + th, 0xFFE53935.toInt())
+            g.drawString(font, tag, titleX + 3, titleY, 0xFFFFFFFF.toInt(), false)
+            titleX += tw + 4
+            shown = trimToWidth(title, textW - tw - 4)
+        }
+        g.drawString(font, shown, titleX, titleY, 0xFFFFFFFF.toInt(), false)
+
+        val meta2 = StringBuilder()
+        if (!channel.isNullOrEmpty()) meta2.append(channel)
+        if (views.isNotEmpty()) {
+            if (meta2.isNotEmpty()) meta2.append(" • ")
+            meta2.append(views)
+        }
+        if (likes.isNotEmpty()) {
+            if (meta2.isNotEmpty()) meta2.append(" • ")
+            meta2.append(likes).append(" ").append(Component.translatable("dreamdisplays.ui.likes").string)
+        }
+        if (!published.isNullOrEmpty()) {
+            if (meta2.isNotEmpty()) meta2.append(" • ")
+            meta2.append(published)
+        }
+        val metaShown = trimToWidth(meta2.toString(), textW)
+        g.drawString(font, metaShown, x + padX, boxY + padY + font.lineHeight + padY, 0xFFAAAAAA.toInt(), false)
+    }*/
 
     private fun trimToWidth(s: String, maxW: Int): String {
         if (font.width(s) <= maxW) return s
@@ -735,6 +1108,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         return null
     }
 
+    //? if >=26 {
     private fun renderSettingsSection(g: GuiGraphicsExtractor, px: Int, py: Int, pw: Int, ph: Int) {
         val innerX = px + PANEL_PADDING_X
         val innerY = py + headerHeight()
@@ -759,6 +1133,31 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         brightnessHover = labelHover(innerX + 6, brightnessRowY, "dreamdisplays.button.brightness")
         syncHover = labelHover(innerX + 6, syncRowY, "dreamdisplays.button.synchronization")
     }
+    //?} else
+    /*private fun renderSettingsSection(g: GuiGraphics, px: Int, py: Int, pw: Int, ph: Int) {
+        val innerX = px + PANEL_PADDING_X
+        val innerY = py + headerHeight()
+        val innerW = pw - PANEL_PADDING_X * 2
+
+        var rowY = innerY
+        val volumeRowY = rowY
+        rowY = renderRow(g, innerX, rowY, innerW, "dreamdisplays.button.volume", volume, volumeReset)
+        val renderDRowY = rowY
+        rowY = renderRow(g, innerX, rowY, innerW, "dreamdisplays.button.render-distance", renderD, renderDReset)
+        val qualityRowY = rowY
+        rowY = renderRow(g, innerX, rowY, innerW, "dreamdisplays.button.quality", quality, qualityReset)
+        val brightnessRowY = rowY
+        rowY = renderRow(g, innerX, rowY, innerW, "dreamdisplays.button.brightness", brightness, brightnessReset)
+        rowY += 6
+        val syncRowY = rowY
+        renderRow(g, innerX, rowY, innerW, "dreamdisplays.button.synchronization", sync, syncReset)
+
+        volumeHover = labelHover(innerX + 6, volumeRowY, "dreamdisplays.button.volume")
+        renderDHover = labelHover(innerX + 6, renderDRowY, "dreamdisplays.button.render-distance")
+        qualityHover = labelHover(innerX + 6, qualityRowY, "dreamdisplays.button.quality")
+        brightnessHover = labelHover(innerX + 6, brightnessRowY, "dreamdisplays.button.brightness")
+        syncHover = labelHover(innerX + 6, syncRowY, "dreamdisplays.button.synchronization")
+    }*/
 
     private fun labelHover(x: Int, rowY: Int, key: String): HoverArea {
         val w = font.width(Component.translatable(key))
@@ -766,6 +1165,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         return HoverArea(x, textY, w, font.lineHeight)
     }
 
+    //? if >=26 {
     private fun renderRow(
         g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, key: String,
         control: AbstractWidget?, reset: ButtonWidget?
@@ -791,6 +1191,32 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
         return y + ROW_H + ROW_GAP
     }
+    //?} else
+    /*private fun renderRow(
+        g: GuiGraphics, x: Int, y: Int, w: Int, key: String,
+        control: AbstractWidget?, reset: ButtonWidget?
+    ): Int {
+        g.fill(x, y, x + w, y + ROW_H, ROW_BG)
+        val label = Component.translatable(key)
+        g.drawString(font, label, x + 6, y + ROW_H / 2 - font.lineHeight / 2, 0xFFFFFFFF.toInt(), false)
+
+        var rightEdge = x + w - 4
+        if (reset != null) {
+            reset.x = rightEdge - RESET_W
+            reset.y = y
+            reset.width = RESET_W
+            reset.height = ROW_H
+            rightEdge -= RESET_W + 4
+        }
+        if (control != null) {
+            val controlW = min(CONTROL_W, max(60, rightEdge - (x + 6 + font.width(label) + 8)))
+            control.x = rightEdge - controlW
+            control.y = y
+            control.width = controlW
+            control.height = ROW_H
+        }
+        return y + ROW_H + ROW_GAP
+    }*/
 
     private fun layoutOwnerActions(sx: Int, sy: Int, sw: Int, sh: Int) {
         val btn = CTRL_BTN
@@ -850,6 +1276,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         return super.mouseReleased(event)
     }
 
+    //? if >=26 {
     private fun renderTooltips(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {
         val scr = displayScreen ?: return
         if (scr.errored) return
@@ -980,7 +1407,139 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             }
         }
     }
+    //?} else
+    /*private fun renderTooltips(g: GuiGraphics, mouseX: Int, mouseY: Int) {
+        val scr = displayScreen ?: return
+        if (scr.errored) return
 
+        if (volumeHover?.contains(mouseX, mouseY) == true) {
+            g.setComponentTooltipForNextFrame(
+                font, listOf(
+                    Component.translatable("dreamdisplays.button.volume.tooltip.1")
+                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
+                    Component.translatable("dreamdisplays.button.volume.tooltip.2")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.translatable("dreamdisplays.button.volume.tooltip.3")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.translatable(
+                        "dreamdisplays.button.volume.tooltip.4",
+                        volume?.let { (it.value * 200).toInt() } ?: 0)
+                        .withStyle { it.withColor(ChatFormatting.GOLD) },
+                ), mouseX, mouseY
+            )
+        }
+        if (renderDHover?.contains(mouseX, mouseY) == true) {
+            g.setComponentTooltipForNextFrame(
+                font, listOf(
+                    Component.translatable("dreamdisplays.button.render-distance.tooltip.1")
+                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
+                    Component.translatable("dreamdisplays.button.render-distance.tooltip.2")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.translatable("dreamdisplays.button.render-distance.tooltip.3")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.literal(""),
+                    Component.translatable(
+                        "dreamdisplays.button.render-distance.tooltip.8",
+                        renderD?.let { (it.value * (128 - 24) + 24).toInt() } ?: 0)
+                        .withStyle { it.withColor(ChatFormatting.GOLD) },
+                ), mouseX, mouseY
+            )
+        }
+        if (qualityHover?.contains(mouseX, mouseY) == true && quality != null) {
+            val tip = mutableListOf<Component>(
+                Component.translatable("dreamdisplays.button.quality.tooltip.1")
+                    .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
+                Component.translatable("dreamdisplays.button.quality.tooltip.2")
+                    .withStyle { it.withColor(ChatFormatting.GRAY) },
+                Component.literal(""),
+                Component.translatable("dreamdisplays.button.quality.tooltip.4", qualityFromFraction(quality!!.value))
+                    .withStyle { it.withColor(ChatFormatting.GOLD) },
+            )
+            try {
+                if (scr.quality.toInt() >= 1080) {
+                    tip.add(
+                        Component.translatable("dreamdisplays.button.quality.tooltip.5")
+                            .withStyle { it.withColor(ChatFormatting.YELLOW) })
+                }
+            } catch (_: NumberFormatException) {
+            }
+            g.setComponentTooltipForNextFrame(font, tip, mouseX, mouseY)
+        }
+        if (brightnessHover?.contains(mouseX, mouseY) == true) {
+            g.setComponentTooltipForNextFrame(
+                font, listOf(
+                    Component.translatable("dreamdisplays.button.brightness.tooltip.1")
+                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
+                    Component.translatable("dreamdisplays.button.brightness.tooltip.2")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.literal(""),
+                    Component.translatable(
+                        "dreamdisplays.button.brightness.tooltip.3",
+                        brightness?.let { floor(it.value * 200).toInt() } ?: 100)
+                        .withStyle { it.withColor(ChatFormatting.GOLD) },
+                ), mouseX, mouseY
+            )
+        }
+        if (syncHover?.contains(mouseX, mouseY) == true && sync != null) {
+            g.setComponentTooltipForNextFrame(
+                font, listOf(
+                    Component.translatable("dreamdisplays.button.synchronization.tooltip.1")
+                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
+                    Component.translatable("dreamdisplays.button.synchronization.tooltip.2")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.translatable("dreamdisplays.button.synchronization.tooltip.3")
+                        .withStyle { it.withColor(ChatFormatting.GRAY) },
+                    Component.literal(""),
+                    Component.translatable(
+                        "dreamdisplays.button.synchronization.tooltip.5",
+                        if (sync!!.value) Component.translatable("dreamdisplays.button.enabled")
+                        else Component.translatable("dreamdisplays.button.disabled")
+                    )
+                        .withStyle { it.withColor(ChatFormatting.GOLD) },
+                ), mouseX, mouseY
+            )
+        }
+
+        lockButtonWidget?.let {
+            val locked = displayScreen?.isLocked
+            if (locked != null && hovered(mouseX, mouseY, it)) {
+                g.setComponentTooltipForNextFrame(
+                    font, listOf(
+                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.1" else "dreamdisplays.button.unlock.tooltip.1")
+                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
+                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.2" else "dreamdisplays.button.unlock.tooltip.2")
+                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
+                    ), mouseX, mouseY
+                )
+            }
+        }
+        deleteButtonWidget?.let {
+            if (hovered(mouseX, mouseY, it)) {
+                g.setComponentTooltipForNextFrame(
+                    font, listOf(
+                        Component.translatable("dreamdisplays.button.delete.tooltip.1")
+                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
+                        Component.translatable("dreamdisplays.button.delete.tooltip.2")
+                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
+                    ), mouseX, mouseY
+                )
+            }
+        }
+        reportButtonWidget?.let {
+            if (hovered(mouseX, mouseY, it)) {
+                g.setComponentTooltipForNextFrame(
+                    font, listOf(
+                        Component.translatable("dreamdisplays.button.report.tooltip.1")
+                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
+                        Component.translatable("dreamdisplays.button.report.tooltip.2")
+                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
+                    ), mouseX, mouseY
+                )
+            }
+        }
+    }*/
+
+    //? if >=26 {
     private fun drawPanel(g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, h: Int, title: String) {
         g.fill(x, y, x + w, y + h, PANEL_BG)
         val b = PANEL_BORDER
@@ -990,6 +1549,16 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         g.fill(x + w - 1, y, x + w, y + h, b)
         g.text(font, title, x + PANEL_PADDING_X, y + PANEL_PADDING_Y, 0xFFFFFFFF.toInt(), false)
     }
+    //?} else
+    /*private fun drawPanel(g: GuiGraphics, x: Int, y: Int, w: Int, h: Int, title: String) {
+        g.fill(x, y, x + w, y + h, PANEL_BG)
+        val b = PANEL_BORDER
+        g.fill(x, y, x + w, y + 1, b)
+        g.fill(x, y + h - 1, x + w, y + h, b)
+        g.fill(x, y, x + 1, y + h, b)
+        g.fill(x + w - 1, y, x + w, y + h, b)
+        g.drawString(font, title, x + PANEL_PADDING_X, y + PANEL_PADDING_Y, 0xFFFFFFFF.toInt(), false)
+    }*/
 
     private fun qualityFraction(q: String): Double {
         val ds = displayScreen ?: return 0.0
@@ -1022,6 +1591,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
 
     override fun isPauseScreen(): Boolean = false
 
+    //? if >=26 {
     private fun renderModLabel(g: GuiGraphicsExtractor, x: Int, y: Int) {
         val update = UpdateCheck.shouldShowArrow()
         val name = Component.literal("Dream Displays")
@@ -1046,6 +1616,31 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
         modLabelHover = HoverArea(x, y - 1, totalW, font.lineHeight + 2)
     }
+    //?} else
+    /*private fun renderModLabel(g: GuiGraphics, x: Int, y: Int) {
+        val update = UpdateCheck.shouldShowArrow()
+        val name = Component.literal("Dream Displays")
+        val ver = Component.literal(" ${GeneralUtil.getModVersion()}")
+            .withStyle(Style.EMPTY.withColor(0xFF6AB7FF.toInt()))
+        val label = name.copy().append(ver)
+        g.drawString(font, label, x, y, 0xFFFFFFFF.toInt(), true)
+
+        val textW = font.width(label)
+        var totalW = textW
+        if (update) {
+            val t = ((System.currentTimeMillis() - modLabelOpenedAtMs) % 1800L) / 1800f
+            var arrowYOffset = 0
+            if (t < 0.25f) {
+                val p = t / 0.25f
+                arrowYOffset = (-sin(p * Math.PI) * 3.0).toInt()
+            }
+            val arrow = Component.literal(" ▲")
+                .withStyle(Style.EMPTY.withColor(0xFFFF4040.toInt()))
+            g.drawString(font, arrow, x + textW, y + arrowYOffset, 0xFFFFFFFF.toInt(), true)
+            totalW += font.width(arrow)
+        }
+        modLabelHover = HoverArea(x, y - 1, totalW, font.lineHeight + 2)
+    }*/
 
     private data class HoverArea(val x: Int, val y: Int, val w: Int, val h: Int) {
         fun contains(mx: Int, my: Int): Boolean = mx >= x && mx < x + w && my >= y && my < y + h

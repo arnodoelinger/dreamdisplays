@@ -10,9 +10,12 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
+//? if >=26 {
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
+//?} else
+/*import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents*/
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType
@@ -56,6 +59,7 @@ class Client : ClientModInitializer, Mod {
             Initializer.onClearCachePacket(payload)
         }
 
+        //? if >=26 {
         LevelRenderEvents.BEFORE_GIZMOS.register { context ->
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
@@ -71,6 +75,13 @@ class Client : ClientModInitializer, Mod {
                 deltaTracker.getGameTimeDeltaPartialTick(false)
             )
         }
+        //?} else
+        /*WorldRenderEvents.AFTER_ENTITIES.register { context ->
+            val mc = Minecraft.getInstance()
+            if (mc.level != null && mc.player != null) {
+                ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
+            }
+        }*/
 
         ClientTickEvents.END_CLIENT_TICK.register { Initializer.onEndTick(it) }
 
@@ -96,6 +107,7 @@ class Client : ClientModInitializer, Mod {
         ClientPlayNetworking.send(packet)
     }
 
+    //? if >=26 {
     private fun renderScreens(context: LevelRenderContext, mc: Minecraft) {
         val camera = mainCamera(mc)
         val submitNodeCollector = runCatching {
@@ -142,6 +154,7 @@ class Client : ClientModInitializer, Mod {
             .getMethod("submitCustomGeometry", PoseStack::class.java, RenderType::class.java, rendererClass)
             .invoke(submitNodeCollector, stack, type, renderer)
     }
+    //?}
 
     private companion object {
         private val logger = LoggerFactory.getLogger("DreamDisplays/FabricClient")

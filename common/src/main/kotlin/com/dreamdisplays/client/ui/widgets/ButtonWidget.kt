@@ -1,7 +1,10 @@
 package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -43,7 +46,10 @@ abstract class ButtonWidget(
 
     override fun updateWidgetNarration(builder: NarrationElementOutput) {}
 
+    //? if >=26 {
     override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
+    //?} else
+    /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {*/
         val sprite = setSprites?.get(active, isHoveredOrFocused) ?: SPRITES.get(active, isHoveredOrFocused)
         g.blitSprite(
             RenderPipelines.GUI_TEXTURED, sprite,

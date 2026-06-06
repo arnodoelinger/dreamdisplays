@@ -4,6 +4,7 @@
 
 ### Features
 
+- Add Minecraft 1.21.11 support (in-world Picture-in-Picture overlay on Fabric is currently 26.x-only)
 - Support 26.2-pre4 version
 - Use `LoggerFactory` for logging
 - Use default config implementation instead of `AbstractConfig`
