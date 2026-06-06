@@ -60,7 +60,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     private val dataSource = HikariDataSource(HikariConfig().apply {
         jdbcUrl = when (type.uppercase()) {
             "SQLITE" -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
-            "MYSQL" -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false"
+            "MYSQL" -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false&useInformationSchema=false"
             else -> error("Unsupported storage type: $type")
         }
         if (type.uppercase() != "SQLITE") {
