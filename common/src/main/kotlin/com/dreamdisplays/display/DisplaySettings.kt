@@ -4,6 +4,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import org.slf4j.LoggerFactory
 import java.io.*
+import java.security.MessageDigest
 import java.util.*
 
 /** Manages loading and saving of display settings and data. */
@@ -43,7 +44,7 @@ object DisplaySettings {
     /** Loads the display registry for [serverId] from `server-{serverId}-displays.json` and sets it as current. */
     fun loadServerDisplays(serverId: String) {
         currentServerId = serverId
-        val serverFile = File(SETTINGS_DIR, "server-$serverId-displays.json")
+        val serverFile = readableServerFile(serverId)
         try {
             FileReader(serverFile).use { reader ->
                 val type = object : TypeToken<Map<String, FullDisplayData>>() {}.type
@@ -89,7 +90,7 @@ object DisplaySettings {
             }
             val displays = serverDisplays[serverId] ?: HashMap()
             val toSave = displays.entries.associate { (k, v) -> k.toString() to v }
-            FileWriter(File(SETTINGS_DIR, "server-$serverId-displays.json")).use { writer ->
+            FileWriter(safeServerFile(serverId)).use { writer ->
                 GSON.toJson(toSave, writer)
             }
         } catch (e: IOException) {
@@ -149,6 +150,35 @@ object DisplaySettings {
         }
         displaySettings.remove(displayUuid)
         save()
+    }
+
+    /**
+     * Returns the file to read the display registry for [serverId], preferring the safe hashed filename but falling back
+     * to the legacy one for backwards compatibility.
+     */
+    private fun readableServerFile(serverId: String): File {
+        val safe = safeServerFile(serverId)
+        val legacy = File(SETTINGS_DIR, "server-$serverId-displays.json")
+        return if (safe.exists() || !legacy.exists()) safe else legacy
+    }
+
+    /** Returns the file to write the display registry for [serverId], creating a safe hashed filename. */
+    private fun safeServerFile(serverId: String): File =
+        File(SETTINGS_DIR, "server-${safeServerFileId(serverId)}-displays.json")
+
+    /** Returns a safe filename for [serverId] based on its lowercased slug and SHA-256 hash. */
+    private fun safeServerFileId(serverId: String): String {
+        val slug = serverId
+            .lowercase(Locale.ROOT)
+            .replace(Regex("[^a-z0-9._-]+"), "_")
+            .trim('_')
+            .take(48)
+            .ifEmpty { "server" }
+        val hash = MessageDigest.getInstance("SHA-256")
+            .digest(serverId.toByteArray(Charsets.UTF_8))
+            .take(6)
+            .joinToString("") { "%02x".format(it.toInt() and 0xFF) }
+        return "$slug-$hash"
     }
 
     class ClientDisplaySettings {
