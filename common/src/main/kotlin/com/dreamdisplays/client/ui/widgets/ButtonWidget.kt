@@ -16,7 +16,7 @@ import net.minecraft.util.ARGB
 import kotlin.math.max
 
 /** Button widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 abstract class ButtonWidget(
     x: Int, y: Int, width: Int, height: Int,
     private val iconWidth: Int,

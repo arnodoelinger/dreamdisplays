@@ -15,7 +15,7 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.resources.Identifier
 
 /** Toggle widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 abstract class ToggleWidget(
     x: Int, y: Int, width: Int, height: Int,
     message: Component,

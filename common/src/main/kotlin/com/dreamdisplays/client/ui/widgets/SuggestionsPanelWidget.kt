@@ -32,7 +32,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** Suggestions panel widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 class SuggestionsPanelWidget(
     x: Int, y: Int, width: Int, height: Int,
     private val onPick: Consumer<YtVideoInfo>,

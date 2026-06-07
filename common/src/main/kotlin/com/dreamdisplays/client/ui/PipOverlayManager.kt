@@ -12,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
  * the manager only sequences rendering and prevents two overlays from occupying the
  * same anchor.
  */
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 object PipOverlayManager {
     private val overlays = mutableListOf<PipOverlay>()
 
