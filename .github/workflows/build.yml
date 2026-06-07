@@ -227,7 +227,8 @@ jobs:
                   props[key.strip()] = value.strip()
 
           minecraft_version = props.get("minecraft.version", mc)
-          publish_mc = minecraft_version.split("-", 1)[0]
+          base_mc = minecraft_version.split("-", 1)[0]
+          publish_mc = "1.21" if base_mc.startswith("1.21.") else base_mc
           curseforge_publishable = (
               re.fullmatch(r"\d+(?:\.\d+)*", minecraft_version) is not None
               and minecraft_version != "1.21.11"
@@ -235,14 +236,14 @@ jobs:
 
           paper_1_21 = ["1.21"] + [f"1.21.{p}" for p in range(1, 12)]
           paper_26_1 = ["26.1", "26.1.1", "26.1.2"]
-          paper_versions = paper_1_21 + paper_26_1 + ["26.2"]
+          paper_versions = paper_1_21 + paper_26_1
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"mc={mc}\n")
               f.write(f"publish_mc={publish_mc}\n")
               f.write(f"curseforge_publishable={str(curseforge_publishable).lower()}\n")
               f.write("mc_versions<<VERSIONS_EOF\n")
-              f.write(publish_mc + "\n")
+              f.write(minecraft_version + "\n")
               f.write("VERSIONS_EOF\n")
               f.write("paper_versions<<VERSIONS_EOF\n")
               f.write("\n".join(paper_versions) + "\n")
@@ -295,6 +296,23 @@ jobs:
           with open("changelog.md", "w") as f:
               f.write("\n".join(lines).strip() + "\n")
           EOF
+
+      - name: Publish Paper
+        if: (needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true') && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[Paper] Dream Displays ${{ needs.metadata.outputs.version }}'
+          version: paper-${{ needs.metadata.outputs.version }}
+          version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-paper-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
+          changelog-file: changelog.md
+          modrinth-id: dreamdisplays
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          loaders: |
+            folia
+            paper
+            purpur
+          game-versions: ${{ steps.versions.outputs.paper_versions }}
 
       - name: Publish Fabric to Modrinth
         uses: Kir-Antipov/mc-publish@v3.3
@@ -357,23 +375,6 @@ jobs:
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
           loaders: neoforge
           game-versions: ${{ steps.versions.outputs.mc_versions }}
-
-      - name: Publish Paper
-        if: (needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true') && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
-        uses: Kir-Antipov/mc-publish@v3.3
-        with:
-          name: '[Paper] Dream Displays ${{ needs.metadata.outputs.version }}'
-          version: paper-${{ needs.metadata.outputs.version }}
-          version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-paper-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
-          changelog-file: changelog.md
-          modrinth-id: dreamdisplays
-          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
-          loaders: |
-            folia
-            paper
-            purpur
-          game-versions: ${{ steps.versions.outputs.paper_versions }}
 
       - name: Download all build artifacts for GitHub Release
         if: needs.metadata.outputs.is_release == 'true' && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
