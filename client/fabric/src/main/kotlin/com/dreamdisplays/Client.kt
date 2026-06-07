@@ -1,6 +1,7 @@
 package com.dreamdisplays
 
 import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.render.ScreenRenderer
 import com.mojang.blaze3d.vertex.PoseStack
@@ -85,8 +86,8 @@ class Client : ClientModInitializer, Mod {
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
             DisplayManager.saveAllScreens()
             DisplayManager.unloadAll()
-            Initializer.isPremium = false
-            Initializer.isAdmin = false
+            ClientStateManager.isPremium = false
+            ClientStateManager.isAdmin = false
         }
 
         ClientLifecycleEvents.CLIENT_STOPPING.register { Initializer.onStop() }

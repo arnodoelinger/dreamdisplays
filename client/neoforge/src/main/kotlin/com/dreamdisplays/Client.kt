@@ -1,6 +1,7 @@
 package com.dreamdisplays
 
 import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.render.ScreenRenderer
 import net.minecraft.client.Minecraft
@@ -71,8 +72,8 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     @SubscribeEvent fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
         DisplayManager.saveAllScreens()
         DisplayManager.unloadAll()
-        Initializer.isPremium = false
-        Initializer.isAdmin = false
+        ClientStateManager.isPremium = false
+        ClientStateManager.isAdmin = false
     }
 
     @SubscribeEvent fun onClientStopping(event: ClientStoppingEvent) {

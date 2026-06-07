@@ -2,6 +2,7 @@ package com.dreamdisplays.player
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.events.PlayerEvents
 import com.dreamdisplays.player.managers.PlaybackSessionManager
 import com.dreamdisplays.player.managers.StatsReporter
@@ -111,7 +112,7 @@ class MediaPlayer(
     @Volatile private var durationHintNanos = 0L
     @Volatile private var lastQuality = 0
     @Volatile private var brightness = 1.0
-    @Volatile private var userVolume = Initializer.config.defaultDisplayVolume
+    @Volatile private var userVolume = ClientStateManager.config.defaultDisplayVolume
     @Volatile private var lastAttenuation = 1.0
     @Volatile private var hwAccelDisabled = false
     @Volatile private var sessionStartNanos = 0L
@@ -206,7 +207,7 @@ class MediaPlayer(
 
     /** Returns the list of available video quality levels (in pixels) for the current stream. */
     fun getAvailableQualities(): List<Int> {
-        val cap = if (Initializer.isPremium) 2160 else 1080
+        val cap = if (ClientStateManager.isPremium) 2160 else 1080
         return streams?.availableVideo.orEmpty().asSequence()
             .mapNotNull { it.resolution }
             .map { MediaStreamSelector.parseQualityValue(it, Int.MAX_VALUE) }
@@ -276,7 +277,7 @@ class MediaPlayer(
     private fun startStreams(streamSet: StreamSet, offsetNanos: Long) {
         if (terminated.get()) return
         val hwAccel =
-            if (Initializer.config.useHwAccel && !hwAccelDisabled) HwAccelBackend.detectDefault()
+            if (ClientStateManager.config.useHwAccel && !hwAccelDisabled) HwAccelBackend.detectDefault()
             else HwAccelBackend.NONE
         sessionStartNanos = System.nanoTime()
         sessionManager.start(streamSet, offsetNanos, lastQuality, hwAccel)

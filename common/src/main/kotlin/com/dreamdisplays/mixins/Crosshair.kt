@@ -1,6 +1,6 @@
 package com.dreamdisplays.mixins
 
-import com.dreamdisplays.Initializer
+import com.dreamdisplays.managers.ClientStateManager
 import net.minecraft.client.DeltaTracker
 import net.minecraft.client.gui.GuiGraphicsExtractor
 import org.spongepowered.asm.mixin.Mixin
@@ -21,7 +21,7 @@ open class Crosshair {
         deltaTracker: DeltaTracker,
         ci: CallbackInfo
     ) {
-        if (Initializer.isOnScreen) {
+        if (ClientStateManager.isOnScreen) {
             ci.cancel()
         }
     }

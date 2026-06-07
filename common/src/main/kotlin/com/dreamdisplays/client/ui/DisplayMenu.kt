@@ -5,6 +5,7 @@ import com.dreamdisplays.client.ui.widgets.*
 import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.display.DisplayScreen
 import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.meta.UpdateCheck
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.GeneralUtil
@@ -193,10 +194,10 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
 
         renderDReset = resetButton {
-            ds.renderDistance = Initializer.config.defaultDistance
+            ds.renderDistance = ClientStateManager.config.defaultDistance
             renderD?.let {
-                it.value = (Initializer.config.defaultDistance - 24) / (128 - 24).toDouble()
-                it.message = Component.literal("${Initializer.config.defaultDistance} blocks")
+                it.value = (ClientStateManager.config.defaultDistance - 24) / (128 - 24).toDouble()
+                it.message = Component.literal("${ClientStateManager.config.defaultDistance} blocks")
             }
             DisplayManager.saveScreenData(ds)
         }
@@ -285,7 +286,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         deleteButtonWidget!!.setSprites(red)
         deleteButtonWidget!!.active = ds.owner || ds.isAdmin
 
-        reportButtonWidget = if (Initializer.isReportingEnabled) {
+        reportButtonWidget = if (ClientStateManager.isReportingEnabled) {
             object : ButtonWidget(
                 0, 0, 0, 0, 64, 64,
                 Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "report"), 2
@@ -365,7 +366,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         val videoReady = ds.isVideoStarted && !ds.errored
         val popoutLocked = ds.isPopoutActive
         syncReset?.active = videoReady && ds.canEdit && ds.isSync
-        renderDReset?.active = videoReady && !popoutLocked && ds.renderDistance != Initializer.config.defaultDistance
+        renderDReset?.active = videoReady && !popoutLocked && ds.renderDistance != ClientStateManager.config.defaultDistance
         qualityReset?.active = videoReady && ds.quality != "720"
         brightness?.let { brightnessReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }
         volume?.let { volumeReset?.active = videoReady && abs(it.value - 0.5) > 0.01 }

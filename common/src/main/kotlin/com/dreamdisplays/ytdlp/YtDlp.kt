@@ -1,6 +1,7 @@
 package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.Initializer
+import com.dreamdisplays.managers.ClientStateManager
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -243,7 +244,7 @@ object YtDlp {
      * Returns the path to a temp cookie copy (to be deleted after the process exits), or null.
      */
     private fun addCookieArgs(args: MutableList<String>): Path? {
-        val proxy = Initializer.config.ytdlpProxy.trim()
+        val proxy = ClientStateManager.config.ytdlpProxy.trim()
         if (proxy.isNotEmpty()) {
             args.add("--proxy")
             args.add(proxy)
@@ -282,7 +283,7 @@ object YtDlp {
     }
 
     private fun cookiesDisabledByConfig(): Boolean {
-        val configured = Initializer.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
+        val configured = ClientStateManager.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
         return configured == "none" || configured == "off" || configured == "disabled" || configured.isEmpty()
     }
 
@@ -753,7 +754,7 @@ object YtDlp {
         synchronized(this) {
             if (cookieBrowserResolved && resolvedCookieBrowser != null) return resolvedCookieBrowser
             if (cookieBrowserResolved && (now - cookieBrowserResolvedAt) < COOKIE_BROWSER_RETRY_MS) return null
-            var configured = Initializer.config.ytdlpCookiesFromBrowser
+            var configured = ClientStateManager.config.ytdlpCookiesFromBrowser
             configured = configured.trim().lowercase(Locale.ENGLISH)
 
             if (configured == "none" || configured == "off" || configured == "disabled" || configured.isEmpty()) {

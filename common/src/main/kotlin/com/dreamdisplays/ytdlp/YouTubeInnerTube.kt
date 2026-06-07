@@ -1,6 +1,6 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.Initializer
+import com.dreamdisplays.managers.ClientStateManager
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
@@ -137,7 +137,7 @@ object YouTubeInnerTube {
     private fun openConnection(url: String): HttpURLConnection {
         val uri = URI.create(url)
         val proxyStr = try {
-            Initializer.config.ytdlpProxy.trim()
+            ClientStateManager.config.ytdlpProxy.trim()
         } catch (_: Exception) {
             ""
         }

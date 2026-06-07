@@ -3,9 +3,8 @@ package com.dreamdisplays.display
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.client.ui.DisplayMenu
 import com.dreamdisplays.client.ui.PipCorner
-import com.dreamdisplays.client.ui.PipOverlay
-import com.dreamdisplays.client.ui.PipOverlayManager
-import com.dreamdisplays.client.ui.VideoPopoutWindow
+import com.dreamdisplays.managers.DisplayPopoutManager
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.MinecraftScreenUtil
@@ -42,7 +41,7 @@ class DisplayScreen(
     private val savedSettings = DisplaySettings.getSettings(uuid)
 
     var owner: Boolean = Minecraft.getInstance().player?.gameProfile?.id?.toString() == ownerUuid.toString()
-    val isAdmin: Boolean get() = Initializer.isAdmin
+    val isAdmin: Boolean get() = ClientStateManager.isAdmin
     var isLocked: Boolean? = null
     var errored: Boolean = false
     val canEdit: Boolean get() = owner || isAdmin || isLocked != true
@@ -81,6 +80,9 @@ class DisplayScreen(
     @Volatile private var lastSyncTargetNs: Long = -1L
     @Volatile private var lastSyncRecvWallNs: Long = 0L
     private var mediaPlayer: MediaPlayer? = null
+    private val popoutManager = DisplayPopoutManager(this) {
+        mediaPlayer?.setPopoutSink(null)
+    }
     var videoUrl: String? = null
         private set
     private var clientUrlOverride: Boolean = false
@@ -88,13 +90,11 @@ class DisplayScreen(
     @Transient private var blockPos: BlockPos? = null
     var lang: String? = null
         private set
-    private var popoutWindow: VideoPopoutWindow? = null
-    private var pipOverlay: PipOverlay? = null
 
     val isVideoStarted: Boolean get() = mediaPlayer?.textureFilled() == true
 
     val isPopoutActive: Boolean
-        get() = (popoutWindow?.isOpen == true) || (pipOverlay != null)
+        get() = popoutManager.isActive
 
     val pos: BlockPos
         get() = blockPos ?: BlockPos(x, y, z).also { blockPos = it }
@@ -157,12 +157,7 @@ class DisplayScreen(
         textureWidth = ((width / height.toDouble()) * qualityInt).toInt()
         textureHeight = qualityInt
 
-        popoutWindow?.let { win ->
-            if (win.isOpen) newPlayer.setPopoutSink { buf, fw, fh -> win.updateFrame(buf, fw, fh, videoContentAspect) }
-        }
-        pipOverlay?.let { overlay ->
-            newPlayer.setPopoutSink { buf, fw, fh -> overlay.updateFrame(buf, fw, fh, videoContentAspect) }
-        }
+        popoutManager.attachTo(newPlayer) { videoContentAspect }
 
         waitForMFInit(generation) {
             startVideo()
@@ -296,7 +291,7 @@ class DisplayScreen(
         } catch (e: Exception) {
             logger.warn("$uuid fitTexture failed: ${e.message}")
         }
-        popoutWindow?.renderFrame()
+        popoutManager.renderFrame()
     }
 
     /** Passes [volume] directly to the media player without persisting to settings. */
@@ -314,49 +309,19 @@ class DisplayScreen(
 
     /** Opens or focuses the `GLFW` window mode. Closes PiP if active. */
     fun activateWindowMode() {
-        if (!VideoPopoutWindow.isAvailable) return
         val mp = mediaPlayer ?: return
-        pipOverlay?.startClose()
-        pipOverlay = null
-        val win = popoutWindow
-        if (win != null && win.isOpen) {
-            win.open(textureWidth.takeIf { it > 0 } ?: 1280, textureHeight.takeIf { it > 0 } ?: 720)
-            return
-        }
-        try {
-            val w = textureWidth.takeIf { it > 0 } ?: 1280
-            val h = textureHeight.takeIf { it > 0 } ?: 720
-            val newWin = win ?: VideoPopoutWindow {
-                mediaPlayer?.setPopoutSink(null)
-            }.also { popoutWindow = it }
-            mp.setPopoutSink { buf, fw, fh -> newWin.updateFrame(buf, fw, fh, videoContentAspect) }
-            newWin.open(w, h)
-        } catch (e: Exception) {
-            logger.warn("Could not open window: ${e.message}.")
-        }
+        popoutManager.activateWindowMode(mp, textureWidth, textureHeight) { videoContentAspect }
     }
 
     /** Shows the in-game PiP overlay at [corner]. Closes window mode if active. */
     fun activatePipMode(corner: PipCorner = PipCorner.BOTTOM_RIGHT) {
         val mp = mediaPlayer ?: return
-        popoutWindow?.let { win -> if (win.isOpen) { mp.setPopoutSink(null); win.close() } }
-        pipOverlay?.startClose()
-        pipOverlay = null
-        val overlay = PipOverlay(this, corner)
-        if (PipOverlayManager.add(overlay)) {
-            pipOverlay = overlay
-            mp.setPopoutSink { buf, fw, fh -> overlay.updateFrame(buf, fw, fh, videoContentAspect) }
-        } else {
-            logger.warn("No PiP corners available (max 4).")
-        }
+        popoutManager.activatePipMode(mp, corner) { videoContentAspect }
     }
 
     /** Closes whichever popout mode is active. */
     fun deactivatePopout() {
-        mediaPlayer?.setPopoutSink(null)
-        popoutWindow?.let { if (it.isOpen) it.close() }
-        pipOverlay?.startClose()
-        pipOverlay = null
+        popoutManager.deactivate(mediaPlayer)
     }
 
     /** Applies volume, brightness, and paused state to the media player, then seeks to the saved position. */
@@ -440,10 +405,7 @@ class DisplayScreen(
         videoStarted = false
         val currentPlayer = mediaPlayer
         mediaPlayer = null
-        currentPlayer?.setPopoutSink(null)
-        popoutWindow?.let { if (it.isOpen) it.close() }
-        PipOverlayManager.remove(this)
-        pipOverlay = null
+        popoutManager.unregister(currentPlayer)
         currentPlayer?.stop()
 
         val mc = Minecraft.getInstance()
@@ -535,7 +497,7 @@ class DisplayScreen(
 
     /** Called every game tick to update distance-based volume attenuation from [pos]. */
     fun tick(pos: BlockPos) {
-        val maxRadius = if (isPopoutActive) Double.MAX_VALUE else Initializer.config.defaultDistance.toDouble()
+        val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
         mediaPlayer?.tick(pos, maxRadius)
     }
 

@@ -1,6 +1,7 @@
 package com.dreamdisplays
 
 import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.managers.ClientStateManager
 import net.minecraft.client.Minecraft
 
 /** Background thread that temporarily mutes / unmutes screens based on window focus. */
@@ -14,7 +15,7 @@ class Focuser : Thread() {
     /** Polls window focus every 250 ms and mutes or unmutes all screens when `mute-on-alt-tab` is enabled. */
     override fun run() {
         while (true) {
-            if (Initializer.config.muteOnAltTab) {
+            if (ClientStateManager.config.muteOnAltTab) {
                 val mc: Minecraft? = runCatching { Minecraft.getInstance() }.getOrNull()
                 if (mc != null) {
                     val focused = mc.isWindowActive
