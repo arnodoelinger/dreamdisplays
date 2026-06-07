@@ -171,6 +171,47 @@ jobs:
           path: build/libs
           merge-multiple: true
 
+      - name: Extract snapshot changelog
+        if: needs.metadata.outputs.is_snapshot == 'true'
+        run: |
+          python3 - <<'EOF'
+          import re
+          import sys
+
+          with open("CHANGELOG.md") as f:
+              content = f.read()
+
+          version = "${{ needs.metadata.outputs.version }}"
+          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+
+          if not match:
+              with open("changelog.md", "w") as f:
+                  f.write("")
+              sys.exit(0)
+
+          block = match.group(1)
+          sections = re.split(r"^## ", block, flags=re.MULTILINE)
+          lines = []
+
+          for section in sections:
+              if not section.strip():
+                  continue
+
+              header, _, body = section.partition("\n")
+              lines.append(f"## {header.strip()}")
+
+              for item in body.splitlines():
+                  item = item.strip()
+                  if item:
+                      lines.append(item)
+
+              lines.append("")
+
+          with open("changelog.md", "w") as f:
+              f.write("\n".join(lines).strip() + "\n")
+          EOF
+
       - name: Publish dev pre-release
         if: needs.metadata.outputs.is_dev == 'true'
         run: |
@@ -184,7 +225,7 @@ jobs:
         if: needs.metadata.outputs.is_snapshot == 'true'
         run: |
           TAG="v${{ needs.metadata.outputs.version }}"
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.metadata.outputs.version }}" --prerelease build/libs/dreamdisplays-*.jar \
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.metadata.outputs.version }}" --prerelease --notes-file changelog.md build/libs/dreamdisplays-*.jar \
           || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --repo "${{ github.repository }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
