@@ -18,8 +18,9 @@
 - Video frame pipeline stability and brightness handling
 - Enhance cookie handling and process management
 - Improve `Gradle` configuration
-- Remove INotSleep's utils
+- Workflow improvements
 - Improve the publishing system
+- Remove INotSleep's utils
 - Update dependencies
 
 ### Fixes
