@@ -6,7 +6,10 @@ import com.dreamdisplays.render.AsyncTextureUploader
 import com.dreamdisplays.render.TextureUploadUtil
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.resources.Identifier
@@ -17,7 +20,7 @@ import java.util.UUID
 enum class PipCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
 
 /** 8 magnetic snap zones around the screen edges. */
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 enum class PipAnchor {
     TOP_LEFT, TOP_CENTER, TOP_RIGHT,
     MIDDLE_LEFT, MIDDLE_RIGHT,
@@ -181,7 +184,10 @@ class PipOverlay(
     /** Returns false when the close animation has finished – caller should discard. */
     fun render(
         mc: Minecraft,
+        //? if >=26 {
         g: GuiGraphicsExtractor,
+        //?} else
+        /*g: GuiGraphics,*/
         mouseX: Int, mouseY: Int,
         leftPressed: Boolean,
         partialTick: Float,
@@ -386,7 +392,10 @@ class PipOverlay(
         return x to y
     }
 
+    //? if >=26 {
     private fun renderResizeHandle(g: GuiGraphicsExtractor, hx: Int, hy: Int, alpha: Float) {
+    //?} else
+    /*private fun renderResizeHandle(g: GuiGraphics, hx: Int, hy: Int, alpha: Float) {*/
         val (sx, sy) = anchor.centerFacingCorner()
         val color = blendColor(if (hoveringResize) ACCENT else 0xFFFFFFFF.toInt(), alpha)
         drawCornerBracket(g, hx, hy, sx, sy, 8, 0, color)
@@ -394,7 +403,10 @@ class PipOverlay(
     }
 
     private fun drawCornerBracket(
+        //? if >=26 {
         g: GuiGraphicsExtractor,
+        //?} else
+        /*g: GuiGraphics,*/
         baseX: Int, baseY: Int,
         sx: Int, sy: Int,
         len: Int,
@@ -448,7 +460,10 @@ class PipOverlay(
         private const val PANEL_BORDER = 0xFF606060.toInt()
         private const val ACCENT = 0xFF4A90E2.toInt()
 
+        //? if >=26 {
         private fun outline(g: GuiGraphicsExtractor, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
+        //?} else
+        /*private fun outline(g: GuiGraphics, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {*/
             g.fill(x1, y1, x2, y1 + 1, color)
             g.fill(x1, y2 - 1, x2, y2, color)
             g.fill(x1, y1, x1 + 1, y2, color)

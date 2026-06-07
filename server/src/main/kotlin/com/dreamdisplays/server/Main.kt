@@ -167,31 +167,44 @@ import org.slf4j.LoggerFactory
     /** Registers all custom payload types for clientbound and serverbound play channels. */
     private fun registerPayloadTypes() {
         try {
-            with(PayloadTypeRegistry.clientboundPlay()) {
-                register(Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
-                register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
-                register(Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
-                register(Packets.IsAdmin.PACKET_ID, Packets.IsAdmin.PACKET_CODEC)
-                register(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
-                register(Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
-                register(Packets.ReportEnabled.PACKET_ID, Packets.ReportEnabled.PACKET_CODEC)
-                register(Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC)
-            }
+            val clientbound = payloadRegistry("clientboundPlay", "playS2C")
+            registerPayload(clientbound, Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
+            registerPayload(clientbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
+            registerPayload(clientbound, Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
+            registerPayload(clientbound, Packets.IsAdmin.PACKET_ID, Packets.IsAdmin.PACKET_CODEC)
+            registerPayload(clientbound, Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
+            registerPayload(clientbound, Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
+            registerPayload(clientbound, Packets.ReportEnabled.PACKET_ID, Packets.ReportEnabled.PACKET_CODEC)
+            registerPayload(clientbound, Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC)
 
-            with(PayloadTypeRegistry.serverboundPlay()) {
-                register(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
-                register(Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
-                register(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
-                register(Packets.Report.PACKET_ID, Packets.Report.PACKET_CODEC)
-                register(Packets.Version.PACKET_ID, Packets.Version.PACKET_CODEC)
-                register(Packets.SetVideo.PACKET_ID, Packets.SetVideo.PACKET_CODEC)
-                register(Packets.SetLocked.PACKET_ID, Packets.SetLocked.PACKET_CODEC)
-                register(Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
-            }
+            val serverbound = payloadRegistry("serverboundPlay", "playC2S")
+            registerPayload(serverbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
+            registerPayload(serverbound, Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
+            registerPayload(serverbound, Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
+            registerPayload(serverbound, Packets.Report.PACKET_ID, Packets.Report.PACKET_CODEC)
+            registerPayload(serverbound, Packets.Version.PACKET_ID, Packets.Version.PACKET_CODEC)
+            registerPayload(serverbound, Packets.SetVideo.PACKET_ID, Packets.SetVideo.PACKET_CODEC)
+            registerPayload(serverbound, Packets.SetLocked.PACKET_ID, Packets.SetLocked.PACKET_CODEC)
+            registerPayload(serverbound, Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
         } catch (e: Exception) {
             logger.error("Failed to register payload types", e)
             throw e
         }
+    }
+
+    private fun payloadRegistry(vararg methodNames: String): Any {
+        val type = PayloadTypeRegistry::class.java
+        val method = methodNames.firstNotNullOfOrNull { name ->
+            runCatching { type.getMethod(name) }.getOrNull()
+        } ?: error("No compatible Fabric payload registry method found: ${methodNames.joinToString()}.")
+        return method.invoke(null)
+    }
+
+    private fun registerPayload(registry: Any, packetId: Any, packetCodec: Any) {
+        val register = registry.javaClass.methods.first {
+            it.name == "register" && it.parameterCount == 2
+        }
+        register.invoke(registry, packetId, packetCodec)
     }
 
     /** Starts repeating tasks for display updates and update checking. */

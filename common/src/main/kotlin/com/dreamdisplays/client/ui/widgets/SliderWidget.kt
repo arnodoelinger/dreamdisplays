@@ -2,7 +2,10 @@ package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -14,7 +17,7 @@ import net.minecraft.resources.Identifier
 import net.minecraft.util.Mth
 
 /** Slider widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 abstract class SliderWidget(
     x: Int, y: Int, width: Int, height: Int,
     message: Component,
@@ -48,6 +51,7 @@ abstract class SliderWidget(
         }
     }
 
+    //? if >=26 {
     override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
         g.blitSprite(
@@ -61,6 +65,20 @@ abstract class SliderWidget(
             msg, 2
         )
     }
+    //?} else
+    /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(
+            RenderPipelines.GUI_TEXTURED, getHandleTexture(),
+            x + (value * (width - 8).toDouble()).toInt(), y, 8, height
+        )
+        val i = if (active) 16777215 else 10526880
+        val msg = message.copy().withStyle { it.withColor(i) }
+        renderScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+            msg, 2
+        )
+    }*/
 
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
         setValueFromMouse(event.x())

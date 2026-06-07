@@ -14,7 +14,10 @@ import com.dreamdisplays.utils.RayCastingUtil
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -297,7 +300,10 @@ object Initializer {
     }
 
     /** Renders all active PiP overlays on the HUD when the player is in-world and no screen is open. */
+    //? if >=26 {
     fun onRenderHud(mc: Minecraft, graphics: GuiGraphicsExtractor, partialTick: Float) {
+    //?} else
+    /*fun onRenderHud(mc: Minecraft, graphics: GuiGraphics, partialTick: Float) {*/
         if (mc.level == null || mc.player == null) return
         if (MinecraftScreenUtil.currentScreen(mc) != null) return
         PipOverlayManager.renderAll(mc, graphics, -1, -1, false, partialTick)

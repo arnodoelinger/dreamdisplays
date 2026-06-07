@@ -36,13 +36,12 @@ object TextureUploadUtil {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
         val encoderClass = encoder.javaClass
 
-        runCatching {
+        try {
             encoderClass
                 .getMethod(
                     "writeToTexture",
                     GpuTexture::class.java,
                     ByteBuffer::class.java,
-                    NativeImage.Format::class.java,
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
@@ -50,15 +49,16 @@ object TextureUploadUtil {
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
                 )
-                .invokeOrThrowTarget(encoder, texture, rgba, NativeImage.Format.RGBA, 0, 0, 0, 0, w, h)
+                .invokeOrThrowTarget(encoder, texture, rgba, 0, 0, 0, 0, w, h)
             return
-        }
+        } catch (_: NoSuchMethodException) {}
 
         encoderClass
             .getMethod(
                 "writeToTexture",
                 GpuTexture::class.java,
                 ByteBuffer::class.java,
+                NativeImage.Format::class.java,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
@@ -66,7 +66,7 @@ object TextureUploadUtil {
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
             )
-            .invokeOrThrowTarget(encoder, texture, rgba, 0, 0, 0, 0, w, h)
+            .invokeOrThrowTarget(encoder, texture, rgba, NativeImage.Format.RGBA, 0, 0, 0, 0, w, h)
     }
 
     private fun java.lang.reflect.Method.invokeOrThrowTarget(target: Any, vararg args: Any?) {

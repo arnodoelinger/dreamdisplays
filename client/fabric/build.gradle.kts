@@ -1,10 +1,27 @@
 import java.util.Properties
 
 plugins {
-    id("net.fabricmc.fabric-loom")
+    id("net.fabricmc.fabric-loom") apply false
+    id("net.fabricmc.fabric-loom-remap") apply false
     id("maven-publish")
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.shadow-conventions")
+}
+
+// Loom plugin id depends on whether the target Minecraft is obfuscated.
+// Legacy releases (1.21.11 and older) ship obfuscated -> fabric-loom-remap.
+// Year-versioned releases (26.x) ship deobfuscated -> fabric-loom.
+// The plugin version is supplied per Stonecutter version via settings.gradle.kts resolutionStrategy.
+run {
+    val active = rootProject.file("versions/active.txt").readText().trim()
+    val props = Properties().apply {
+        rootProject.file("versions/$active/gradle.properties").inputStream().use { load(it) }
+    }
+    val mcVersion = props.getProperty("minecraft.version")
+        ?: error("Missing 'minecraft.version' for $active.")
+    val isLegacyObfuscated = mcVersion.startsWith("1.")
+    if (isLegacyObfuscated) apply(plugin = "net.fabricmc.fabric-loom-remap")
+    else apply(plugin = "net.fabricmc.fabric-loom")
 }
 
 repositories {
@@ -25,12 +42,43 @@ val stonecutterVersions = Properties().apply {
 fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
     ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
 
+// Legacy (obfuscated) Minecraft targets need layered Mojang+Parchment mappings and modImplementation;
+// year-versioned (deobfuscated) targets resolve the source set directly with plain implementation.
+val isLegacyObfuscated = scVersion("minecraft.version").startsWith("1.")
+
 sourceSets.main {
-    kotlin.srcDir(project(":server").file("src/main/kotlin"))
+    // Consume :server's chiseled output (version directives already resolved) rather than its raw
+    // source, so the active Minecraft version's branch is compiled here too.
+    kotlin.srcDir(project(":server").layout.buildDirectory.dir("generated/chisel/main/kotlin"))
 }
 
-loom {
-    accessWidenerPath.set(project(":common").file("src/main/resources/dreamdisplays.classtweaker"))
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    dependsOn(":server:chiselSource")
+}
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+    dependsOn(":server:chiselSource")
+}
+
+val sourceClassTweaker = project(":common").file("src/main/resources/dreamdisplays.classtweaker")
+val classTweakerNamespace = if (isLegacyObfuscated) "named" else "official"
+val generatedClassTweaker = layout.buildDirectory.file("generated/classtweaker/dreamdisplays.classtweaker").get().asFile
+run {
+    val rewritten = sourceClassTweaker.readText().lineSequence().joinToString("\n") { line ->
+        if (line.startsWith("classTweaker v1 ")) "classTweaker v1 $classTweakerNamespace" else line
+    }
+    if (!generatedClassTweaker.exists() || generatedClassTweaker.readText() != rewritten) {
+        generatedClassTweaker.parentFile.mkdirs()
+        generatedClassTweaker.writeText(rewritten)
+    }
+}
+
+val loomExt = the<net.fabricmc.loom.api.LoomGradleExtensionAPI>()
+loomExt.accessWidenerPath.set(generatedClassTweaker)
+
+configurations.register("mappedFabricApiElements") {
+    isCanBeConsumed = true
+    isCanBeResolved = false
+    extendsFrom(configurations.getByName("modCompileClasspathMapped"))
 }
 
 dependencies {
@@ -46,9 +94,18 @@ dependencies {
     implementation(libs.hikari)
     runtimeOnly(libs.sqliteJdbc)
 
-    minecraft("com.mojang:minecraft:${scVersion("fabric.minecraft.version")}")
-    implementation("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
-    implementation("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    "minecraft"("com.mojang:minecraft:${scVersion("fabric.minecraft.version")}")
+    if (isLegacyObfuscated) {
+        "mappings"(loomExt.layered {
+            officialMojangMappings()
+            parchment("io.papermc.parchment.data:parchment:${scVersion("minecraft.version")}+build.3")
+        })
+        "modImplementation"("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+        "modImplementation"("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    } else {
+        implementation("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+        implementation("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    }
     implementation(project(":common"))
     shadow(project(":common"))
     shadow(libs.kotlinStdlib)
@@ -62,16 +119,21 @@ dependencies {
 }
 
 tasks.processResources {
-    from(project(":common").file("src/main/resources/dreamdisplays.classtweaker"))
+    from(generatedClassTweaker)
     val projectVersion = project.version.toString()
     val fabricMcVer = scVersion("fabric.minecraft.dependency")
+    val javaVersion = scVersion("java.version")
     inputs.property("version", projectVersion)
     inputs.property("minecraftVersion", fabricMcVer)
+    inputs.property("javaVersion", javaVersion)
     filesMatching("fabric.mod.json") {
-        expand(mapOf("version" to projectVersion, "minecraftVersion" to fabricMcVer))
+        expand(mapOf("version" to projectVersion, "minecraftVersion" to fabricMcVer, "javaVersion" to javaVersion))
     }
     filesMatching("quilt.mod.json") {
-        expand(mapOf("version" to projectVersion, "minecraftVersion" to fabricMcVer))
+        expand(mapOf("version" to projectVersion, "minecraftVersion" to fabricMcVer, "javaVersion" to javaVersion))
+    }
+    filesMatching("dreamdisplays.mixins.json") {
+        expand(mapOf("javaVersion" to javaVersion))
     }
     filesMatching("assets/dreamdisplays/version.txt") {
         expand(mapOf("version" to projectVersion))
@@ -91,7 +153,7 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 // Hack: it's a bug in Loom alpha where the validation task expects a named namespace but the classtweaker correctly uses
 // official namespaces, so we have to disable the validation until it's fixed.
 // TODO: when a stable Loom for 26.1.2/26.2 is released, this should be removed
-tasks.named("validateAccessWidener") { enabled = false }
+tasks.findByName("validateAccessWidener")?.enabled = false
 
 tasks.shadowJar {
     configurations = listOf(project.configurations.getByName("shadow"))

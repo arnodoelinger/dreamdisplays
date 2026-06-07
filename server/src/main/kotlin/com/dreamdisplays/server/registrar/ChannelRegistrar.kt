@@ -26,6 +26,7 @@ import com.dreamdisplays.server.utils.net.PacketReceiver
         "dreamdisplays:display_info",
         "dreamdisplays:sync",
         "dreamdisplays:delete",
+        "dreamdisplays:display_enabled",
         "dreamdisplays:report_enabled",
         "dreamdisplays:clear_cache"
     )

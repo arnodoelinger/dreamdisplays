@@ -2,7 +2,10 @@ package com.dreamdisplays.client.ui.widgets
 
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarrationElementOutput
 import net.minecraft.client.input.MouseButtonEvent
@@ -12,7 +15,7 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.resources.Identifier
 
 /** Toggle widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 abstract class ToggleWidget(
     x: Int, y: Int, width: Int, height: Int,
     message: Component,
@@ -35,6 +38,7 @@ abstract class ToggleWidget(
 
     override fun updateWidgetNarration(output: NarrationElementOutput) {}
 
+    //? if >=26 {
     override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
         g.blitSprite(
@@ -48,6 +52,20 @@ abstract class ToggleWidget(
             msg, 2
         )
     }
+    //?} else
+    /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
+        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(
+            RenderPipelines.GUI_TEXTURED, getHandleTexture(),
+            x + (dValue * (width - 8).toDouble()).toInt(), y, 8, height
+        )
+        val i = if (active) 16777215 else 10526880
+        val msg: MutableComponent = message.copy().withStyle { it.withColor(i) }
+        renderScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+            msg, 2
+        )
+    }*/
 
     override fun setFocused(focused: Boolean) {
         super.setFocused(focused)

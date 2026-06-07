@@ -14,6 +14,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.concurrent.ConcurrentLinkedQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -36,6 +37,8 @@ internal class VideoFramePipe(private val debugLabel: String) {
 
         /** Drop a frame when it's more than 80 ms behind the audio clock. */
         private const val DROP_THRESHOLD_NS = 80_000_000L
+
+        private const val MAX_REUSABLE_FRAME_BUFFERS = 4
     }
 
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
@@ -50,7 +53,8 @@ internal class VideoFramePipe(private val debugLabel: String) {
         private set
 
     private val readyBufferRef = AtomicReference<ByteBuffer?>(null)
-    private val frameAvailable = AtomicBoolean(false)
+    private val textureReady = AtomicBoolean(false)
+    private val reusableFrameBuffers = ConcurrentLinkedQueue<ByteBuffer>()
 
     private var uploader: AsyncTextureUploader? = null
     private var rgbaUploadBuffer: ByteBuffer? = null
@@ -59,10 +63,9 @@ internal class VideoFramePipe(private val debugLabel: String) {
     private var uploadCount = 0
 
     /**
-     * Returns true when a frame is available for upload. The render thread should call [updateFrame] as soon as possible
-     * after this returns true, to minimize the chance of the reader thread overwriting the ready buffer before upload.
+     * Returns true once a frame is available for upload or has already been uploaded to the GPU texture.
      */
-    fun textureFilled(): Boolean = readyBufferRef.get() != null
+    fun textureFilled(): Boolean = textureReady.get() || readyBufferRef.get() != null
 
     /**
      * Uploads the ready frame to [texture] if one is available.
@@ -77,36 +80,43 @@ internal class VideoFramePipe(private val debugLabel: String) {
      * ready by the time it executes.
      */
     fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int) {
-        if (!frameAvailable.compareAndSet(true, false)) return
-        val buf = readyBufferRef.get() ?: return
-        if (actualW != expectedW || actualH != expectedH) return
-        if (Minecraft.getInstance().window.isMinimized) return
+        val buf = readyBufferRef.getAndSet(null) ?: return
+        if (actualW != expectedW || actualH != expectedH || Minecraft.getInstance().window.isMinimized) {
+            recycleFrameBuffer(buf)
+            return
+        }
         buf.rewind()
         val start = System.nanoTime()
-        TextureUploadUtil.uploadRgb(
-            texture = texture,
-            src = buf,
-            w = texture.getWidth(0),
-            h = texture.getHeight(0),
-            glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
-            rgbaScratch = rgbaUploadBuffer,
-            setRgbaScratch = { rgbaUploadBuffer = it },
-        )
-        if (MediaPlayer.DEBUG) {
-            uploadTotalNs += System.nanoTime() - start
-            MediaPlayer.framesToGpu.incrementAndGet()
-            if (++uploadCount >= 60) {
-                val avgMs = uploadTotalNs / 60 / 1_000_000.0
-                logger.info("$debugLabel Upload avg. ${String.format("%.3f", avgMs)} ms / frame")
-                uploadTotalNs = 0L; uploadCount = 0
+        try {
+            TextureUploadUtil.uploadRgb(
+                texture = texture,
+                src = buf,
+                w = texture.getWidth(0),
+                h = texture.getHeight(0),
+                glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
+                rgbaScratch = rgbaUploadBuffer,
+                setRgbaScratch = { rgbaUploadBuffer = it },
+            )
+            textureReady.set(true)
+            if (MediaPlayer.DEBUG) {
+                uploadTotalNs += System.nanoTime() - start
+                MediaPlayer.framesToGpu.incrementAndGet()
+                if (++uploadCount >= 60) {
+                    val avgMs = uploadTotalNs / 60 / 1_000_000.0
+                    logger.info("$debugLabel Upload avg. ${String.format("%.3f", avgMs)} ms / frame")
+                    uploadTotalNs = 0L; uploadCount = 0
+                }
             }
+        } finally {
+            recycleFrameBuffer(buf)
         }
     }
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clear() {
-        frameAvailable.set(false)
-        readyBufferRef.set(null)
+        textureReady.set(false)
+        readyBufferRef.getAndSet(null)?.let(::recycleFrameBuffer)
+        reusableFrameBuffers.clear()
     }
 
     /**
@@ -114,6 +124,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
      * discarded (i.e., the owning [MediaPlayer] is being stopped for good).
      */
     fun cleanup() {
+        clear()
         uploader?.cleanup()
         uploader = null
         rgbaUploadBuffer = null
@@ -153,9 +164,8 @@ internal class VideoFramePipe(private val debugLabel: String) {
         onEos: (stderr: String, normalEos: Boolean) -> Unit,
     ) {
         var frameSize = w * h * 3
-        var bufA = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
-        var bufB = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
-        var spare: ByteBuffer = bufA
+        var spare = allocateFrameBuffer(frameSize)
+        recycleFrameBuffer(allocateFrameBuffer(frameSize))
 
         var firstFrame = false
         var videoPts = seekOffsetNanos
@@ -193,25 +203,22 @@ internal class VideoFramePipe(private val debugLabel: String) {
                     val requiredFrameSize = w * h * 3
                     if (rowBuf.size < w * 3) rowBuf = ByteArray(w * 3)
                     if (frameSize != requiredFrameSize
-                        || bufA.capacity() < requiredFrameSize
-                        || bufB.capacity() < requiredFrameSize
                         || spare.capacity() < requiredFrameSize
                     ) {
                         frameSize = requiredFrameSize
-                        bufA = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
-                        bufB = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
-                        spare = bufA
                         readyBufferRef.set(null)
-                        frameAvailable.set(false)
+                        reusableFrameBuffers.clear()
+                        spare = allocateFrameBuffer(frameSize)
+                        recycleFrameBuffer(allocateFrameBuffer(frameSize))
                     }
 
                     if (spare.capacity() < requiredFrameSize) {
-                        spare = ByteBuffer.allocateDirect(requiredFrameSize).order(ByteOrder.nativeOrder())
+                        spare = takeReusableFrameBuffer(requiredFrameSize) ?: allocateFrameBuffer(requiredFrameSize)
                     }
                     spare.clear()
                     if (spare.remaining() < requiredFrameSize) {
                         logger.warn("$debugLabel Reallocated undersized frame buffer: remaining=${spare.remaining()} required=$requiredFrameSize.")
-                        spare = ByteBuffer.allocateDirect(requiredFrameSize).order(ByteOrder.nativeOrder())
+                        spare = allocateFrameBuffer(requiredFrameSize)
                         spare.clear()
                     }
                     if (!readFully(input, spare, rowBuf, requiredFrameSize)) { normalEos = true; break }
@@ -247,13 +254,10 @@ internal class VideoFramePipe(private val debugLabel: String) {
 
                     if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
 
-                    val prev = readyBufferRef.getAndSet(spare)
-                    spare = when {
-                        prev === bufA || prev === bufB -> prev
-                        spare === bufA -> bufB
-                        else -> bufA
-                    }
-                    frameAvailable.set(true)
+                    val published = spare
+                    val dropped = readyBufferRef.getAndSet(published)
+                    if (dropped !== published) dropped?.let(::recycleFrameBuffer)
+                    spare = takeReusableFrameBuffer(requiredFrameSize) ?: allocateFrameBuffer(requiredFrameSize)
                     if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
 
                     videoPts += frameNs
@@ -278,6 +282,35 @@ internal class VideoFramePipe(private val debugLabel: String) {
             try { stderrThread.join(500) } catch (_: InterruptedException) {}
             val stderr = synchronized(stderrBuf) { stderrBuf.toString() }
             onEos(stderr, exitCode == 0)
+        }
+    }
+
+    /** Allocate a new direct `ByteBuffer` of at least [size] bytes. The caller is responsible for recycling it when done. */
+    private fun allocateFrameBuffer(size: Int): ByteBuffer =
+        ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+
+    /**
+     * Takes and returns a reusable frame buffer of at least [requiredSize] bytes, or null if none are available.
+     * The caller is responsible for clearing and recycling the returned buffer when done.
+     */
+    private fun takeReusableFrameBuffer(requiredSize: Int): ByteBuffer? {
+        while (true) {
+            val buffer = reusableFrameBuffers.poll() ?: return null
+            if (buffer.capacity() >= requiredSize) {
+                buffer.clear()
+                return buffer
+            }
+        }
+    }
+
+    /**
+     * Recycles [buffer] for future reuse. The buffer will be cleared before reuse, but the caller must ensure it's not
+     * currently in use (e.g., by the render thread).
+     */
+    private fun recycleFrameBuffer(buffer: ByteBuffer) {
+        buffer.clear()
+        if (reusableFrameBuffers.size < MAX_REUSABLE_FRAME_BUFFERS) {
+            reusableFrameBuffers.offer(buffer)
         }
     }
 

@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.dreamdisplays.mixins",
-  "compatibilityLevel": "JAVA_25",
+  "compatibilityLevel": "JAVA_${javaVersion}",
   "client": [
     "Crosshair",
     "ScreenOverlay"

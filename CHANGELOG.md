@@ -1,35 +1,53 @@
-# Version 1.7.2
+# Version 1.8.0-SNAPSHOT.1
 
 ## Client
 
 ### Features
 
 - Support 26.2-pre4 version
-- Use `LoggerFactory` for logging
-- Use default config implementation instead of `AbstractConfig`
+- Back 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
 - Use `Stonecutter` for the multiversion system
+- Support `Vulcan` for display rendering (`OpenGL` still supported)
+- Use default config implementation instead of `AbstractConfig`
+- Use `LoggerFactory` for logging
 - A bit fresher mod icon
 
 ### Improvements
 
-- Update dependencies
 - Reorganize the project structure
+- Video frame pipeline stability and brightness handling
 - Enhance cookie handling and process management
 - Improve `Gradle` configuration
 - Remove INotSleep's utils
 - Improve the publishing system
+- Update dependencies
 
 ### Fixes
 
 - Critical `Quilt` entry point crash
 - Ancient bug between `NeoForge` and IntelliJ IDEA
+- `NeoForge` client shutdown on normal server disconnect
+- Picture-in-Picture mode displays size calculation
+- Temporary focus mute no longer overwrites the user's mute setting
+- Unsafe server display cache filenames on some systems
+- Invalid display sizes no longer create broken client textures
 
 ## Server
 
+### Features
+
+- Back Java 21 support (if you're running on 1.21.11, you can still use Java 21 with this version instead of being forced to update to Java 25, as it was in previous versions)
+
 ### Improvements
 
-- Update dependencies
+- Remove the useless report button in single-player
 - Improve `Gradle` configuration
+- Update dependencies
+
+### Fixes
+
+- `MariaDB` compatibility issue ([#88](https://github.com/arsmotorin/dreamdisplays/pull/88))
+- Allow sending display enabled packets to clients
 
 # Version 1.7.1
 

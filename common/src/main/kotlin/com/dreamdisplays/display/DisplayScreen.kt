@@ -294,7 +294,7 @@ class DisplayScreen(
         try {
             mp.updateFrame(tex.getTexture())
         } catch (e: Exception) {
-            logger.warn("$uuid fitTexture failed: ${e.message}")
+            logger.warn("$uuid fitTexture failed: ${e.message ?: e::class.java.name}")
         }
         popoutWindow?.renderFrame()
     }

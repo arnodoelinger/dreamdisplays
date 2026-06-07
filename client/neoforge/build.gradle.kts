@@ -36,9 +36,11 @@ tasks.processResources {
     val projectVersion = project.version.toString()
     val neoForgeLoaderRange = scVersion("neoforge.loader.range")
     val minecraftRange = scVersion("neoforge.minecraft.range")
+    val javaVersion = scVersion("java.version")
     inputs.property("version", projectVersion)
     inputs.property("neoforgeLoaderRange", neoForgeLoaderRange)
     inputs.property("minecraftRange", minecraftRange)
+    inputs.property("javaVersion", javaVersion)
     filesMatching("META-INF/neoforge.mods.toml") {
         expand(
             mapOf(
@@ -47,6 +49,9 @@ tasks.processResources {
                 "minecraftRange" to minecraftRange,
             )
         )
+    }
+    filesMatching("dreamdisplays.mixins.json") {
+        expand(mapOf("javaVersion" to javaVersion))
     }
     filesMatching("assets/dreamdisplays/version.txt") {
         expand(mapOf("version" to projectVersion))

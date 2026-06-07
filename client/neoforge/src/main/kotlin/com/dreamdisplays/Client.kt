@@ -79,11 +79,18 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         Initializer.onStop()
     }
 
+    //? if >=26 {
     @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
         ScreenRenderer.render(event.getPoseStack(), mc.gameRenderer.mainCamera)
     }
+    //?} else
+    /*@SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterParticles) {
+        val mc = Minecraft.getInstance()
+        if (mc.level == null || mc.player == null) return
+        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+    }*/
 
     @SubscribeEvent fun onEndTick(event: ClientTickEvent.Post) {
         Initializer.onEndTick(Minecraft.getInstance())

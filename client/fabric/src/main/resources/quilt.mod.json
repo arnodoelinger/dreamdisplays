@@ -33,7 +33,7 @@
       },
       {
         "id": "java",
-        "versions": ">=25"
+        "versions": ">=${javaVersion}"
       }
     ],
     "breaks": []

@@ -6,7 +6,22 @@ plugins {
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
 }
 
+val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+val stonecutterVersions = Properties().apply {
+    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+}
+fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
+    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+val isLegacyObfuscatedMinecraft = scVersion("minecraft.version").startsWith("1.")
+
+if (isLegacyObfuscatedMinecraft) {
+    evaluationDependsOn(":client:fabric")
+}
+
 repositories {
+    if (isLegacyObfuscatedMinecraft) {
+        maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods"))
+    }
     mavenCentral()
     maven("https://repo.lostyy.ru/releases")
     maven("https://repo.papermc.io/repository/maven-public/")
@@ -26,18 +41,15 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 }
 
 dependencies {
-    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-    val stonecutterVersions = Properties().apply {
-        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-    }
-    fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-        ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
-
     paperweight.devBundle("io.papermc.paper", scVersion("paper.api.version"))
     compileOnly(libs.jspecify)
     compileOnly(project(":common"))
     compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
-    compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    if (isLegacyObfuscatedMinecraft) {
+        compileOnly(project(path = ":client:fabric", configuration = "mappedFabricApiElements"))
+    } else {
+        compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    }
 
     implementation(libs.semver4j)
     implementation(libs.tomlj)
@@ -51,7 +63,7 @@ dependencies {
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(providers.gradleProperty("java.version").get().toInt())
+    options.release.set(scVersion("java.version").toInt())
 }
 
 tasks.processResources {

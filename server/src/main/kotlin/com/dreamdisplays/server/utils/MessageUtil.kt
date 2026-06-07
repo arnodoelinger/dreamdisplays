@@ -21,7 +21,10 @@ import net.minecraft.network.chat.contents.ObjectContents as NmsObjectContents
 import net.minecraft.network.chat.contents.objects.AtlasSprite
 import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
+//? if >=26 {
 import net.minecraft.world.item.ItemStackTemplate
+//?} else
+/*import net.minecraft.world.item.ItemStack*/
 import org.bukkit.Material
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -160,8 +163,12 @@ object MessageUtil {
                 val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
                 val spriteId = Identifier.fromNamespaceAndPath(itemId.namespace, (if (isBlock) "block/" else "item/") + itemId.path)
                 val atlasSprite = AtlasSprite(atlasId, spriteId)
+                //? if >=26 {
                 val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStackTemplate(item))
                 val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite, Optional.empty()))
+                //?} else
+                /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
+                val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
                     .withStyle { it.withHoverEvent(hoverEvent) }
                 root.append(spriteComponent)
             }

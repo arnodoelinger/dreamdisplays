@@ -7,7 +7,10 @@ import com.dreamdisplays.ytdlp.YtDlp
 import com.dreamdisplays.ytdlp.YtVideoInfo
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.narration.NarrationElementOutput
@@ -29,7 +32,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /** Suggestions panel widget. **/
-// TODO: rewrite this class entirely in 1.8.0
+// TODO: rewrite this class entirely in 1.9.0
 class SuggestionsPanelWidget(
     x: Int, y: Int, width: Int, height: Int,
     private val onPick: Consumer<YtVideoInfo>,
@@ -209,6 +212,7 @@ class SuggestionsPanelWidget(
         searchBox.width = searchBoxWidth(w)
     }
 
+    //? if >=26 {
     override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, dt: Float) {
         g.fill(x, y, x + width, y + height, PANEL_BG)
         g.fill(x, y, x + width, y + 1, PANEL_BORDER)
@@ -326,6 +330,124 @@ class SuggestionsPanelWidget(
             g.fill(barX, barY, barX + barW, barY + 2, 0xFF808080.toInt())
         }
     }
+    //?} else
+    /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, dt: Float) {
+        g.fill(x, y, x + width, y + height, PANEL_BG)
+        g.fill(x, y, x + width, y + 1, PANEL_BORDER)
+        g.fill(x, y + height - 1, x + width, y + height, PANEL_BORDER)
+        g.fill(x, y, x + 1, y + height, PANEL_BORDER)
+        g.fill(x + width - 1, y, x + width, y + height, PANEL_BORDER)
+
+        val f = Minecraft.getInstance().font
+        g.drawString(f, message, x + 10, y + 10, 0xFFFFFFFF.toInt(), false)
+        searchBox.render(g, mouseX, mouseY, dt)
+
+        clearButtonWidget.x = clearButtonX()
+        clearButtonWidget.y = actionRowY()
+        clearButtonWidget.render(g, mouseX, mouseY, dt)
+
+        searchActionButtonWidget.x = searchButtonX()
+        searchActionButtonWidget.y = actionRowY()
+        searchActionButtonWidget.render(g, mouseX, mouseY, dt)
+
+        val stripTop = searchBox.y + SEARCH_H + 8
+        val stripBottom = y + height - 10
+        val stripH = stripBottom - stripTop
+        if (stripH < 40) return
+
+        if (statusMessage != null) {
+            val base = Component.translatable(statusMessage!!).string
+            val msg = if (statusMessage == "dreamdisplays.suggestions.loading") {
+                val elapsed = maxOf(0L, (System.currentTimeMillis() - loadStartedAtMs) / 1000L)
+                base.replace(Regex("\\.+$"), "") + " • " + elapsed + "s"
+            } else base
+            g.drawString(f, msg, x + 10, stripTop + 6, 0xFFAAAAAA.toInt(), false)
+            return
+        }
+
+        val stripLeft = x + 10
+        val stripRight = x + width - 10
+        val viewportW = stripRight - stripLeft
+        lastStripH = stripH
+
+        if (vertical) {
+            verticalCardW = max(CARD_W, viewportW)
+            var vCardH = if (compactCards) (THUMB_H + 4) else CARD_H
+            val vThumbH = max(THUMB_H, (verticalCardW * 180.0 / 320.0).toInt())
+            if (!compactCards) vCardH = vThumbH + CARD_TEXT_H
+
+            val contentH = cards.size * (vCardH + CARD_GAP) - CARD_GAP
+            val viewportH = stripBottom - stripTop
+            val maxOff = max(0, contentH - viewportH)
+            scrollOffset = max(0, min(maxOff, scrollOffset))
+
+            g.enableScissor(stripLeft, stripTop, stripRight, stripBottom)
+            hoveredCard = -1
+            var cy = stripTop - scrollOffset
+            for (i in cards.indices) {
+                val info = cards[i]
+                val cardTop = cy
+                val cardBottom = cy + vCardH
+                if (cardBottom >= stripTop && cardTop <= stripBottom) {
+                    val hover = mouseX >= stripLeft && mouseX < stripLeft + verticalCardW
+                            && mouseY >= cardTop && mouseY < cardBottom
+                            && mouseY >= stripTop && mouseY < stripBottom
+                    if (hover) hoveredCard = i
+                    renderCardSized(g, f, info, stripLeft, cardTop, verticalCardW, vThumbH, vCardH, hover)
+                    if (Thumbnails.get(info.id) == null)
+                        Thumbnails.request(info.id, info.getThumbnailUrl())
+                }
+                cy += vCardH + CARD_GAP
+            }
+            g.disableScissor()
+
+            if (contentH > viewportH) {
+                val barX = stripRight + 1
+                g.fill(barX, stripTop, barX + 2, stripBottom, 0xFF202020.toInt())
+                val barH = max(20, (viewportH.toFloat() / contentH * viewportH).toInt())
+                val barY = stripTop + (scrollOffset.toFloat() / maxOff * (viewportH - barH)).toInt()
+                g.fill(barX, barY, barX + 2, barY + barH, 0xFF808080.toInt())
+            }
+            return
+        }
+
+        val hCardH = dynCardH()
+        val hThumbH = dynThumbH()
+        val hCardW = dynCardW()
+        val rowY = stripTop + max(0, (stripBottom - stripTop - hCardH) / 2)
+
+        val contentW = cards.size * (hCardW + CARD_GAP) - CARD_GAP
+        val maxOff = max(0, contentW - viewportW)
+        scrollOffset = max(0, min(maxOff, scrollOffset))
+
+        g.enableScissor(stripLeft, stripTop, stripRight, stripBottom)
+        hoveredCard = -1
+        var cx = stripLeft - scrollOffset
+        for (i in cards.indices) {
+            val info = cards[i]
+            val cardLeft = cx
+            val cardRight = cx + hCardW
+            if (cardRight >= stripLeft && cardLeft <= stripRight) {
+                val hover = mouseX in cardLeft..<cardRight
+                        && mouseY >= rowY && mouseY < rowY + hCardH
+                        && mouseX >= stripLeft && mouseX < stripRight
+                if (hover) hoveredCard = i
+                renderCardSized(g, f, info, cardLeft, rowY, hCardW, hThumbH, hCardH, hover)
+                if (Thumbnails.get(info.id) == null)
+                    Thumbnails.request(info.id, info.getThumbnailUrl())
+            }
+            cx += hCardW + CARD_GAP
+        }
+        g.disableScissor()
+
+        if (contentW > viewportW) {
+            val barY = stripBottom + 1
+            g.fill(stripLeft, barY, stripRight, barY + 2, 0xFF202020.toInt())
+            val barW = max(20, (viewportW.toFloat() / contentW * viewportW).toInt())
+            val barX = stripLeft + (scrollOffset.toFloat() / maxOff * (viewportW - barW)).toInt()
+            g.fill(barX, barY, barX + barW, barY + 2, 0xFF808080.toInt())
+        }
+    }*/
 
     private fun dynThumbH(): Int {
         val available = lastStripH - 2 - 3 - CARD_TEXT_H - 2
@@ -340,6 +462,7 @@ class SuggestionsPanelWidget(
         return max(80, (th * CARD_W / THUMB_H.toDouble()).toInt())
     }
 
+    //? if >=26 {
     private fun renderCardSized(
         g: GuiGraphicsExtractor, f: Font, info: YtVideoInfo, x: Int, y: Int,
         w: Int, thumbH: Int, cardH: Int, hover: Boolean
@@ -403,6 +526,70 @@ class SuggestionsPanelWidget(
             g.text(f, trim(f, meta, textW), textX, textY, 0xFFB8B8B8.toInt(), false)
         }
     }
+    //?} else
+    /*private fun renderCardSized(
+        g: GuiGraphics, f: Font, info: YtVideoInfo, x: Int, y: Int,
+        w: Int, thumbH: Int, cardH: Int, hover: Boolean
+    ) {
+        val bg = if (hover) {
+            val pulse = (sin(System.currentTimeMillis() / 400.0 * Math.PI) * 0.5 + 0.5).toFloat()
+            val alpha = (0x60 + pulse * 0x30).toInt()
+            (alpha shl 24) or 0x707070
+        } else CARD_BG
+        g.fill(x, y, x + w, y + cardH, bg)
+
+        val thumbX = x + 2
+        val thumbY = y + 2
+        val thumbW = w - 4
+        val thumb = Thumbnails.get(info.id)
+        if (thumb != null) {
+            g.blit(
+                RenderPipelines.GUI_TEXTURED, thumb,
+                thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH
+            )
+        } else {
+            g.fill(thumbX, thumbY, thumbX + thumbW, thumbY + thumbH, 0xFF000000.toInt())
+        }
+
+        if (info.isRecent(7)) {
+            val tag = Component.translatable("dreamdisplays.ui.new").string
+            val tw = f.width(tag) + 4
+            val th = f.lineHeight + 2
+            g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + th, 0xFFE53935.toInt())
+            g.drawString(f, tag, thumbX + 4, thumbY + 3, 0xFFFFFFFF.toInt(), false)
+        }
+
+        val dur = info.formatDuration()
+        if (dur.isNotEmpty()) {
+            val dw = f.width(dur) + 4
+            val dh = f.lineHeight + 2
+            val dx = thumbX + thumbW - dw - 2
+            val dy = thumbY + thumbH - dh - 2
+            g.fill(dx, dy, dx + dw, dy + dh, 0xC0000000.toInt())
+            g.drawString(f, dur, dx + 2, dy + 2, 0xFFFFFFFF.toInt(), false)
+        }
+
+        if (compactCards) return
+
+        val textX = x + 4
+        val textW = w - 8
+        var textY = thumbY + thumbH + 3
+        val titleLines = wrap(f, info.title, textW, 2)
+        for (line in titleLines) {
+            g.drawString(f, line, textX, textY, 0xFFFFFFFF.toInt(), false)
+            textY += f.lineHeight + 1
+        }
+
+        var meta = info.uploader ?: ""
+        val views = info.formatViews()
+        if (views.isNotEmpty()) {
+            meta = if (meta.isEmpty()) views
+            else trim(f, meta, max(20, textW - f.width(" • $views"))) + " • " + views
+        }
+        if (meta.isNotEmpty()) {
+            g.drawString(f, trim(f, meta, textW), textX, textY, 0xFFB8B8B8.toInt(), false)
+        }
+    }*/
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, dx: Double, dy: Double): Boolean {
         if (!isMouseOver(mouseX, mouseY)) return false

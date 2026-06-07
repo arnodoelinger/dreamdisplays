@@ -19,7 +19,7 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             when (requested.id.id) {
-                "net.fabricmc.fabric-loom" -> useVersion(scVersion("loom.version"))
+                "net.fabricmc.fabric-loom", "net.fabricmc.fabric-loom-remap" -> useVersion(scVersion("loom.version"))
                 "net.neoforged.moddev" -> useVersion(scVersion("moddev.version"))
             }
         }
@@ -55,6 +55,7 @@ include(":server")
 stonecutter {
     create(rootProject) {
         versions(
+            "1.21.11",
             "26.1.2",
             "26.2-pre-4",
         )
