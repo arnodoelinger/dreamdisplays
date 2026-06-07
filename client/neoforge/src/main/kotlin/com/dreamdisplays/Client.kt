@@ -13,6 +13,7 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent
+import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
@@ -70,6 +71,11 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     @SubscribeEvent fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
         DisplayManager.saveAllScreens()
         DisplayManager.unloadAll()
+        Initializer.isPremium = false
+        Initializer.isAdmin = false
+    }
+
+    @SubscribeEvent fun onClientStopping(event: ClientStoppingEvent) {
         Initializer.onStop()
     }
 
