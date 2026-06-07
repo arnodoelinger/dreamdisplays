@@ -71,7 +71,7 @@ object ScreenRenderer {
         stack.scale(displayScreen.width.toFloat(), displayScreen.height.toFloat(), 0f)
 
         if (displayScreen.isVideoStarted && displayScreen.texture != null && displayScreen.renderType != null) {
-            renderGpuTexture(drawQuad, displayScreen.renderType!!, displayScreen.brightness)
+            renderGpuTexture(drawQuad, displayScreen.renderType!!)
         } else if (displayScreen.renderType != null) {
             if (displayScreen.errored) {
                 renderColor(drawQuad, displayScreen.renderType!!, 35, 5, 5)
@@ -124,17 +124,16 @@ object ScreenRenderer {
         }
     }
 
-    /** Draws a unit quad using the screen's GPU texture, with vertex color scaled by [brightness]. */
-    private fun renderGpuTexture(drawQuad: QuadRenderer, type: RenderType, brightness: Float) {
-        val c = (brightness.coerceIn(0f, 1f) * 255f + 0.5f).toInt()
+    /** Draws a unit quad using the screen's GPU texture. */
+    private fun renderGpuTexture(drawQuad: QuadRenderer, type: RenderType) {
         drawQuad(type) { pose, builder ->
-            builder.addVertex(pose, 0f, 0f, 0f).setColor(c, c, c, 255).setUv(0f, 1f).setLight(0xF000F0)
+            builder.addVertex(pose, 0f, 0f, 0f).setColor(255, 255, 255, 255).setUv(0f, 1f).setLight(0xF000F0)
                 .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 0f, 0f).setColor(c, c, c, 255).setUv(1f, 1f).setLight(0xF000F0)
+            builder.addVertex(pose, 1f, 0f, 0f).setColor(255, 255, 255, 255).setUv(1f, 1f).setLight(0xF000F0)
                 .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 1f, 0f).setColor(c, c, c, 255).setUv(1f, 0f).setLight(0xF000F0)
+            builder.addVertex(pose, 1f, 1f, 0f).setColor(255, 255, 255, 255).setUv(1f, 0f).setLight(0xF000F0)
                 .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 0f, 1f, 0f).setColor(c, c, c, 255).setUv(0f, 0f).setLight(0xF000F0)
+            builder.addVertex(pose, 0f, 1f, 0f).setColor(255, 255, 255, 255).setUv(0f, 0f).setLight(0xF000F0)
                 .setNormal(0f, 0f, 1f)
         }
     }

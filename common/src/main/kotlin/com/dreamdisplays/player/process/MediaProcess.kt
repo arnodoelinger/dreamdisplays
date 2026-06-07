@@ -24,7 +24,8 @@ object MediaProcess {
     @Throws(IOException::class)
     fun buildVideo(ffmpeg: String, url: String, w: Int, h: Int, offsetNanos: Long, hwAccel: HwAccelBackend): Process {
         val swPrefix = if (hwAccel.hwOutputFormat != null) "hwdownload,format=nv12," else ""
-        val vf = "${swPrefix}scale=w=$w:h=$h:force_original_aspect_ratio=decrease:flags=bilinear,pad=$w:$h:-1:-1"
+        val vf = "${swPrefix}scale=w=$w:h=$h:force_original_aspect_ratio=decrease:flags=bilinear," +
+            "pad=w=$w:h=$h:x=(ow-iw)/2:y=(oh-ih)/2:color=black,setsar=1,format=rgb24"
         val cmd = baseCommand(ffmpeg, url, offsetNanos, hwAccel).apply {
             addAll(
                 listOf(

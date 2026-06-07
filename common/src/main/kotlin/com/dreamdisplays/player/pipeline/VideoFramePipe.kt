@@ -134,6 +134,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit,
     ): Thread {
+        clear()
         expectedW = w
         expectedH = h
         lastFrameReceivedNanos.set(System.nanoTime())
@@ -145,7 +146,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
     }
 
     /**
-     * Main loop of the video reader thread. Reads raw RGBA frames from [proc], applies brightness, and fills the ready buffer.
+     * Main loop of the video reader thread. Reads raw RGB frames from [proc], applies brightness, and fills the ready buffer.
      */
     private fun read(proc: Process, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
@@ -177,7 +178,7 @@ internal class VideoFramePipe(private val debugLabel: String) {
 
         try {
             proc.inputStream.use { input ->
-                val rowBuf = ByteArray(w * 3)
+                var rowBuf = ByteArray(w * 3)
                 while (!terminated.get() && !stopFlag.get()) {
                     if (!skipToP6(input)) { normalEos = true; break }
                     val pw = readAsciiInt(input)
@@ -190,7 +191,12 @@ internal class VideoFramePipe(private val debugLabel: String) {
                         continue
                     }
                     val requiredFrameSize = w * h * 3
-                    if (frameSize != requiredFrameSize || bufA.capacity() < requiredFrameSize || bufB.capacity() < requiredFrameSize) {
+                    if (rowBuf.size < w * 3) rowBuf = ByteArray(w * 3)
+                    if (frameSize != requiredFrameSize
+                        || bufA.capacity() < requiredFrameSize
+                        || bufB.capacity() < requiredFrameSize
+                        || spare.capacity() < requiredFrameSize
+                    ) {
                         frameSize = requiredFrameSize
                         bufA = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
                         bufB = ByteBuffer.allocateDirect(frameSize).order(ByteOrder.nativeOrder())
@@ -199,8 +205,17 @@ internal class VideoFramePipe(private val debugLabel: String) {
                         frameAvailable.set(false)
                     }
 
+                    if (spare.capacity() < requiredFrameSize) {
+                        spare = ByteBuffer.allocateDirect(requiredFrameSize).order(ByteOrder.nativeOrder())
+                    }
                     spare.clear()
+                    if (spare.remaining() < requiredFrameSize) {
+                        logger.warn("$debugLabel Reallocated undersized frame buffer: remaining=${spare.remaining()} required=$requiredFrameSize.")
+                        spare = ByteBuffer.allocateDirect(requiredFrameSize).order(ByteOrder.nativeOrder())
+                        spare.clear()
+                    }
                     if (!readFully(input, spare, rowBuf, requiredFrameSize)) { normalEos = true; break }
+                    applyBrightness(spare, requiredFrameSize, getBrightness())
                     spare.flip()
 
                     lastFrameReceivedNanos.set(System.nanoTime())
@@ -326,6 +341,24 @@ internal class VideoFramePipe(private val debugLabel: String) {
             remaining -= n
         }
         return true
+    }
+
+    /**
+     * Applies brightness adjustment in-place to the RGB frame in [buf]. [brightness] is a multiplier where 1.0 means no change, <1.0 is darker, and >1.0 is brighter.
+     */
+    private fun applyBrightness(buf: ByteBuffer, size: Int, brightness: Double) {
+        val factor = brightness.coerceIn(0.0, 2.0)
+        if (factor == 1.0) return
+
+        val savedPosition = buf.position()
+        val savedLimit = buf.limit()
+        buf.flip()
+        for (i in 0 until size) {
+            val value = ((buf.get(i).toInt() and 0xFF) * factor).toInt().coerceIn(0, 255)
+            buf.put(i, value.toByte())
+        }
+        buf.limit(savedLimit)
+        buf.position(savedPosition)
     }
 
     /** Drops exactly [size] bytes from [input]. Returns false on premature EOF. */

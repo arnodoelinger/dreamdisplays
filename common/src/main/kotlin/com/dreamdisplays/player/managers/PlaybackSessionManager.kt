@@ -88,6 +88,7 @@ internal class PlaybackSessionManager(
     fun start(streamSet: StreamSet, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend) {
         stop()
         if (terminated.get()) return
+        video.clear()
 
         val ffmpeg = FFmpegBinary.getPath() ?: run {
             logger.error("$debugLabel FFmpeg binary not available.")
