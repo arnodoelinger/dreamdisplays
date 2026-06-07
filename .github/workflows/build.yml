@@ -12,12 +12,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build
+  metadata:
+    name: Metadata
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    permissions:
-      contents: write
+    timeout-minutes: 10
     outputs:
       version: ${{ steps.get_version.outputs.version }}
       is_dev: ${{ steps.get_version.outputs.is_dev }}
@@ -25,6 +23,64 @@ jobs:
       is_release: ${{ steps.get_version.outputs.is_release }}
       stonecutter_versions: ${{ steps.stonecutter_versions.outputs.versions_json }}
       primary_stonecutter_version: ${{ steps.stonecutter_versions.outputs.primary_version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect Stonecutter versions
+        id: stonecutter_versions
+        run: |
+          python3 - <<'EOF'
+          import json, os
+
+          versions = sorted(
+              p for p in os.listdir("versions")
+              if os.path.isfile(os.path.join("versions", p, "gradle.properties"))
+          )
+
+          if not versions:
+              raise SystemExit("No Stonecutter versions found")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"versions_json={json.dumps(versions)}\n")
+              f.write(f"primary_version={versions[0]}\n")
+          EOF
+
+      - name: Get version
+        id: get_version
+        run: |
+          VERSION=$(grep '^version' gradle.properties | cut -d'=' -f2 | tr -d ' ')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+          if [[ "$VERSION" == *"-DEV"* ]]; then
+            echo "is_dev=true" >> $GITHUB_OUTPUT
+            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" == *"-SNAPSHOT."* ]]; then
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "is_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "is_dev=false" >> $GITHUB_OUTPUT
+            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_release=true" >> $GITHUB_OUTPUT
+          fi
+
+  build:
+    name: Build ${{ matrix.mc }}
+    runs-on: ubuntu-24.04
+    needs: metadata
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        mc: ${{ fromJSON(needs.metadata.outputs.stonecutter_versions) }}
 
     steps:
       - name: Checkout repository
@@ -40,145 +96,106 @@ jobs:
         with:
           java-version: 25
           distribution: temurin
-          cache: gradle
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      - name: Detect Stonecutter versions
-        id: stonecutter_versions
-        run: |
-          python3 - <<'EOF'
-          import json, os
-          versions = sorted(
-              p for p in os.listdir("versions")
-              if os.path.isfile(os.path.join("versions", p, "gradle.properties"))
-          )
-          if not versions:
-              raise SystemExit("No Stonecutter versions found")
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"versions_json={json.dumps(versions)}\n")
-              f.write(f"primary_version={versions[0]}\n")
-          EOF
+      - name: Select Stonecutter version
+        run: echo "${{ matrix.mc }}" > versions/active.txt
 
       - name: Build with Gradle
         run: |
-          rm -rf artifacts
-          mkdir -p artifacts
-          python3 - <<'EOF'
-          import json, os, glob, shutil, subprocess
-
-          versions = json.loads(os.environ["STONECUTTER_VERSIONS"])
-          for version in versions:
-              with open("versions/active.txt", "w") as f:
-                  f.write(version + "\n")
-              print(f"::group::Build {version}", flush=True)
-              result = subprocess.run([
-                  "./gradlew", "clean",
-                  ":client:fabric:shadowJar",
-                  ":client:neoforge:shadowJar",
-                  ":server:shadowJar",
-                  "--no-daemon", "--parallel", "--rerun-tasks",
-              ])
-              print("::endgroup::", flush=True)
-              if result.returncode != 0:
-                  raise SystemExit(result.returncode)
-              jars = glob.glob("build/libs/dreamdisplays-*.jar")
-              if not jars:
-                  raise SystemExit(f"No JARs found in build/libs/ for version {version}")
-              for jar in jars:
-                  shutil.copy(jar, "artifacts/")
-          EOF
+          ./gradlew \
+            :client:fabric:shadowJar \
+            :client:neoforge:shadowJar \
+            :server:shadowJar \
+            --no-daemon \
+            --parallel
         env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
-          STONECUTTER_VERSIONS: ${{ steps.stonecutter_versions.outputs.versions_json }}
 
-      - name: Get version
-        id: get_version
+      - name: Collect artifacts
         run: |
-          VERSION=$(grep '^version' gradle.properties | cut -d'=' -f2 | tr -d ' ')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          if [[ "$VERSION" == *"-DEV"* ]]; then
-            echo "is_dev=true"      >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
-            echo "is_release=false"  >> $GITHUB_OUTPUT
-          elif [[ "$VERSION" == *"-SNAPSHOT."* ]]; then
-            echo "is_dev=false"      >> $GITHUB_OUTPUT
-            echo "is_snapshot=true"  >> $GITHUB_OUTPUT
-            echo "is_release=false"  >> $GITHUB_OUTPUT
-          else
-            echo "is_dev=false"      >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
-            echo "is_release=true"   >> $GITHUB_OUTPUT
-          fi
+          mkdir -p artifacts
+          cp build/libs/dreamdisplays-*.jar artifacts/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: build-jars
+          name: build-jars-${{ matrix.mc }}
           path: artifacts/*.jar
           if-no-files-found: error
 
   github-prerelease:
     name: Publish GitHub pre-release
     runs-on: ubuntu-24.04
-    needs: build
-    if: github.event_name == 'push' && (needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_snapshot == 'true')
+    needs:
+      - metadata
+      - build
+    if: github.event_name == 'push' && (needs.metadata.outputs.is_dev == 'true' || needs.metadata.outputs.is_snapshot == 'true')
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - uses: actions/download-artifact@v4
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
         with:
-          name: build-jars
+          pattern: build-jars-*
           path: build/libs
+          merge-multiple: true
 
       - name: Publish dev pre-release
-        if: needs.build.outputs.is_dev == 'true'
+        if: needs.metadata.outputs.is_dev == 'true'
         run: |
-          TAG="v${{ needs.build.outputs.version }}"
+          TAG="v${{ needs.metadata.outputs.version }}"
           gh release delete "$TAG" --repo "${{ github.repository }}" --yes 2>/dev/null || true
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease --notes "" build/libs/dreamdisplays-*.jar
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.metadata.outputs.version }}" --prerelease --notes "" build/libs/dreamdisplays-*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish snapshot pre-release
-        if: needs.build.outputs.is_snapshot == 'true'
+        if: needs.metadata.outputs.is_snapshot == 'true'
         run: |
-          TAG="v${{ needs.build.outputs.version }}"
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease build/libs/dreamdisplays-*.jar \
+          TAG="v${{ needs.metadata.outputs.version }}"
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.metadata.outputs.version }}" --prerelease build/libs/dreamdisplays-*.jar \
           || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --repo "${{ github.repository }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
-    name: Publish
+    name: Publish ${{ matrix.mc }}
     runs-on: ubuntu-24.04
-    needs: build
+    needs:
+      - metadata
+      - build
     if: github.event_name == 'push'
     strategy:
       fail-fast: false
       matrix:
-        mc: ${{ fromJSON(needs.build.outputs.stonecutter_versions) }}
+        mc: ${{ fromJSON(needs.metadata.outputs.stonecutter_versions) }}
     permissions:
       contents: write
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-jars
+          name: build-jars-${{ matrix.mc }}
           path: build/libs
 
       - name: Extract versions
@@ -189,11 +206,13 @@ jobs:
 
           mc = "${{ matrix.mc }}"
           props = {}
+
           with open(f"versions/{mc}/gradle.properties") as f:
               for line in f:
                   line = line.strip()
                   if not line or line.startswith("#") or "=" not in line:
                       continue
+
                   key, value = line.split("=", 1)
                   props[key.strip()] = value.strip()
 
@@ -203,8 +222,7 @@ jobs:
           paper_26_1 = ["26.1", "26.1.1", "26.1.2"]
           paper_versions = paper_1_21 + paper_26_1 + ["26.2"]
 
-          out = os.environ["GITHUB_OUTPUT"]
-          with open(out, "a") as f:
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"mc={mc}\n")
               f.write(f"publish_mc={publish_mc}\n")
               f.write("mc_versions<<VERSIONS_EOF\n")
@@ -216,38 +234,46 @@ jobs:
           EOF
 
       - name: Extract changelog
-        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
+        if: needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true'
         run: |
           python3 - <<'EOF'
-          import re, sys, os
+          import os
+          import re
+          import sys
 
           with open("CHANGELOG.md") as f:
               content = f.read()
 
-          version = "${{ needs.build.outputs.version }}"
-          is_snapshot = "${{ needs.build.outputs.is_snapshot }}" == "true"
+          version = "${{ needs.metadata.outputs.version }}"
+          is_snapshot = "${{ needs.metadata.outputs.is_snapshot }}" == "true"
 
           pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
           match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+
           if not match:
               if is_snapshot:
                   with open("changelog.md", "w") as f:
                       f.write("")
                   sys.exit(0)
+
               sys.exit(f"Version {version} not found in CHANGELOG.md")
 
           block = match.group(1)
           sections = re.split(r"^## ", block, flags=re.MULTILINE)
           lines = []
+
           for section in sections:
               if not section.strip():
                   continue
+
               header, _, body = section.partition("\n")
               lines.append(f"## {header.strip()}")
+
               for item in body.splitlines():
                   item = item.strip()
                   if item:
                       lines.append(item)
+
               lines.append("")
 
           with open("changelog.md", "w") as f:
@@ -255,13 +281,13 @@ jobs:
           EOF
 
       - name: Publish Fabric
-        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
+        if: needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
-          version: fabric-${{ matrix.mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-fabric-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
+          name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
+          version: fabric-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}
+          version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-fabric-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -275,13 +301,13 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}{curseforge:306612}
 
       - name: Publish NeoForge
-        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
+        if: needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
-          version: neoforge-${{ matrix.mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-neoforge-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
+          name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
+          version: neoforge-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}
+          version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-neoforge-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -291,13 +317,13 @@ jobs:
           game-versions: ${{ steps.versions.outputs.mc_versions }}
 
       - name: Publish Paper
-        if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true') && matrix.mc == needs.build.outputs.primary_stonecutter_version
+        if: (needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true') && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Paper] Dream Displays ${{ needs.build.outputs.version }}'
-          version: paper-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-paper-${{ matrix.mc }}-${{ needs.build.outputs.version }}.jar
+          name: '[Paper] Dream Displays ${{ needs.metadata.outputs.version }}'
+          version: paper-${{ needs.metadata.outputs.version }}
+          version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-paper-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -307,12 +333,20 @@ jobs:
             purpur
           game-versions: ${{ steps.versions.outputs.paper_versions }}
 
+      - name: Download all build artifacts for GitHub Release
+        if: needs.metadata.outputs.is_release == 'true' && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
+        uses: actions/download-artifact@v4
+        with:
+          pattern: build-jars-*
+          path: build/libs
+          merge-multiple: true
+
       - name: Create GitHub Release
-        if: needs.build.outputs.is_release == 'true' && matrix.mc == needs.build.outputs.primary_stonecutter_version
+        if: needs.metadata.outputs.is_release == 'true' && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-tag: v${{ needs.build.outputs.version }}
+          github-tag: v${{ needs.metadata.outputs.version }}
           github-generate-changelog: false
           github-draft: false
           files: build/libs/dreamdisplays-*.jar
