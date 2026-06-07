@@ -1,18 +1,11 @@
 /**
- * Minimal, deterministic processor for the Stonecutter-style version directives used in this
+ * Minimal, deterministic processor for the `Stonecutter`-style version directives used in this
  * project's shared Kotlin source.
- *
- * The source is authored in the ">=26 active" state, i.e. each directive looks like:
- *
- *     //? if >=26 {
- *     <code compiled for 26.x>
- *     //?} else
- *     /*<code compiled for legacy 1.x>*/
  *
  * For 26.x targets the checked-in source is already valid Kotlin, so no transform is needed.
  * For legacy (1.21.x) targets we comment out the if-branch and uncomment the else-branch.
  *
- * Stonecutter cannot process these comments here because the plugin is only applied to the root
+ * `Stonecutter` cannot process these comments here because the plugin is only applied to the root
  * project while the code lives in subprojects; this helper performs the equivalent transform into
  * a generated source directory that the Kotlin source set points at.
  */
