@@ -3,7 +3,7 @@ package com.dreamdisplays
 import com.dreamdisplays.display.DisplayManager
 import net.minecraft.client.Minecraft
 
-/** Background thread that mutes / unmutes screens based on window focus. */
+/** Background thread that temporarily mutes / unmutes screens based on window focus. */
 class Focuser : Thread() {
     init {
         isDaemon = true
@@ -19,7 +19,7 @@ class Focuser : Thread() {
                 if (mc != null) {
                     val focused = mc.isWindowActive
                     for (screen in DisplayManager.getScreens()) {
-                        screen.mute(!focused)
+                        screen.setFocusMuted(!focused)
                     }
                 }
             }
@@ -33,6 +33,7 @@ class Focuser : Thread() {
     }
 
     companion object {
-        var instance: Focuser = Focuser()
+        @Volatile var instance: Focuser? = null
+            private set
     }
 }
