@@ -13,7 +13,9 @@ import io.github.arsmotorin.ofrat.FabricOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+//? if >=1.21.11 {
 import net.minecraft.server.players.NameAndId
+//?}
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
 
@@ -40,7 +42,10 @@ import org.slf4j.LoggerFactory
                 FabricPacketUtil.sendIsAdmin(player, isOpLevel2(player))
                 FabricPacketUtil.sendReportEnabled(player, config.settings.webhookUrl.isNotEmpty())
 
+                //? if >=1.21.11 {
                 val playerWorldKey = player.level().dimension().identifier().toString()
+                //?} else
+                /*val playerWorldKey = player.level().dimension().location().toString()*/
                 val displays = DisplayManager.getDisplays()
                     .filterIsInstance<FabricDisplayData>()
                     .filter { it.worldKey == playerWorldKey }
@@ -205,7 +210,13 @@ import org.slf4j.LoggerFactory
 
     /** Checks if [player] has operator level 2 permissions, which is the threshold for privileged actions. */
     fun isOpLevel2(player: ServerPlayer): Boolean {
-        return player.level().server.playerList.isOp(NameAndId(player.gameProfile))
+        val server = player.level().server ?: return false
+        return server.playerList.isOp(
+            //? if >=1.21.11 {
+            NameAndId(player.gameProfile)
+            //?} else
+            /*player.gameProfile*/
+        )
     }
 }
 

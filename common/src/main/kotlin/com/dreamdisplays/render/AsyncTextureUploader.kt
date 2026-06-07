@@ -1,6 +1,9 @@
 package com.dreamdisplays.render
 
+//? if >=1.21.11 {
 import com.mojang.blaze3d.opengl.GlStateManager
+//?} else
+/*import com.mojang.blaze3d.platform.GlStateManager*/
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
 import org.lwjgl.opengl.GL21

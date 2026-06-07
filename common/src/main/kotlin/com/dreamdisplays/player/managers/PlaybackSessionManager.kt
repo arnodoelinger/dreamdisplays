@@ -10,7 +10,10 @@ import com.dreamdisplays.player.process.MediaProcess
 import com.dreamdisplays.player.stream.MediaStreamSelector
 import com.dreamdisplays.player.stream.StreamSet
 import com.dreamdisplays.player.util.joinSafely
+//? if >=1.21.11 {
 import com.mojang.blaze3d.textures.GpuTexture
+//?} else
+/*import net.minecraft.client.renderer.texture.DynamicTexture as GpuTexture*/
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.io.IOException

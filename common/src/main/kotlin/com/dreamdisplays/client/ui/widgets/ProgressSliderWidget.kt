@@ -9,11 +9,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.util.Mth
 import java.util.function.LongConsumer
 import java.util.function.LongSupplier
@@ -53,15 +58,12 @@ class ProgressSliderWidget(
         val cur = if (dragging) dragTargetNanos else currentSupplier.asLong
         val value = if (dur > 0) Mth.clamp(cur / dur.toDouble(), 0.0, 1.0) else 0.0
 
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTrackSprite(), x, y, width, height)
+        g.blitSprite(getTrackSprite(), x, y, width, height)
         val handleX = x + (value * (width - 8).toDouble()).toInt()
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, getHandleSprite(), handleX, y, 8, height)
+        g.blitSprite(getHandleSprite(), handleX, y, 8, height)
 
         val label = buildLabel(cur, dur)
-        renderScrollingStringOverContents(
-            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
-            label, 4
-        )
+        g.drawCenteredString(Minecraft.getInstance().font, label, x + width / 2, y + (height - 8) / 2, 0xFFFFFF)
     }*/
 
     /** Formats the current / total time as a colored text component for display on the slider. */
@@ -89,6 +91,7 @@ class ProgressSliderWidget(
         builder.add(NarratedElementType.TITLE, createNarrationMessage())
     }
 
+    //? if >=1.21.11 {
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
         if (!active) return
         val dur = durationSupplier.asLong
@@ -104,6 +107,22 @@ class ProgressSliderWidget(
         if (dur <= 0) return
         dragTargetNanos = positionFromMouse(event.x(), dur)
     }
+    //?} else
+    /*override fun onClick(mouseX: Double, mouseY: Double, button: Int) {
+        if (!active) return
+        val dur = durationSupplier.asLong
+        if (dur <= 0) return
+        dragTargetNanos = positionFromMouse(mouseX, dur)
+        dragging = true
+    }
+
+    override fun onDrag(mouseX: Double, mouseY: Double, dragX: Double, dragY: Double) {
+        super.onDrag(mouseX, mouseY, dragX, dragY)
+        if (!dragging || !active) return
+        val dur = durationSupplier.asLong
+        if (dur <= 0) return
+        dragTargetNanos = positionFromMouse(mouseX, dur)
+    }*/
 
     fun commitDragIfActive(): Boolean {
         if (!dragging) return false

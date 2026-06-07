@@ -14,13 +14,18 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.EditBox
 import net.minecraft.client.gui.narration.NarrationElementOutput
+//? if >=1.21.11 {
 import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.network.chat.Component
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
 import org.slf4j.LoggerFactory
@@ -479,10 +484,10 @@ class SuggestionsPanelWidget(
         val thumbW = w - 4
         val thumb = Thumbnails.get(info.id)
         if (thumb != null) {
-            g.blit(
-                RenderPipelines.GUI_TEXTURED, thumb,
-                thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH
-            )
+            //? if >=1.21.11 {
+            g.blit(RenderPipelines.GUI_TEXTURED, thumb, thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH)
+            //?} else
+            /*g.blit(thumb, thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH)*/
         } else {
             g.fill(thumbX, thumbY, thumbX + thumbW, thumbY + thumbH, 0xFF000000.toInt())
         }
@@ -543,10 +548,7 @@ class SuggestionsPanelWidget(
         val thumbW = w - 4
         val thumb = Thumbnails.get(info.id)
         if (thumb != null) {
-            g.blit(
-                RenderPipelines.GUI_TEXTURED, thumb,
-                thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH
-            )
+            g.blit(thumb, thumbX, thumbY, 0f, 0f, thumbW, thumbH, thumbW, thumbH)
         } else {
             g.fill(thumbX, thumbY, thumbX + thumbW, thumbY + thumbH, 0xFF000000.toInt())
         }
@@ -614,6 +616,7 @@ class SuggestionsPanelWidget(
         return true
     }
 
+    //? if >=1.21.11 {
     override fun mouseClicked(event: MouseButtonEvent, dbl: Boolean): Boolean {
         val mouseX = event.x()
         val mouseY = event.y()
@@ -622,8 +625,19 @@ class SuggestionsPanelWidget(
             event,
             dbl
         )
+    //?} else
+    /*override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (clearButtonWidget.isMouseOver(mouseX, mouseY)) return clearButtonWidget.mouseClicked(mouseX, mouseY, button)
+        if (searchActionButtonWidget.isMouseOver(mouseX, mouseY)) return searchActionButtonWidget.mouseClicked(
+            mouseX,
+            mouseY,
+            button
+        )*/
         if (searchBox.isMouseOver(mouseX, mouseY)) {
+            //? if >=1.21.11 {
             val handled = searchBox.mouseClicked(event, dbl)
+            //?} else
+            /*val handled = searchBox.mouseClicked(mouseX, mouseY, button)*/
             searchBox.isFocused = true
             return handled
         }
@@ -634,9 +648,13 @@ class SuggestionsPanelWidget(
             onPick.accept(cards[hoveredCard])
             return true
         }
+        //? if >=1.21.11 {
         return super.mouseClicked(event, dbl)
+        //?} else
+        /*return super.mouseClicked(mouseX, mouseY, button)*/
     }
 
+    //? if >=1.21.11 {
     override fun keyPressed(event: KeyEvent): Boolean {
         if (searchBox.isFocused) {
             if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
@@ -652,6 +670,22 @@ class SuggestionsPanelWidget(
         if (searchBox.isFocused) return searchBox.charTyped(event)
         return super.charTyped(event)
     }
+    //?} else
+    /*override fun keyPressed(keyCode: Int, scanCode: Int, modifiers: Int): Boolean {
+        if (searchBox.isFocused) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                runSearch()
+                return true
+            }
+            return searchBox.keyPressed(keyCode, scanCode, modifiers)
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers)
+    }
+
+    override fun charTyped(codePoint: Char, modifiers: Int): Boolean {
+        if (searchBox.isFocused) return searchBox.charTyped(codePoint, modifiers)
+        return super.charTyped(codePoint, modifiers)
+    }*/
 
     override fun updateWidgetNarration(out: NarrationElementOutput) {}
 

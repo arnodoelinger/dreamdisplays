@@ -27,6 +27,7 @@ run {
 repositories {
     mavenCentral()
     maven("https://maven.fabricmc.net/")
+    maven("https://maven.parchmentmc.org")
     maven("https://maven.quiltmc.org/repository/release/")
     maven("https://maven.quiltmc.org/repository/snapshot/")
     maven("https://repo.lostyy.ru/releases")
@@ -98,7 +99,7 @@ dependencies {
     if (isLegacyObfuscated) {
         "mappings"(loomExt.layered {
             officialMojangMappings()
-            parchment("io.papermc.parchment.data:parchment:${scVersion("minecraft.version")}+build.3")
+            parchment(scVersion("parchment.dependency"))
         })
         "modImplementation"("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
         "modImplementation"("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")

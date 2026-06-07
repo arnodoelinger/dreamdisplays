@@ -19,11 +19,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.screens.Screen
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import java.awt.Desktop
 import java.net.URI
 import kotlin.math.*
@@ -780,17 +785,16 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         val texId = scr.textureId
         if (scr.isVideoStarted && scr.texture != null && texId != null) {
             scr.fitTexture()
-            g.blit(
-                RenderPipelines.GUI_TEXTURED, texId,
-                videoX, videoY, 0f, 0f, videoW, videoH,
-                videoW, videoH,
-            )
+            //? if >=1.21.11 {
+            g.blit(RenderPipelines.GUI_TEXTURED, texId, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)
+            //?} else
+            /*g.blit(texId, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)*/
         } else {
             currentThumbnail()?.let { thumb ->
-                g.blit(
-                    RenderPipelines.GUI_TEXTURED, thumb,
-                    videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH
-                )
+                //? if >=1.21.11 {
+                g.blit(RenderPipelines.GUI_TEXTURED, thumb, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)
+                //?} else
+                /*g.blit(thumb, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)*/
                 g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
             }
             val waiting = Component.translatable("dreamdisplays.ui.waiting").string
@@ -891,17 +895,10 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         val texId = scr.textureId
         if (scr.isVideoStarted && scr.texture != null && texId != null) {
             scr.fitTexture()
-            g.blit(
-                RenderPipelines.GUI_TEXTURED, texId,
-                videoX, videoY, 0f, 0f, videoW, videoH,
-                videoW, videoH,
-            )
+            g.blit(texId, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)
         } else {
             currentThumbnail()?.let { thumb ->
-                g.blit(
-                    RenderPipelines.GUI_TEXTURED, thumb,
-                    videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH
-                )
+                g.blit(thumb, videoX, videoY, 0f, 0f, videoW, videoH, videoW, videoH)
                 g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
             }
             val waiting = Component.translatable("dreamdisplays.ui.waiting").string
@@ -1242,10 +1239,15 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
 
     private fun headerHeight(): Int = PANEL_PADDING_Y + font.lineHeight + 6
 
+    //? if >=1.21.11 {
     override fun mouseClicked(event: MouseButtonEvent, dbl: Boolean): Boolean {
         val mx = event.x().toInt(); val my = event.y().toInt()
+        val button = event.button()
+    //?} else
+    /*override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        val mx = mouseX.toInt(); val my = mouseY.toInt()*/
 
-        if (popoutDropdownVisible && event.button() == 0) {
+        if (popoutDropdownVisible && button == 0) {
             val ds = displayScreen
             if (ds != null && mx in ddX..(ddX + ddW) && my in ddY..(ddY + ddItemH * 2)) {
                 popoutDropdownVisible = false
@@ -1268,13 +1270,22 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             }
             return true
         }
+        //? if >=1.21.11 {
         return super.mouseClicked(event, dbl)
+        //?} else
+        /*return super.mouseClicked(mouseX, mouseY, button)*/
     }
 
+    //? if >=1.21.11 {
     override fun mouseReleased(event: MouseButtonEvent): Boolean {
         if (progress?.commitDragIfActive() == true) return true
         return super.mouseReleased(event)
     }
+    //?} else
+    /*override fun mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (progress?.commitDragIfActive() == true) return true
+        return super.mouseReleased(mouseX, mouseY, button)
+    }*/
 
     //? if >=26 {
     private fun renderTooltips(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int) {
@@ -1408,136 +1419,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
         }
     }
     //?} else
-    /*private fun renderTooltips(g: GuiGraphics, mouseX: Int, mouseY: Int) {
-        val scr = displayScreen ?: return
-        if (scr.errored) return
-
-        if (volumeHover?.contains(mouseX, mouseY) == true) {
-            g.setComponentTooltipForNextFrame(
-                font, listOf(
-                    Component.translatable("dreamdisplays.button.volume.tooltip.1")
-                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                    Component.translatable("dreamdisplays.button.volume.tooltip.2")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.translatable("dreamdisplays.button.volume.tooltip.3")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.translatable(
-                        "dreamdisplays.button.volume.tooltip.4",
-                        volume?.let { (it.value * 200).toInt() } ?: 0)
-                        .withStyle { it.withColor(ChatFormatting.GOLD) },
-                ), mouseX, mouseY
-            )
-        }
-        if (renderDHover?.contains(mouseX, mouseY) == true) {
-            g.setComponentTooltipForNextFrame(
-                font, listOf(
-                    Component.translatable("dreamdisplays.button.render-distance.tooltip.1")
-                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                    Component.translatable("dreamdisplays.button.render-distance.tooltip.2")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.translatable("dreamdisplays.button.render-distance.tooltip.3")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.literal(""),
-                    Component.translatable(
-                        "dreamdisplays.button.render-distance.tooltip.8",
-                        renderD?.let { (it.value * (128 - 24) + 24).toInt() } ?: 0)
-                        .withStyle { it.withColor(ChatFormatting.GOLD) },
-                ), mouseX, mouseY
-            )
-        }
-        if (qualityHover?.contains(mouseX, mouseY) == true && quality != null) {
-            val tip = mutableListOf<Component>(
-                Component.translatable("dreamdisplays.button.quality.tooltip.1")
-                    .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                Component.translatable("dreamdisplays.button.quality.tooltip.2")
-                    .withStyle { it.withColor(ChatFormatting.GRAY) },
-                Component.literal(""),
-                Component.translatable("dreamdisplays.button.quality.tooltip.4", qualityFromFraction(quality!!.value))
-                    .withStyle { it.withColor(ChatFormatting.GOLD) },
-            )
-            try {
-                if (scr.quality.toInt() >= 1080) {
-                    tip.add(
-                        Component.translatable("dreamdisplays.button.quality.tooltip.5")
-                            .withStyle { it.withColor(ChatFormatting.YELLOW) })
-                }
-            } catch (_: NumberFormatException) {
-            }
-            g.setComponentTooltipForNextFrame(font, tip, mouseX, mouseY)
-        }
-        if (brightnessHover?.contains(mouseX, mouseY) == true) {
-            g.setComponentTooltipForNextFrame(
-                font, listOf(
-                    Component.translatable("dreamdisplays.button.brightness.tooltip.1")
-                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                    Component.translatable("dreamdisplays.button.brightness.tooltip.2")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.literal(""),
-                    Component.translatable(
-                        "dreamdisplays.button.brightness.tooltip.3",
-                        brightness?.let { floor(it.value * 200).toInt() } ?: 100)
-                        .withStyle { it.withColor(ChatFormatting.GOLD) },
-                ), mouseX, mouseY
-            )
-        }
-        if (syncHover?.contains(mouseX, mouseY) == true && sync != null) {
-            g.setComponentTooltipForNextFrame(
-                font, listOf(
-                    Component.translatable("dreamdisplays.button.synchronization.tooltip.1")
-                        .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                    Component.translatable("dreamdisplays.button.synchronization.tooltip.2")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.translatable("dreamdisplays.button.synchronization.tooltip.3")
-                        .withStyle { it.withColor(ChatFormatting.GRAY) },
-                    Component.literal(""),
-                    Component.translatable(
-                        "dreamdisplays.button.synchronization.tooltip.5",
-                        if (sync!!.value) Component.translatable("dreamdisplays.button.enabled")
-                        else Component.translatable("dreamdisplays.button.disabled")
-                    )
-                        .withStyle { it.withColor(ChatFormatting.GOLD) },
-                ), mouseX, mouseY
-            )
-        }
-
-        lockButtonWidget?.let {
-            val locked = displayScreen?.isLocked
-            if (locked != null && hovered(mouseX, mouseY, it)) {
-                g.setComponentTooltipForNextFrame(
-                    font, listOf(
-                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.1" else "dreamdisplays.button.unlock.tooltip.1")
-                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
-                        Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.2" else "dreamdisplays.button.unlock.tooltip.2")
-                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
-                    ), mouseX, mouseY
-                )
-            }
-        }
-        deleteButtonWidget?.let {
-            if (hovered(mouseX, mouseY, it)) {
-                g.setComponentTooltipForNextFrame(
-                    font, listOf(
-                        Component.translatable("dreamdisplays.button.delete.tooltip.1")
-                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
-                        Component.translatable("dreamdisplays.button.delete.tooltip.2")
-                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
-                    ), mouseX, mouseY
-                )
-            }
-        }
-        reportButtonWidget?.let {
-            if (hovered(mouseX, mouseY, it)) {
-                g.setComponentTooltipForNextFrame(
-                    font, listOf(
-                        Component.translatable("dreamdisplays.button.report.tooltip.1")
-                            .withStyle { s -> s.withColor(ChatFormatting.WHITE).withBold(true) },
-                        Component.translatable("dreamdisplays.button.report.tooltip.2")
-                            .withStyle { s -> s.withColor(ChatFormatting.GRAY) },
-                    ), mouseX, mouseY
-                )
-            }
-        }
-    }*/
+    /*private fun renderTooltips(g: GuiGraphics, mouseX: Int, mouseY: Int) {}*/
 
     //? if >=26 {
     private fun drawPanel(g: GuiGraphicsExtractor, x: Int, y: Int, w: Int, h: Int, title: String) {

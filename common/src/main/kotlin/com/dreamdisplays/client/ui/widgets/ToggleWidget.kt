@@ -8,11 +8,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 /*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarrationElementOutput
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 
 /** Toggle widget. **/
 // TODO: rewrite this class entirely in 1.9.0
@@ -54,17 +59,14 @@ abstract class ToggleWidget(
     }
     //?} else
     /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(getTexture(), x, y, width, height)
         g.blitSprite(
-            RenderPipelines.GUI_TEXTURED, getHandleTexture(),
+            getHandleTexture(),
             x + (dValue * (width - 8).toDouble()).toInt(), y, 8, height
         )
         val i = if (active) 16777215 else 10526880
         val msg: MutableComponent = message.copy().withStyle { it.withColor(i) }
-        renderScrollingStringOverContents(
-            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
-            msg, 2
-        )
+        g.drawCenteredString(Minecraft.getInstance().font, msg, x + width / 2, y + (height - 8) / 2, i)
     }*/
 
     override fun setFocused(focused: Boolean) {
@@ -83,7 +85,10 @@ abstract class ToggleWidget(
         dValue = if (value) 1.0 else 0.0
     }
 
+    //? if >=1.21.11 {
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
+    //?} else
+    /*override fun onClick(mouseX: Double, mouseY: Double, button: Int) {*/
         setValueFromMouse()
         updateMessage()
         applyValue()

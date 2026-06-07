@@ -266,7 +266,10 @@ import java.util.function.Consumer
     /** Returns the players currently in range of [display] in its world. */
     @FabricOnly fun getReceivers(display: FabricDisplayData, server: MinecraftServer): List<ServerPlayer> {
         return server.playerList.players.filter { p ->
+            //? if >=1.21.11 {
             p.level().dimension().identifier().toString() == display.worldKey &&
+            //?} else
+            /*p.level().dimension().location().toString() == display.worldKey &&*/
                 p.blockPosition().isInRange(display)
         }
     }

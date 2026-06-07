@@ -13,6 +13,7 @@ subprojects {
     repositories {
         mavenCentral()
         maven("https://maven.fabricmc.net/")
+        maven("https://maven.parchmentmc.org")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://maven.quiltmc.org/repository/snapshot/")
         maven("https://repo.lostyy.ru/releases")

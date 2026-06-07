@@ -16,7 +16,10 @@ import com.dreamdisplays.player.stream.StreamSet
 import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.ytdlp.YtDlp
+//? if >=1.21.11 {
 import com.mojang.blaze3d.textures.GpuTexture
+//?} else
+/*import net.minecraft.client.renderer.texture.DynamicTexture as GpuTexture*/
 import net.minecraft.core.BlockPos
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer

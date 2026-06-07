@@ -13,7 +13,9 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent
+//? if >=1.21.11 {
 import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent
+//?}
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 
@@ -29,10 +31,15 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     fun registerPayloads(event: RegisterPayloadHandlersEvent) {
         val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
 
+        //? if >=1.21.11 {
         registrar.playBidirectional(
             Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC,
             { _, _ -> },
             { payload, _ -> Initializer.onDeletePacket(payload) })
+        //?} else
+        /*registrar.playToClient(Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC) { payload, _ ->
+            Initializer.onDeletePacket(payload)
+        }*/
         registrar.playToClient(Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC) { payload, _ ->
             Initializer.onDisplayInfoPacket(payload)
         }
@@ -48,10 +55,16 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         registrar.playToClient(Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC) { payload, _ ->
             Initializer.onClearCachePacket(payload)
         }
+        //? if >=1.21.11 {
         registrar.playBidirectional(
             Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC,
             { _, _ -> },
             { payload, _ -> Initializer.onSyncPacket(payload) })
+        //?} else
+        /*registrar.playToClient(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC) { payload, _ ->
+            Initializer.onSyncPacket(payload)
+        }
+        registrar.playToServer(Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC) { _, _ -> }*/
         registrar.playToServer(Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC) { _, _ -> }
         registrar.playToServer(Packets.Report.PACKET_ID, Packets.Report.PACKET_CODEC) { _, _ -> }
         registrar.playToServer(Packets.Version.PACKET_ID, Packets.Version.PACKET_CODEC) { _, _ -> }
@@ -75,9 +88,11 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         Initializer.isAdmin = false
     }
 
+    //? if >=1.21.11 {
     @SubscribeEvent fun onClientStopping(event: ClientStoppingEvent) {
         Initializer.onStop()
     }
+    //?}
 
     //? if >=26 {
     @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
@@ -86,10 +101,11 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         ScreenRenderer.render(event.getPoseStack(), mc.gameRenderer.mainCamera)
     }
     //?} else
-    /*@SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterParticles) {
+    /*@SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent) {
+        if (event.stage != RenderLevelStageEvent.Stage.AFTER_PARTICLES) return
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
-        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+        ScreenRenderer.render(event.getPoseStack(), mc.gameRenderer.mainCamera)
     }*/
 
     @SubscribeEvent fun onEndTick(event: ClientTickEvent.Post) {

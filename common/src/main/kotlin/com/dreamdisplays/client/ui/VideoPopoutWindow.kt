@@ -135,7 +135,10 @@ class VideoPopoutWindow(private val onClose: () -> Unit) {
     /** Creates and configures a new GLFW window sized to [videoW] x [videoH]; must run on the render thread. */
     private fun createGlfwWindow(videoW: Int, videoH: Int) {
         val mc = Minecraft.getInstance()
+        //? if >=1.21.11 {
         mcWindowHandle = mc.window.handle()
+        //?} else
+        /*mcWindowHandle = mc.window.window*/
 
         val w = videoW.coerceIn(480, 1280)
         val h = videoH.coerceIn(270, 720)

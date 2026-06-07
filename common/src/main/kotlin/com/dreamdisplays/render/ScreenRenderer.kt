@@ -4,7 +4,10 @@ import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.display.DisplayScreen
 import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.Camera
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
 import net.minecraft.world.phys.Vec3
 import org.joml.Quaternionf
 import kotlin.math.abs
@@ -24,7 +27,10 @@ object ScreenRenderer {
 
     /** Iterates all registered screens and lets the caller submit quads through the active renderer. */
     fun render(stack: PoseStack, camera: Camera, drawQuad: QuadRenderer) {
+        //? if >=1.21.11 {
         val cameraPos = camera.position()
+        //?} else
+        /*val cameraPos = camera.position*/
         for (displayScreen in DisplayManager.getScreens()) {
             if (displayScreen.texture == null) continue
 

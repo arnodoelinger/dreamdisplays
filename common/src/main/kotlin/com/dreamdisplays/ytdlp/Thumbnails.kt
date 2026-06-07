@@ -4,7 +4,10 @@ import com.dreamdisplays.Initializer
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import org.lwjgl.system.MemoryUtil
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -119,7 +122,10 @@ object Thumbnails {
     private fun register(videoId: String, bytes: ByteArray) {
         try {
             val image = decode(bytes)
+            //? if >=1.21.11 {
             val tex = DynamicTexture({ "yt-thumb-$videoId" }, image)
+            //?} else
+            /*val tex = DynamicTexture(image)*/
             val safe = videoId.lowercase(Locale.ROOT).replace(Regex("[^a-z0-9_]"), "_")
             val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/$safe")
             Minecraft.getInstance().textureManager.register(id, tex)
@@ -148,13 +154,19 @@ object Thumbnails {
         val h = src.height
         val image = NativeImage(NativeImage.Format.RGBA, w, h, false)
         val pixels = src.getRGB(0, 0, w, h, null, 0, w)
+        //? if >=1.21.11 {
         val ptr = image.pointer
+        //?} else
+        /*val ptr = 0L*/
         for (i in pixels.indices) {
             val argb = pixels[i]
             val abgr = (argb and 0xFF00FF00.toInt()) or
                     ((argb shl 16) and 0x00FF0000) or
                     ((argb shr 16) and 0xFF)
+            //? if >=1.21.11 {
             MemoryUtil.memPutInt(ptr + i.toLong() * 4, abgr)
+            //?} else
+            /*image.setPixelRGBA(i % w, i / w, abgr)*/
         }
         image
     }

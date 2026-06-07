@@ -11,13 +11,19 @@ import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.ytdlp.YtDlp
 import net.minecraft.client.Minecraft
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
@@ -292,7 +298,10 @@ class DisplayScreen(
         val mp = mediaPlayer ?: return
         val tex = texture ?: return
         try {
+            //? if >=1.21.11 {
             mp.updateFrame(tex.getTexture())
+            //?} else
+            /*mp.updateFrame(tex)*/
         } catch (e: Exception) {
             logger.warn("$uuid fitTexture failed: ${e.message ?: e::class.java.name}")
         }
@@ -485,7 +494,10 @@ class DisplayScreen(
             t.close()
             textureId?.let { Minecraft.getInstance().textureManager.release(it) }
         }
+        //? if >=1.21.11 {
         texture = DynamicTexture({ UUID.randomUUID().toString() }, NativeImage(NativeImage.Format.RGBA, textureWidth, textureHeight, false))
+        //?} else
+        /*texture = DynamicTexture(NativeImage(NativeImage.Format.RGBA, textureWidth, textureHeight, false))*/
         textureId = Identifier.fromNamespaceAndPath(
             Initializer.MOD_ID,
             "screen-main-texture-$uuid-${UUID.randomUUID()}"
@@ -551,6 +563,7 @@ class DisplayScreen(
         private const val SYNC_JUMP_THRESHOLD_NS = 1_500_000_000L
 
         /** Creates a custom [RenderType] that samples texture [id] through the solid-block pipeline. */
+        //? if >=1.21.11 {
         private fun createRenderType(id: Identifier): RenderType = RenderType.create(
             "dream-displays",
             RenderSetup.builder(RenderPipelines.SOLID_BLOCK)
@@ -559,5 +572,7 @@ class DisplayScreen(
                 .useLightmap()
                 .createRenderSetup()
         )
+        //?} else
+        /*private fun createRenderType(id: Identifier): RenderType = RenderType.entityCutoutNoCull(id)*/
     }
 }

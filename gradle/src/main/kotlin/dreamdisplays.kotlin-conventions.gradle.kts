@@ -38,13 +38,11 @@ tasks.withType<Jar>().configureEach {
 }
 
 // Stonecutter only versions the root project (dependency selection); the shared Kotlin code lives
-// in subprojects, so Stonecutter never processes the `//? if >=26 { ... //?} else /*...*/`
+// in subprojects, so Stonecutter never processes the `//? if ... { ... //?} else /*...*/`
 // directives in their source. This transform resolves those directives for the active Minecraft
-// version into a generated source directory that the Kotlin source set compiles instead of the
-// checked-in source. For 26.x the source is already valid, so the transform is a verbatim copy.
+// version into a generated source directory that the Kotlin source set compiles instead.
 run {
     val minecraftVersion = scVersion("minecraft.version")
-    val legacy = minecraftVersion.startsWith("1.")
 
     val sourceDir = layout.projectDirectory.dir("src/main/kotlin").asFile
     val chiselDir = layout.buildDirectory.dir("generated/chisel/main/kotlin")
@@ -54,7 +52,7 @@ run {
         if (sourceDir.exists()) {
             inputs.dir(sourceDir).withPathSensitivity(PathSensitivity.RELATIVE)
         }
-        inputs.property("legacy", legacy)
+        inputs.property("minecraftVersion", minecraftVersion)
         outputs.dir(chiselDir)
         doLast {
             outDir.deleteRecursively()
@@ -63,7 +61,7 @@ run {
             sourceDir.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { file ->
                 val target = outDir.resolve(file.relativeTo(sourceDir).path)
                 target.parentFile.mkdirs()
-                target.writeText(if (legacy) chiselToLegacy(file.readLines()) else file.readText())
+                target.writeText(chisel(file.readLines(), minecraftVersion))
             }
         }
     }

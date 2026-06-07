@@ -6,6 +6,7 @@ import io.github.arsmotorin.ofrat.PaperOnly
 import net.minecraft.resources.ResourceKey
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
+import net.minecraft.world.level.Level
 import org.bukkit.Location
 import org.bukkit.World
 import org.jspecify.annotations.NullMarked
@@ -48,12 +49,19 @@ object RegionUtil {
     @PaperOnly private fun getRange(a: Int, b: Int): IntRange = min(a, b)..max(a, b)
     /** Resolves a [ServerLevel] from a dimension key string like `"minecraft:overworld"`. */
     @FabricOnly fun getLevelByKey(server: MinecraftServer, worldKey: String): ServerLevel? {
+        //? if >=1.21.11 {
         val rl = runCatching { net.minecraft.resources.Identifier.parse(worldKey) }.getOrNull() ?: return null
+        //?} else
+        /*val rl = runCatching { net.minecraft.resources.ResourceLocation.parse(worldKey) }.getOrNull() ?: return null*/
         val key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, rl)
         return server.getLevel(key)
     }
-    /** Returns the dimension key string (e.g. `"minecraft:overworld"`) for a given [ServerLevel]. */
-    @FabricOnly fun getLevelKey(level: ServerLevel): String = level.dimension().identifier().toString()
+    /** Returns the dimension key string (e.g. `"minecraft:overworld"`) for a given [Level]. */
+    @FabricOnly fun getLevelKey(level: Level): String =
+        //? if >=1.21.11 {
+        level.dimension().identifier().toString()
+        //?} else
+        /*level.dimension().location().toString()*/
 
     @PaperOnly @NullMarked data class RegionData(
         val minX: Int,

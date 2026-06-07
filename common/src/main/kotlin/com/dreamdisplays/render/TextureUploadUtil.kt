@@ -1,9 +1,12 @@
 package com.dreamdisplays.render
 
-import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.platform.NativeImage
+//? if >=1.21.11 {
+import com.mojang.blaze3d.opengl.GlTexture
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
+//?} else
+/*import net.minecraft.client.renderer.texture.DynamicTexture as GpuTexture*/
 import java.lang.reflect.InvocationTargetException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -19,6 +22,7 @@ object TextureUploadUtil {
         rgbaScratch: ByteBuffer?,
         setRgbaScratch: (ByteBuffer) -> Unit,
     ) {
+        //? if >=1.21.11 {
         if (texture.isClosed) return
         if (texture is GlTexture) {
             glUploader().upload(texture.glId(), src, texture.getWidth(0), texture.getHeight(0))
@@ -30,8 +34,11 @@ object TextureUploadUtil {
             ?: ByteBuffer.allocateDirect(rgbaSize).order(ByteOrder.nativeOrder()).also(setRgbaScratch)
         rgbToRgba(src, rgba, w, h)
         writeToTexture(texture, rgba, w, h)
+        //?} else
+        /*glUploader().upload(texture.id, src, w, h)*/
     }
 
+    //? if >=1.21.11 {
     private fun writeToTexture(texture: GpuTexture, rgba: ByteBuffer, w: Int, h: Int) {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
         val encoderClass = encoder.javaClass
@@ -76,6 +83,7 @@ object TextureUploadUtil {
             throw e.targetException
         }
     }
+    //?}
 
     private fun rgbToRgba(src: ByteBuffer, dst: ByteBuffer, w: Int, h: Int) {
         val size = w * h * 3

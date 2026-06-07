@@ -34,7 +34,11 @@ open class ScreenOverlay {
         if (PipOverlayManager.isEmpty) return
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
-        val leftPressed = GLFW.glfwGetMouseButton(mc.window.handle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
+        //? if >=1.21.11 {
+        val window = mc.window.handle()
+        //?} else
+        /*val window = mc.window.window*/
+        val leftPressed = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
         PipOverlayManager.renderAll(mc, graphics, mouseX, mouseY, leftPressed, partialTick)
     }
 }

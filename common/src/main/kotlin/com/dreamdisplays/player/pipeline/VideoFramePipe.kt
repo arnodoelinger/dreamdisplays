@@ -5,7 +5,10 @@ import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.render.AsyncTextureUploader
 import com.dreamdisplays.render.TextureUploadUtil
+//? if >=1.21.11 {
 import com.mojang.blaze3d.textures.GpuTexture
+//?} else
+/*import net.minecraft.client.renderer.texture.DynamicTexture as GpuTexture*/
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
@@ -81,7 +84,11 @@ internal class VideoFramePipe(private val debugLabel: String) {
      */
     fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int) {
         val buf = readyBufferRef.getAndSet(null) ?: return
-        if (actualW != expectedW || actualH != expectedH || Minecraft.getInstance().window.isMinimized) {
+        //? if >=1.21.11 {
+        val windowMinimized = Minecraft.getInstance().window.isMinimized
+        //?} else
+        /*val windowMinimized = false*/
+        if (actualW != expectedW || actualH != expectedH || windowMinimized) {
             recycleFrameBuffer(buf)
             return
         }
@@ -91,8 +98,12 @@ internal class VideoFramePipe(private val debugLabel: String) {
             TextureUploadUtil.uploadRgb(
                 texture = texture,
                 src = buf,
+                //? if >=1.21.11 {
                 w = texture.getWidth(0),
                 h = texture.getHeight(0),
+                //?} else
+                /*w = actualW,
+                h = actualH,*/
                 glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
                 rgbaScratch = rgbaUploadBuffer,
                 setRgbaScratch = { rgbaUploadBuffer = it },

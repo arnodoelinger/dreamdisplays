@@ -15,11 +15,17 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 //?} else
-/*import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents*/
+/*import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents*/
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 import java.lang.reflect.Proxy
@@ -86,7 +92,7 @@ class Client : ClientModInitializer, Mod {
         /*WorldRenderEvents.AFTER_ENTITIES.register { context ->
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
-                ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
+                context.matrixStack()?.let { ScreenRenderer.render(it, context.camera()) }
             }
         }*/
 

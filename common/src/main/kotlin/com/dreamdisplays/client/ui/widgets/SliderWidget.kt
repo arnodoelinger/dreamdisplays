@@ -9,11 +9,16 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.util.Mth
 
 /** Slider widget. **/
@@ -67,19 +72,17 @@ abstract class SliderWidget(
     }
     //?} else
     /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {
-        g.blitSprite(RenderPipelines.GUI_TEXTURED, getTexture(), x, y, width, height)
+        g.blitSprite(getTexture(), x, y, width, height)
         g.blitSprite(
-            RenderPipelines.GUI_TEXTURED, getHandleTexture(),
+            getHandleTexture(),
             x + (value * (width - 8).toDouble()).toInt(), y, 8, height
         )
         val i = if (active) 16777215 else 10526880
         val msg = message.copy().withStyle { it.withColor(i) }
-        renderScrollingStringOverContents(
-            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
-            msg, 2
-        )
+        g.drawCenteredString(Minecraft.getInstance().font, msg, x + width / 2, y + (height - 8) / 2, i)
     }*/
 
+    //? if >=1.21.11 {
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
         setValueFromMouse(event.x())
         super.playDownSound(Minecraft.getInstance().soundManager)
@@ -89,6 +92,16 @@ abstract class SliderWidget(
         super.onDrag(event, dragX, dragY)
         setValueFromMouse(event.x())
     }
+    //?} else
+    /*override fun onClick(mouseX: Double, mouseY: Double, button: Int) {
+        setValueFromMouse(mouseX)
+        super.playDownSound(Minecraft.getInstance().soundManager)
+    }
+
+    override fun onDrag(mouseX: Double, mouseY: Double, dragX: Double, dragY: Double) {
+        super.onDrag(mouseX, mouseY, dragX, dragY)
+        setValueFromMouse(mouseX)
+    }*/
 
     override fun setFocused(focused: Boolean) {
         super.setFocused(focused)

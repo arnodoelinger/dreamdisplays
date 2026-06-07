@@ -9,17 +9,26 @@ import com.mojang.serialization.JsonOps
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.HoverEvent
+//? if >=1.21.11 {
 import net.kyori.adventure.text.`object`.ObjectContents
+//?}
 import net.minecraft.core.registries.BuiltInRegistries
+//? if >=1.21.11 {
 import net.minecraft.data.AtlasIds
+//?}
 import net.minecraft.network.chat.Component as NmsComponent
 import net.minecraft.network.chat.MutableComponent
 import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
 import net.minecraft.network.chat.ComponentSerialization
+//? if >=1.21.11 {
 import net.minecraft.network.chat.contents.ObjectContents as NmsObjectContents
 import net.minecraft.network.chat.contents.objects.AtlasSprite
+//?}
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.server.level.ServerPlayer
 //? if >=26 {
 import net.minecraft.world.item.ItemStackTemplate
@@ -99,6 +108,7 @@ object MessageUtil {
     @PaperOnly private fun materialSpriteComponent(mat: Material): Component {
         val ns = mat.key().namespace()
         val name = mat.key().value()
+        //? if >=1.21.11 {
         val atlas: Key
         val spriteKey: Key
         if (mat.isBlock) {
@@ -110,6 +120,8 @@ object MessageUtil {
         }
         return Component.`object`(ObjectContents.sprite(atlas, spriteKey))
             .hoverEvent(HoverEvent.showItem(mat.key(), 1))
+        //?} else
+        /*return Component.text(name).hoverEvent(HoverEvent.showItem(mat.key(), 1))*/
     }
 
     /** Sends a localized message identified by [messageKey] to [player]. */
@@ -158,7 +170,11 @@ object MessageUtil {
             val index = match.groupValues[1].toIntOrNull()
             if (index != null && index < materialKeys.size) {
                 val itemId = Identifier.parse(materialKeys[index])
+                //? if >=1.21.11 {
                 val item = BuiltInRegistries.ITEM.getValue(itemId)
+                //?} else
+                /*val item = BuiltInRegistries.ITEM.get(itemId)*/
+                //? if >=1.21.11 {
                 val isBlock = item is net.minecraft.world.item.BlockItem
                 val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
                 val spriteId = Identifier.fromNamespaceAndPath(itemId.namespace, (if (isBlock) "block/" else "item/") + itemId.path)
@@ -171,6 +187,8 @@ object MessageUtil {
                 val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
                     .withStyle { it.withHoverEvent(hoverEvent) }
                 root.append(spriteComponent)
+                //?} else
+                /*root.append(NmsComponent.literal(itemId.toString()))*/
             }
             lastIndex = match.range.last + 1
         }

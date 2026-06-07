@@ -8,11 +8,18 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.gui.components.AbstractWidget
 import net.minecraft.client.gui.components.WidgetSprites
 import net.minecraft.client.gui.narration.NarrationElementOutput
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.network.chat.Component
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+//? if >=1.21.11 {
 import net.minecraft.util.ARGB
+//?}
 import kotlin.math.max
 
 /** Button widget. **/
@@ -39,7 +46,10 @@ abstract class ButtonWidget(
 
     abstract fun onPress()
 
+    //? if >=1.21.11 {
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
+    //?} else
+    /*override fun onClick(mouseX: Double, mouseY: Double, button: Int) {*/
         onPress()
         super.playDownSound(Minecraft.getInstance().soundManager)
     }
@@ -51,10 +61,13 @@ abstract class ButtonWidget(
     //?} else
     /*override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) {*/
         val sprite = setSprites?.get(active, isHoveredOrFocused) ?: SPRITES.get(active, isHoveredOrFocused)
+        //? if >=1.21.11 {
         g.blitSprite(
             RenderPipelines.GUI_TEXTURED, sprite,
             x, y, width, height, ARGB.white(alpha)
         )
+        //?} else
+        /*g.blitSprite(sprite, x, y, width, height)*/
 
         val dW = width - 2 * margin
         val dH = height - 2 * margin
@@ -66,10 +79,13 @@ abstract class ButtonWidget(
         val dx = x + width / 2 - iconW / 2
         val dy = y + height / 2 - iconH / 2
 
+        //? if >=1.21.11 {
         g.blitSprite(
             RenderPipelines.GUI_TEXTURED, iconTextureId,
             dx, dy, iconW, iconH, ARGB.white(alpha)
         )
+        //?} else
+        /*g.blitSprite(iconTextureId, dx, dy, iconW, iconH)*/
     }
 
     companion object {

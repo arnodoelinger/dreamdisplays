@@ -276,7 +276,10 @@ object Initializer {
             }
         }
 
+        //? if >=1.21.11 {
         val window = minecraft.window.handle()
+        //?} else
+        /*val window = minecraft.window.window*/
         val pressed = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
 
         if (pressed && !wasPressed) {
