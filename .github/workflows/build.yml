@@ -24,6 +24,7 @@ jobs:
       is_marketplace_publishable: ${{ steps.get_version.outputs.is_marketplace_publishable }}
       stonecutter_versions: ${{ steps.stonecutter_versions.outputs.versions_json }}
       primary_stonecutter_version: ${{ steps.stonecutter_versions.outputs.primary_version }}
+      marketplace_publish_tasks: ${{ steps.stonecutter_versions.outputs.marketplace_tasks_json }}
 
     steps:
       - name: Checkout repository
@@ -45,9 +46,16 @@ jobs:
           if not versions:
               raise SystemExit("No Stonecutter versions found")
 
+          tasks = (
+              [{"kind": "fabric", "mc": version} for version in versions] +
+              [{"kind": "neoforge", "mc": version} for version in versions] +
+              [{"kind": "paper", "mc": versions[0]}]
+          )
+
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
               f.write(f"versions_json={json.dumps(versions)}\n")
               f.write(f"primary_version={versions[0]}\n")
+              f.write(f"marketplace_tasks_json={json.dumps(tasks)}\n")
           EOF
 
       - name: Get version
@@ -182,7 +190,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   publish:
-    name: Publish to Modrinth and CurseForge
+    name: Publish ${{ matrix.task.kind }} ${{ matrix.task.mc }}
     runs-on: ubuntu-latest
     needs:
       - metadata
@@ -190,8 +198,9 @@ jobs:
     if: github.event_name == 'push' && needs.metadata.outputs.is_marketplace_publishable == 'true'
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
-        mc: ${{ fromJSON(needs.metadata.outputs.stonecutter_versions) }}
+        task: ${{ fromJSON(needs.metadata.outputs.marketplace_publish_tasks) }}
     permissions:
       contents: write
 
@@ -204,7 +213,7 @@ jobs:
       - name: Download build artifacts
         uses: actions/download-artifact@v4
         with:
-          name: build-jars-${{ matrix.mc }}
+          name: build-jars-${{ matrix.task.mc }}
           path: build/libs
 
       - name: Extract versions
@@ -214,7 +223,7 @@ jobs:
           import os
           import re
 
-          mc = "${{ matrix.mc }}"
+          mc = "${{ matrix.task.mc }}"
           props = {}
 
           with open(f"versions/{mc}/gradle.properties") as f:
@@ -298,7 +307,7 @@ jobs:
           EOF
 
       - name: Publish Paper
-        if: (needs.metadata.outputs.is_release == 'true' || needs.metadata.outputs.is_snapshot == 'true') && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
+        if: matrix.task.kind == 'paper'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Paper] Dream Displays ${{ needs.metadata.outputs.version }}'
@@ -316,12 +325,13 @@ jobs:
           game-version-filter: none
 
       - name: Publish Fabric to Modrinth
+        if: matrix.task.kind == 'fabric'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
           version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.metadata.outputs.version }}
           version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-fabric-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
+          files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -334,13 +344,13 @@ jobs:
             fabric-api(required){modrinth:P7dR8mSH}
 
       - name: Publish Fabric to CurseForge
-        if: steps.versions.outputs.curseforge_publishable == 'true'
+        if: matrix.task.kind == 'fabric' && steps.versions.outputs.curseforge_publishable == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
           version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.metadata.outputs.version }}
           version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-fabric-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
+          files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
@@ -352,12 +362,13 @@ jobs:
             fabric-api(required){curseforge:306612}
 
       - name: Publish NeoForge to Modrinth
+        if: matrix.task.kind == 'neoforge'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
           version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.metadata.outputs.version }}
           version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-neoforge-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
+          files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
           modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
@@ -366,13 +377,13 @@ jobs:
           game-version-filter: none
 
       - name: Publish NeoForge to CurseForge
-        if: steps.versions.outputs.curseforge_publishable == 'true'
+        if: matrix.task.kind == 'neoforge' && steps.versions.outputs.curseforge_publishable == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.metadata.outputs.version }}'
           version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.metadata.outputs.version }}
           version-type: ${{ needs.metadata.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
-          files: build/libs/dreamdisplays-neoforge-${{ matrix.mc }}-${{ needs.metadata.outputs.version }}.jar
+          files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.metadata.outputs.version }}.jar
           changelog-file: changelog.md
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
           curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
@@ -380,7 +391,7 @@ jobs:
           game-versions: ${{ steps.versions.outputs.mc_versions }}
 
       - name: Download all build artifacts for GitHub Release
-        if: needs.metadata.outputs.is_release == 'true' && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
+        if: needs.metadata.outputs.is_release == 'true' && matrix.task.kind == 'paper'
         uses: actions/download-artifact@v4
         with:
           pattern: build-jars-*
@@ -388,7 +399,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub Release
-        if: needs.metadata.outputs.is_release == 'true' && matrix.mc == needs.metadata.outputs.primary_stonecutter_version
+        if: needs.metadata.outputs.is_release == 'true' && matrix.task.kind == 'paper'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
