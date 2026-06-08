@@ -1,372 +1,163 @@
 package com.dreamdisplays.client.ui
 
-import com.dreamdisplays.render.AsyncTextureUploader
-import net.minecraft.client.Minecraft
-import org.lwjgl.glfw.GLFW
-import org.lwjgl.opengl.GL
 import org.slf4j.LoggerFactory
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GLCapabilities
+import java.awt.Color
+import java.awt.Graphics
+import java.awt.GraphicsEnvironment
+import java.awt.event.KeyAdapter
+import java.awt.event.KeyEvent
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
+import java.awt.image.BufferedImage
+import java.awt.image.DataBufferInt
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import javax.swing.JFrame
+import javax.swing.JPanel
+import javax.swing.SwingUtilities
 
 /**
- * Detached window that mirrors the decoded video, backed by a dedicated `GLFW` window.
+ * Detached window that mirrors the decoded video, backed by an AWT [JFrame].
  *
  * Thread model:
- *  - `GLFW` window creation / destruction and event callbacks happen on the Minecraft render thread.
- *    On macOS this is the main thread (required by `-XstartOnFirstThread` / `GLFW`).
- *  - [updateFrame] is called from the video reader thread; it does only a very fast byte-copy.
- *  - [renderFrame] is called from the Minecraft render thread (via `DisplayScreen.fitTexture`).
- *    All `GL` work (context switch, texture upload, quad draw, etc.) happens on
- *    that one thread, so `Metal`'s internal resource list is never touched concurrently.
+ *  - [open] and [close] are safe to call from any thread; they dispatch to the AWT event queue.
+ *  - [updateFrame] is called from the video reader thread; it does a fast pixel copy and schedules
+ *    a repaint on the AWT event queue.
+ *  - [renderFrame] is a no-op: AWT drives its own repaints.
  */
 class VideoPopoutWindow(private val onClose: () -> Unit) {
-    @Volatile private var frontBuf: ByteBuffer = EMPTY_DIRECT
-    private var backBuf: ByteBuffer = EMPTY_DIRECT
-    @Volatile private var frameW = 0
-    @Volatile private var frameH = 0
+
+    @Volatile private var currentImage: BufferedImage? = null
     @Volatile private var contentAspect = 0.0
-    private val frameVersion = AtomicLong(0)
-    private var uploadedVersion = 0L
 
-    @Volatile private var windowHandle = 0L
-    private val winW = AtomicInteger(0)
-    private val winH = AtomicInteger(0)
+    private var frame: JFrame? = null
+    private var panel: VideoPanel? = null
 
-    // Render-thread-only GL state
-    private var renderer: QuadRenderer? = null
-    private var popoutCaps: GLCapabilities? = null
-    private var mcWindowHandle = 0L
+    val isOpen: Boolean get() = frame?.isDisplayable == true
 
-    @Volatile private var fullscreen = false
-    private var savedX = 0; private var savedY = 0
-    private var savedW = 0; private var savedH = 0
+    private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
 
-    val isOpen: Boolean get() = windowHandle != 0L
-
-    /** Direct -> direct memcpy frame updater. Called on the video reader thread. */
+    /** Copies the decoded RGB frame into a [BufferedImage] and schedules a repaint. */
     fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
-        if (windowHandle == 0L) return
-        val size = w * h * 3
-        if (size <= 0 || buf.remaining() < size) return
-        var back = backBuf
-        if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-        back.clear()
-        val savedLimit = buf.limit()
-        val savedPos = buf.position()
-        buf.limit(savedPos + size)
-        back.put(buf)
-        buf.limit(savedLimit)
-        buf.position(savedPos)
-        back.flip()
+        if (!isOpen || w <= 0 || h <= 0 || buf.remaining() < w * h * 3) return
 
-        val prev = frontBuf
-        frontBuf = back
-        backBuf = if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+        val img = currentImage?.takeIf { it.width == w && it.height == h }
+            ?: BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
+
+        val pixels = (img.raster.dataBuffer as DataBufferInt).data
+        val src = buf.duplicate()
+        for (i in pixels.indices) {
+            val r = src.get().toInt() and 0xFF
+            val g = src.get().toInt() and 0xFF
+            val b = src.get().toInt() and 0xFF
+            pixels[i] = (r shl 16) or (g shl 8) or b
+        }
         contentAspect = aspect
-        frameW = w; frameH = h
-        frameVersion.incrementAndGet()
+        currentImage = img
+        panel?.repaint()
     }
 
-    /**
-     * Renders the current frame to the popout window.
-     * Must be called from the Minecraft render thread.
-     * Briefly switches GL context to the popout window and back.
-     */
-    fun renderFrame() {
-        val handle = windowHandle
-        if (handle == 0L) return
-        val fw = frameW; val fh = frameH; val buf = frontBuf
-        val vw = winW.get(); val vh = winH.get()
-        val size = fw * fh * 3
-        if (fw <= 0 || fh <= 0 || buf.remaining() < size || vw <= 0 || vh <= 0) return
+    /** No-op: AWT drives its own repaints independently of the Minecraft render thread. */
+    fun renderFrame() = Unit
 
-        val version = frameVersion.get()
-        // The window must redraw even when no new frame arrived (resize, refresh) but skip the GPU
-        // upload itself unless the frame actually changed.
-        val haveNewFrame = version != uploadedVersion
-
-        val previousContext = GLFW.glfwGetCurrentContext()
-        val previousCaps = runCatching { GL.getCapabilities() }.getOrNull()
-
-        GLFW.glfwMakeContextCurrent(handle)
-        val caps = popoutCaps
-        if (caps == null) {
-            popoutCaps = GL.createCapabilities()
-        } else {
-            GL.setCapabilities(caps)
-        }
-
-        val r = renderer ?: QuadRenderer().also { renderer = it }
-        if (haveNewFrame) {
-            r.upload(buf, fw, fh)
-            uploadedVersion = version
-        }
-        r.draw(vw, vh, contentRect(fw, fh, contentAspect), fw, fh)
-        GLFW.glfwSwapBuffers(handle)
-
-        GLFW.glfwMakeContextCurrent(previousContext)
-        GL.setCapabilities(previousCaps)
-    }
-
-    /** Opens (or re-shows) the popout. Safe to call from any thread, dispatches to render thread. */
+    /** Opens (or focuses) the window. Safe to call from any thread. */
     fun open(videoW: Int, videoH: Int) {
-        Minecraft.getInstance().execute {
-            if (windowHandle != 0L) {
-                GLFW.glfwShowWindow(windowHandle)
-                GLFW.glfwFocusWindow(windowHandle)
-                return@execute
+        SwingUtilities.invokeLater {
+            val existing = frame
+            if (existing != null && existing.isDisplayable) {
+                existing.toFront()
+                existing.requestFocus()
+                return@invokeLater
             }
-            createGlfwWindow(videoW, videoH)
+            createFrame(videoW, videoH)
         }
     }
 
-    /** Closes the popout. Safe to call from any thread. */
+    /** Closes the window. Safe to call from any thread. */
     fun close() {
-        Minecraft.getInstance().execute { destroyWindow() }
+        SwingUtilities.invokeLater { destroyFrame() }
     }
 
-    /** Creates and configures a new GLFW window sized to [videoW] x [videoH]; must run on the render thread. */
-    private fun createGlfwWindow(videoW: Int, videoH: Int) {
-        val mc = Minecraft.getInstance()
-        mcWindowHandle = mc.window.handle()
-
+    /** Initializes the JFrame and its content panel, and sets up event listeners for closing and fullscreen. */
+    private fun createFrame(videoW: Int, videoH: Int) {
         val w = videoW.coerceIn(480, 1280)
         val h = videoH.coerceIn(270, 720)
 
-        GLFW.glfwDefaultWindowHints()
-        GLFW.glfwWindowHint(GLFW.GLFW_CLIENT_API, GLFW.GLFW_OPENGL_API)
-        GLFW.glfwWindowHint(GLFW.GLFW_VISIBLE, GLFW.GLFW_TRUE)
-        GLFW.glfwWindowHint(GLFW.GLFW_RESIZABLE, GLFW.GLFW_TRUE)
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MAJOR, 3)
-        GLFW.glfwWindowHint(GLFW.GLFW_CONTEXT_VERSION_MINOR, 2)
-        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_PROFILE, GLFW.GLFW_OPENGL_CORE_PROFILE)
-        GLFW.glfwWindowHint(GLFW.GLFW_OPENGL_FORWARD_COMPAT, GL11.GL_TRUE)
+        val p = VideoPanel()
+        panel = p
 
-        // Separate context
-        val handle = GLFW.glfwCreateWindow(w, h, "Dream Displays", 0L, 0L)
-        if (handle == 0L) {
-            logger.warn("glfwCreateWindow failed")
-            return
-        }
+        val f = JFrame("Dream Displays")
+        frame = f
+        f.defaultCloseOperation = JFrame.DO_NOTHING_ON_CLOSE
+        f.contentPane = p
+        f.setSize(w, h)
+        f.setLocationRelativeTo(null)
 
-        windowHandle = handle
-        winW.set(w); winH.set(h)
-
-        GLFW.glfwSetWindowCloseCallback(handle) { _ -> destroyWindow() }
-        GLFW.glfwSetKeyCallback(handle) { _, key, _, action, _ ->
-            if (action == GLFW.GLFW_PRESS) when (key) {
-                GLFW.GLFW_KEY_ESCAPE -> destroyWindow()
-                GLFW.GLFW_KEY_F      -> toggleFullscreen(handle)
+        f.addWindowListener(object : WindowAdapter() {
+            override fun windowClosing(e: WindowEvent) = destroyFrame()
+        })
+        f.addKeyListener(object : KeyAdapter() {
+            override fun keyPressed(e: KeyEvent) {
+                when (e.keyCode) {
+                    KeyEvent.VK_ESCAPE -> destroyFrame()
+                    KeyEvent.VK_F -> toggleFullscreen(f)
+                }
             }
-        }
-        GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh ->
-            winW.set(fw); winH.set(fh)
-        }
-        val wArr = IntArray(1); val hArr = IntArray(1)
-        GLFW.glfwGetFramebufferSize(handle, wArr, hArr)
-        if (wArr[0] > 0 && hArr[0] > 0) { winW.set(wArr[0]); winH.set(hArr[0]) }
+        })
+
+        f.isVisible = true
     }
 
-    /** Destroys the `GLFW` window and cleans up GL resources. Must be called from the render thread. */
-    private fun destroyWindow() {
-        val handle = windowHandle
-        windowHandle = 0L
-        if (handle != 0L && renderer != null) {
-            val previousContext = GLFW.glfwGetCurrentContext()
-            val previousCaps = runCatching { GL.getCapabilities() }.getOrNull()
-            GLFW.glfwMakeContextCurrent(handle)
-            GL.setCapabilities(popoutCaps ?: GL.createCapabilities())
-            renderer?.cleanup()
-            renderer = null
-            popoutCaps = null
-            GLFW.glfwMakeContextCurrent(previousContext)
-            GL.setCapabilities(previousCaps)
-            GLFW.glfwDestroyWindow(handle)
-        } else if (handle != 0L) {
-            GLFW.glfwDestroyWindow(handle)
-        }
+    /** Frame destroy logic, shared by both the close button and the ESC key. */
+    private fun destroyFrame() {
+        frame?.dispose()
+        frame = null
+        panel = null
+        currentImage = null
         onClose()
     }
 
-    /** Toggles fullscreen mode for the popout. Safe to call from any thread, dispatches to render thread. */
-    private fun toggleFullscreen(handle: Long) {
-        if (!fullscreen) {
-            val monitor = GLFW.glfwGetPrimaryMonitor()
-            if (monitor == 0L) return
-            val mode = GLFW.glfwGetVideoMode(monitor) ?: return
-            val xArr = IntArray(1); val yArr = IntArray(1)
-            GLFW.glfwGetWindowPos(handle, xArr, yArr)
-            savedX = xArr[0]; savedY = yArr[0]; savedW = winW.get(); savedH = winH.get()
-            GLFW.glfwSetWindowMonitor(handle, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate())
-            fullscreen = true
-        } else {
-            GLFW.glfwSetWindowMonitor(handle, 0L, savedX, savedY, savedW, savedH, GLFW.GLFW_DONT_CARE)
-            fullscreen = false
-        }
+    /** Toggles fullscreen mode for the given frame. */
+    private fun toggleFullscreen(f: JFrame) {
+        val state = f.extendedState
+        f.extendedState = if (state and JFrame.MAXIMIZED_BOTH != 0) JFrame.NORMAL else JFrame.MAXIMIZED_BOTH
     }
 
-    companion object {
-        private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
-        const val isAvailable: Boolean = true
-        private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+    /** Custom panel that paints the current video frame, letterboxing as needed. */
+    private inner class VideoPanel : JPanel() {
+        init {
+            background = Color.BLACK
+            isFocusable = true
+        }
 
-        private fun contentRect(frameW: Int, frameH: Int, contentAspect: Double): ContentRect {
-            if (frameW <= 0 || frameH <= 0) return ContentRect(0, 0, frameW, frameH)
-            if (contentAspect <= 0.0 || !contentAspect.isFinite()) return ContentRect(0, 0, frameW, frameH)
+        override fun paintComponent(g: Graphics) {
+            super.paintComponent(g)
+            val img = currentImage ?: return
+            val aspect = contentAspect
+            val vw = width; val vh = height
+            if (vw <= 0 || vh <= 0) return
 
-            val frameAspect = frameW / frameH.toDouble()
-            return if (contentAspect > frameAspect) {
-                val contentH = (frameW / contentAspect).toInt().coerceIn(1, frameH)
-                ContentRect(0, (frameH - contentH) / 2, frameW, contentH)
+            val drawW: Int; val drawH: Int; val ox: Int; val oy: Int
+            if (aspect > 0.0 && aspect.isFinite()) {
+                val panelAspect = vw.toDouble() / vh
+                if (aspect > panelAspect) {
+                    drawW = vw
+                    drawH = (vw / aspect).toInt().coerceIn(1, vh)
+                    ox = 0; oy = (vh - drawH) / 2
+                } else {
+                    drawW = (vh * aspect).toInt().coerceIn(1, vw)
+                    drawH = vh
+                    ox = (vw - drawW) / 2; oy = 0
+                }
             } else {
-                val contentW = (frameH * contentAspect).toInt().coerceIn(1, frameW)
-                ContentRect((frameW - contentW) / 2, 0, contentW, frameH)
+                drawW = vw; drawH = vh; ox = 0; oy = 0
             }
+
+            g.drawImage(img, ox, oy, drawW, drawH, null)
         }
-    }
-
-}
-
-private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)
-
-/** Minimal `OpenGL` 3.2 renderer. */
-private class QuadRenderer {
-    private val texId: Int = GL11.glGenTextures()
-    private val vao: Int = GL30.glGenVertexArrays()
-    private val vbo: Int = GL15.glGenBuffers()
-    private val program: Int = buildProgram()
-    private val uploader = AsyncTextureUploader(stateCache = false)
-
-    private var texW = 0; private var texH = 0
-
-    init {
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
-        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-
-        GL30.glBindVertexArray(vao)
-        GL15.glBindBuffer(GL15.GL_ARRAY_BUFFER, vbo)
-        val verts = floatArrayOf(
-            -1f,  1f,  0f, 0f,
-            -1f, -1f,  0f, 1f,
-             1f, -1f,  1f, 1f,
-            -1f,  1f,  0f, 0f,
-             1f, -1f,  1f, 1f,
-             1f,  1f,  1f, 0f,
-        )
-        GL15.glBufferData(GL15.GL_ARRAY_BUFFER, verts, GL15.GL_STATIC_DRAW)
-        GL20.glVertexAttribPointer(0, 2, GL11.GL_FLOAT, false, 16, 0L)
-        GL20.glEnableVertexAttribArray(0)
-        GL20.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 16, 8L)
-        GL20.glEnableVertexAttribArray(1)
-        GL30.glBindVertexArray(0)
-    }
-
-    /** Uploads a new frame to the texture. Must be called from the render thread. */
-    fun upload(buf: ByteBuffer, w: Int, h: Int) {
-        if (texW != w || texH != h) {
-            // Allocate the texture storage once per resolution change. The driver may reject a 0-sized
-            // initial upload, so we hand it the real ByteBuffer for the first frame and then switch to
-            // the PBO path on subsequent frames.
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
-            val savedPos = buf.position()
-            val savedLimit = buf.limit()
-            buf.limit(savedPos + w * h * 3)
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
-                GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf)
-            buf.limit(savedLimit); buf.position(savedPos)
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-            texW = w; texH = h
-            return
-        }
-        uploader.upload(texId, buf, w, h)
-    }
-
-    /** Draws the quad. Must be called from the render thread. */
-    fun draw(vw: Int, vh: Int, content: ContentRect, fw: Int, fh: Int) {
-        val scale = minOf(vw.toFloat() / content.w, vh.toFloat() / content.h)
-        val dw = (content.w * scale).toInt(); val dh = (content.h * scale).toInt()
-        val ox = (vw - dw) / 2; val oy = (vh - dh) / 2
-
-        GL11.glClearColor(0f, 0f, 0f, 1f)
-        GL11.glViewport(0, 0, vw, vh)
-        GL11.glClear(GL11.GL_COLOR_BUFFER_BIT)
-        GL11.glViewport(ox, oy, dw, dh)
-
-        GL20.glUseProgram(program)
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
-        setCropUniform(content, fw, fh)
-        GL30.glBindVertexArray(vao)
-        GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 6)
-        GL30.glBindVertexArray(0)
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
-        GL20.glUseProgram(0)
-    }
-
-    private fun setCropUniform(content: ContentRect, fw: Int, fh: Int) {
-        val loc = GL20.glGetUniformLocation(program, "crop")
-        if (loc < 0) return
-        GL20.glUniform4f(
-            loc,
-            content.x / fw.toFloat(),
-            content.y / fh.toFloat(),
-            content.w / fw.toFloat(),
-            content.h / fh.toFloat(),
-        )
-    }
-
-    /** Cleans up GL resources. Must be called from the render thread. */
-    fun cleanup() {
-        uploader.cleanup()
-        GL11.glDeleteTextures(texId)
-        GL15.glDeleteBuffers(vbo)
-        GL30.glDeleteVertexArrays(vao)
-        GL20.glDeleteProgram(program)
     }
 
     companion object {
-        /** Build a shader program that renders a single quad. */
-        private fun buildProgram(): Int {
-            val vs = GL20.glCreateShader(GL20.GL_VERTEX_SHADER)
-            GL20.glShaderSource(vs, """
-                #version 150
-                in vec2 pos;
-                in vec2 uv;
-                out vec2 vUv;
-                void main() { gl_Position = vec4(pos, 0.0, 1.0); vUv = uv; }
-            """.trimIndent())
-            GL20.glCompileShader(vs)
-
-            val fs = GL20.glCreateShader(GL20.GL_FRAGMENT_SHADER)
-            GL20.glShaderSource(fs, """
-                #version 150
-                uniform sampler2D tex;
-                uniform vec4 crop;
-                in vec2 vUv;
-                out vec4 fragColor;
-                void main() { fragColor = texture(tex, crop.xy + vUv * crop.zw); }
-            """.trimIndent())
-            GL20.glCompileShader(fs)
-
-            val prog = GL20.glCreateProgram()
-            GL20.glAttachShader(prog, vs)
-            GL20.glAttachShader(prog, fs)
-            GL20.glBindAttribLocation(prog, 0, "pos")
-            GL20.glBindAttribLocation(prog, 1, "uv")
-            GL20.glLinkProgram(prog)
-            GL20.glDetachShader(prog, vs); GL20.glDeleteShader(vs)
-            GL20.glDetachShader(prog, fs); GL20.glDeleteShader(fs)
-            return prog
-        }
+        /** False only in a headless environment where AWT is unavailable. */
+        val isAvailable: Boolean = !GraphicsEnvironment.isHeadless()
     }
 }
