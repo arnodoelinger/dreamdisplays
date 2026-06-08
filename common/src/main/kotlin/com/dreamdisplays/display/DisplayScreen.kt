@@ -296,6 +296,14 @@ class DisplayScreen(
         } catch (e: Exception) {
             logger.warn("$uuid fitTexture failed: ${e.message ?: e::class.java.name}")
         }
+    }
+
+    /**
+     * Renders the current frame to the popout window.
+     * Must be called after all Minecraft / mod rendering for the frame is complete so that any
+     * GL-context switch (GLFW backend on macOS) does not corrupt in-flight command buffers.
+     */
+    fun renderPopout() {
         popoutWindow?.renderFrame()
     }
 

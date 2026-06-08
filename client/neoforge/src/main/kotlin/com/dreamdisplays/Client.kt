@@ -101,6 +101,9 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
             event.guiGraphics,
             event.partialTick.getGameTimeDeltaPartialTick(false)
         )
+        // Render popout windows after all Minecraft/mod rendering is submitted,
+        // so any GL-context switch (macOS GLFW backend) does not disturb in-flight commands.
+        DisplayManager.getScreens().forEach { it.renderPopout() }
     }
     override fun sendPacket(packet: CustomPacketPayload) {
         Minecraft.getInstance().connection?.send(packet)

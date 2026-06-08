@@ -71,6 +71,9 @@ class Client : ClientModInitializer, Mod {
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
                 renderBufferedScreens(context, mc)
+                // Render popout windows after all Minecraft/mod rendering is submitted,
+                // so any GL-context switch (macOS GLFW backend) does not disturb in-flight commands.
+                DisplayManager.getScreens().forEach { it.renderPopout() }
             }
         }
 
