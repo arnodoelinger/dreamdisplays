@@ -91,6 +91,7 @@ class Client : ClientModInitializer, Mod {
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
                 ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
+                DisplayManager.getScreens().forEach { it.renderPopout() }
             }
         }*/
 
