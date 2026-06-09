@@ -291,9 +291,7 @@ object YtDlp {
     }
 
     private fun cookiesDisabledByConfig(): Boolean {
-        val configured = ClientStateManager.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
-        return configured == "none" || configured == "off" || configured == "disabled" ||
-                configured == "auto" || configured.isEmpty()
+        return CookieSource.fromConfig(ClientStateManager.config.ytdlpCookiesFromBrowser)?.isDisabled ?: false
     }
 
     /**
@@ -651,11 +649,7 @@ object YtDlp {
     /** Returns true if the `yt-dlp` output object indicates a live or upcoming stream. */
     private fun isLive(obj: JsonObject): Boolean {
         if (optBoolean(obj)) return true
-        val liveStatus = optString(obj, "live_status") ?: return false
-        return when (liveStatus) {
-            "is_live", "is_upcoming", "post_live" -> true
-            else -> false
-        }
+        return LiveStatus.fromWire(optString(obj, "live_status")).isLiveLike
     }
 
     /** Reads the `duration` field from the JSON object and converts seconds to nanoseconds; returns 0 for live or missing values. */
