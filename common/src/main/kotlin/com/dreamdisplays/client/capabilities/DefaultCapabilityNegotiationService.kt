@@ -12,6 +12,8 @@ import org.slf4j.LoggerFactory
  * [ClientCapabilityDetector]; server capabilities are assembled incrementally from the legacy
  * handshake (the server answers a [Packets.Version] advertise with Premium / ReportEnabled
  * packets, which [com.dreamdisplays.managers.ClientPacketManager] merges in via [onServerCapabilities]).
+ *
+ * @since 1.8.0
  */
 class DefaultCapabilityNegotiationService(
     private val detector: ClientCapabilityDetector,
@@ -20,13 +22,12 @@ class DefaultCapabilityNegotiationService(
     /** Probed once on first access; capability detection is stable for the process lifetime. */
     override val localCapabilities: ClientCapabilities by lazy { detector.detect() }
 
-    @Volatile
-    override var serverCapabilities: ServerCapabilities? = null
+    /** Updated incrementally as the handshake packets arrive; null until the first arrives. */
+    @Volatile override var serverCapabilities: ServerCapabilities? = null
         private set
 
-    /** True once any server capability information has arrived. */
-    override val isNegotiated: Boolean
-        get() = serverCapabilities != null
+    /** True, once any server capability information has arrived. */
+    override val isNegotiated: Boolean get() = serverCapabilities != null
 
     /**
      * Starts the handshake by sending the legacy [Packets.Version] packet; the server responds
