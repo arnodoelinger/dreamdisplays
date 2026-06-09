@@ -1,7 +1,12 @@
 package com.dreamdisplays.render
 
+import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.client.render.ClientRenderService
+import com.dreamdisplays.client.render.DisplayRenderEntry
 import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.render.api.RenderContext
+import com.dreamdisplays.render.api.TextureHandle
 import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.Camera
 import net.minecraft.client.renderer.rendertype.RenderType
@@ -11,7 +16,7 @@ import kotlin.math.abs
 import kotlin.math.sin
 
 /** Renders screens in the world. */
-object ScreenRenderer {
+object ScreenRenderer : ClientRenderService {
     private typealias QuadAppender = (PoseStack.Pose, VertexConsumer) -> Unit
     private typealias QuadRenderer = (RenderType, QuadAppender) -> Unit
 
@@ -21,6 +26,33 @@ object ScreenRenderer {
             drawImmediate(stack, type, appendVertices)
         }
     }
+
+    /**
+     * [ClientRenderService] render entry point. Unwraps a [MinecraftRenderContext] and delegates to
+     * [render]; any other [RenderContext] type is a no-op (this renderer can only draw through a live
+     * [PoseStack] / [Camera]).
+     */
+    override fun renderAll(context: RenderContext) {
+        val ctx = context as? MinecraftRenderContext ?: return
+        render(ctx.stack, ctx.camera)
+    }
+
+    /** No-op: live screens are created by [DisplayManager] from network packets, not flat entries. */
+    override fun registerDisplay(entry: DisplayRenderEntry) = Unit
+
+    /** Unregisters the live screen matching [displayId], delegating to [DisplayManager]. */
+    override fun unregisterDisplay(displayId: DisplayId) {
+        DisplayManager.getScreens()
+            .firstOrNull { it.uuid == displayId.uuid }
+            ?.let { DisplayManager.unregisterScreen(it) }
+    }
+
+    /** No-op: each [DisplayScreen] owns its own GPU texture lifecycle in the current model. */
+    override fun updateTexture(displayId: DisplayId, handle: TextureHandle) = Unit
+
+    /** Number of live screens with an uploaded texture. Those this renderer will actually draw. */
+    override val registeredCount: Int
+        get() = DisplayManager.getScreens().count { it.texture != null }
 
     /** Iterates all registered screens and lets the caller submit quads through the active renderer. */
     fun render(stack: PoseStack, camera: Camera, drawQuad: QuadRenderer) {
