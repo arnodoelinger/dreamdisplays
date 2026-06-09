@@ -10,7 +10,7 @@ class Config(private val baseDir: File) {
     var defaultDistance: Int = 64
     var defaultDisplayVolume: Double = 0.5
     var displaysEnabled: Boolean = true
-    var ytdlpCookiesFromBrowser: String = "auto"
+    var ytdlpCookiesFromBrowser: String = "none"
     var ytdlpProxy: String = ""
     var useHwAccel: Boolean = true
 

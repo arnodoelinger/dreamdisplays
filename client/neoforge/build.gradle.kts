@@ -7,10 +7,16 @@ plugins {
     id("dreamdisplays.shadow-conventions")
 }
 
+repositories {
+    mavenCentral()
+    maven("https://jitpack.io")
+}
+
 dependencies {
     implementation(project(":common"))
     shadow(project(":common"))
     shadow(libs.kotlinStdlib)
+    shadow(libs.newpipeExtractor)
 }
 
 val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
@@ -73,6 +79,14 @@ tasks.shadowJar {
         include(dependency("org.semver4j:semver4j"))
         include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
         include(dependency("org.jetbrains:annotations"))
+        // NewPipeExtractor (in-process YouTube resolver) + its runtime deps. jsr305 is intentionally
+        // omitted: its annotations are not needed at runtime and Guava already provides them.
+        include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
+        include(dependency("com.github.TeamNewPipe:nanojson"))
+        include(dependency("org.jsoup:jsoup"))
+        include(dependency("com.google.protobuf:protobuf-javalite"))
+        include(dependency("org.mozilla:rhino"))
+        include(dependency("org.mozilla:rhino-engine"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
@@ -82,6 +96,12 @@ tasks.shadowJar {
         "kotlin",
         "org.jetbrains.annotations",
         "org.intellij.lang.annotations",
+        "org.schabi.newpipe",
+        "com.grack.nanojson",
+        "org.jsoup",
+        "com.google.protobuf",
+        "org.mozilla.javascript",
+        "org.mozilla.classfile",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }

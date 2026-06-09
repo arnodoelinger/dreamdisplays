@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import java.nio.file.attribute.FileTime
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.*
 import java.util.concurrent.*
@@ -41,8 +42,13 @@ object YtDlp {
     private const val INFO_CACHE_TTL_MS: Long = 30L * 60L * 1_000L
     private const val COOKIE_REFRESH_MS: Long = 2L * 60L * 60L * 1_000L
 
-    private val BROWSER_CANDIDATES = arrayOf("chrome", "firefox", "safari", "edge", "brave", "opera", "vivaldi")
-    private val BROWSER_CANDIDATES_MACOS = arrayOf("safari", "firefox", "chrome", "edge", "brave", "opera", "vivaldi")
+    /** Per-invocation yt-dlp wait. With cookies off + token-free clients a warm fetch is sub-second,
+     *  so this only bounds genuine failures; keep it short so they surface fast. */
+    private const val FETCH_TIMEOUT_SECONDS: Long = 25L
+
+    /** Re-run `yt-dlp -U` on the bundled binary once it is older than this; a stale binary is a top
+     *  cause of "not a bot" / extraction failures since it never self-updates otherwise. */
+    private const val BINARY_REFRESH_MS: Long = 7L * 24L * 60L * 60L * 1_000L
 
     private val PREWARM_EXECUTOR = Executors.newSingleThreadExecutor { r ->
         Thread(r, "YtDlp-prewarm").apply { isDaemon = true }
@@ -108,6 +114,7 @@ object YtDlp {
         if (resolvedBinary != null && cookieBrowserResolved && cachedCookieHeader != null) return
         PREWARM_EXECUTOR.submit {
             try {
+                NewPipeResolver.ensureInitialized()
                 resolveBinary()
                 resolveCookieBrowser()
                 getCookieHeader()
@@ -284,7 +291,8 @@ object YtDlp {
 
     private fun cookiesDisabledByConfig(): Boolean {
         val configured = ClientStateManager.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
-        return configured == "none" || configured == "off" || configured == "disabled" || configured.isEmpty()
+        return configured == "none" || configured == "off" || configured == "disabled" ||
+                configured == "auto" || configured.isEmpty()
     }
 
     /**
@@ -365,9 +373,15 @@ object YtDlp {
         }
     }
 
-    /** Runs `yt-dlp` for [videoUrl] with one automatic retry on non-timeout errors. */
+    /**
+     * Resolves streams for [videoUrl]. Tries the in-process [NewPipeResolver] fast path first and
+     * falls back to the `yt-dlp` subprocess (with one automatic retry on non-timeout errors).
+     */
     @Throws(IOException::class)
     private fun fetchUncached(videoUrl: String): List<YtStream> {
+        val viaNewPipe = NewPipeResolver.fetch(videoUrl)
+        if (viaNewPipe.isNotEmpty()) return viaNewPipe
+
         var lastError: IOException? = null
         for (attempt in 0 until 2) {
             if (attempt > 0) {
@@ -401,7 +415,8 @@ object YtDlp {
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }
         if (!hasCookieArg) {
-            val clients = if (attempt == 0) "web,ios,mweb" else "android,tv_embedded,mweb"
+            // Token-free, non-DRM clients only
+            val clients = if (attempt == 0) "android_vr,ios,tv" else "tv,android,ios"
             cmd.addAll(listOf("--extractor-args", "youtube:player_client=$clients"))
         }
 
@@ -429,7 +444,7 @@ object YtDlp {
         stdoutReader.start()
         stderrReader.start()
         try {
-            if (!process.waitFor(60, TimeUnit.SECONDS)) {
+            if (!process.waitFor(FETCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
                 val pid = try {
                     process.pid()
                 } catch (_: Exception) {
@@ -440,7 +455,7 @@ object YtDlp {
                 stdoutReader.join(2_000)
                 stderrReader.join(2_000)
                 logger.warn(
-                    "Fetch timeout after 60s for $videoUrl " +
+                    "Fetch timeout after ${FETCH_TIMEOUT_SECONDS}s for $videoUrl " +
                             "(pid=$pid, alive=$alive, stdoutBytes=${stdout.length}, stderrBytes=${stderr.length}, " +
                             "stderrTail=${stderr.takeLast(500).trim()}, " +
                             "stdoutTail=${stdout.takeLast(200).trim()})"
@@ -493,6 +508,7 @@ object YtDlp {
 
     /** Returns the cached cookie header, re-exporting from the browser if the TTL has expired. Thread-safe. */
     private fun getCookieHeader(): String? {
+        if (cookiesDisabledByConfig()) return null
         val cached = cachedCookieHeader
         val now = System.currentTimeMillis()
         if (cached != null && (now - cookieHeaderExportedAt) < COOKIE_REFRESH_MS) return cached
@@ -733,6 +749,7 @@ object YtDlp {
             for (c in candidates) {
                 if (canExecute(c)) {
                     resolvedBinary = c
+                    if (c == bundled.toString()) maybeSelfUpdateBundled(bundled)
                     return c
                 }
             }
@@ -740,6 +757,47 @@ object YtDlp {
             val downloaded = downloadBundled(bundled)
             resolvedBinary = downloaded
             return downloaded
+        }
+    }
+
+    private val bundledUpdateChecked = AtomicBoolean(false)
+
+    /**
+     * If the bundled `yt-dlp` binary at [bundled] is older than [BINARY_REFRESH_MS], runs
+     * `yt-dlp -U` in the background to pull the latest release. Runs at most once per session and
+     * never blocks the caller; failures are logged and ignored. The binary's mtime is bumped on a
+     * successful run so a no-op update doesn't re-check for another week.
+     */
+    private fun maybeSelfUpdateBundled(bundled: Path) {
+        if (!bundledUpdateChecked.compareAndSet(false, true)) return
+        val age = try {
+            System.currentTimeMillis() - Files.getLastModifiedTime(bundled).toMillis()
+        } catch (_: IOException) {
+            return
+        }
+        if (age < BINARY_REFRESH_MS) return
+        PREWARM_EXECUTOR.submit {
+            try {
+                logger.info("Bundled yt-dlp is ${age / 86_400_000L} days old, running self-update...")
+                val p = ProcessBuilder(bundled.toString(), "-U", "--no-warnings")
+                    .redirectErrorStream(true).start()
+                try {
+                    p.outputStream.close()
+                } catch (_: IOException) {
+                }
+                p.inputStream.use { it.readAllBytes() }
+                if (!p.waitFor(120, TimeUnit.SECONDS)) {
+                    destroyProcessTree(p)
+                    return@submit
+                }
+                try {
+                    Files.setLastModifiedTime(bundled, FileTime.fromMillis(System.currentTimeMillis()))
+                } catch (_: IOException) {
+                }
+                logger.info("yt-dlp self-update finished.")
+            } catch (e: Exception) {
+                logger.warn("yt-dlp self-update failed: ${e.message}")
+            }
         }
     }
 
@@ -754,21 +812,21 @@ object YtDlp {
         synchronized(this) {
             if (cookieBrowserResolved && resolvedCookieBrowser != null) return resolvedCookieBrowser
             if (cookieBrowserResolved && (now - cookieBrowserResolvedAt) < COOKIE_BROWSER_RETRY_MS) return null
-            var configured = ClientStateManager.config.ytdlpCookiesFromBrowser
-            configured = configured.trim().lowercase(Locale.ENGLISH)
+            val configured = ClientStateManager.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
 
-            if (configured == "none" || configured == "off" || configured == "disabled" || configured.isEmpty()) {
+            if (cookiesDisabledByConfig()) {
                 cookieBrowserResolved = true
                 resolvedCookieBrowser = null
+                // Set the timestamp so the early-return guards above short-circuit later call;
+                // otherwise this branch re-runs (and re-logs) on every fetch.
+                cookieBrowserResolvedAt = System.currentTimeMillis()
                 logger.info("Cookies-from-browser disabled via config.")
                 return null
             }
 
-            // Try to avoid false message popup "Security wants to use your confidential information..." on macOS
-            val isMacOs = System.getProperty("os.name", "").lowercase(Locale.ENGLISH).contains("mac")
-            val candidates = if (configured == "auto") {
-                if (isMacOs) BROWSER_CANDIDATES_MACOS else BROWSER_CANDIDATES
-            } else arrayOf(configured)
+            // Cookies are opt-in, so "configured" is always a single explicit browser name here
+            // (see cookiesDisabledByConfig). No auto-detection sweep -> no macOS keychain popup.
+            val candidates = arrayOf(configured)
             val binary: String? = try {
                 resolveBinary()
             } catch (_: IOException) {
@@ -788,13 +846,11 @@ object YtDlp {
                     return browser
                 }
             }
-            if (configured != "auto") {
-                logger.warn(
-                    "Browser '$configured' not found or has no YouTube cookies. " +
-                            "YouTube may rate-limit or refuse requests. " +
-                            "Set 'ytdlp-cookies-from-browser' to 'none' to disable."
-                )
-            }
+            logger.warn(
+                "Browser '$configured' not found or has no YouTube cookies. " +
+                        "YouTube may rate-limit or refuse requests. " +
+                        "Set 'ytdlp-cookies-from-browser' to 'none' to disable."
+            )
             cookieBrowserResolvedAt = System.currentTimeMillis()
             cookieBrowserResolved = true
             return null
@@ -857,6 +913,7 @@ object YtDlp {
     }
 
     /** Returns the GitHub release asset name to download for the current OS and architecture. */
+    // TODO: move to downloader in future
     private fun downloadAssetName(): String {
         val os = System.getProperty("os.name", "").lowercase(Locale.ENGLISH)
         val arch = System.getProperty("os.arch", "").lowercase(Locale.ENGLISH)
@@ -877,7 +934,7 @@ object YtDlp {
 
         val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
         conn.instanceFollowRedirects = true
-        conn.connectTimeout = 15_000
+        conn.connectTimeout = 15_000 // TODO: separate
         conn.readTimeout = 120_000
         conn.setRequestProperty("User-Agent", "DreamDisplays-yt-dlp-bootstrap")
         try {
@@ -896,9 +953,10 @@ object YtDlp {
             }
             try {
                 // Hack: this operation is needed for safe FFmpeg execution on macOS, since otherwise the quarantine flag may prevent
-                // it from running. It doesn't matter if this fails, since the binary will still work in most cases, but removing the
+                // it from running. It doesn't matter if this fails, since the binary will still work in most cases. However, removing the
                 // quarantine flag can help avoid some weird issues on macOS where the OS prevents the binary from running due to
                 // security concerns.
+                // TODO: remove this hack in future
                 ProcessBuilder("xattr", "-d", "com.apple.quarantine", target.toString())
                     .redirectErrorStream(true).start().waitFor(5, TimeUnit.SECONDS)
             } catch (_: Exception) {

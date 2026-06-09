@@ -116,6 +116,7 @@ dependencies {
     shadow(libs.exposedJdbc)
     shadow(libs.exposedMigrationJdbc)
     shadow(libs.hikari)
+    shadow(libs.newpipeExtractor)
 }
 
 tasks.processResources {
@@ -181,6 +182,12 @@ tasks.shadowJar {
         include(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-datetime-jvm"))
         include(dependency("com.zaxxer:HikariCP"))
+        include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
+        include(dependency("com.github.TeamNewPipe:nanojson"))
+        include(dependency("org.jsoup:jsoup"))
+        include(dependency("com.google.protobuf:protobuf-javalite"))
+        include(dependency("org.mozilla:rhino"))
+        include(dependency("org.mozilla:rhino-engine"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
@@ -195,6 +202,12 @@ tasks.shadowJar {
         "org.semver4j",
         "org.jetbrains.exposed",
         "com.zaxxer.hikari",
+        "org.schabi.newpipe",
+        "com.grack.nanojson",
+        "org.jsoup",
+        "com.google.protobuf",
+        "org.mozilla.javascript",
+        "org.mozilla.classfile",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }

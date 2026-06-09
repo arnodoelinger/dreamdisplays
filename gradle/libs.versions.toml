@@ -12,6 +12,7 @@ bstats = "3.2.1"
 shadow = "9.4.1"
 kotlin = "2.4.0"
 paperweight = "2.0.0-beta.21"
+newpipeExtractor = "v0.26.2"
 
 [libraries]
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
@@ -28,3 +29,4 @@ exposedJdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "ex
 exposedMigrationJdbc = { module = "org.jetbrains.exposed:exposed-migration-jdbc", version.ref = "exposed" }
 hikari = { module = "com.zaxxer:HikariCP", version.ref = "hikari" }
 bstats = { module = "org.bstats:bstats-bukkit", version.ref = "bstats" }
+newpipeExtractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "newpipeExtractor" }
