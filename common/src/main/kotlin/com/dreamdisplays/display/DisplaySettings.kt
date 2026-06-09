@@ -1,5 +1,6 @@
 package com.dreamdisplays.display
 
+import com.dreamdisplays.api.DisplayFacing
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import org.slf4j.LoggerFactory
@@ -196,7 +197,7 @@ object DisplaySettings {
         var x: Int,
         var y: Int,
         var z: Int,
-        var facing: String,
+        var facing: DisplayFacing,
         var width: Int,
         var height: Int,
         var videoUrl: String,

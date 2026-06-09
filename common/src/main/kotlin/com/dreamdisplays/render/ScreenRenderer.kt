@@ -1,5 +1,6 @@
 package com.dreamdisplays.render
 
+import com.dreamdisplays.api.DisplayFacing
 import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
@@ -92,20 +93,22 @@ object ScreenRenderer : ClientRenderService {
         moveForward(stack, displayScreen.facing, 0.008f)
 
         when (displayScreen.facing) {
-            "NORTH" -> {
-                moveHorizontal(stack, "NORTH", -displayScreen.width.toFloat())
-                moveForward(stack, "NORTH", 1f)
+            DisplayFacing.NORTH -> {
+                moveHorizontal(stack, DisplayFacing.NORTH, -displayScreen.width.toFloat())
+                moveForward(stack, DisplayFacing.NORTH, 1f)
             }
 
-            "SOUTH" -> {
-                moveHorizontal(stack, "SOUTH", 1f)
-                moveForward(stack, "SOUTH", 1f)
+            DisplayFacing.SOUTH -> {
+                moveHorizontal(stack, DisplayFacing.SOUTH, 1f)
+                moveForward(stack, DisplayFacing.SOUTH, 1f)
             }
 
-            "EAST" -> {
-                moveHorizontal(stack, "EAST", -(displayScreen.width - 1).toFloat())
-                moveForward(stack, "EAST", 2f)
+            DisplayFacing.EAST -> {
+                moveHorizontal(stack, DisplayFacing.EAST, -(displayScreen.width - 1).toFloat())
+                moveForward(stack, DisplayFacing.EAST, 2f)
             }
+
+            DisplayFacing.WEST -> {}
         }
 
         fixRotation(stack, displayScreen.facing)
@@ -126,17 +129,17 @@ object ScreenRenderer : ClientRenderService {
     }
 
     /** Applies the quaternion rotation and position correction so the quad faces the correct direction for [facing]. */
-    private fun fixRotation(stack: PoseStack, facing: String) {
+    private fun fixRotation(stack: PoseStack, facing: DisplayFacing) {
         val rotation: Quaternionf = when (facing) {
-            "NORTH" -> Quaternionf().rotationY(Math.toRadians(180.0).toFloat()).also {
+            DisplayFacing.NORTH -> Quaternionf().rotationY(Math.toRadians(180.0).toFloat()).also {
                 stack.translate(0f, 0f, 1f)
             }
 
-            "WEST" -> Quaternionf().rotationY(Math.toRadians(-90.0).toFloat()).also {
+            DisplayFacing.WEST -> Quaternionf().rotationY(Math.toRadians(-90.0).toFloat()).also {
                 stack.translate(0f, 0f, 0f)
             }
 
-            "EAST" -> Quaternionf().rotationY(Math.toRadians(90.0).toFloat()).also {
+            DisplayFacing.EAST -> Quaternionf().rotationY(Math.toRadians(90.0).toFloat()).also {
                 stack.translate(-1f, 0f, 1f)
             }
 
@@ -146,21 +149,21 @@ object ScreenRenderer : ClientRenderService {
     }
 
     /** Translates [stack] by [amount] blocks in the forward axis of [facing]. */
-    private fun moveForward(stack: PoseStack, facing: String, amount: Float) {
+    private fun moveForward(stack: PoseStack, facing: DisplayFacing, amount: Float) {
         when (facing) {
-            "NORTH" -> stack.translate(0f, 0f, -amount)
-            "WEST" -> stack.translate(-amount, 0f, 0f)
-            "EAST" -> stack.translate(amount, 0f, 0f)
+            DisplayFacing.NORTH -> stack.translate(0f, 0f, -amount)
+            DisplayFacing.WEST -> stack.translate(-amount, 0f, 0f)
+            DisplayFacing.EAST -> stack.translate(amount, 0f, 0f)
             else -> stack.translate(0f, 0f, amount)
         }
     }
 
     /** Translates [stack] by [amount] blocks along the horizontal axis perpendicular to [facing]. */
-    private fun moveHorizontal(stack: PoseStack, facing: String, amount: Float) {
+    private fun moveHorizontal(stack: PoseStack, facing: DisplayFacing, amount: Float) {
         when (facing) {
-            "NORTH" -> stack.translate(-amount, 0f, 0f)
-            "WEST" -> stack.translate(0f, 0f, amount)
-            "EAST" -> stack.translate(0f, 0f, -amount)
+            DisplayFacing.NORTH -> stack.translate(-amount, 0f, 0f)
+            DisplayFacing.WEST -> stack.translate(0f, 0f, amount)
+            DisplayFacing.EAST -> stack.translate(0f, 0f, -amount)
             else -> stack.translate(amount, 0f, 0f)
         }
     }

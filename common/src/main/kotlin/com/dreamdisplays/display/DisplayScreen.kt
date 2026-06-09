@@ -2,6 +2,7 @@ package com.dreamdisplays.display
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.api.DisplayEvent
+import com.dreamdisplays.api.DisplayFacing
 import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.client.ui.DisplayMenu
 import com.dreamdisplays.client.ui.PipCorner
@@ -38,7 +39,7 @@ class DisplayScreen(
     private var x: Int,
     private var y: Int,
     private var z: Int,
-    var facing: String,
+    var facing: DisplayFacing,
     var width: Int,
     var height: Int,
     var isSync: Boolean,
@@ -184,7 +185,7 @@ class DisplayScreen(
         y = packet.pos.y
         z = packet.pos.z
         blockPos = null
-        facing = packet.facingUtil.toString()
+        facing = packet.facingUtil.toDisplayFacing()
         width = packet.width
         height = packet.height
         isSync = packet.isSync
@@ -267,8 +268,8 @@ class DisplayScreen(
         val maxY = y + height - 1
         var maxZ = z
         when (facing) {
-            "NORTH", "SOUTH" -> maxX += width - 1
-            else -> maxZ += width - 1
+            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
+            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
         }
         return pos.x in x..maxX &&
                 y <= pos.y && maxY >= pos.y &&
@@ -281,8 +282,8 @@ class DisplayScreen(
         val maxY = y + height - 1
         var maxZ = z
         when (facing) {
-            "NORTH", "SOUTH" -> maxX += width - 1
-            "EAST", "WEST" -> maxZ += width - 1
+            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
+            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
         }
         val clampedX = min(max(pos.x, x), maxX)
         val clampedY = min(max(pos.y, y), maxY)

@@ -21,11 +21,7 @@ internal fun DisplayScreen.toDisplay(): Display = Display(
     bounds = DisplayBounds(
         x = pos.x.toDouble(), y = pos.y.toDouble(), z = pos.z.toDouble(),
         width = width, height = height,
-        facing = when (facing.uppercase()) {
-            "NORTH" -> DisplayFacing.NORTH; "SOUTH" -> DisplayFacing.SOUTH
-            "EAST" -> DisplayFacing.EAST; "WEST" -> DisplayFacing.WEST
-            else -> DisplayFacing.NORTH
-        },
+        facing = facing,
     ),
     settings = ApiDisplaySettings(
         volume = volume, quality = quality, brightness = brightness,

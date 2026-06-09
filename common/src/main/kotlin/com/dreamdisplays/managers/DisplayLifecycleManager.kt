@@ -1,5 +1,6 @@
 package com.dreamdisplays.managers
 
+import com.dreamdisplays.api.DisplayFacing
 import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.display.DisplayScreen
 import com.dreamdisplays.display.DisplaySettings
@@ -40,7 +41,7 @@ object DisplayLifecycleManager {
             val renderDistance = DisplaySettings.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
             val dist = distanceToScreen(
                 packet.pos.x, packet.pos.y, packet.pos.z,
-                packet.width, packet.height, packet.facingUtil.toString(),
+                packet.width, packet.height, packet.facingUtil.toDisplayFacing(),
                 player.blockPosition()
             )
             if (dist > renderDistance) return
@@ -60,7 +61,7 @@ object DisplayLifecycleManager {
         width: Int, height: Int, code: String, lang: String, isSync: Boolean,
     ) {
         val displayScreen = DisplayScreen(
-            uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toString(),
+            uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toDisplayFacing(),
             width, height, isSync
         )
 
@@ -112,14 +113,14 @@ object DisplayLifecycleManager {
         distanceToScreen(data.x, data.y, data.z, data.width, data.height, data.facing, playerPos)
 
     private fun distanceToScreen(
-        x: Int, y: Int, z: Int, width: Int, height: Int, facing: String, playerPos: BlockPos
+        x: Int, y: Int, z: Int, width: Int, height: Int, facing: DisplayFacing, playerPos: BlockPos
     ): Double {
         var maxX = x
         val maxY = y + height - 1
         var maxZ = z
         when (facing) {
-            "NORTH", "SOUTH" -> maxX += width - 1
-            "EAST", "WEST" -> maxZ += width - 1
+            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
+            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
         }
         return sqrt(playerPos.distSqr(BlockPos(
             minOf(maxOf(playerPos.x, x), maxX),
