@@ -1,10 +1,14 @@
 package com.dreamdisplays
 
+import com.dreamdisplays.client.core.ClientApplication
+import com.dreamdisplays.client.core.ClientLifecycleEvent
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.overlay.OverlayManager
 import com.dreamdisplays.client.ui.MinecraftOverlayRenderContext
+import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.managers.ClientPacketManager
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.managers.ClientShutdownManager
 import com.dreamdisplays.managers.ClientStartupManager
 import com.dreamdisplays.managers.ClientTickManager
@@ -38,6 +42,34 @@ object Initializer {
 
         logger.info("Starting Dream Displays...")
         ClientStartupManager.start()
+    }
+
+    /**
+     * Called by the platform entrypoint after joining a server: records [serverId] in the client
+     * state, restores saved screens, and emits [ClientLifecycleEvent.ServerJoined].
+     */
+    fun onServerJoined(serverId: String) {
+        ClientStateManager.connectedServerId = serverId
+        DisplayManager.loadScreensForServer(serverId)
+        DreamServices.registry.getOrNull<ClientApplication>()
+            ?.emit(ClientLifecycleEvent.ServerJoined(serverId))
+    }
+
+    /**
+     * Called by the platform entrypoint on disconnect: persists and unloads all screens, resets
+     * the per-server flags, and emits [ClientLifecycleEvent.ServerLeft].
+     */
+    fun onServerLeft() {
+        val serverId = ClientStateManager.connectedServerId
+        DisplayManager.saveAllScreens()
+        DisplayManager.unloadAll()
+        ClientStateManager.isPremium = false
+        ClientStateManager.isAdmin = false
+        ClientStateManager.connectedServerId = null
+        if (serverId != null) {
+            DreamServices.registry.getOrNull<ClientApplication>()
+                ?.emit(ClientLifecycleEvent.ServerLeft(serverId))
+        }
     }
 
     /** Handles an incoming [Packets.Info] packet: updates an existing screen or creates a new one if within render distance. */

@@ -1,10 +1,13 @@
 package com.dreamdisplays.render
 
 import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.render.ClientRenderService
 import com.dreamdisplays.client.render.DisplayRenderEntry
 import com.dreamdisplays.display.DisplayManager
 import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.render.api.DisplayRenderer
 import com.dreamdisplays.render.api.RenderContext
 import com.dreamdisplays.render.api.TextureHandle
 import com.mojang.blaze3d.vertex.*
@@ -71,6 +74,12 @@ object ScreenRenderer : ClientRenderService {
 
             stack.popPose()
         }
+
+        // API-registered surfaces draw in the same world pass, after the mod's own screens.
+        // The world render hooks do not surface a partial tick, hence the 0f tickDelta.
+        DreamServices.registry.getOrNull<DisplayRenderer>()
+            ?.takeIf { it.registeredCount > 0 }
+            ?.renderAll(MinecraftRenderContext(stack, camera, 0f))
     }
 
     /** Translates and rotates the pose for [displayScreen]'s facing direction, then renders the video or fallback color. */

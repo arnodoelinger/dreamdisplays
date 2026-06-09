@@ -2,6 +2,8 @@ package com.dreamdisplays.managers
 
 import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.client.capabilities.CapabilityNegotiationService
+import com.dreamdisplays.client.core.ClientApplication
+import com.dreamdisplays.client.core.ClientLifecycleEvent
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.input.DisplayInteraction
@@ -26,8 +28,13 @@ object ClientTickManager {
     private var wasFocused = false
     private var unloadCheckTick = 0
     private var hoveredDisplayScreen: DisplayScreen? = null
+    private var tickCount = 0L
 
     fun tick(minecraft: Minecraft) {
+        tickCount++
+        DreamServices.registry.getOrNull<ClientApplication>()
+            ?.emit(ClientLifecycleEvent.Tick(tickCount))
+
         val level = minecraft.level
         if (level != null && (minecraft.currentServer != null || minecraft.isLocalServer)) {
             if (lastLevel == null) {

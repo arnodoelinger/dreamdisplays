@@ -1,8 +1,11 @@
 package com.dreamdisplays
 
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.register
 import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.platform.FabricPlatform
+import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
@@ -30,6 +33,9 @@ class Client : ClientModInitializer, Mod {
     private var customGeometryUnavailable = false
 
     override fun onInitializeClient() {
+        // The Platform must be in the registry before onModInit so ClientStartupManager
+        // can host the ClientApplication on top of it during bootstrap.
+        DreamServices.registry.register<Platform>(FabricPlatform)
         Initializer.onModInit(this)
 
         // Note: PayloadTypeRegistry registrations are done in server/ (it's a main entrypoint)
@@ -101,15 +107,12 @@ class Client : ClientModInitializer, Mod {
             if (client.level != null && client.player != null) {
                 val serverId = if (client.isLocalServer) "singleplayer"
                 else client.currentServer?.ip ?: "unknown"
-                DisplayManager.loadScreensForServer(serverId)
+                Initializer.onServerJoined(serverId)
             }
         }
 
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
-            DisplayManager.saveAllScreens()
-            DisplayManager.unloadAll()
-            ClientStateManager.isPremium = false
-            ClientStateManager.isAdmin = false
+            Initializer.onServerLeft()
         }
 
         ClientLifecycleEvents.CLIENT_STOPPING.register { Initializer.onStop() }

@@ -3,8 +3,14 @@ package com.dreamdisplays.managers
 import com.dreamdisplays.Config
 import com.dreamdisplays.Focuser
 import com.dreamdisplays.Initializer
+import com.dreamdisplays.client.core.ClientApplication
+import com.dreamdisplays.client.core.DefaultClientApplication
+import com.dreamdisplays.client.core.DefaultClientContext
 import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.client.core.register
 import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.display.DisplayScreen
 import com.dreamdisplays.display.DisplaySettings
 import com.dreamdisplays.ffmpeg.FFmpegBinary
@@ -39,6 +45,13 @@ object ClientStartupManager {
         // Wire the contract-typed service graph (media resolver chain, ...) before any
         // background prewarm touches it.
         DreamServices.bootstrap()
+
+        // If the loader entrypoint registered a Platform, host the module system on top of it.
+        DreamServices.registry.getOrNull<Platform>()?.let { platform ->
+            val application = DefaultClientApplication(DefaultClientContext(platform))
+            DreamServices.registry.register<ClientApplication>(application)
+            application.start()
+        }
 
         YtDlp.prewarmAsync()
         FFmpegBinary.prewarmAsync()

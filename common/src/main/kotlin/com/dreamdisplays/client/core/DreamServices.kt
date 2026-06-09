@@ -23,7 +23,11 @@ import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.media.api.MediaSessionManager
 import com.dreamdisplays.media.api.StreamSelector
+import com.dreamdisplays.render.AsyncTextureUploader
+import com.dreamdisplays.render.DefaultDisplayRenderer
 import com.dreamdisplays.render.ScreenRenderer
+import com.dreamdisplays.render.api.DisplayRenderer
+import com.dreamdisplays.render.api.TextureUploaderFactory
 import com.dreamdisplays.ytdlp.NewPipeResolver
 import com.dreamdisplays.ytdlp.YtDlpResolver
 
@@ -55,6 +59,13 @@ object DreamServices {
      *
      * Client integration: [ClientRenderService] ([ScreenRenderer]), [ClientCapabilityDetector],
      * and [CapabilityNegotiationService].
+     *
+     * Render: [DisplayRenderer] (orchestrator for API-registered surfaces) and
+     * [TextureUploaderFactory] (per-GL-context [AsyncTextureUploader] instances).
+     *
+     * The loader entrypoint additionally registers a [com.dreamdisplays.platform.api.Platform];
+     * when present, [com.dreamdisplays.managers.ClientStartupManager] hosts a
+     * [ClientApplication] on top of it.
      */
     @Synchronized
     fun bootstrap() {
@@ -79,5 +90,7 @@ object DreamServices {
         registry.register<CapabilityNegotiationService>(
             DefaultCapabilityNegotiationService(MinecraftClientCapabilityDetector)
         )
+        registry.register<DisplayRenderer>(DefaultDisplayRenderer())
+        registry.register<TextureUploaderFactory>(TextureUploaderFactory { AsyncTextureUploader(stateCache = it) })
     }
 }
