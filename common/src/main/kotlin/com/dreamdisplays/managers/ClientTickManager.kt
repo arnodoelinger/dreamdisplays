@@ -1,6 +1,9 @@
 package com.dreamdisplays.managers
 
 import com.dreamdisplays.Initializer
+import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.client.input.DisplayInteraction
+import com.dreamdisplays.client.input.MinecraftDisplayInteractionService
 import com.dreamdisplays.client.ui.DisplayMenu
 import com.dreamdisplays.client.ui.PipOverlayManager
 import com.dreamdisplays.display.DisplayManager
@@ -88,7 +91,10 @@ object ClientTickManager {
         val window = minecraft.window.handle()
         val pressed = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_RIGHT) == GLFW.GLFW_PRESS
         if (pressed && !wasPressed && player.isShiftKeyDown) {
-            hoveredDisplayScreen?.let { DisplayMenu.open(it) }
+            hoveredDisplayScreen?.let {
+                MinecraftDisplayInteractionService.emit(DisplayInteraction.RightClicked(DisplayId(it.uuid)))
+                DisplayMenu.open(it)
+            }
         }
         wasPressed = pressed
 
