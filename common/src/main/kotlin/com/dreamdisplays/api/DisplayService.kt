@@ -1,5 +1,8 @@
 package com.dreamdisplays.api
 
+/**
+ * Represents a display in the system.
+ */
 interface DisplayService {
     fun getDisplay(id: DisplayId): Display?
     fun listDisplays(): List<Display>

@@ -1,5 +1,10 @@
 package com.dreamdisplays.api
 
+/**
+ * The facing direction of a display.
+ *
+ * @since 1.0.0
+ */
 enum class DisplayFacing(val byte: Byte) {
     NORTH(0),
     EAST(1),
@@ -15,6 +20,6 @@ enum class DisplayFacing(val byte: Byte) {
 
     companion object {
         fun fromByte(byte: Byte): DisplayFacing =
-            entries.firstOrNull { it.byte == byte } ?: error("Unknown facing byte: $byte")
+            entries.firstOrNull { it.byte == byte } ?: error("Unknown facing byte: $byte.")
     }
 }
