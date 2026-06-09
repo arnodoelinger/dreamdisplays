@@ -396,6 +396,7 @@ object YtDlp {
                 return fetchUncachedOnce(videoUrl, attempt)
             } catch (e: IOException) {
                 if (e.message?.contains("timed out") == true) throw e
+                if (e.message?.contains("DRM protected", ignoreCase = true) == true) throw e
                 lastError = e
             }
         }
