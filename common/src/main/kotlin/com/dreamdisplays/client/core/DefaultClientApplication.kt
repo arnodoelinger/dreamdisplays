@@ -7,8 +7,27 @@ import java.util.concurrent.CopyOnWriteArrayList
  * dependency order on [start]; lifecycle events fan out to external listeners (via [onEvent]) and
  * to every installed module's [ClientModule.onEvent].
  *
+ * The application itself does not render videos, draw overlays, manage popouts, talk to YouTube, or
+ * handle input. Those responsibilities belong to modules.
+ *
+ * Its job is boring (and it's great):
+ *  - Install modules
+ *  - Resolve dependencies
+ *  - Dispatch lifecycle events
+ *  - Shut everything down cleanly
+ *
+ * Modules declare dependencies through [ClientModule.dependencies]. During
+ * [start], dependencies are installed before dependents. Missing dependencies
+ * and dependency cycles are fatal because silently continuing would be even
+ * dumber.
+ *
+ * Lifecycle events are dispatched through a single path instead of every
+ * subsystem inventing its own special snowflake startup hook.
+ *
+ * Put everything in one place and don't make garbage.
+ *
  * @since 1.8.0
- */
+*/
 class DefaultClientApplication(override val context: ClientContext) : ClientApplication {
     private val modules = LinkedHashMap<String, ClientModule>()
     private val installed = LinkedHashSet<String>()
