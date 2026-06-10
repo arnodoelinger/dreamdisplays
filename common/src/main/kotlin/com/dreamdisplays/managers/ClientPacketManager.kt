@@ -4,8 +4,8 @@ import com.dreamdisplays.Mod
 import com.dreamdisplays.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.store.DisplayStorage
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.protocol.ServerCapabilities
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory
 /**
  * Handles client packet state changes and delegates outgoing packets to the platform implementation.
  */
+// TODO: rewrite
 object ClientPacketManager {
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientPacketManager")
 
@@ -40,7 +41,7 @@ object ClientPacketManager {
     fun handleDelete(packet: Packets.Delete) {
         DisplayManager.screens[packet.uuid]?.let { DisplayManager.unregisterScreen(it) }
         DisplayManager.unloadedScreens.remove(packet.uuid)
-        DisplaySettings.removeDisplay(packet.uuid)
+        DisplayStorage.removeDisplay(packet.uuid)
         logger.info("Display deleted and removed from saved data: ${packet.uuid}.")
     }
 
@@ -67,7 +68,7 @@ object ClientPacketManager {
     fun handleClearCache(packet: Packets.ClearCache) {
         packet.displayUuids.forEach { uuid ->
             DisplayManager.screens.remove(uuid)?.unregister()
-            DisplaySettings.removeDisplay(uuid)
+            DisplayStorage.removeDisplay(uuid)
         }
     }
 }

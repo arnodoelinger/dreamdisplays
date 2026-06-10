@@ -6,8 +6,8 @@ import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.render.ClientRenderService
 import com.dreamdisplays.client.render.DisplayRenderEntry
 import com.dreamdisplays.client.render.RenderHook
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.render.api.RenderContext
 import com.dreamdisplays.render.api.TextureHandle
 import com.mojang.blaze3d.vertex.*

@@ -5,8 +5,8 @@ import com.dreamdisplays.client.overlay.Overlay
 import com.dreamdisplays.client.overlay.OverlayEvent
 import com.dreamdisplays.client.overlay.OverlayManager
 import com.dreamdisplays.client.overlay.OverlayRenderContext
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -18,7 +18,6 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
  * the manager only sequences rendering and prevents two overlays from occupying the
  * same anchor.
  */
-// TODO: rewrite this class entirely in 1.9.0
 object PipOverlayManager : OverlayManager {
     private val overlays = mutableListOf<PipOverlay>()
 

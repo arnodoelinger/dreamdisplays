@@ -6,7 +6,7 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.overlay.OverlayManager
 import com.dreamdisplays.client.ui.MinecraftOverlayRenderContext
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.managers.ClientPacketManager
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.managers.ClientShutdownManager

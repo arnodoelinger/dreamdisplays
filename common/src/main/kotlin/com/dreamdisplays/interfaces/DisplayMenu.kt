@@ -2,9 +2,9 @@ package com.dreamdisplays.client.ui
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.client.ui.widgets.*
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
-import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
+import com.dreamdisplays.displays.store.DisplayStorage
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.utils.UpdateCheck
 import com.dreamdisplays.net.Packets
@@ -37,7 +37,6 @@ import java.net.URI
 import kotlin.math.*
 
 /** Configuration of a display screen GUI. */
-// TODO: rewrite this class entirely in 1.9.0
 class DisplayMenu private constructor() : Screen(Component.translatable("dreamdisplays.ui.title")) {
 
     var displayScreen: DisplayScreen? = null
@@ -287,7 +286,7 @@ class DisplayMenu private constructor() : Screen(Component.translatable("dreamdi
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "delete"), 2
         ) {
             override fun onPress() {
-                DisplaySettings.removeDisplay(ds.uuid)
+                DisplayStorage.removeDisplay(ds.uuid)
                 DisplayManager.unregisterScreen(ds)
                 Initializer.sendPacket(Packets.Delete(ds.uuid))
                 onClose()

@@ -1,7 +1,7 @@
 package com.dreamdisplays.api
 
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.toDisplay
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.toDisplay
 
 /**
  * Default [DisplayService] backed by [DisplayManager].

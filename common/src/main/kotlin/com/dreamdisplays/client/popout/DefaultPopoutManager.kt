@@ -4,13 +4,13 @@ import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.overlay.OverlayManager
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.media.api.VideoFrameSink
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Global [PopoutManager] facade. Delegates per-display window and PiP operations to the
- * [com.dreamdisplays.managers.DisplayPopoutManager] embedded in each [com.dreamdisplays.display.DisplayScreen]
+ * [com.dreamdisplays.managers.DisplayPopoutManager] embedded in each [com.dreamdisplays.displays.DisplayScreen]
  * (looked up via [DisplayManager]), and queries [OverlayManager] for PiP status.
  *
  * Frame-sink wiring remains internal to [com.dreamdisplays.managers.DisplayPopoutManager]; [openWindow] and

@@ -1,7 +1,7 @@
 package com.dreamdisplays.player
 
 import com.dreamdisplays.Initializer
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.events.PlayerEvents
 import com.dreamdisplays.player.managers.PlaybackSessionManager

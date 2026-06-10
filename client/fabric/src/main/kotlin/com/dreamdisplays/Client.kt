@@ -2,7 +2,7 @@ package com.dreamdisplays
 
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.register
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.platform.FabricPlatform
 import com.dreamdisplays.platform.api.Platform

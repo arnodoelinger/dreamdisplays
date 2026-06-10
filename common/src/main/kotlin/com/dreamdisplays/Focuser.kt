@@ -1,6 +1,6 @@
 package com.dreamdisplays
 
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.managers.ClientStateManager
 import net.minecraft.client.Minecraft
 

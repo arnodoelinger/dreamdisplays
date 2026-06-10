@@ -8,7 +8,7 @@ import com.dreamdisplays.client.ui.PipCorner
 import com.dreamdisplays.client.ui.PipOverlay
 import com.dreamdisplays.client.ui.PipOverlayManager
 import com.dreamdisplays.client.ui.VideoPopoutWindow
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.player.MediaPlayer
 import org.slf4j.LoggerFactory
 

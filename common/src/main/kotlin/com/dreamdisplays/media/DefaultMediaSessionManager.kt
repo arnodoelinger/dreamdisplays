@@ -1,7 +1,7 @@
 package com.dreamdisplays.media
 
 import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.media.api.MediaSession
 import com.dreamdisplays.media.api.MediaSessionManager
 

@@ -1,11 +1,11 @@
 package com.dreamdisplays.api
 
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.toRuntimeState
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.toRuntimeState
 import kotlin.time.Duration
 
 /**
- * Default [PlaybackService] backed by [DisplayManager] and the [com.dreamdisplays.display.DisplayScreen] API.
+ * Default [PlaybackService] backed by [DisplayManager] and the [com.dreamdisplays.displays.DisplayScreen] API.
  *
  * @since 1.8.0
  */

@@ -13,8 +13,8 @@ import com.dreamdisplays.client.input.InputAction
 import com.dreamdisplays.client.input.InputHandler
 import com.dreamdisplays.client.input.KeyBindingRegistry
 import com.dreamdisplays.client.overlay.OverlayManager
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.world.effect.MobEffectInstance

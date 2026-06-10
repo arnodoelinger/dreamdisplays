@@ -1,14 +1,17 @@
-package com.dreamdisplays.display
+package com.dreamdisplays.displays
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.api.DisplayEvent
 import com.dreamdisplays.api.DisplayFacing
 import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.displays.store.ClientSettingsStore
 import com.dreamdisplays.client.ui.DisplayMenu
 import com.dreamdisplays.client.ui.PipCorner
 import com.dreamdisplays.managers.DisplayPopoutManager
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.render.DisplayGeometry
+import com.dreamdisplays.render.DisplayTextureResource
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.client.core.DreamServices
@@ -18,20 +21,13 @@ import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSource
 import com.dreamdisplays.media.api.VideoQuality
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.RenderPipelines
-import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
-import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
-import kotlin.math.sqrt
 
 /** Represents a video display screen in the game world. */
 class DisplayScreen(
@@ -46,7 +42,7 @@ class DisplayScreen(
     var isSync: Boolean,
 ) {
     private val mediaPlayerGeneration = AtomicLong()
-    private val savedSettings = DisplaySettings.getSettings(uuid)
+    private val savedSettings = ClientSettingsStore.getSettings(uuid)
 
     var owner: Boolean = Minecraft.getInstance().player?.gameProfile?.id?.toString() == ownerUuid.toString()
     val isAdmin: Boolean get() = ClientStateManager.isAdmin
@@ -55,39 +51,40 @@ class DisplayScreen(
     val errored: Boolean get() = mediaError != null
     val canEdit: Boolean get() = owner || isAdmin || isLocked != true
     var muted: Boolean = savedSettings.muted
-    var texture: DynamicTexture? = null
-    var textureId: Identifier? = null
-    var renderType: RenderType? = null
-    var textureWidth: Int = 0
-    var textureHeight: Int = 0
+
+    private val textureResource = DisplayTextureResource(uuid)
+    val texture: DynamicTexture? get() = textureResource.texture
+    val textureId: Identifier? get() = textureResource.textureId
+    val renderType: RenderType? get() = textureResource.renderType
+    val textureWidth: Int get() = textureResource.width
+    val textureHeight: Int get() = textureResource.height
     @Volatile var videoContentAspect: Double = 0.0
 
     var volume: Float = savedSettings.volume
         set(value) {
             field = value
             applyEffectiveVolume()
-            DisplaySettings.updateSettings(uuid, value, quality, brightness, muted, paused)
+            ClientSettingsStore.updateSettings(uuid, value, quality, brightness, muted, paused)
         }
     var brightness: Float = savedSettings.brightness
         set(value) {
             field = value.coerceIn(0f, 2f)
             mediaPlayer?.setBrightness(field)
-            DisplaySettings.updateSettings(uuid, volume, quality, field, muted, paused)
+            ClientSettingsStore.updateSettings(uuid, volume, quality, field, muted, paused)
         }
     var quality: VideoQuality = VideoQuality.parse(savedSettings.quality)
         set(value) {
             field = value
             mediaPlayer?.setQuality(value)
-            DisplaySettings.updateSettings(uuid, volume, value, brightness, muted, paused)
+            ClientSettingsStore.updateSettings(uuid, volume, value, brightness, muted, paused)
         }
-    private var videoStarted: Boolean = false
+    internal var videoStarted: Boolean = false
+        private set
     private var paused: Boolean = savedSettings.paused
     private var focusMuted: Boolean = false
     var renderDistance: Int = 64
     var savedTimeNanos: Long = 0
-    @Volatile private var serverSyncReceivedAt: Long = 0L
-    @Volatile private var lastSyncTargetNs: Long = -1L
-    @Volatile private var lastSyncRecvWallNs: Long = 0L
+    private val syncController = DisplaySyncController(this)
     private var mediaPlayer: MediaPlayer? = null
     private val popoutManager = DisplayPopoutManager(this) {
         mediaPlayer?.setPopoutSink(null)
@@ -123,7 +120,7 @@ class DisplayScreen(
 
     /** Loads a new video from [videoUrl], preserving the current paused state. */
     fun loadVideo(videoUrl: String, lang: String) {
-        if (!clientUrlOverride) DisplaySettings.setUrlOverride(uuid, null, null)
+        if (!clientUrlOverride) ClientSettingsStore.setUrlOverride(uuid, null, null)
         loadVideoInternal(videoUrl, lang, true)
     }
 
@@ -137,7 +134,7 @@ class DisplayScreen(
     /** Overrides the server-assigned video with a client-side suggestion, sends a [Packets.SetVideo] packet, and starts playback. */
     fun playSuggestedVideo(videoUrl: String, lang: String) {
         clientUrlOverride = true
-        DisplaySettings.setUrlOverride(uuid, videoUrl, lang)
+        ClientSettingsStore.setUrlOverride(uuid, videoUrl, lang)
         Initializer.sendPacket(Packets.SetVideo(uuid, videoUrl, lang))
         playVideoNow(videoUrl, lang)
     }
@@ -153,8 +150,7 @@ class DisplayScreen(
         mediaPlayer = null
         videoStarted = false
         mediaError = null
-        lastSyncTargetNs = -1L
-        serverSyncReceivedAt = 0L
+        syncController.reset()
         oldPlayer?.stop()
 
         this.videoUrl = videoUrl
@@ -163,9 +159,7 @@ class DisplayScreen(
         val shouldBePaused = preservePausedState && paused
         val newPlayer = MediaPlayer(videoUrl, lang, this)
         mediaPlayer = newPlayer
-        val qualityInt = parseQualityOrDefault()
-        textureWidth = ((width / height.toDouble()) * qualityInt).toInt()
-        textureHeight = qualityInt
+        textureResource.prepareDimensions(width, height, parseQualityOrDefault())
 
         popoutManager.attachTo(newPlayer) { videoContentAspect }
 
@@ -196,7 +190,7 @@ class DisplayScreen(
         if (videoUrl != packet.url || lang != packet.lang) {
             if (clientUrlOverride) return
 
-            val ds = DisplaySettings.getSettings(uuid)
+            val ds = ClientSettingsStore.getSettings(uuid)
             val override = ds.urlOverride
             if (!override.isNullOrEmpty()) {
                 clientUrlOverride = true
@@ -221,39 +215,20 @@ class DisplayScreen(
     fun updateData(packet: Packets.Sync) {
         isSync = packet.isSync
         if (!isSync) return
-        serverSyncReceivedAt = System.nanoTime()
-
-        val nanos = System.nanoTime()
-        val desiredPaused = packet.currentState
-
-        waitForMFInit {
-            if (!videoStarted) {
-                paused = desiredPaused
-                startVideo()
-            }
-
-            val lostTime = System.nanoTime() - nanos
-            val targetTime = max(0L, packet.currentTime + lostTime)
-            val drift = abs(targetTime - currentTimeNanos)
-            val canSeek = canSeek()
-
-            if (desiredPaused && !paused) setPaused(true)
-            val mp = mediaPlayer
-            val clockRunning = mp?.isClockRunning() == true
-            val recvWallNs = System.nanoTime()
-            val ownerSeeked = if (lastSyncTargetNs < 0) {
-                true
-            } else {
-                val elapsed = recvWallNs - lastSyncRecvWallNs
-                abs(targetTime - (lastSyncTargetNs + elapsed)) > SYNC_JUMP_THRESHOLD_NS
-            }
-            lastSyncTargetNs = targetTime
-            lastSyncRecvWallNs = recvWallNs
-            if (ownerSeeked && canSeek && clockRunning && drift > SYNC_SEEK_TOLERANCE_NS)
-                seekVideoTo(targetTime)
-            if (!desiredPaused && paused) setPaused(false)
-        }
+        syncController.onSyncPacket(packet.currentTime, packet.currentState)
     }
+
+    /** Forces the pause state and starts playback; used by the sync controller before the video has started. */
+    internal fun beginPlaybackPaused(desiredPaused: Boolean) {
+        paused = desiredPaused
+        startVideo()
+    }
+
+    /** True if the media player's playback clock is currently advancing. */
+    internal fun isClockRunning(): Boolean = mediaPlayer?.isClockRunning() == true
+
+    /** The current media-player generation, used by the sync controller to detect stale video swaps. */
+    internal val mediaGeneration: Long get() = mediaPlayerGeneration.get()
 
     /** Recreates the GPU texture (e.g. after a resolution change). */
     fun reloadTexture() = createTexture()
@@ -264,38 +239,17 @@ class DisplayScreen(
     }
 
     /** Returns true if [pos] falls within the screen's block bounding box. */
-    fun isInScreen(pos: BlockPos): Boolean {
-        var maxX = x
-        val maxY = y + height - 1
-        var maxZ = z
-        when (facing) {
-            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
-            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
-        }
-        return pos.x in x..maxX &&
-                y <= pos.y && maxY >= pos.y &&
-                z <= pos.z && maxZ >= pos.z
-    }
+    fun isInScreen(pos: BlockPos): Boolean =
+        DisplayGeometry.isInBounds(pos, x, y, z, width, height, facing)
 
     /** Returns the shortest Euclidean distance from [pos] to any block in the screen's bounding box. */
-    fun getDistanceToScreen(pos: BlockPos): Double {
-        var maxX = x
-        val maxY = y + height - 1
-        var maxZ = z
-        when (facing) {
-            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
-            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
-        }
-        val clampedX = min(max(pos.x, x), maxX)
-        val clampedY = min(max(pos.y, y), maxY)
-        val clampedZ = min(max(pos.z, z), maxZ)
-        return sqrt(pos.distSqr(BlockPos(clampedX, clampedY, clampedZ)))
-    }
+    fun getDistanceToScreen(pos: BlockPos): Double =
+        DisplayGeometry.distanceTo(pos, x, y, z, width, height, facing)
 
     /** Uploads the latest decoded frame to the GPU texture. Called on the render thread once per frame. */
     fun fitTexture() {
         val mp = mediaPlayer ?: return
-        val tex = texture ?: return
+        val tex = textureResource.texture ?: return
         try {
             mp.updateFrame(tex.getTexture())
         } catch (e: Exception) {
@@ -353,26 +307,7 @@ class DisplayScreen(
             paused = false
         }
         restoreSavedTime()
-        bootstrapServerSyncIfNeeded()
-    }
-
-    /**
-     * For sync displays, the server's clock only exists once *someone* (the owner) has sent a
-     * Sync packet. If a fresh server / no-one's-been-owner-yet situation leaves playStates empty,
-     * RequestSync returns nothing and clients sit at 0 forever. So the owner sends a Sync ~1.5s
-     * after startVideo, but only if no server Sync arrived in that window (otherwise we'd
-     * overwrite the server's ticking clock with our local time=0 on every reconnect).
-     */
-    private fun bootstrapServerSyncIfNeeded() {
-        if (!owner || !isSync) return
-        val gen = mediaPlayerGeneration.get()
-        com.dreamdisplays.player.util.daemon({
-            try { Thread.sleep(1500) } catch (_: InterruptedException) { return@daemon }
-            if (gen != mediaPlayerGeneration.get()) return@daemon
-            if (serverSyncReceivedAt > 0L) return@daemon
-            if (!owner || !isSync) return@daemon
-            sendSync()
-        }, "MediaPlayer-bootstrap-sync").start()
+        syncController.bootstrapIfNeeded()
     }
 
     val isPaused: Boolean get() = paused
@@ -387,7 +322,7 @@ class DisplayScreen(
         if (this.paused == paused) return
         this.paused = paused
         if (paused) mediaPlayer?.pause() else mediaPlayer?.play()
-        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused)
+        ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
         if (owner && isSync) sendSync()
     }
 
@@ -426,16 +361,9 @@ class DisplayScreen(
         popoutManager.unregister(currentPlayer)
         currentPlayer?.stop()
 
-        val mc = Minecraft.getInstance()
-        textureId?.let { id ->
-            mc.execute {
-                try {
-                    mc.textureManager.release(id)
-                } catch (_: Exception) {
-                }
-            }
-        }
+        textureResource.releaseAsync()
 
+        val mc = Minecraft.getInstance()
         val screen = MinecraftScreenUtil.currentScreen(mc)
         if (screen is DisplayMenu && screen.displayScreen === this) screen.onClose()
     }
@@ -445,7 +373,7 @@ class DisplayScreen(
         if (muted == status) return
         muted = status
         applyEffectiveVolume()
-        DisplaySettings.updateSettings(uuid, volume, quality, brightness, muted, paused)
+        ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
     }
 
     /** Applies temporary focus mute without changing the user's persisted mute setting. */
@@ -455,23 +383,9 @@ class DisplayScreen(
         applyEffectiveVolume()
     }
 
-    /** Allocates (or reallocates) the [DynamicTexture] and [RenderType] for the current quality setting. */
+    /** Allocates (or reallocates) the GPU texture and render type for the current quality setting. */
     fun createTexture() {
-        val qualityInt = parseQualityOrDefault()
-        textureWidth = ((width / height.toDouble()) * qualityInt).toInt()
-        textureHeight = qualityInt
-
-        texture?.let { t ->
-            t.close()
-            textureId?.let { Minecraft.getInstance().textureManager.release(it) }
-        }
-        texture = DynamicTexture({ UUID.randomUUID().toString() }, NativeImage(NativeImage.Format.RGBA, textureWidth, textureHeight, false))
-        textureId = Identifier.fromNamespaceAndPath(
-            Initializer.MOD_ID,
-            "screen-main-texture-$uuid-${UUID.randomUUID()}"
-        )
-        Minecraft.getInstance().textureManager.register(textureId!!, texture!!)
-        renderType = createRenderType(textureId!!)
+        textureResource.allocate(width, height, parseQualityOrDefault())
     }
 
     /** Sends the current playback state to the server as a [Packets.Sync] packet. */
@@ -521,17 +435,5 @@ class DisplayScreen(
     companion object {
         private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayScreen")
         private const val DEFAULT_QUALITY = 720
-        private const val SYNC_SEEK_TOLERANCE_NS = 750_000_000L
-        private const val SYNC_JUMP_THRESHOLD_NS = 1_500_000_000L
-
-        /** Creates a custom [RenderType] that samples texture [id] through the solid-block pipeline. */
-        private fun createRenderType(id: Identifier): RenderType = RenderType.create(
-            "dream-displays",
-            RenderSetup.builder(RenderPipelines.SOLID_BLOCK)
-                .withTexture("Sampler0", id)
-                .affectsCrumbling()
-                .useLightmap()
-                .createRenderSetup()
-        )
     }
 }

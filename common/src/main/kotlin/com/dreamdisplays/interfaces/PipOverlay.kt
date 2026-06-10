@@ -6,7 +6,7 @@ import com.dreamdisplays.client.overlay.Overlay
 import com.dreamdisplays.client.overlay.OverlayBounds
 import com.dreamdisplays.client.overlay.OverlayEvent
 import com.dreamdisplays.client.overlay.OverlayRenderContext
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.render.AsyncTextureUploader
 import com.dreamdisplays.render.TextureUploadUtil
 import com.mojang.blaze3d.platform.NativeImage

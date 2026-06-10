@@ -4,7 +4,7 @@ import com.dreamdisplays.Focuser
 import com.dreamdisplays.client.core.ClientApplication
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 
 /**
  * Handles client shutdown cleanup.

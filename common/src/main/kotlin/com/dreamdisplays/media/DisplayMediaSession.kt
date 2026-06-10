@@ -3,8 +3,8 @@ package com.dreamdisplays.media
 import com.dreamdisplays.api.DisplayEvent
 import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.api.DisplayRuntimeState
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.media.api.MediaMetadata
 import com.dreamdisplays.media.api.MediaSession
 import com.dreamdisplays.media.api.MediaSessionEvent

@@ -3,7 +3,7 @@ package com.dreamdisplays.client.input
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.ui.DisplayMenu
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 

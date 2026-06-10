@@ -9,10 +9,10 @@ import com.dreamdisplays.client.core.DefaultClientContext
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.client.core.register
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.platform.api.Platform
-import com.dreamdisplays.display.DisplayScreen
-import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.displays.DisplayScreen
+import com.dreamdisplays.displays.store.DisplayStorage
 import com.dreamdisplays.player.process.FFmpegBinary
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
@@ -40,7 +40,7 @@ object ClientStartupManager {
 
     fun start() {
         config.reload()
-        DisplaySettings.load()
+        DisplayStorage.load()
 
         // Wire the contract-typed service graph (media resolver chain, ...) before any
         // background prewarm touches it.

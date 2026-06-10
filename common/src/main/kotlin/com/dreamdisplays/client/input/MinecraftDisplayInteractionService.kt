@@ -1,7 +1,7 @@
 package com.dreamdisplays.client.input
 
 import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayManager
 import com.dreamdisplays.utils.RayCastingUtil
 import net.minecraft.client.Minecraft
 import java.util.concurrent.CopyOnWriteArrayList

@@ -1,9 +1,11 @@
 package com.dreamdisplays.managers
 
 import com.dreamdisplays.api.DisplayFacing
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
-import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.displays.DisplayManager
+import com.dreamdisplays.displays.DisplayScreen
+import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.displays.store.FullDisplayData
+import com.dreamdisplays.displays.store.ServerDisplayStore
 import com.dreamdisplays.media.api.VideoQuality
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.FacingUtil
@@ -39,7 +41,7 @@ object DisplayLifecycleManager {
         }
 
         Minecraft.getInstance().player?.let { player ->
-            val renderDistance = DisplaySettings.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
+            val renderDistance = ServerDisplayStore.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
             val dist = distanceToScreen(
                 packet.pos.x, packet.pos.y, packet.pos.z,
                 packet.width, packet.height, packet.facingUtil.toDisplayFacing(),
@@ -66,7 +68,7 @@ object DisplayLifecycleManager {
             width, height, isSync
         )
 
-        val savedData = DisplaySettings.getDisplayData(uuid)
+        val savedData = ServerDisplayStore.getDisplayData(uuid)
         displayScreen.renderDistance = savedData?.renderDistance ?: ClientStateManager.config.defaultDistance
 
         displayScreen.createTexture()
@@ -84,10 +86,10 @@ object DisplayLifecycleManager {
             }
     }
 
-    private fun restoreScreen(data: DisplaySettings.FullDisplayData) {
+    private fun restoreScreen(data: FullDisplayData) {
         if (!isValidDisplaySize(data.width, data.height)) {
             logger.warn("Skipping cached display ${data.uuid}: invalid size ${data.width}x${data.height}.")
-            DisplaySettings.removeDisplay(data.uuid)
+            DisplayStorage.removeDisplay(data.uuid)
             return
         }
 
@@ -110,7 +112,7 @@ object DisplayLifecycleManager {
         }
     }
 
-    private fun distanceToData(data: DisplaySettings.FullDisplayData, playerPos: BlockPos) =
+    private fun distanceToData(data: FullDisplayData, playerPos: BlockPos) =
         distanceToScreen(data.x, data.y, data.z, data.width, data.height, data.facing, playerPos)
 
     private fun distanceToScreen(
