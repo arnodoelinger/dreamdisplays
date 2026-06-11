@@ -1,6 +1,7 @@
 package com.dreamdisplays.server
 
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.net.V2Payload
 import com.dreamdisplays.server.datatypes.PaperDisplayData
 import com.dreamdisplays.server.listeners.FabricPlayerListener
 import com.dreamdisplays.server.listeners.FabricProtectionListener
@@ -15,6 +16,7 @@ import com.dreamdisplays.server.registrar.CommandRegistrar
 import com.dreamdisplays.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.server.registrar.ListenerRegistrar
 import com.dreamdisplays.server.registrar.SchedulerRegistrar
+import com.dreamdisplays.server.utils.net.FabricV2Networking
 import com.dreamdisplays.server.utils.net.ServerPacketHandler
 import io.github.arsmotorin.ofrat.*
 import org.semver4j.Semver
@@ -135,6 +137,7 @@ import org.slf4j.LoggerFactory
         registerPayloadTypes()
 
         ServerPacketHandler.registerReceivers()
+        FabricV2Networking.registerReceivers()
         FabricCommandRegistrar.register()
         FabricPlayerListener.register()
         FabricProtectionListener.register()
@@ -168,6 +171,7 @@ import org.slf4j.LoggerFactory
     private fun registerPayloadTypes() {
         try {
             val clientbound = payloadRegistry("clientboundPlay", "playS2C")
+            registerPayload(clientbound, V2Payload.TYPE, V2Payload.CODEC)
             registerPayload(clientbound, Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
             registerPayload(clientbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
             registerPayload(clientbound, Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
@@ -178,6 +182,7 @@ import org.slf4j.LoggerFactory
             registerPayload(clientbound, Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC)
 
             val serverbound = payloadRegistry("serverboundPlay", "playC2S")
+            registerPayload(serverbound, V2Payload.TYPE, V2Payload.CODEC)
             registerPayload(serverbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
             registerPayload(serverbound, Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
             registerPayload(serverbound, Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)

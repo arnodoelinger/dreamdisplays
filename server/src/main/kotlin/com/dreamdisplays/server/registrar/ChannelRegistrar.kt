@@ -4,6 +4,8 @@ import io.github.arsmotorin.ofrat.PaperOnly
 
 import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.utils.net.PacketReceiver
+import com.dreamdisplays.server.utils.net.PaperV2Networking
+import com.dreamdisplays.server.utils.net.V2_CHANNEL
 
 /**
  * Manages the registration of plugin channels for incoming and outgoing messages.
@@ -38,5 +40,9 @@ import com.dreamdisplays.server.utils.net.PacketReceiver
 
         incomingChannels.forEach { messenger.registerIncomingPluginChannel(plugin, it, receiver) }
         outgoingChannels.forEach { messenger.registerOutgoingPluginChannel(plugin, it) }
+
+        // Protocol v2: a single envelope channel in both directions.
+        messenger.registerIncomingPluginChannel(plugin, V2_CHANNEL, PaperV2Networking)
+        messenger.registerOutgoingPluginChannel(plugin, V2_CHANNEL)
     }
 }

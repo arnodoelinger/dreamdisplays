@@ -8,6 +8,5 @@ interface Platform {
     val scheduler: PlatformScheduler
     val logger: PlatformLogger
     val paths: PlatformPaths
-    val networking: PlatformNetworking
     val isDevEnvironment: Boolean
 }

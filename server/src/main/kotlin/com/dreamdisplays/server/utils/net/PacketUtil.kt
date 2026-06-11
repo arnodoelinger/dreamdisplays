@@ -4,6 +4,11 @@ import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.ClearCache
+import com.dreamdisplays.protocol.DisplayDelete
+import com.dreamdisplays.protocol.DisplayInfo
+import com.dreamdisplays.protocol.DisplaySync
+import com.dreamdisplays.protocol.SetDisplaysEnabled
 import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.datatypes.FabricDisplayData
 import com.dreamdisplays.server.datatypes.SyncData
@@ -25,10 +30,9 @@ import java.nio.charset.StandardCharsets
 import java.util.*
 
 /**
- * Utility object for sending packets to players.
- *
- * Provides methods to send various types of packets to players,
- * including display info, sync data, delete commands, and settings updates.
+ * Dual-protocol send facade for the Paper flavor. Each method partitions the recipients by
+ * [V2PlayerTracker]: negotiated players receive protocol-v2 envelopes via [PaperV2Networking],
+ * everyone else gets the FROZEN v1 plugin messages whose wire format must never change.
  */
 @PaperOnly @NullMarked object PacketUtil {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketUtil")
@@ -57,6 +61,18 @@ import java.util.*
         isSync: Boolean,
         isLocked: Boolean = true,
     ) {
+        val (v2, players) = partition(players)
+        PaperV2Networking.send(
+            v2,
+            DisplayInfo(
+                id = id, ownerId = ownerId,
+                x = position.blockX, y = position.blockY, z = position.blockZ,
+                width = width, height = height, url = url,
+                facing = facing.toPacketByte().toInt(),
+                isSync = isSync, lang = lang, isLocked = isLocked,
+            ),
+        )
+        if (players.isEmpty()) return
         runCatching {
             val packet = buildPacket { output ->
                 output.writeUUID(id)
@@ -83,6 +99,12 @@ import java.util.*
     fun sendSync(players: List<Player?>, syncData: SyncData) {
         val id = syncData.id ?: return
 
+        val (v2, players) = partition(players)
+        PaperV2Networking.send(
+            v2,
+            DisplaySync(id, syncData.isSync, syncData.currentState, syncData.currentTime, syncData.limitTime),
+        )
+        if (players.isEmpty()) return
         runCatching {
             val packet = buildPacket { output ->
                 output.writeUUID(id)
@@ -100,6 +122,9 @@ import java.util.*
 
     /** Tells [players] to remove the display with [id] from their local registry. */
     fun sendDelete(players: List<Player?>, id: UUID) {
+        val (v2, players) = partition(players)
+        PaperV2Networking.send(v2, DisplayDelete(id))
+        if (players.isEmpty()) return
         runCatching {
             val packet = buildPacket { output ->
                 output.writeUUID(id)
@@ -123,7 +148,11 @@ import java.util.*
 
     /** Pushes the global displays-enabled flag for [player] to the client. */
     fun sendDisplayEnabled(player: Player, isEnabled: Boolean) {
-        sendBooleanPacket(player, CHANNEL_DISPLAY_ENABLED, isEnabled)
+        if (V2PlayerTracker.isV2(player.uniqueId)) {
+            PaperV2Networking.send(listOf(player), SetDisplaysEnabled(isEnabled))
+        } else {
+            sendBooleanPacket(player, CHANNEL_DISPLAY_ENABLED, isEnabled)
+        }
     }
 
     /** Tells the client whether the report feature is enabled (i.e., a webhook is configured). */
@@ -135,6 +164,9 @@ import java.util.*
     fun sendClearCache(players: List<Player?>, displayUuids: List<UUID>) {
         if (displayUuids.isEmpty()) return
 
+        val (v2, players) = partition(players)
+        PaperV2Networking.send(v2, ClearCache(displayUuids))
+        if (players.isEmpty()) return
         runCatching {
             val packet = buildPacket { output ->
                 output.writeVarInt(displayUuids.size)
@@ -148,6 +180,10 @@ import java.util.*
             logger.warn("Failed to send clear cache packet", e)
         }
     }
+
+    /** Splits the recipients into (v2-negotiated, legacy) lists. */
+    private fun partition(players: List<Player?>): Pair<List<Player>, List<Player>> =
+        players.filterNotNull().partition { V2PlayerTracker.isV2(it.uniqueId) }
 
     /** Sends a one-byte boolean payload on [channel] to [player], swallowing IO errors with a warning. */
     private fun sendBooleanPacket(player: Player, channel: String, value: Boolean) {
@@ -264,11 +300,28 @@ import java.util.*
 }
 
 /**
- * `Fabric`-specific implementation of [PacketUtil].
+ * Dual-protocol send facade for the Fabric flavor: v2-negotiated players receive envelope
+ * payloads via [FabricV2Networking], everyone else gets the frozen v1 payloads.
  */
 @FabricOnly object FabricPacketUtil {
+    /** Splits the recipients into (v2-negotiated, legacy) lists. */
+    private fun partition(players: List<ServerPlayer>): Pair<List<ServerPlayer>, List<ServerPlayer>> =
+        players.partition { V2PlayerTracker.isV2(it.uuid) }
+
     /** Encodes and broadcasts a `display_info` packet describing a single display to [players]. */
     fun sendDisplayInfo(players: List<ServerPlayer>, display: FabricDisplayData) {
+        val (v2, legacy) = partition(players)
+        FabricV2Networking.send(
+            v2,
+            DisplayInfo(
+                id = display.id, ownerId = display.ownerId,
+                x = display.minX, y = display.minY, z = display.minZ,
+                width = display.width, height = display.height, url = display.url,
+                facing = directionToFacingUtil(display.facing).toPacket().toInt(),
+                isSync = display.isSync, lang = display.lang, isLocked = display.isLocked,
+            ),
+        )
+        if (legacy.isEmpty()) return
         val facing = directionToFacingUtil(display.facing)
         val packet = Packets.Info(
             uuid = display.id,
@@ -282,7 +335,7 @@ import java.util.*
             lang = display.lang,
             isLocked = display.isLocked,
         )
-        players.forEach { player ->
+        legacy.forEach { player ->
             runCatching { ServerPlayNetworking.send(player, packet) }
         }
     }
@@ -290,6 +343,12 @@ import java.util.*
     /** Encodes and broadcasts a `sync` packet carrying the current playback state. */
     fun sendSync(players: List<ServerPlayer>, syncData: SyncData) {
         val id = syncData.id ?: return
+        val (v2, legacy) = partition(players)
+        FabricV2Networking.send(
+            v2,
+            DisplaySync(id, syncData.isSync, syncData.currentState, syncData.currentTime, syncData.limitTime),
+        )
+        if (legacy.isEmpty()) return
         val packet = Packets.Sync(
             uuid = id,
             isSync = syncData.isSync,
@@ -297,15 +356,17 @@ import java.util.*
             currentTime = syncData.currentTime,
             limitTime = syncData.limitTime
         )
-        players.forEach { player ->
+        legacy.forEach { player ->
             runCatching { ServerPlayNetworking.send(player, packet) }
         }
     }
 
     /** Tells [players] to remove the display with [id] from their local registry. */
     fun sendDelete(players: List<ServerPlayer>, id: UUID) {
+        val (v2, legacy) = partition(players)
+        FabricV2Networking.send(v2, DisplayDelete(id))
         val packet = Packets.Delete(id)
-        players.forEach { player ->
+        legacy.forEach { player ->
             runCatching { ServerPlayNetworking.send(player, packet) }
         }
     }
@@ -322,7 +383,11 @@ import java.util.*
 
     /** Pushes the global displays-enabled flag for [player] to the client. */
     fun sendDisplayEnabled(player: ServerPlayer, isEnabled: Boolean) {
-        runCatching { ServerPlayNetworking.send(player, Packets.DisplayEnabled(isEnabled)) }
+        if (V2PlayerTracker.isV2(player.uuid)) {
+            FabricV2Networking.send(listOf(player), SetDisplaysEnabled(isEnabled))
+        } else {
+            runCatching { ServerPlayNetworking.send(player, Packets.DisplayEnabled(isEnabled)) }
+        }
     }
 
     /** Tells the client whether the report feature is enabled (i.e., a webhook is configured). */
@@ -333,8 +398,11 @@ import java.util.*
     /** Tells [players] to evict the listed display UUIDs from any local caches. */
     fun sendClearCache(players: List<ServerPlayer>, uuids: List<UUID>) {
         if (uuids.isEmpty()) return
+        val (v2, legacy) = partition(players)
+        FabricV2Networking.send(v2, ClearCache(uuids))
+        if (legacy.isEmpty()) return
         val packet = Packets.ClearCache(uuids)
-        players.forEach { player ->
+        legacy.forEach { player ->
             runCatching { ServerPlayNetworking.send(player, packet) }
         }
     }

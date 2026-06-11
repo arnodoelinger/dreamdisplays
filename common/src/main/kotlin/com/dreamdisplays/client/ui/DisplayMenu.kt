@@ -25,7 +25,9 @@ import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.media.api.VideoQuality
-import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.DisplayDelete
+import com.dreamdisplays.protocol.ReportDisplay
+import com.dreamdisplays.protocol.SetLocked
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.ytdlp.VideoMetadataCache
 import com.dreamdisplays.ytdlp.VideoTitleCache
@@ -208,7 +210,7 @@ class DisplayMenu private constructor(
             val locked = ds.isLocked ?: return@IconButton
             val newLocked = !locked
             ds.isLocked = newLocked
-            Initializer.sendPacket(Packets.SetLocked(ds.uuid, newLocked))
+            Initializer.sendPacket(SetLocked(ds.uuid, newLocked))
         })
         lockButton.enabledWhen = { ds.owner || ds.isAdmin }
         lockButton.visibleWhen = { ds.isLocked != null && !ds.errored }
@@ -219,7 +221,7 @@ class DisplayMenu private constructor(
         ) {
             DisplayStorage.removeDisplay(ds.uuid)
             DisplayRegistry.unregisterScreen(ds)
-            Initializer.sendPacket(Packets.Delete(ds.uuid))
+            Initializer.sendPacket(DisplayDelete(ds.uuid))
             onClose()
         })
         deleteButton.enabledWhen = { ds.owner || ds.isAdmin }
@@ -229,7 +231,7 @@ class DisplayMenu private constructor(
                 icon = { IconButton.modIcon("report") },
                 sprites = IconButton.RED_SPRITES,
             ) {
-                Initializer.sendPacket(Packets.Report(ds.uuid))
+                Initializer.sendPacket(ReportDisplay(ds.uuid))
                 onClose()
             })
         } else null

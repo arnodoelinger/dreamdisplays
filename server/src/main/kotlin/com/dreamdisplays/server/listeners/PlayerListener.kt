@@ -9,6 +9,7 @@ import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.PlatformUtil
 import com.dreamdisplays.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.server.utils.net.PacketUtil
+import com.dreamdisplays.server.utils.net.V2PlayerTracker
 import com.dreamdisplays.server.utils.net.ServerScheduler
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
@@ -63,6 +64,7 @@ import org.jspecify.annotations.NullMarked
     /** Drops cached per-player state when a player disconnects. */
     @EventHandler fun onPlayerLeave(event: PlayerQuitEvent) {
         PlayerManager.removeVersion(event.player)
+        V2PlayerTracker.clear(event.player.uniqueId)
     }
 }
 
@@ -107,6 +109,7 @@ import org.jspecify.annotations.NullMarked
 
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             PlayerManager.removeVersion(handler.player)
+            V2PlayerTracker.clear(handler.player.uuid)
         }
     }
 }

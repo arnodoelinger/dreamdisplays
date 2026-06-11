@@ -13,7 +13,9 @@ import com.dreamdisplays.managers.ClientShutdownManager
 import com.dreamdisplays.managers.ClientStartupManager
 import com.dreamdisplays.managers.ClientTickManager
 import com.dreamdisplays.managers.DisplayLifecycleManager
-import com.dreamdisplays.net.Packets
+import com.dreamdisplays.net.LegacyAdapter
+import com.dreamdisplays.net.ProtocolRouter
+import com.dreamdisplays.protocol.DreamPacket
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
 //? if >=26 {
@@ -64,25 +66,22 @@ object Initializer {
         ClientStateManager.isPremium = false
         ClientStateManager.isAdmin = false
         ClientStateManager.connectedServerId = null
+        ProtocolRouter.reset()
+        ClientPacketManager.reset()
         if (serverId != null) {
             DreamServices.registry.getOrNull<ClientApplication>()
                 ?.emit(ClientLifecycleEvent.ServerLeft(serverId))
         }
     }
 
-    /** Handles an incoming [Packets.Info] packet: updates an existing screen or creates a new one if within render distance. */
-    fun onDisplayInfoPacket(packet: Packets.Info) {
-        DisplayLifecycleManager.handleInfoPacket(packet)
+    /** Lifts an incoming frozen-v1 [payload] into its v2 packet and dispatches it. */
+    fun onLegacyPacket(payload: CustomPacketPayload) {
+        ProtocolRouter.onLegacyReceived(LegacyAdapter.fromLegacy(payload))
     }
 
-    /** Toggles global display rendering on / off as instructed by the server. */
-    fun onDisplayEnabledPacket(packet: Packets.DisplayEnabled) {
-        ClientPacketManager.handleDisplayEnabled(packet)
-    }
-
-    /** Forwards a [Packets.Sync] packet to the matching display screen. */
-    fun onSyncPacket(packet: Packets.Sync) {
-        ClientPacketManager.handleSync(packet)
+    /** Decodes and dispatches v2 envelope [bytes] from the `dreamdisplays:v2` channel. */
+    fun onV2Packet(bytes: ByteArray) {
+        ProtocolRouter.onV2Received(bytes)
     }
 
     /**
@@ -104,38 +103,13 @@ object Initializer {
             ?.renderAll(MinecraftOverlayRenderContext(mc, graphics, -1, -1, false, partialTick))
     }
 
-    /** Delegates packet sending to the platform-specific [Mod] implementation. */
-    fun sendPacket(packet: CustomPacketPayload) {
-        ClientPacketManager.send(packet)
-    }
-
-    /** Unregisters and removes all data for the display identified by [Packets.Delete.uuid]. */
-    fun onDeletePacket(packet: Packets.Delete) {
-        ClientPacketManager.handleDelete(packet)
+    /** Routes an outgoing [packet] through protocol negotiation (v2 when available, else v1). */
+    fun sendPacket(packet: DreamPacket) {
+        ProtocolRouter.send(packet)
     }
 
     /** Saves screen data to disk, stops all players, and interrupts background threads on mod shutdown. */
     fun onStop() {
         ClientShutdownManager.stop()
-    }
-
-    /** Updates the local premium flag from a server [Packets.Premium] packet. */
-    fun onPremiumPacket(packet: Packets.Premium) {
-        ClientPacketManager.handlePremium(packet)
-    }
-
-    /** Updates the local admin flag from a server [Packets.IsAdmin] packet. */
-    fun onIsAdminPacket(packet: Packets.IsAdmin) {
-        ClientPacketManager.handleIsAdmin(packet)
-    }
-
-    /** Enables or disables the reporting feature based on a server [Packets.ReportEnabled] packet. */
-    fun onReportEnabledPacket(packet: Packets.ReportEnabled) {
-        ClientPacketManager.handleReportEnabled(packet)
-    }
-
-    /** Unregisters and clears saved data for the UUIDs listed in a [Packets.ClearCache] packet. */
-    fun onClearCachePacket(packet: Packets.ClearCache) {
-        ClientPacketManager.handleClearCache(packet)
     }
 }

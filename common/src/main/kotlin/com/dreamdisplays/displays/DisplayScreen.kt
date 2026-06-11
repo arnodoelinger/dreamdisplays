@@ -10,7 +10,11 @@ import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.render.DisplayGeometry
 import com.dreamdisplays.render.DisplayTextureResource
-import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.DisplayInfo
+import com.dreamdisplays.protocol.DisplaySync
+import com.dreamdisplays.protocol.RequestSync
+import com.dreamdisplays.protocol.SetVideo
+import com.dreamdisplays.utils.FacingUtil
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.media.api.VideoQuality
@@ -123,11 +127,11 @@ class DisplayScreen(
         loadVideoInternal(videoUrl, lang, false)
     }
 
-    /** Overrides the server-assigned video with a client-side suggestion, sends a [Packets.SetVideo] packet, and starts playback. */
+    /** Overrides the server-assigned video with a client-side suggestion, sends a [SetVideo] packet, and starts playback. */
     fun playSuggestedVideo(videoUrl: String, lang: String) {
         clientUrlOverride = true
         ClientSettingsStore.setUrlOverride(uuid, videoUrl, lang)
-        Initializer.sendPacket(Packets.SetVideo(uuid, videoUrl, lang))
+        Initializer.sendPacket(SetVideo(uuid, videoUrl, lang))
         playVideoNow(videoUrl, lang)
     }
 
@@ -152,18 +156,18 @@ class DisplayScreen(
         popoutManager.attachTo(player) { videoContentAspect }
     }
 
-    /** Updates position, dimensions, and video URL from an incoming [Packets.Info] packet. */
-    fun updateData(packet: Packets.Info) {
-        x = packet.pos.x
-        y = packet.pos.y
-        z = packet.pos.z
+    /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
+    fun updateData(packet: DisplayInfo) {
+        x = packet.x
+        y = packet.y
+        z = packet.z
         blockPos = null
-        facing = packet.facingUtil.toDisplayFacing()
+        facing = FacingUtil.fromPacket(packet.facing.toByte()).toDisplayFacing()
         width = packet.width
         height = packet.height
         isSync = packet.isSync
         isLocked = packet.isLocked
-        owner = Minecraft.getInstance().player?.gameProfile?.id?.toString() == packet.ownerUuid.toString()
+        owner = Minecraft.getInstance().player?.gameProfile?.id?.toString() == packet.ownerId.toString()
 
         if (videoUrl != packet.url || lang != packet.lang) {
             if (clientUrlOverride) return
@@ -184,16 +188,16 @@ class DisplayScreen(
         }
     }
 
-    /** Sends a [Packets.RequestSync] packet to ask the server for the current playback state. */
+    /** Sends a [RequestSync] packet to ask the server for the current playback state. */
     private fun sendRequestSyncPacket() {
-        Initializer.sendPacket(Packets.RequestSync(uuid))
+        Initializer.sendPacket(RequestSync(uuid))
     }
 
     /** Applies a sync packet from the server: adjusts pause state and seeks if the owner made a real jump. */
-    fun updateData(packet: Packets.Sync) {
+    fun updateData(packet: DisplaySync) {
         isSync = packet.isSync
         if (!isSync) return
-        syncController.onSyncPacket(packet.currentTime, packet.currentState)
+        syncController.onSyncPacket(packet.currentTimeMs, packet.isPaused)
     }
 
     /** Forces the pause state and starts playback; used by the sync controller before the video has started. */
@@ -352,10 +356,10 @@ class DisplayScreen(
         textureResource.allocate(width, height, parseQualityOrDefault())
     }
 
-    /** Sends the current playback state to the server as a [Packets.Sync] packet. */
+    /** Sends the current playback state to the server as a [DisplaySync] packet. */
     fun sendSync() {
         val mp = mediaPlayer ?: return
-        Initializer.sendPacket(Packets.Sync(uuid, isSync, paused, mp.getCurrentTime(), mp.getDuration()))
+        Initializer.sendPacket(DisplaySync(uuid, isSync, paused, mp.getCurrentTime(), mp.getDuration()))
     }
 
     /** Seeks to the saved playback position after reconnection; skipped for sync displays. */

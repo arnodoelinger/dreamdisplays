@@ -46,6 +46,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "dreamdisplays"
+include(":protocol")
 include(":common")
 include(":client")
 include(":client:fabric")
@@ -57,7 +58,7 @@ stonecutter {
         versions(
             "1.21.11",
             "26.1.2",
-            "26.2-pre-4",
+            "26.2-rc.1",
         )
     }
 }

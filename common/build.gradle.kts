@@ -11,6 +11,7 @@ repositories {
 }
 
 dependencies {
+    api(project(":protocol"))
     api(libs.jspecify)
     api(libs.commonsCompress)
     api(libs.tukaaniXz)

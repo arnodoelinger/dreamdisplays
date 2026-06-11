@@ -2,10 +2,10 @@ package com.dreamdisplays.client.capabilities
 
 import com.dreamdisplays.client.ui.VideoPopoutWindow
 import com.dreamdisplays.player.process.HwAccelBackend
-import com.dreamdisplays.protocol.ClientCapabilities
+import com.dreamdisplays.protocol.ClientHello
 
 /**
- * Probes the running client for [ClientCapabilities]. Popout support comes from the `GLFW`
+ * Probes the running client for [ClientHello] capabilities. Popout support comes from the `GLFW`
  * shared-context check in [VideoPopoutWindow], hardware decode from the per-OS
  * [HwAccelBackend] default, and codec support from what the FFmpeg pipeline decodes.
  *
@@ -27,8 +27,8 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
     /** Codecs the `FFmpeg` decode pipeline accepts regardless of hwaccel availability. */
     override val supportedCodecs: List<String> = listOf("h264", "hevc", "vp9", "av1")
 
-    /** Snapshots all probes into an immutable [ClientCapabilities] for the handshake. */
-    override fun detect(): ClientCapabilities = ClientCapabilities(
+    /** Snapshots all probes into an immutable [ClientHello] for the handshake. */
+    override fun detect(): ClientHello = ClientHello(
         supportsPopout = supportsPopout,
         supportsHardwareDecode = supportsHardwareDecode,
         supportsHighResolution = maxTextureSize >= 4096,

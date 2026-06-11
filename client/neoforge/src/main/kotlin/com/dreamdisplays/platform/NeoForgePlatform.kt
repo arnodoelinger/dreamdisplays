@@ -3,7 +3,6 @@ package com.dreamdisplays.platform
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.platform.api.PlatformLogger
-import com.dreamdisplays.platform.api.PlatformNetworking
 import com.dreamdisplays.platform.api.PlatformPaths
 import com.dreamdisplays.platform.api.PlatformScheduler
 import com.dreamdisplays.platform.api.PlatformSide
@@ -33,7 +32,6 @@ object NeoForgePlatform : Platform {
 
     override val scheduler: PlatformScheduler = MinecraftClientScheduler
     override val logger: PlatformLogger = Slf4jPlatformLogger("DreamDisplays")
-    override val networking: PlatformNetworking = PendingProtocolNetworking
 
     /** Mirrors the mod's existing layout: `config/dreamdisplays` for config and caches, `libs` for binaries. */
     override val paths: PlatformPaths = object : PlatformPaths {

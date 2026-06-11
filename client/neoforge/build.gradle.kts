@@ -15,6 +15,8 @@ repositories {
 dependencies {
     implementation(project(":common"))
     shadow(project(":common"))
+    shadow(project(":protocol"))
+    shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinStdlib)
     shadow(libs.newpipeExtractor)
 }
@@ -74,6 +76,11 @@ tasks.shadowJar {
     archiveVersion.set("$activeStonecutterVersion-${rootProject.version}")
     dependencies {
         include(project(":common"))
+        include(project(":protocol"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm"))
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))
         include(dependency("org.semver4j:semver4j"))
@@ -94,6 +101,7 @@ tasks.shadowJar {
         "org.tukaani.xz",
         "org.semver4j",
         "kotlin",
+        "kotlinx",
         "org.jetbrains.annotations",
         "org.intellij.lang.annotations",
         "org.schabi.newpipe",

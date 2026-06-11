@@ -1,6 +1,6 @@
 package com.dreamdisplays.client.capabilities
 
-import com.dreamdisplays.protocol.ClientCapabilities
+import com.dreamdisplays.protocol.ClientHello
 
 /**
  * Detects the capabilities of the client device, such as supported codecs, maximum texture size, and whether popout
@@ -9,8 +9,8 @@ import com.dreamdisplays.protocol.ClientCapabilities
  * @since 1.8.0
  */
 interface ClientCapabilityDetector {
-    /** Returns the detected capabilities. */
-    fun detect(): ClientCapabilities
+    /** Returns the detected capabilities as a [ClientHello] (without the mod version filled in). */
+    fun detect(): ClientHello
 
     /** True if the client supports popout windows, which allow the display to be rendered in a separate window. */
     val supportsPopout: Boolean

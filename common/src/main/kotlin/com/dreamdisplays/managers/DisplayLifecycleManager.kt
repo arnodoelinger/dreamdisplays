@@ -7,7 +7,7 @@ import com.dreamdisplays.displays.store.DisplayStorage
 import com.dreamdisplays.displays.store.FullDisplayData
 import com.dreamdisplays.displays.store.ServerDisplayStore
 import com.dreamdisplays.media.api.VideoQuality
-import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.utils.FacingUtil
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
@@ -28,33 +28,35 @@ object DisplayLifecycleManager {
 
     private const val MAX_DISPLAY_BLOCKS = 256
 
-    fun handleInfoPacket(packet: Packets.Info) {
+    fun handleInfoPacket(packet: DisplayInfo) {
         if (!ClientStateManager.displaysEnabled) return
         if (!isValidDisplaySize(packet.width, packet.height)) {
-            logger.warn("Ignoring display ${packet.uuid}: invalid size ${packet.width}x${packet.height}.")
+            logger.warn("Ignoring display ${packet.id}: invalid size ${packet.width} x ${packet.height}.")
             return
         }
 
-        DisplayRegistry.screens[packet.uuid]?.let {
+        DisplayRegistry.screens[packet.id]?.let {
             it.updateData(packet)
             return
         }
 
+        val facing = FacingUtil.fromPacket(packet.facing.toByte())
+
         Minecraft.getInstance().player?.let { player ->
-            val renderDistance = ServerDisplayStore.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
+            val renderDistance = ServerDisplayStore.getDisplayData(packet.id)?.renderDistance ?: ClientStateManager.config.defaultDistance
             val dist = distanceToScreen(
-                packet.pos.x, packet.pos.y, packet.pos.z,
-                packet.width, packet.height, packet.facingUtil.toDisplayFacing(),
+                packet.x, packet.y, packet.z,
+                packet.width, packet.height, facing.toDisplayFacing(),
                 player.blockPosition()
             )
             if (dist > renderDistance) return
         }
 
         DreamServices.registry.getOrNull<MediaResolverChain>()?.prefetch(MediaSource.from(packet.url))
-        DisplayRegistry.unloadedScreens.remove(packet.uuid)
+        DisplayRegistry.unloadedScreens.remove(packet.id)
 
         createScreen(
-            packet.uuid, packet.ownerUuid, packet.pos, packet.facingUtil,
+            packet.id, packet.ownerId, Vector3i(packet.x, packet.y, packet.z), facing,
             packet.width, packet.height, packet.url, packet.lang, packet.isSync
         )
     }

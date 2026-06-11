@@ -108,6 +108,8 @@ dependencies {
     }
     implementation(project(":common"))
     shadow(project(":common"))
+    shadow(project(":protocol"))
+    shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinStdlib)
     shadow(libs.tomlj)
     shadow(libs.semver4j)
@@ -166,6 +168,11 @@ tasks.shadowJar {
     }
     dependencies {
         include(project(":common"))
+        include(project(":protocol"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm"))
         include(dependency("org.xerial:sqlite-jdbc"))
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))

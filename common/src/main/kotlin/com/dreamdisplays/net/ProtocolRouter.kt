@@ -1,0 +1,55 @@
+package com.dreamdisplays.net
+
+import com.dreamdisplays.managers.ClientPacketManager
+import com.dreamdisplays.protocol.DreamPacket
+import com.dreamdisplays.protocol.PacketRegistry
+import com.dreamdisplays.protocol.ServerHello
+import org.slf4j.LoggerFactory
+
+/**
+ * Client-side protocol negotiation: speaks v2 only after the server has proven v2 support by
+ * answering the blind [com.dreamdisplays.protocol.ClientHello] with a [ServerHello].
+ */
+object ProtocolRouter {
+    private val logger = LoggerFactory.getLogger("DreamDisplays/ProtocolRouter")
+
+    @Volatile
+    var v2Negotiated: Boolean = false
+        private set
+
+    /** Sends [packet] over v2 when negotiated, otherwise as the equivalent frozen-v1 payload. */
+    fun send(packet: DreamPacket) {
+        if (v2Negotiated) {
+            sendV2(packet)
+        } else {
+            ClientPacketManager.send(LegacyAdapter.toLegacy(packet))
+        }
+    }
+
+    /** Sends [packet] over the v2 channel unconditionally; used for the blind hello bootstrap. */
+    fun sendV2(packet: DreamPacket) {
+        ClientPacketManager.send(V2Payload(PacketRegistry.encode(packet)))
+    }
+
+    /** Decodes and dispatches v2 envelope bytes; the first [ServerHello] flips the v2 switch. */
+    fun onV2Received(bytes: ByteArray) {
+        val packet = runCatching { PacketRegistry.decode(bytes) }
+            .onFailure { logger.warn("Failed to decode v2 packet", it) }
+            .getOrNull() ?: return
+        if (packet is ServerHello && !v2Negotiated) {
+            v2Negotiated = true
+            logger.info("Protocol v2 negotiated (server protocol ${packet.protocolVersion}).")
+        }
+        ClientPacketManager.handle(packet)
+    }
+
+    /** Dispatches a packet adapted from a frozen-v1 payload; never flips the v2 switch. */
+    fun onLegacyReceived(packet: DreamPacket) {
+        ClientPacketManager.handle(packet)
+    }
+
+    /** Drops back to v1-until-proven on disconnect. */
+    fun reset() {
+        v2Negotiated = false
+    }
+}

@@ -4,6 +4,7 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.register
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.net.V2Payload
 import com.dreamdisplays.platform.FabricPlatform
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
@@ -41,29 +42,20 @@ class Client : ClientModInitializer, Mod {
         // Note: PayloadTypeRegistry registrations are done in server/ (it's a main entrypoint)
         // which runs on both integrated and dedicated servers, before the client entrypoint.
 
-        ClientPlayNetworking.registerGlobalReceiver(Packets.Info.PACKET_ID) { payload, _ ->
-            Initializer.onDisplayInfoPacket(payload)
+        // Protocol v2: every packet arrives as one opaque envelope payload
+        ClientPlayNetworking.registerGlobalReceiver(V2Payload.TYPE) { payload, _ ->
+            Initializer.onV2Packet(payload.bytes)
         }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.Premium.PACKET_ID) { payload, _ ->
-            Initializer.onPremiumPacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.IsAdmin.PACKET_ID) { payload, _ ->
-            Initializer.onIsAdminPacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.Delete.PACKET_ID) { payload, _ ->
-            Initializer.onDeletePacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.DisplayEnabled.PACKET_ID) { payload, _ ->
-            Initializer.onDisplayEnabledPacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.Sync.PACKET_ID) { payload, _ ->
-            Initializer.onSyncPacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.ReportEnabled.PACKET_ID) { payload, _ ->
-            Initializer.onReportEnabledPacket(payload)
-        }
-        ClientPlayNetworking.registerGlobalReceiver(Packets.ClearCache.PACKET_ID) { payload, _ ->
-            Initializer.onClearCachePacket(payload)
+
+        // Frozen v1 receivers for pre-v2 servers; payloads are lifted into v2 packets
+        listOf(
+            Packets.Info.PACKET_ID, Packets.Premium.PACKET_ID, Packets.IsAdmin.PACKET_ID,
+            Packets.Delete.PACKET_ID, Packets.DisplayEnabled.PACKET_ID, Packets.Sync.PACKET_ID,
+            Packets.ReportEnabled.PACKET_ID, Packets.ClearCache.PACKET_ID,
+        ).forEach { type ->
+            ClientPlayNetworking.registerGlobalReceiver(type) { payload, _ ->
+                Initializer.onLegacyPacket(payload)
+            }
         }
 
         //? if >=26 {

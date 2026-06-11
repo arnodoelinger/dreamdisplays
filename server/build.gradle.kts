@@ -51,6 +51,8 @@ dependencies {
         compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
     }
 
+    implementation(project(":protocol"))
+    implementation(libs.kotlinxSerializationProtobuf)
     implementation(libs.semver4j)
     implementation(libs.tomlj)
     implementation(libs.exposedCore)
@@ -109,6 +111,7 @@ tasks.shadowJar {
         "org.tomlj",
         "org.semver4j",
         "org.jetbrains.exposed",
+        "kotlinx.serialization",
         "com.zaxxer.hikari",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")

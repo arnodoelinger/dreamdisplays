@@ -1,17 +1,16 @@
 package com.dreamdisplays.client.capabilities
 
-import com.dreamdisplays.Initializer
-import com.dreamdisplays.net.Packets
-import com.dreamdisplays.protocol.ClientCapabilities
-import com.dreamdisplays.protocol.ServerCapabilities
+import com.dreamdisplays.net.ProtocolRouter
+import com.dreamdisplays.protocol.ClientHello
+import com.dreamdisplays.protocol.ServerHello
 import com.dreamdisplays.utils.GeneralUtil
 import org.slf4j.LoggerFactory
 
 /**
  * Default [CapabilityNegotiationService]. Local capabilities are probed once via the
- * [ClientCapabilityDetector]; server capabilities are assembled incrementally from the legacy
- * handshake (the server answers a [Packets.Version] advertise with Premium / ReportEnabled
- * packets, which [com.dreamdisplays.managers.ClientPacketManager] merges in via [onServerCapabilities]).
+ * [ClientCapabilityDetector]; server capabilities arrive either as a single v2
+ * [ServerHello] or merged incrementally from the legacy per-flag handshake packets
+ * (via [com.dreamdisplays.managers.ClientPacketManager]).
  *
  * @since 1.8.0
  */
@@ -20,29 +19,34 @@ class DefaultCapabilityNegotiationService(
 ) : CapabilityNegotiationService {
 
     /** Probed once on first access; capability detection is stable for the process lifetime. */
-    override val localCapabilities: ClientCapabilities by lazy { detector.detect() }
+    override val localCapabilities: ClientHello by lazy {
+        detector.detect().copy(modVersion = GeneralUtil.getModVersion())
+    }
 
-    /** Updated incrementally as the handshake packets arrive; null until the first arrives. */
-    @Volatile override var serverCapabilities: ServerCapabilities? = null
+    /** Updated as handshake packets arrive; null until the first arrives. */
+    @Volatile override var serverCapabilities: ServerHello? = null
         private set
 
     /** True, once any server capability information has arrived. */
     override val isNegotiated: Boolean get() = serverCapabilities != null
 
     /**
-     * Starts the handshake by sending the legacy [Packets.Version] packet; the server responds
-     * with the per-feature packets that populate [serverCapabilities].
+     * Starts the handshake: first the blind v2 [ClientHello] (ignored by pre-v2 servers), then the
+     * legacy `version` packet so old servers run their v1 flow. Order matters — a v2 server must
+     * mark the player as v2 before it processes the legacy packet.
      */
     override fun advertise() {
+        runCatching { ProtocolRouter.sendV2(localCapabilities) }
+            .onFailure { logger.debug("v2 hello not deliverable, staying on v1.", it) }
         try {
-            Initializer.sendPacket(Packets.Version(GeneralUtil.getModVersion()))
+            ProtocolRouter.send(localCapabilities)
         } catch (e: Exception) {
             logger.error("Unable to advertise client version", e)
         }
     }
 
     /** Replaces the negotiated [serverCapabilities] snapshot wholesale. */
-    override fun onServerCapabilities(capabilities: ServerCapabilities) {
+    override fun onServerCapabilities(capabilities: ServerHello) {
         serverCapabilities = capabilities
     }
 

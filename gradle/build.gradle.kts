@@ -4,5 +4,6 @@ plugins {
 
 dependencies {
     implementation("org.jetbrains.kotlin:kotlin-gradle-plugin:${libs.versions.kotlin.get()}")
+    implementation("org.jetbrains.kotlin:kotlin-serialization:${libs.versions.kotlin.get()}")
     implementation("com.gradleup.shadow:shadow-gradle-plugin:${libs.versions.shadow.get()}")
 }

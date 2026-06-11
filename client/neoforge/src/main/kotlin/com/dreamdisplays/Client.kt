@@ -4,6 +4,7 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.register
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.net.V2Payload
 import com.dreamdisplays.platform.NeoForgePlatform
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
@@ -36,29 +37,37 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     fun registerPayloads(event: RegisterPayloadHandlersEvent) {
         val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
 
+        // Protocol v2: one opaque envelope payload in both directions; the optional registrar
+        // keeps blind sends to vanilla / Paper servers working, same as the legacy version packet.
+        registrar.playBidirectional(
+            V2Payload.TYPE, V2Payload.CODEC,
+            { _, _ -> },
+            { payload, _ -> Initializer.onV2Packet(payload.bytes) })
+
+        // Frozen v1 payloads for pre-v2 servers; incoming ones are lifted into v2 packets
         registrar.playBidirectional(
             Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC,
             { _, _ -> },
-            { payload, _ -> Initializer.onDeletePacket(payload) })
+            { payload, _ -> Initializer.onLegacyPacket(payload) })
         registrar.playToClient(Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC) { payload, _ ->
-            Initializer.onDisplayInfoPacket(payload)
+            Initializer.onLegacyPacket(payload)
         }
         registrar.playToClient(Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC) { payload, _ ->
-            Initializer.onPremiumPacket(payload)
+            Initializer.onLegacyPacket(payload)
         }
         registrar.playToClient(Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC) { payload, _ ->
-            Initializer.onDisplayEnabledPacket(payload)
+            Initializer.onLegacyPacket(payload)
         }
         registrar.playToClient(Packets.ReportEnabled.PACKET_ID, Packets.ReportEnabled.PACKET_CODEC) { payload, _ ->
-            Initializer.onReportEnabledPacket(payload)
+            Initializer.onLegacyPacket(payload)
         }
         registrar.playToClient(Packets.ClearCache.PACKET_ID, Packets.ClearCache.PACKET_CODEC) { payload, _ ->
-            Initializer.onClearCachePacket(payload)
+            Initializer.onLegacyPacket(payload)
         }
         registrar.playBidirectional(
             Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC,
             { _, _ -> },
-            { payload, _ -> Initializer.onSyncPacket(payload) })
+            { payload, _ -> Initializer.onLegacyPacket(payload) })
         registrar.playToServer(Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC) { _, _ -> }
         registrar.playToServer(Packets.Report.PACKET_ID, Packets.Report.PACKET_CODEC) { _, _ -> }
         registrar.playToServer(Packets.Version.PACKET_ID, Packets.Version.PACKET_CODEC) { _, _ -> }
