@@ -447,7 +447,6 @@ class PipOverlay(
         private const val RESIZE_INSET = 6
         private const val SNAP_LERP_SPEED = 8f
 
-        private const val PANEL_BG_OPAQUE = 0xFF0A0A0A.toInt()
         private const val PANEL_BORDER = 0xFF606060.toInt()
         private const val ACCENT = 0xFF4A90E2.toInt()
 

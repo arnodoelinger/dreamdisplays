@@ -1,14 +1,13 @@
 package com.dreamdisplays.player.process
 
+import com.dreamdisplays.utils.OsInfo
+import com.dreamdisplays.utils.Processes
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory
 import java.io.*
 import java.net.HttpURLConnection
 import java.net.URI
-import java.nio.file.Files
-import java.nio.file.attribute.PosixFilePermissions
-import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
@@ -67,8 +66,8 @@ object FFmpegBinary {
             if (!binary.isFile || binary.length() == 0L) {
                 throw IOException("Extracted binary is missing or empty.")
             }
-            markExecutable(binary)
-            removeMacQuarantine(binary)
+            Processes.markExecutable(binary.toPath())
+            Processes.removeMacQuarantine(binary.toPath())
             logger.info("Ready to work.")
             binary.absolutePath
         } catch (e: Exception) {
@@ -164,30 +163,6 @@ object FFmpegBinary {
         throw IOException("'$suffix' not found in ${archive.name}.")
     }
 
-    /** Sets the executable bit on [binary] using POSIX permissions when available, falling back to `setExecutable`. */
-    private fun markExecutable(binary: File) {
-        try {
-            Files.setPosixFilePermissions(binary.toPath(), PosixFilePermissions.fromString("rwxr-xr-x"))
-        } catch (_: UnsupportedOperationException) {
-            binary.setExecutable(true, false)
-        } catch (_: IOException) {
-            binary.setExecutable(true, false)
-        }
-    }
-
-    // Hack: this operation is needed for safe FFmpeg execution on macOS, since otherwise the quarantine flag may prevent
-    // it from running. It doesn't matter if this fails, since the binary will still work in most cases, but removing the
-    // quarantine flag can help avoid some weird issues on macOS where the OS prevents the binary from running due to
-    // security concerns.
-    private fun removeMacQuarantine(binary: File) {
-        if (!isMac()) return
-        try {
-            ProcessBuilder("xattr", "-d", "com.apple.quarantine", binary.absolutePath)
-                .redirectErrorStream(true).start().waitFor(5, TimeUnit.SECONDS)
-        } catch (_: Exception) {
-        }
-    }
-
     /** Scans well-known system paths for a working `ffmpeg` binary; returns null if none responds with exit 0. */
     private fun findSystemFfmpeg(): String? {
         val candidates = arrayOf("ffmpeg", "/opt/homebrew/bin/ffmpeg", "/usr/local/bin/ffmpeg", "/usr/bin/ffmpeg")
@@ -212,19 +187,13 @@ object FFmpegBinary {
         return null
     }
 
-    /** Returns true when running on macOS. */
-    private fun isMac(): Boolean =
-        System.getProperty("os.name", "").lowercase(Locale.ENGLISH).contains("mac")
-
     /** Returns a [Platform] descriptor for the current OS and architecture, or null if no bundled build is available. */
     private fun detectPlatform(): Platform? {
-        val os = System.getProperty("os.name", "").lowercase(Locale.ENGLISH)
-        val arch = System.getProperty("os.arch", "").lowercase(Locale.ENGLISH)
-        val isArm = "aarch64" in arch || "arm64" in arch || arch == "arm"
+        val isArm = OsInfo.isArm
         return when {
-            "win" in os -> if (isArm) null else
+            OsInfo.isWindows -> if (isArm) null else
                 Platform("windows-x64", "$BTBN_BASE/ffmpeg-master-latest-win64-gpl.zip", "ffmpeg.exe", "/bin/ffmpeg.exe", false)
-            "mac" in os -> if (isArm)
+            OsInfo.isMac -> if (isArm)
                 Platform("macos-aarch64", "https://www.osxexperts.net/ffmpeg71arm.zip", "ffmpeg", "ffmpeg", false)
             else
                 Platform("macos-x64", "https://evermeet.cx/ffmpeg/getrelease/zip", "ffmpeg", "ffmpeg", false)

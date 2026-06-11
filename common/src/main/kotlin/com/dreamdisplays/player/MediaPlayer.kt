@@ -1,6 +1,5 @@
 package com.dreamdisplays.player
 
-import com.dreamdisplays.Initializer
 import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.events.PlayerEvents
@@ -29,7 +28,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.math.abs
 
 /**
  * Manages the lifecycle of a single media playback instance, including stream selection, `FFmpeg`

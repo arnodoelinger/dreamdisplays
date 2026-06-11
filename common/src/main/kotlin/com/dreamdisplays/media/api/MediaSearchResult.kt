@@ -16,10 +16,10 @@ data class MediaSearchResult(
         publishedDaysAgo != null && publishedDaysAgo >= 0 && publishedDaysAgo <= daysWindow
 
     /** Returns the YouTube watch URL for this video. */
-    fun getWatchUrl(): String = "https://www.youtube.com/watch?v=$id"
+    fun getWatchUrl(): String = YouTubeUrls.watchUrl(id)
 
     /** Returns the YouTube thumbnail URL for this video. */
-    fun getThumbnailUrl(): String = "https://i.ytimg.com/vi/$id/mqdefault.jpg"
+    fun getThumbnailUrl(): String = YouTubeUrls.thumbnailUrl(id)
 
     /** Returns a formatted HH:MM:SS duration string, or empty if unavailable. */
     fun formatDuration(): String {

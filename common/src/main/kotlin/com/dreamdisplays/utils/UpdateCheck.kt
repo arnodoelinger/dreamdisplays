@@ -1,7 +1,5 @@
 package com.dreamdisplays.utils
 
-import com.dreamdisplays.utils.GeneralUtil
-import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
@@ -15,15 +13,7 @@ object UpdateCheck {
     private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
 
     @Volatile private var checked = false
-    @Volatile private var updateAvailable = false
     @Volatile private var latestVersion: String? = null
-
-    /** Returns true if a newer stable release exists; skipped entirely for DEV / SNAPSHOT builds. */
-    fun isUpdateAvailable(): Boolean {
-        if (isPreRelease(GeneralUtil.getModVersion())) return false
-        if (!checked) startCheck()
-        return updateAvailable
-    }
 
     /**
      * Returns true if the UI update arrow should be shown.
@@ -36,9 +26,6 @@ object UpdateCheck {
         return compareVersions(latest, GeneralUtil.getModVersion()) > 0
     }
 
-    /** Returns the latest stable release version string, or the installed version if the check hasn't completed. */
-    fun latestVersion(): String = latestVersion ?: GeneralUtil.getModVersion()
-
     /** Returns true if [version] is a DEV or SNAPSHOT build. */
     fun isPreRelease(version: String): Boolean =
         version.contains("-DEV", ignoreCase = true) || version.contains("-SNAPSHOT", ignoreCase = true)
@@ -50,7 +37,7 @@ object UpdateCheck {
         Thread(::doCheck, "dreamdisplays-update-check").apply { isDaemon = true }.start()
     }
 
-    /** Queries the GitHub releases API and sets [latestVersion] and [updateAvailable]. */
+    /** Queries the GitHub releases API and sets [latestVersion]. */
     private fun doCheck() {
         var conn: HttpURLConnection? = null
         try {
@@ -69,30 +56,20 @@ object UpdateCheck {
             val rawTag: String = when {
                 root.isJsonObject -> {
                     val obj = root.asJsonObject
-                    optString(obj, "tag_name") ?: optString(obj, "name")
+                    obj.optString("tag_name") ?: obj.optString("name")
                 }
                 root.isJsonArray -> {
                     val arr = root.asJsonArray
-                    if (!arr.isEmpty && arr[0].isJsonObject) optString(arr[0].asJsonObject, "tag_name") else null
+                    if (!arr.isEmpty && arr[0].isJsonObject) arr[0].asJsonObject.optString("tag_name") else null
                 }
                 else -> null
             } ?: return
-            val tag = rawTag.trimStart('v', 'V')
-            latestVersion = tag
-            if (compareVersions(tag, GeneralUtil.getModVersion()) > 0) {
-                updateAvailable = true
-            }
+            latestVersion = rawTag.trimStart('v', 'V')
         } catch (e: Exception) {
             logger.warn("Update check failed: ${e.message}")
         } finally {
             conn?.disconnect()
         }
-    }
-
-    /** Returns the string value of [key] in [obj], or null if absent or null. */
-    private fun optString(obj: JsonObject, key: String): String? {
-        if (!obj.has(key) || obj.get(key).isJsonNull) return null
-        return runCatching { obj.get(key).asString }.getOrNull()
     }
 
     /** Compares two version strings using semver rules. Returns positive if [a] is newer than [b]. */

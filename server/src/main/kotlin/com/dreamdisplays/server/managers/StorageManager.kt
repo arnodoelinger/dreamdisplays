@@ -107,11 +107,6 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     /** Deletes the display with the given [data] from the displays table. */
     fun deleteDisplay(data: DisplayData) = delete(data.id)
 
-    /** Upserts all rows in [displays] into the displays table. */
-    @PaperOnly fun saveAllPaper(displays: Collection<PaperDisplayData>) {
-        displays.forEach(::saveDisplay)
-    }
-
     @PaperOnly private fun rowToPaper(row: ResultRow): PaperDisplayData? {
         val id = row[table.id].toUUID()
         val worldName = row[table.world]
@@ -143,10 +138,6 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
             packPos(data.pos1.x, data.pos1.y, data.pos1.z),
             packPos(data.pos2.x, data.pos2.y, data.pos2.z),
             DIRECTION_TO_ORDINAL.getValue(data.facing))
-    }
-
-    @FabricOnly fun saveAllFabric(displays: Collection<FabricDisplayData>) {
-        displays.forEach(::saveDisplay)
     }
 
     @FabricOnly private fun rowToFabric(row: ResultRow): FabricDisplayData {

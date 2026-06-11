@@ -10,6 +10,7 @@ import com.dreamdisplays.client.ui.kit.UiTheme
 import com.dreamdisplays.client.ui.widgets.IconButton
 import com.dreamdisplays.client.ui.widgets.SeekBar
 import com.dreamdisplays.displays.DisplayScreen
+import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.ytdlp.Thumbnails
 import com.dreamdisplays.ytdlp.VideoMetadataCache
@@ -162,7 +163,7 @@ class PreviewSection(
         val url = ds.videoUrl ?: return null
         val id = DreamServices.registry.getOrNull<MediaSearchService>()?.extractVideoId(url) ?: return null
         Thumbnails.get(id)?.let { return it }
-        Thumbnails.request(id, "https://i.ytimg.com/vi/$id/mqdefault.jpg")
+        Thumbnails.request(id, YouTubeUrls.thumbnailUrl(id))
         return null
     }
 }
