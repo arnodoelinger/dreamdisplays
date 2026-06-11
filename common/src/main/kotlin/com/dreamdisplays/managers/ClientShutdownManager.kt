@@ -1,16 +1,20 @@
 package com.dreamdisplays.managers
 
 import com.dreamdisplays.Focuser
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.client.core.ClientApplication
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.displays.DisplayRegistry
 
 /**
  * Handles client shutdown cleanup.
  */
 object ClientShutdownManager {
     fun stop() {
-        DisplayManager.saveAllScreens()
+        DreamServices.registry.getOrNull<ClientApplication>()?.stop()
+        DisplayRegistry.saveAllScreens()
         ClientStateManager.qualityRefreshThread.interrupt()
-        DisplayManager.unloadAll()
+        DisplayRegistry.unloadAll()
         Focuser.instance?.interrupt()
     }
 }

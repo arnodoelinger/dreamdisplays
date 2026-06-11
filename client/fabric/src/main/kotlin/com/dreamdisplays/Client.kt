@@ -1,8 +1,11 @@
 package com.dreamdisplays
 
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.managers.ClientStateManager
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.register
+import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.platform.FabricPlatform
+import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
@@ -11,8 +14,8 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-//? if >=26 {
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
+//? if >=26 {
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 //?} else
@@ -30,6 +33,9 @@ class Client : ClientModInitializer, Mod {
     private var customGeometryUnavailable = false
 
     override fun onInitializeClient() {
+        // The Platform must be in the registry before onModInit so ClientStartupManager
+        // can host the ClientApplication on top of it during bootstrap.
+        DreamServices.registry.register<Platform>(FabricPlatform)
         Initializer.onModInit(this)
 
         // Note: PayloadTypeRegistry registrations are done in server/ (it's a main entrypoint)
@@ -74,9 +80,18 @@ class Client : ClientModInitializer, Mod {
                 renderBufferedScreens(context, mc)
                 // Render popout windows after all Minecraft/mod rendering is submitted,
                 // so any GL-context switch (macOS GLFW backend) does not disturb in-flight commands.
-                DisplayManager.getScreens().forEach { it.renderPopout() }
+                DisplayRegistry.getScreens().forEach { it.renderPopout() }
             }
         }
+
+        //?} else
+        /*WorldRenderEvents.AFTER_ENTITIES.register { context ->
+            val mc = Minecraft.getInstance()
+            if (mc.level != null && mc.player != null) {
+                ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
+                DisplayRegistry.getScreens().forEach { it.renderPopout() }
+            }
+        }*/
 
         HudElementRegistry.addLast(
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pip_overlay")
@@ -86,14 +101,6 @@ class Client : ClientModInitializer, Mod {
                 deltaTracker.getGameTimeDeltaPartialTick(false)
             )
         }
-        //?} else
-        /*WorldRenderEvents.AFTER_ENTITIES.register { context ->
-            val mc = Minecraft.getInstance()
-            if (mc.level != null && mc.player != null) {
-                ScreenRenderer.render(context.matrices(), context.gameRenderer().mainCamera)
-                DisplayManager.getScreens().forEach { it.renderPopout() }
-            }
-        }*/
 
         ClientTickEvents.END_CLIENT_TICK.register { Initializer.onEndTick(it) }
 
@@ -101,15 +108,12 @@ class Client : ClientModInitializer, Mod {
             if (client.level != null && client.player != null) {
                 val serverId = if (client.isLocalServer) "singleplayer"
                 else client.currentServer?.ip ?: "unknown"
-                DisplayManager.loadScreensForServer(serverId)
+                Initializer.onServerJoined(serverId)
             }
         }
 
         ClientPlayConnectionEvents.DISCONNECT.register { _, _ ->
-            DisplayManager.saveAllScreens()
-            DisplayManager.unloadAll()
-            ClientStateManager.isPremium = false
-            ClientStateManager.isAdmin = false
+            Initializer.onServerLeft()
         }
 
         ClientLifecycleEvents.CLIENT_STOPPING.register { Initializer.onStop() }

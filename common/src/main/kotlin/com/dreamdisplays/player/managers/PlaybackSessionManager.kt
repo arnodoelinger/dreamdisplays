@@ -1,6 +1,7 @@
 package com.dreamdisplays.player.managers
 
-import com.dreamdisplays.ffmpeg.FFmpegBinary
+import com.dreamdisplays.player.process.FFmpegBinary
+import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.player.events.PlayerEvents
 import com.dreamdisplays.player.pipeline.AudioSink
 import com.dreamdisplays.player.pipeline.PlaybackClock
@@ -8,7 +9,7 @@ import com.dreamdisplays.player.pipeline.VideoFramePipe
 import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.player.process.MediaProcess
 import com.dreamdisplays.player.stream.MediaStreamSelector
-import com.dreamdisplays.player.stream.StreamSet
+import com.dreamdisplays.player.stream.ActiveStreams
 import com.dreamdisplays.player.util.joinSafely
 import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
@@ -85,14 +86,14 @@ internal class PlaybackSessionManager(
      *
      * @param lastQuality last confirmed quality in pixels; 0 = derive from stream metadata
      */
-    fun start(streamSet: StreamSet, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend) {
+    fun start(streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend) {
         stop()
         if (terminated.get()) return
         video.clear()
 
         val ffmpeg = FFmpegBinary.getPath() ?: run {
             logger.error("$debugLabel FFmpeg binary not available.")
-            events.onError(); return
+            events.onError(DreamMediaException.Decode("FFmpeg binary not available", isFatal = true)); return
         }
         clock.reset(offsetNanos)
 
@@ -119,7 +120,7 @@ internal class PlaybackSessionManager(
             isPlaying = true
         } catch (e: IOException) {
             logger.error("$debugLabel Failed to start FFmpeg", e)
-            events.onError()
+            events.onError(DreamMediaException.Decode("Failed to start FFmpeg: ${e.message}", e))
         }
     }
 

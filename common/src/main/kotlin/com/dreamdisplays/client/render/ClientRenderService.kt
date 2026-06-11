@@ -1,0 +1,27 @@
+package com.dreamdisplays.client.render
+
+import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.render.api.RenderContext
+import com.dreamdisplays.render.api.TextureHandle
+
+/**
+ * Service for rendering displays on the client.
+ *
+ * @since 1.0.0
+ */
+interface ClientRenderService {
+    /** Registers a render hook to be called during the rendering process. */
+    fun registerDisplay(entry: DisplayRenderEntry)
+
+    /** Unregisters a display, removing it from the rendering process. */
+    fun unregisterDisplay(displayId: DisplayId)
+
+    /** Updates the texture for a specific display. The display must already be registered. */
+    fun updateTexture(displayId: DisplayId, handle: TextureHandle)
+
+    /** Renders all registered displays. This is called by the rendering system and should not be called directly. */
+    fun renderAll(context: RenderContext)
+
+    /** Number of live displays with an uploaded texture. Those this renderer will actually draw. */
+    val registeredCount: Int
+}

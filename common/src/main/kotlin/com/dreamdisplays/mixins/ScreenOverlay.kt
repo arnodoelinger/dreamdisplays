@@ -1,6 +1,9 @@
 package com.dreamdisplays.mixins
 
-import com.dreamdisplays.client.ui.PipOverlayManager
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.client.overlay.OverlayManager
+import com.dreamdisplays.client.ui.MinecraftOverlayRenderContext
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -26,15 +29,16 @@ open class ScreenOverlay {
     open fun onRenderReturn(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {
     //?} else
     /*@Inject(
-        method = ["render"],
+        method = ["renderWithTooltipAndSubtitles"],
         at = [At("RETURN")],
         require = 0
     )
     open fun onRenderReturn(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {*/
-        if (PipOverlayManager.isEmpty) return
+        val overlays = DreamServices.registry.getOrNull<OverlayManager>() ?: return
+        if (overlays.isEmpty) return
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
         val leftPressed = GLFW.glfwGetMouseButton(mc.window.handle(), GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
-        PipOverlayManager.renderAll(mc, graphics, mouseX, mouseY, leftPressed, partialTick)
+        overlays.renderAll(MinecraftOverlayRenderContext(mc, graphics, mouseX, mouseY, leftPressed, partialTick))
     }
 }

@@ -1,6 +1,11 @@
 package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.managers.ClientStateManager
+import com.dreamdisplays.media.api.MediaMetadata
+import com.dreamdisplays.media.api.MediaResolver
+import com.dreamdisplays.media.api.MediaSource
+import com.dreamdisplays.media.api.ResolvedMedia
+import kotlin.time.Duration.Companion.nanoseconds
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
@@ -30,10 +35,44 @@ import kotlin.math.round
  * It never throws to its callers; on any failure it returns an empty list so [YtDlp.fetchUncached]
  * transparently falls back to `yt-dlp`.
  */
-object NewPipeResolver {
+object NewPipeResolver : MediaResolver {
     private val logger = LoggerFactory.getLogger("DreamDisplays/NewPipe")
 
     private val initialized = AtomicBoolean(false)
+
+    override val priority: Int = 10
+
+    override fun canResolve(source: MediaSource): Boolean = source is MediaSource.YouTube
+
+    override fun resolve(source: MediaSource): ResolvedMedia {
+        ensureInitialized()
+        check(initialized.get()) { "NewPipeExtractor failed to initialize" }
+        val url = when (source) {
+            is MediaSource.YouTube -> "https://www.youtube.com/watch?v=${source.videoId}"
+            is MediaSource.Remote -> source.url
+            is MediaSource.DirectStream -> source.streamUrl
+            is MediaSource.Twitch -> throw UnsupportedOperationException("Twitch not supported by NewPipeResolver")
+        }
+        val info = StreamInfo.getInfo(url)
+        val isLive = info.streamType == StreamType.LIVE_STREAM ||
+                info.streamType == StreamType.AUDIO_LIVE_STREAM ||
+                info.streamType == StreamType.POST_LIVE_STREAM
+        val metadata = MediaMetadata(
+            title = info.name.ifBlank { null },
+            uploader = info.uploaderName.ifBlank { null },
+            duration = if (info.duration > 0) durationToNanos(info.duration).nanoseconds else null,
+            thumbnailUrl = info.thumbnails.firstOrNull()?.url,
+            viewCount = info.viewCount.takeIf { it > 0 },
+            likeCount = info.likeCount.takeIf { it > 0 },
+            uploadDate = null,
+        )
+        return ResolvedMedia(
+            streams = mapStreams(info).map { it.toMediaStream() },
+            metadata = metadata,
+            isLive = isLive,
+            isSeekable = !isLive && info.duration > 0,
+        )
+    }
 
     /** Initializes NewPipeExtractor with our HTTP downloader exactly once. Safe to call repeatedly. */
     fun ensureInitialized() {

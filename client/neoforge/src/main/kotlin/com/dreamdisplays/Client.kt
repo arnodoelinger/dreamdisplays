@@ -1,8 +1,11 @@
 package com.dreamdisplays
 
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.managers.ClientStateManager
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.register
+import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.platform.NeoForgePlatform
+import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -22,6 +25,9 @@ import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 @Mod(value = Initializer.MOD_ID, dist = [Dist.CLIENT])
 class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     init {
+        // The Platform must be in the registry before onModInit so ClientStartupManager
+        // can host the ClientApplication on top of it during bootstrap.
+        DreamServices.registry.register<Platform>(NeoForgePlatform)
         Initializer.onModInit(this)
         modEventBus.addListener(::registerPayloads)
         NeoForge.EVENT_BUS.register(this)
@@ -65,15 +71,12 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         if (mc.level != null && mc.player != null) {
             val serverId = if (mc.hasSingleplayerServer()) "singleplayer"
             else mc.currentServer?.ip ?: "unknown"
-            DisplayManager.loadScreensForServer(serverId)
+            Initializer.onServerJoined(serverId)
         }
     }
 
     @SubscribeEvent fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
-        DisplayManager.saveAllScreens()
-        DisplayManager.unloadAll()
-        ClientStateManager.isPremium = false
-        ClientStateManager.isAdmin = false
+        Initializer.onServerLeft()
     }
 
     @SubscribeEvent fun onClientStopping(event: ClientStoppingEvent) {
@@ -104,7 +107,7 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         )
         // Render popout windows after all Minecraft/mod rendering is submitted,
         // so any GL-context switch (macOS GLFW backend) does not disturb in-flight commands.
-        DisplayManager.getScreens().forEach { it.renderPopout() }
+        DisplayRegistry.getScreens().forEach { it.renderPopout() }
     }
     override fun sendPacket(packet: CustomPacketPayload) {
         Minecraft.getInstance().connection?.send(packet)

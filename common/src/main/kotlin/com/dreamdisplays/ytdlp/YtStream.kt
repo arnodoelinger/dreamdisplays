@@ -1,5 +1,8 @@
 package com.dreamdisplays.ytdlp
 
+import com.dreamdisplays.media.api.MediaStream
+import com.dreamdisplays.media.api.MediaStreamType
+
 /**
  * YouTube stream information, as returned by `yt-dlp`. It includes methods to check if the stream has video / audio and
  * if it's muxed (because it can be a stream or première or etc.)
@@ -33,6 +36,25 @@ class YtStream(
 
     /** Returns true if the stream is a muxed stream (video and audio in the same file). */
     val isMuxed: Boolean get() = hasVideo && hasAudio
+
+    /** Maps this internal stream descriptor to the media-api contract type used by [MediaResolver]. */
+    fun toMediaStream(): MediaStream = MediaStream(
+        url = url,
+        type = when {
+            hasVideo && hasAudio -> MediaStreamType.VIDEO_AUDIO
+            hasVideo -> MediaStreamType.VIDEO
+            else -> MediaStreamType.AUDIO
+        },
+        codec = vcodec?.takeIf { it.isNotBlank() && it != "none" }
+            ?: acodec?.takeIf { it.isNotBlank() && it != "none" },
+        width = width,
+        height = height,
+        fps = fps,
+        bitrate = tbrKbps?.let { (it * 1000).toInt() },
+        audioTrackName = audioTrackName,
+        audioTrackLang = audioTrackId,
+        isDefault = false,
+    )
 
     /** Returns a human-readable string representation of the stream, including all available metadata. */
     override fun toString(): String = buildString {

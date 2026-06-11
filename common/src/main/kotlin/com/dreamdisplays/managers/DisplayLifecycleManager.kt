@@ -1,11 +1,18 @@
 package com.dreamdisplays.managers
 
-import com.dreamdisplays.display.DisplayManager
-import com.dreamdisplays.display.DisplayScreen
-import com.dreamdisplays.display.DisplaySettings
+import com.dreamdisplays.api.DisplayFacing
+import com.dreamdisplays.displays.DisplayRegistry
+import com.dreamdisplays.displays.DisplayScreen
+import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.displays.store.FullDisplayData
+import com.dreamdisplays.displays.store.ServerDisplayStore
+import com.dreamdisplays.media.api.VideoQuality
 import com.dreamdisplays.net.Packets
 import com.dreamdisplays.utils.FacingUtil
-import com.dreamdisplays.ytdlp.YtDlp
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.media.api.MediaResolverChain
+import com.dreamdisplays.media.api.MediaSource
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import org.joml.Vector3i
@@ -28,23 +35,23 @@ object DisplayLifecycleManager {
             return
         }
 
-        DisplayManager.screens[packet.uuid]?.let {
+        DisplayRegistry.screens[packet.uuid]?.let {
             it.updateData(packet)
             return
         }
 
         Minecraft.getInstance().player?.let { player ->
-            val renderDistance = DisplaySettings.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
+            val renderDistance = ServerDisplayStore.getDisplayData(packet.uuid)?.renderDistance ?: ClientStateManager.config.defaultDistance
             val dist = distanceToScreen(
                 packet.pos.x, packet.pos.y, packet.pos.z,
-                packet.width, packet.height, packet.facingUtil.toString(),
+                packet.width, packet.height, packet.facingUtil.toDisplayFacing(),
                 player.blockPosition()
             )
             if (dist > renderDistance) return
         }
 
-        YtDlp.prefetchFormats(packet.url)
-        DisplayManager.unloadedScreens.remove(packet.uuid)
+        DreamServices.registry.getOrNull<MediaResolverChain>()?.prefetch(MediaSource.from(packet.url))
+        DisplayRegistry.unloadedScreens.remove(packet.uuid)
 
         createScreen(
             packet.uuid, packet.ownerUuid, packet.pos, packet.facingUtil,
@@ -57,32 +64,32 @@ object DisplayLifecycleManager {
         width: Int, height: Int, code: String, lang: String, isSync: Boolean,
     ) {
         val displayScreen = DisplayScreen(
-            uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toString(),
+            uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toDisplayFacing(),
             width, height, isSync
         )
 
-        val savedData = DisplaySettings.getDisplayData(uuid)
+        val savedData = ServerDisplayStore.getDisplayData(uuid)
         displayScreen.renderDistance = savedData?.renderDistance ?: ClientStateManager.config.defaultDistance
 
         displayScreen.createTexture()
-        DisplayManager.registerScreen(displayScreen)
+        DisplayRegistry.registerScreen(displayScreen)
         if (code != "") displayScreen.loadVideo(code, lang)
     }
 
     fun restoreVisibleUnloadedScreens(playerPos: BlockPos) {
-        DisplayManager.unloadedScreens.values
+        DisplayRegistry.unloadedScreens.values
             .filter { it.videoUrl.isNotEmpty() && distanceToData(it, playerPos) <= it.renderDistance }
             .toList()
             .forEach { data ->
-                DisplayManager.unloadedScreens.remove(data.uuid)
+                DisplayRegistry.unloadedScreens.remove(data.uuid)
                 restoreScreen(data)
             }
     }
 
-    private fun restoreScreen(data: DisplaySettings.FullDisplayData) {
+    private fun restoreScreen(data: FullDisplayData) {
         if (!isValidDisplaySize(data.width, data.height)) {
             logger.warn("Skipping cached display ${data.uuid}: invalid size ${data.width}x${data.height}.")
-            DisplaySettings.removeDisplay(data.uuid)
+            DisplayStorage.removeDisplay(data.uuid)
             return
         }
 
@@ -93,30 +100,30 @@ object DisplayLifecycleManager {
         displayScreen.renderDistance = data.renderDistance
         displayScreen.savedTimeNanos = data.currentTimeNanos
         displayScreen.volume = data.volume
-        displayScreen.quality = data.quality
+        displayScreen.quality = VideoQuality.parse(data.quality)
         displayScreen.brightness = data.brightness
         displayScreen.muted = data.muted
 
         displayScreen.createTexture()
-        DisplayManager.screens[displayScreen.uuid] = displayScreen
+        DisplayRegistry.screens[displayScreen.uuid] = displayScreen
 
         if (data.videoUrl.isNotEmpty()) {
             displayScreen.loadVideo(data.videoUrl, data.lang)
         }
     }
 
-    private fun distanceToData(data: DisplaySettings.FullDisplayData, playerPos: BlockPos) =
+    private fun distanceToData(data: FullDisplayData, playerPos: BlockPos) =
         distanceToScreen(data.x, data.y, data.z, data.width, data.height, data.facing, playerPos)
 
     private fun distanceToScreen(
-        x: Int, y: Int, z: Int, width: Int, height: Int, facing: String, playerPos: BlockPos
+        x: Int, y: Int, z: Int, width: Int, height: Int, facing: DisplayFacing, playerPos: BlockPos
     ): Double {
         var maxX = x
         val maxY = y + height - 1
         var maxZ = z
         when (facing) {
-            "NORTH", "SOUTH" -> maxX += width - 1
-            "EAST", "WEST" -> maxZ += width - 1
+            DisplayFacing.NORTH, DisplayFacing.SOUTH -> maxX += width - 1
+            DisplayFacing.EAST, DisplayFacing.WEST -> maxZ += width - 1
         }
         return sqrt(playerPos.distSqr(BlockPos(
             minOf(maxOf(playerPos.x, x), maxX),

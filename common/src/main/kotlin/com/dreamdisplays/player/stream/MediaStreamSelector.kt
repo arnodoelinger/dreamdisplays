@@ -1,31 +1,18 @@
 package com.dreamdisplays.player.stream
 
-import com.dreamdisplays.ytdlp.YtStream
+import com.dreamdisplays.media.api.MediaStream
+import com.dreamdisplays.media.api.MediaStreamType
 import kotlin.math.abs
 
-/**
- * Pure helpers for parsing stream quality labels and picking video / audio
- * tracks from the candidate lists returned by `yt-dlp`.
- */
+/** Pure helpers for parsing quality values and picking video / audio tracks from a [MediaStream] list. */
 object MediaStreamSelector {
-    /** Parses a stream's resolution label (e.g. "720p") into an integer quality value (e.g. 720). */
-    fun parseQuality(stream: YtStream): Int = parseQualityValue(stream.resolution, Int.MAX_VALUE)
 
-    /** Extracts the leading integer from a resolution string like "720p" or "1080"; returns [fallback] if unparseable. */
-    fun parseQualityValue(raw: String?, fallback: Int): Int {
-        if (raw == null) return fallback
-        var i = 0
-        val n = raw.length
-        while (i < n && !raw[i].isDigit()) i++
-        val start = i
-        while (i < n && raw[i].isDigit()) i++
-        if (start == i) return fallback
-        return raw.substring(start, i).toIntOrNull() ?: fallback
-    }
+    /** Returns the pixel height of [stream], or [Int.MAX_VALUE] if unknown. */
+    fun parseQuality(stream: MediaStream): Int = stream.height ?: Int.MAX_VALUE
 
     /**
-     * Maps a quality value (e.g. 720) to a standard video dimension (e.g. 1280 x 720). This is used to pick the best
-     * matching stream when the quality label is missing or unparseable.
+     * Maps a quality value (e.g. 720) to a standard video dimension (e.g. 1280 x 720). Used to
+     * pick the best matching stream when the quality label is missing or unparseable.
      */
     fun qualityToDims(quality: Int): IntArray = when {
         quality <= 240 -> intArrayOf(426, 240)
@@ -38,52 +25,57 @@ object MediaStreamSelector {
     }
 
     /**
-     * Pick the best matching video stream from the list of candidates, based on the target quality and presence of audio.
+     * Picks the stream pair closest to [target] height from [streams]' available tracks.
+     * @return the updated set, or null when no switch is possible (no candidate, or the best
+     *   candidate is already the current video).
      */
-    fun pickVideo(streams: List<YtStream>?, target: Int): YtStream? {
+    internal fun switchQuality(streams: ActiveStreams, target: Int, lang: String): ActiveStreams? {
+        val best = pickVideo(streams.availableVideo, target)
+            ?.takeIf { it.url != streams.currentVideo.url } ?: return null
+        val audio = pickAudio(streams.availableAudio, lang, best) ?: streams.currentAudio
+        return streams.copy(currentVideo = best, currentAudio = audio)
+    }
+
+    /** Pick the best video stream closest to [target] quality (height in pixels). */
+    fun pickVideo(streams: List<MediaStream>?, target: Int): MediaStream? {
         if (streams.isNullOrEmpty()) return null
         return streams.asSequence()
-            .filter { it.resolution != null }
+            .filter { it.height != null }
             .minWithOrNull(
-                compareBy<YtStream> { abs(parseQuality(it) - target) }
-                    .thenBy { if (it.isMuxed) 0 else 1 }
-                    .thenBy { if (it.hasAudio()) 0 else 1 }
+                compareBy<MediaStream> { abs(parseQuality(it) - target) }
+                    .thenBy { if (it.type == MediaStreamType.VIDEO_AUDIO) 0 else 1 }
+                    .thenBy { if (it.type.hasAudio) 0 else 1 }
             )
     }
 
-    /**
-     * Pick the best matching audio stream from the list of candidates, based on the requested language and presence of
-     * audio in the chosen video stream.
-     */
-    fun pickAudio(audioStreams: List<YtStream>, lang: String, chosenVideo: YtStream?): YtStream? {
-        val audioOnly = audioStreams.filter { !it.hasVideo() }
+    /** Pick the best audio stream for [lang], falling back to default / first available. */
+    fun pickAudio(audioStreams: List<MediaStream>, lang: String, chosenVideo: MediaStream?): MediaStream? {
+        val audioOnly = audioStreams.filter { !it.type.hasVideo }
         val requested = lang.trim()
 
-        // Additional languages
         if (requested.isNotEmpty()) {
             audioOnly.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
         }
 
-        // Default
         audioOnly.firstOrNull {
             it.audioTrackName?.lowercase()?.let { n -> "original" in n || "default" in n } == true
         }?.let { return it }
-        audioOnly.firstOrNull { it.audioTrackId.isNullOrBlank() || it.audioTrackId == "und" }
+        audioOnly.firstOrNull { it.audioTrackLang.isNullOrBlank() || it.audioTrackLang == "und" }
             ?.let { return it }
         audioOnly.firstOrNull()?.let { return it }
 
-        if (chosenVideo != null && chosenVideo.hasAudio()) return chosenVideo
+        if (chosenVideo != null && chosenVideo.type.hasAudio) return chosenVideo
         if (requested.isNotEmpty()) {
             audioStreams.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
         }
         return audioStreams.firstOrNull()
     }
 
-    /** Matches the requested language against the stream's audio track ID and name. Case-insensitive, partial match. */
-    fun matchesLanguage(stream: YtStream, lang: String): Boolean {
+    /** Case-insensitive partial match of [lang] against the stream's language tag and track name. */
+    fun matchesLanguage(stream: MediaStream, lang: String): Boolean {
         val needle = lang.lowercase()
         if (needle.isEmpty()) return false
-        return stream.audioTrackId?.lowercase()?.contains(needle) == true
+        return stream.audioTrackLang?.lowercase()?.contains(needle) == true
                 || stream.audioTrackName?.lowercase()?.contains(needle) == true
     }
 }

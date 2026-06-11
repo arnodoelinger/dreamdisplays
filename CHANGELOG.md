@@ -16,6 +16,8 @@
 
 - Fix critical crash on the `Fabric` 1.21.11 version
 - Fix incompatibility between the popout window and `Vivecraft` mod
+- Fix DRM waiting issue
+- Less log spam
 
 ## Server
 

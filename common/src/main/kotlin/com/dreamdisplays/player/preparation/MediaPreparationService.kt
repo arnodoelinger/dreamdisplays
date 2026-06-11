@@ -1,51 +1,64 @@
 package com.dreamdisplays.player.preparation
 
-import com.dreamdisplays.player.stream.MediaStreamSelector
-import com.dreamdisplays.player.stream.StreamSet
-import com.dreamdisplays.utils.GeneralUtil
-import com.dreamdisplays.ytdlp.YtDlp
-import com.dreamdisplays.ytdlp.YtStream
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.get
+import com.dreamdisplays.media.api.DreamMediaException
+import com.dreamdisplays.media.api.MediaResolverChain
+import com.dreamdisplays.media.api.MediaSource
+import com.dreamdisplays.media.api.StreamPreferences
+import com.dreamdisplays.media.api.StreamSelector
+import com.dreamdisplays.media.api.VideoQuality
+import com.dreamdisplays.player.stream.ActiveStreams
 
 /**
- * Fetches stream metadata via `yt-dlp` and selects the best video and audio tracks.
- * Runs on a background thread; throws on failure so the caller can handle retries.
+ * Resolves stream metadata via [MediaResolverChain], selects the best tracks via [StreamSelector],
+ * and returns a [PreparedMedia] ready for playback. Runs on a background thread.
  */
 internal object MediaPreparationService {
+
     /**
-     * Resolves the video ID, fetches streams, analyses metadata, and picks the best tracks.
+     * Resolves [url] through the registry's [MediaResolverChain], selects tracks via [StreamSelector],
+     * and returns all necessary playback metadata.
      *
-     * @param url     raw YouTube URL
-     * @param lang    preferred audio language (empty = default)
-     * @param quality preferred video quality string, e.g. "720p"
-     * @throws IllegalArgumentException if the video ID cannot be extracted from [url]
-     * @throws IllegalStateException    if no usable streams are found
+     * @param url raw media URL (YouTube, direct stream, etc.)
+     * @param lang preferred audio language (empty = default)
+     * @param quality preferred video quality ([VideoQuality.Auto] caps at 720p as a sane default)
+     * @throws DreamMediaException if no usable streams are found
      */
-    fun prepare(url: String, lang: String, quality: String): PreparedMedia {
-        val videoId = GeneralUtil.extractVideoId(url)?.takeIf { it.isNotEmpty() }
-            ?: throw IllegalArgumentException("Could not extract video ID from URL: $url.")
+    fun prepare(url: String, lang: String, quality: VideoQuality): PreparedMedia {
+        val registry = DreamServices.registry
+        val chain = registry.get<MediaResolverChain>()
+        val selector = registry.get<StreamSelector>()
+        val source = MediaSource.from(url)
+        val resolved = chain.resolve(source)
 
-        val cleanUrl = "https://www.youtube.com/watch?v=$videoId"
-        val all = YtDlp.fetch(cleanUrl).takeIf { it.isNotEmpty() }
-            ?: throw IllegalStateException("No streams available for $cleanUrl.")
+        if (resolved.streams.isEmpty()) throw DreamMediaException.NotFound("No streams available for $url.")
 
-        val isLive = all.any(YtStream::isLive)
-        val isSeekable = !isLive && all.any(YtStream::isSeekable)
-        val durationNanos = all.maxOfOrNull(YtStream::durationNanos) ?: 0L
+        val prefs = StreamPreferences(
+            maxHeight = (quality.targetHeight ?: 720).takeIf { it > 0 },
+            preferFps60 = true,
+            preferredAudioTrack = null,
+            preferredAudioLanguage = lang.ifEmpty { null },
+            allowHdr = false,
+        )
+        val selected = selector.select(resolved.streams, prefs)
 
-        val videoStreams = all.filter(YtStream::hasVideo)
-        val audioStreams = all.filter(YtStream::hasAudio)
+        val video = selected.videoStream
+            ?: throw DreamMediaException.NotFound("No usable video stream for $url.")
+        val audio = selected.audioStream
+            ?: throw DreamMediaException.NotFound("No usable audio stream for $url.")
 
-        val requestedQuality = MediaStreamSelector.parseQualityValue(quality, 720)
-        val pickedVideo = MediaStreamSelector.pickVideo(videoStreams, requestedQuality)
-            ?: videoStreams.firstOrNull()
-            ?: throw IllegalStateException("No usable video stream for $cleanUrl.")
-        val pickedAudio = MediaStreamSelector.pickAudio(audioStreams, lang, pickedVideo)
-            ?: throw IllegalStateException("No usable audio stream for $cleanUrl.")
+        val durationNanos = resolved.metadata.duration?.inWholeNanoseconds ?: 0L
 
         return PreparedMedia(
-            streamSet = StreamSet(videoStreams, audioStreams, pickedVideo, pickedAudio),
-            isLive = isLive,
-            isSeekable = isSeekable,
+            streamSet = ActiveStreams(
+                availableVideo = resolved.videoStreams,
+                availableAudio = resolved.audioStreams,
+                currentVideo = video,
+                currentAudio = audio,
+            ),
+            isLive = resolved.isLive,
+            isSeekable = resolved.isSeekable,
             durationNanos = durationNanos,
         )
     }

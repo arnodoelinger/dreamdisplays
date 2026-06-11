@@ -1,7 +1,12 @@
 package com.dreamdisplays.client.ui
 
 import com.dreamdisplays.Initializer
-import com.dreamdisplays.display.DisplayScreen
+import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.client.overlay.Overlay
+import com.dreamdisplays.client.overlay.OverlayBounds
+import com.dreamdisplays.client.overlay.OverlayEvent
+import com.dreamdisplays.client.overlay.OverlayRenderContext
+import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.render.AsyncTextureUploader
 import com.dreamdisplays.render.TextureUploadUtil
 import com.mojang.blaze3d.platform.NativeImage
@@ -17,52 +22,6 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 
-enum class PipCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
-
-/** 8 magnetic snap zones around the screen edges. */
-// TODO: rewrite this class entirely in 1.9.0
-enum class PipAnchor {
-    TOP_LEFT, TOP_CENTER, TOP_RIGHT,
-    MIDDLE_LEFT, MIDDLE_RIGHT,
-    BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT;
-
-    fun position(sw: Int, sh: Int, pw: Int, ph: Int, m: Int): Pair<Int, Int> = when (this) {
-        TOP_LEFT -> m to m
-        TOP_CENTER -> (sw / 2 - pw / 2) to m
-        TOP_RIGHT -> (sw - pw - m) to m
-        MIDDLE_LEFT -> m to (sh / 2 - ph / 2)
-        MIDDLE_RIGHT -> (sw - pw - m) to (sh / 2 - ph / 2)
-        BOTTOM_LEFT -> m to (sh - ph - m)
-        BOTTOM_CENTER -> (sw / 2 - pw / 2) to (sh - ph - m)
-        BOTTOM_RIGHT -> (sw - pw - m) to (sh - ph - m)
-    }
-
-    /**
-     * Returns (sx, sy) describing which corner of the PiP faces the screen center:
-     *  sx: -1 = handle on left of PiP, +1 = right, 0 = horizontal center
-     *  sy: -1 = top, +1 = bottom, 0 = vertical center
-     */
-    fun centerFacingCorner(): Pair<Int, Int> = when (this) {
-        TOP_LEFT -> 1 to 1
-        TOP_CENTER -> 0 to 1
-        TOP_RIGHT -> -1 to 1
-        MIDDLE_LEFT -> 1 to 0
-        MIDDLE_RIGHT -> -1 to 0
-        BOTTOM_LEFT -> 1 to -1
-        BOTTOM_CENTER -> 0 to -1
-        BOTTOM_RIGHT -> -1 to -1
-    }
-
-    companion object {
-        fun fromCorner(c: PipCorner): PipAnchor = when (c) {
-            PipCorner.TOP_LEFT -> TOP_LEFT
-            PipCorner.TOP_RIGHT -> TOP_RIGHT
-            PipCorner.BOTTOM_LEFT -> BOTTOM_LEFT
-            PipCorner.BOTTOM_RIGHT -> BOTTOM_RIGHT
-        }
-    }
-}
-
 /**
  * In-game Picture-in-Picture overlay for one display screen.
  *
@@ -73,7 +32,7 @@ enum class PipAnchor {
 class PipOverlay(
     val displayScreen: DisplayScreen,
     initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
-) {
+) : Overlay {
     @Volatile private var frontBuf: ByteBuffer = EMPTY_DIRECT
     private var backBuf: ByteBuffer = EMPTY_DIRECT
     @Volatile var frameW = 0
@@ -123,6 +82,41 @@ class PipOverlay(
 
     val isFinished: Boolean get() = closing && animProgress < 0.01f
     val isDragging: Boolean get() = dragging
+
+    /** Stable identity usable with [Overlay] / [com.dreamdisplays.client.overlay.OverlayManager] contracts. */
+    override val displayId: DisplayId get() = DisplayId(displayScreen.uuid)
+
+    /** Visible until the close animation has fully played out. */
+    override val isVisible: Boolean get() = !isFinished
+
+    /** Current screen-space bounds, valid only after the first [render] call. */
+    override val bounds: OverlayBounds
+        get() = OverlayBounds(
+            x = lastPipX.toFloat(),
+            y = lastPipY.toFloat(),
+            width = lastPipW.toFloat(),
+            height = lastPipH.toFloat(),
+        )
+
+    /**
+     * [Overlay] contract entry point. Bridges the platform-agnostic call into the existing
+     * Minecraft render path by unwrapping a [MinecraftOverlayRenderContext]; a context of any other
+     * type is ignored (this overlay can only draw through Minecraft's HUD).
+     */
+    override fun render(context: OverlayRenderContext) {
+        val mc = context as? MinecraftOverlayRenderContext ?: return
+        render(mc.mc, mc.graphics, mc.mouseX, mc.mouseY, mc.leftPressed, context.partialTick)
+    }
+
+    /**
+     * [Overlay] contract input hook. PiP input is otherwise polled from the render context
+     * (see [handleMouseInput]); this only handles the explicit close request.
+     * @return true if the event was consumed.
+     */
+    override fun onEvent(event: OverlayEvent): Boolean = when (event) {
+        is OverlayEvent.CloseRequested -> { startClose(); true }
+        else -> false
+    }
 
     fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
         val size = w * h * 3
@@ -392,10 +386,7 @@ class PipOverlay(
         return x to y
     }
 
-    //? if >=26 {
-    private fun renderResizeHandle(g: GuiGraphicsExtractor, hx: Int, hy: Int, alpha: Float) {
-    //?} else
-    /*private fun renderResizeHandle(g: GuiGraphics, hx: Int, hy: Int, alpha: Float) {*/
+    private fun renderResizeHandle(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
         val (sx, sy) = anchor.centerFacingCorner()
         val color = blendColor(if (hoveringResize) ACCENT else 0xFFFFFFFF.toInt(), alpha)
         drawCornerBracket(g, hx, hy, sx, sy, 8, 0, color)
@@ -456,14 +447,10 @@ class PipOverlay(
         private const val RESIZE_INSET = 6
         private const val SNAP_LERP_SPEED = 8f
 
-        private const val PANEL_BG_OPAQUE = 0xFF0A0A0A.toInt()
         private const val PANEL_BORDER = 0xFF606060.toInt()
         private const val ACCENT = 0xFF4A90E2.toInt()
 
-        //? if >=26 {
-        private fun outline(g: GuiGraphicsExtractor, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
-        //?} else
-        /*private fun outline(g: GuiGraphics, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {*/
+        private fun outline(g: GuiGraphicsCompat, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
             g.fill(x1, y1, x2, y1 + 1, color)
             g.fill(x1, y2 - 1, x2, y2, color)
             g.fill(x1, y1, x1 + 1, y2, color)

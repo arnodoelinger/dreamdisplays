@@ -1,5 +1,8 @@
 package com.dreamdisplays.render
 
+import com.dreamdisplays.media.api.DecodedVideoFrame
+import com.dreamdisplays.render.api.TextureHandle
+import com.dreamdisplays.render.api.TextureUploader
 import com.mojang.blaze3d.opengl.GlStateManager
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
@@ -16,7 +19,7 @@ import java.nio.ByteBuffer
  *
  * @param stateCache If true, cached `GlStateManager` methods are used for state optimization.
  */
-class AsyncTextureUploader(private val stateCache: Boolean) {
+class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
 
     /** [PBO_COUNT] persistent buffer IDs that we rotate through. */
     private val pboIds: IntArray = IntArray(PBO_COUNT) { GL15.glGenBuffers() }
@@ -26,6 +29,52 @@ class AsyncTextureUploader(private val stateCache: Boolean) {
 
     /** Index of the `PBO` to write into; advanced on each upload. */
     private var ringIndex: Int = 0
+
+    private var managedTexId: Int = -1
+    private var managedTexW: Int = -1
+    private var managedTexH: Int = -1
+
+    override val supportsAsync: Boolean = true
+    override val maxTextureSize: Int = 8192
+
+    override fun upload(frame: DecodedVideoFrame): TextureHandle {
+        if (managedTexId == -1) {
+            managedTexId = GL11.glGenTextures()
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
+            GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+        }
+        val w = frame.width; val h = frame.height
+        val buf = ByteBuffer.wrap(frame.data)
+        if (w != managedTexW || h != managedTexH) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
+                GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf)
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            managedTexW = w; managedTexH = h
+        } else {
+            upload(managedTexId, buf, w, h)
+        }
+        return TextureHandle(managedTexId)
+    }
+
+    override fun release(handle: TextureHandle) {
+        if (handle.id == managedTexId && managedTexId != -1) {
+            GL11.glDeleteTextures(managedTexId)
+            managedTexId = -1; managedTexW = -1; managedTexH = -1
+        }
+    }
+
+    override fun close() {
+        if (managedTexId != -1) {
+            GL11.glDeleteTextures(managedTexId)
+            managedTexId = -1
+        }
+        cleanup()
+    }
 
     /**
      * Uploads `w * h * 3` bytes from [src] into the next `PBO` in the ring, then schedules an async

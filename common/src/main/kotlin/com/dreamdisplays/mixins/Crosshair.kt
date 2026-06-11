@@ -1,5 +1,8 @@
 package com.dreamdisplays.mixins
 
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.client.overlay.CrosshairPolicy
 import com.dreamdisplays.managers.ClientStateManager
 import net.minecraft.client.DeltaTracker
 //? if >=26 {
@@ -32,7 +35,10 @@ open class Crosshair {
         deltaTracker: DeltaTracker,
         ci: CallbackInfo
     ) {*/
-        if (ClientStateManager.isOnScreen) {
+        val suppress = DreamServices.registry.getOrNull<CrosshairPolicy>()
+            ?.shouldSuppressCrosshair()
+            ?: ClientStateManager.isOnScreen
+        if (suppress) {
             ci.cancel()
         }
     }

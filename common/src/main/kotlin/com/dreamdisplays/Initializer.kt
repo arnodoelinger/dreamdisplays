@@ -1,7 +1,14 @@
 package com.dreamdisplays
 
-import com.dreamdisplays.client.ui.PipOverlayManager
+import com.dreamdisplays.client.core.ClientApplication
+import com.dreamdisplays.client.core.ClientLifecycleEvent
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.client.overlay.OverlayManager
+import com.dreamdisplays.client.ui.MinecraftOverlayRenderContext
+import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.managers.ClientPacketManager
+import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.managers.ClientShutdownManager
 import com.dreamdisplays.managers.ClientStartupManager
 import com.dreamdisplays.managers.ClientTickManager
@@ -13,8 +20,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.GuiGraphicsExtractor
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
-import net.minecraft.client.multiplayer.ClientLevel
-import net.minecraft.core.BlockPos
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 
@@ -35,6 +40,34 @@ object Initializer {
 
         logger.info("Starting Dream Displays...")
         ClientStartupManager.start()
+    }
+
+    /**
+     * Called by the platform entrypoint after joining a server: records [serverId] in the client
+     * state, restores saved screens, and emits [ClientLifecycleEvent.ServerJoined].
+     */
+    fun onServerJoined(serverId: String) {
+        ClientStateManager.connectedServerId = serverId
+        DisplayRegistry.loadScreensForServer(serverId)
+        DreamServices.registry.getOrNull<ClientApplication>()
+            ?.emit(ClientLifecycleEvent.ServerJoined(serverId))
+    }
+
+    /**
+     * Called by the platform entrypoint on disconnect: persists and unloads all screens, resets
+     * the per-server flags, and emits [ClientLifecycleEvent.ServerLeft].
+     */
+    fun onServerLeft() {
+        val serverId = ClientStateManager.connectedServerId
+        DisplayRegistry.saveAllScreens()
+        DisplayRegistry.unloadAll()
+        ClientStateManager.isPremium = false
+        ClientStateManager.isAdmin = false
+        ClientStateManager.connectedServerId = null
+        if (serverId != null) {
+            DreamServices.registry.getOrNull<ClientApplication>()
+                ?.emit(ClientLifecycleEvent.ServerLeft(serverId))
+        }
     }
 
     /** Handles an incoming [Packets.Info] packet: updates an existing screen or creates a new one if within render distance. */
@@ -67,7 +100,8 @@ object Initializer {
     /*fun onRenderHud(mc: Minecraft, graphics: GuiGraphics, partialTick: Float) {*/
         if (mc.level == null || mc.player == null) return
         if (MinecraftScreenUtil.currentScreen(mc) != null) return
-        PipOverlayManager.renderAll(mc, graphics, -1, -1, false, partialTick)
+        DreamServices.registry.getOrNull<OverlayManager>()
+            ?.renderAll(MinecraftOverlayRenderContext(mc, graphics, -1, -1, false, partialTick))
     }
 
     /** Delegates packet sending to the platform-specific [Mod] implementation. */

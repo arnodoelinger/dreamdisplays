@@ -1,5 +1,10 @@
 package com.dreamdisplays.client.ui
 
+import com.dreamdisplays.client.popout.PopoutEvent
+import com.dreamdisplays.client.popout.PopoutWindow
+import com.dreamdisplays.client.popout.WindowBackend
+import com.dreamdisplays.client.popout.WindowConfig
+import com.dreamdisplays.media.api.VideoFrameSink
 import com.dreamdisplays.render.AsyncTextureUploader
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
@@ -30,28 +35,62 @@ import javax.swing.SwingUtilities
 /**
  * Detached window that mirrors the decoded video.
  */
-class VideoPopoutWindow(private val onClose: () -> Unit) {
+class VideoPopoutWindow(
+    private val displayId: String,
+    private val onClose: () -> Unit,
+) : PopoutWindow {
 
-    private val backend: PopoutBackend =
-        if (IS_MACOS) GlfwBackend(onClose) else AwtBackend(onClose)
+    private val eventListeners = java.util.concurrent.CopyOnWriteArrayList<(PopoutEvent) -> Unit>()
 
-    val isOpen: Boolean get() = backend.isOpen
+    private fun emitEvent(event: PopoutEvent) = eventListeners.forEach { it(event) }
+
+    private val impl: PopoutBackend =
+        if (IS_MACOS) GlfwBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        else AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+
+    override val backend: WindowBackend = if (IS_MACOS) WindowBackend.GLFW else WindowBackend.AWT
+    override val isOpen: Boolean get() = impl.isOpen
+    override val width: Int get() = impl.width
+    override val height: Int get() = impl.height
+
+    /** Opens the window using dimensions from [config] and returns a [VideoFrameSink] for pushing frames. */
+    override fun open(config: WindowConfig): VideoFrameSink {
+        impl.open(config.initialWidth, config.initialHeight)
+        emitEvent(PopoutEvent.Opened(displayId))
+        return VideoFrameSink { frame ->
+            impl.updateFrame(
+                ByteBuffer.wrap(frame.data), frame.width, frame.height,
+                frame.width.toDouble() / frame.height,
+            )
+        }
+    }
+
+    override fun on(listener: (PopoutEvent) -> Unit): AutoCloseable {
+        eventListeners += listener
+        return AutoCloseable { eventListeners -= listener }
+    }
 
     /** Updates the current frame buffer. Safe to call from any thread. */
     fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) =
-        backend.updateFrame(buf, w, h, aspect)
+        impl.updateFrame(buf, w, h, aspect)
 
     /** No-op on AWT (self-driven repaints). On GLFW, renders the current frame to the window. */
-    fun renderFrame() = backend.renderFrame()
+    fun renderFrame() = impl.renderFrame()
 
     /** Opens (or focuses) the window. Safe to call from any thread. */
-    fun open(videoW: Int, videoH: Int) = backend.open(videoW, videoH)
+    fun open(videoW: Int, videoH: Int) {
+        val wasOpen = impl.isOpen
+        impl.open(videoW, videoH)
+        if (!wasOpen) emitEvent(PopoutEvent.Opened(displayId))
+    }
 
     /** Closes the window. Safe to call from any thread. */
-    fun close() = backend.close()
+    override fun close() = impl.close()
 
     private interface PopoutBackend {
         val isOpen: Boolean
+        val width: Int
+        val height: Int
         fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double)
         fun renderFrame()
         fun open(videoW: Int, videoH: Int)
@@ -86,6 +125,8 @@ class VideoPopoutWindow(private val onClose: () -> Unit) {
         private var savedW = 0; private var savedH = 0
 
         override val isOpen: Boolean get() = windowHandle != 0L
+        override val width: Int get() = winW.get()
+        override val height: Int get() = winH.get()
 
         override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
             if (windowHandle == 0L) return
@@ -254,6 +295,8 @@ class VideoPopoutWindow(private val onClose: () -> Unit) {
         private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
 
         override val isOpen: Boolean get() = frame?.isDisplayable == true
+        override val width: Int get() = frame?.width ?: 0
+        override val height: Int get() = frame?.height ?: 0
 
         override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
             if (!isOpen || w <= 0 || h <= 0 || buf.remaining() < w * h * 3) return

@@ -1,13 +1,11 @@
 package com.dreamdisplays.server.datatypes
 
-import com.dreamdisplays.server.utils.OutlinerUtil
 import com.dreamdisplays.server.utils.RegionUtil
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
-import org.bukkit.Bukkit.getPlayer
 import org.bukkit.Location
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
@@ -56,14 +54,6 @@ interface SelectionData {
         pos2 = null
         isReady = false
         face = null
-    }
-
-    /** Renders an outline of the current selection to the owning player. */
-    fun drawBox() {
-        val p1 = pos1 ?: return
-        val p2 = pos2 ?: return
-        val player = getPlayer(playerId) ?: return
-        OutlinerUtil.showOutline(player, p1, p2)
     }
 
     /**

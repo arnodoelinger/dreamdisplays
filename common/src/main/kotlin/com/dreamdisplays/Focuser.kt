@@ -1,6 +1,6 @@
 package com.dreamdisplays
 
-import com.dreamdisplays.display.DisplayManager
+import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.managers.ClientStateManager
 import net.minecraft.client.Minecraft
 
@@ -19,7 +19,7 @@ class Focuser : Thread() {
                 val mc: Minecraft? = runCatching { Minecraft.getInstance() }.getOrNull()
                 if (mc != null) {
                     val focused = mc.isWindowActive
-                    for (screen in DisplayManager.getScreens()) {
+                    for (screen in DisplayRegistry.getScreens()) {
                         screen.setFocusMuted(!focused)
                     }
                 }
