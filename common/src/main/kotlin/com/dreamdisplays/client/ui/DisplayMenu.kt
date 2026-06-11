@@ -381,7 +381,7 @@ class DisplayMenu private constructor(
         refreshRelatedVideos()
 
         drawChildren(g, mouseX, mouseY, partialTick)
-        settings.renderTooltips(g, mouseX, mouseY)
+        settings.renderTooltips(g, mouseX, mouseY, toRealX(mouseX), toRealY(mouseY))
     }
 
     /** Re-syncs the quality slider position when the available quality list (re)appears. */
@@ -406,20 +406,25 @@ class DisplayMenu private constructor(
         }
     }
 
-    override fun mouseClicked(event: MouseButtonEvent, dbl: Boolean): Boolean {
+    override fun onMouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
+        // Coordinates are already in virtual space (UiScreenBase converted them); dropdown and mod
+        // label are laid out in that same space, so hit-testing matches what's drawn at any GUI scale.
         val mx = event.x().toInt()
         val my = event.y().toInt()
         if (dropdown.visible && event.button() == 0 && dropdown.handleClick(mx, my)) return true
-        if (modLabel.handleClick(mx, my)) return true
-        return super.mouseClicked(event, dbl)
+        return modLabel.handleClick(mx, my)
     }
 
-    override fun mouseReleased(event: MouseButtonEvent): Boolean {
-        if (progress.commitDragIfActive()) return true
-        return super.mouseReleased(event)
-    }
+    override fun onMouseReleased(event: MouseButtonEvent): Boolean = progress.commitDragIfActive()
 
     override fun isPauseScreen(): Boolean = false
+
+    /**
+     * The menu needs roughly this much logical space for the normal (non-compact) layout — preview and
+     * settings side by side on top, suggestions strip below. On smaller windows (e.g. high GUI scale)
+     * [UiScreenBase] scales the whole menu down to fit instead of letting panels overflow.
+     */
+    override fun minContentSize(): Pair<Int, Int> = MIN_CONTENT_W to MIN_CONTENT_H
 
     /** Maps a quality string (e.g. "720") to its fractional position within the available quality list. */
     private fun qualityFraction(q: String): Double {
@@ -439,6 +444,10 @@ class DisplayMenu private constructor(
     }
 
     companion object {
+        /** Minimum logical canvas the normal layout is comfortable in; smaller windows scale down. */
+        private const val MIN_CONTENT_W = 640
+        private const val MIN_CONTENT_H = 380
+
         /** Opens the menu for [displayScreen]. */
         fun open(displayScreen: DisplayScreen) {
             MinecraftScreenUtil.setScreen(Minecraft.getInstance(), DisplayMenu(displayScreen))

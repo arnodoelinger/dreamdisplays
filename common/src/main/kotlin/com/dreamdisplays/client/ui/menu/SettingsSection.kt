@@ -85,12 +85,16 @@ class SettingsSection(
         }
     }
 
-    /** Renders the tooltip of whichever row label or action button is currently hovered. */
-    fun renderTooltips(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int) {
+    /**
+     * Renders the tooltip of whichever row label or action button is hovered. Hit-testing uses the
+     * virtual ([mouseX], [mouseY]) coordinates; the tooltip is anchored at the real ([anchorX],
+     * [anchorY]) coordinates because deferred tooltips render unscaled, outside the menu's transform.
+     */
+    fun renderTooltips(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, anchorX: Int, anchorY: Int) {
         val font = Minecraft.getInstance().font
         for (row in rows) {
             if (row.labelHover?.contains(mouseX, mouseY) == true) {
-                g.setComponentTooltipForNextFrame(font, row.tooltip(), mouseX, mouseY)
+                g.setComponentTooltipForNextFrame(font, row.tooltip(), anchorX, anchorY)
             }
         }
         for ((button, tooltip) in buttonTooltips) {
@@ -98,7 +102,7 @@ class SettingsSection(
             if (mouseX >= button.x && mouseX < button.x + button.width &&
                 mouseY >= button.y && mouseY < button.y + button.height
             ) {
-                tooltip()?.let { g.setComponentTooltipForNextFrame(font, it, mouseX, mouseY) }
+                tooltip()?.let { g.setComponentTooltipForNextFrame(font, it, anchorX, anchorY) }
             }
         }
     }
