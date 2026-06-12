@@ -18,6 +18,7 @@ import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.media.api.MediaStream
 import com.dreamdisplays.media.api.VideoQuality
+import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.ytdlp.YtDlp
 import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
@@ -187,7 +188,7 @@ class MediaPlayer(
     fun isClockRunning(): Boolean = clock.isRunning
 
     /** Connects or disconnects the popout window sink. Pass null to detach. */
-    fun setPopoutSink(sink: ((ByteBuffer, Int, Int) -> Unit)?) {
+    fun setPopoutSink(sink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?) {
         sessionManager.popoutFrameSink = sink
     }
 

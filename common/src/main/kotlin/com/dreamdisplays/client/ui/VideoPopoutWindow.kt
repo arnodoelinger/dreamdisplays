@@ -6,6 +6,7 @@ import com.dreamdisplays.client.popout.WindowBackend
 import com.dreamdisplays.client.popout.WindowConfig
 import com.dreamdisplays.media.api.VideoFrameSink
 import com.dreamdisplays.render.AsyncTextureUploader
+import com.dreamdisplays.render.UploadPixelFormat
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 import org.lwjgl.opengl.GL
@@ -61,6 +62,7 @@ class VideoPopoutWindow(
             impl.updateFrame(
                 ByteBuffer.wrap(frame.data), frame.width, frame.height,
                 frame.width.toDouble() / frame.height,
+                UploadPixelFormat.RGB24,
             )
         }
     }
@@ -71,8 +73,8 @@ class VideoPopoutWindow(
     }
 
     /** Updates the current frame buffer. Safe to call from any thread. */
-    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) =
-        impl.updateFrame(buf, w, h, aspect)
+    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat = UploadPixelFormat.RGB24) =
+        impl.updateFrame(buf, w, h, aspect, format)
 
     /** No-op on AWT (self-driven repaints). On GLFW, renders the current frame to the window. */
     fun renderFrame() = impl.renderFrame()
@@ -91,7 +93,7 @@ class VideoPopoutWindow(
         val isOpen: Boolean
         val width: Int
         val height: Int
-        fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double)
+        fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat)
         fun renderFrame()
         fun open(videoW: Int, videoH: Int)
         fun close()
@@ -109,6 +111,7 @@ class VideoPopoutWindow(
         private var backBuf: ByteBuffer = EMPTY_DIRECT
         @Volatile private var frameW = 0
         @Volatile private var frameH = 0
+        @Volatile private var frameFormat = UploadPixelFormat.RGB24
         @Volatile private var contentAspect = 0.0
         private val frameVersion = AtomicLong(0)
         private var uploadedVersion = 0L
@@ -128,9 +131,9 @@ class VideoPopoutWindow(
         override val width: Int get() = winW.get()
         override val height: Int get() = winH.get()
 
-        override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
+        override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat) {
             if (windowHandle == 0L) return
-            val size = w * h * 3
+            val size = w * h * format.bytesPerPixel
             if (size <= 0 || buf.remaining() < size) return
             var back = backBuf
             if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
@@ -145,6 +148,7 @@ class VideoPopoutWindow(
             backBuf = if (prev.capacity() >= size) prev
                       else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
             contentAspect = aspect
+            frameFormat = format
             frameW = w; frameH = h
             frameVersion.incrementAndGet()
         }
@@ -153,8 +157,9 @@ class VideoPopoutWindow(
             val handle = windowHandle
             if (handle == 0L) return
             val fw = frameW; val fh = frameH; val buf = frontBuf
+            val format = frameFormat
             val vw = winW.get(); val vh = winH.get()
-            if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * 3 || vw <= 0 || vh <= 0) return
+            if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
 
             val version = frameVersion.get()
             val haveNewFrame = version != uploadedVersion
@@ -170,7 +175,7 @@ class VideoPopoutWindow(
             if (caps == null) popoutCaps = GL.createCapabilities() else GL.setCapabilities(caps)
 
             val r = renderer ?: QuadRenderer().also { renderer = it }
-            if (haveNewFrame) { r.upload(buf, fw, fh); uploadedVersion = version }
+            if (haveNewFrame) { r.upload(buf, fw, fh, format); uploadedVersion = version }
             r.draw(vw, vh, contentRect(fw, fh, contentAspect), fw, fh)
             GLFW.glfwSwapBuffers(handle)
 
@@ -298,8 +303,8 @@ class VideoPopoutWindow(
         override val width: Int get() = frame?.width ?: 0
         override val height: Int get() = frame?.height ?: 0
 
-        override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
-            if (!isOpen || w <= 0 || h <= 0 || buf.remaining() < w * h * 3) return
+        override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat) {
+            if (!isOpen || w <= 0 || h <= 0 || buf.remaining() < w * h * format.bytesPerPixel) return
             val img = currentImage?.takeIf { it.width == w && it.height == h }
                 ?: BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
             val pixels = (img.raster.dataBuffer as DataBufferInt).data
@@ -308,6 +313,7 @@ class VideoPopoutWindow(
                 val r = src.get().toInt() and 0xFF
                 val g = src.get().toInt() and 0xFF
                 val b = src.get().toInt() and 0xFF
+                if (format == UploadPixelFormat.RGBA32) src.get()
                 pixels[i] = (r shl 16) or (g shl 8) or b
             }
             contentAspect = aspect
@@ -448,21 +454,21 @@ private class QuadRenderer {
         GL30.glBindVertexArray(0)
     }
 
-    fun upload(buf: ByteBuffer, w: Int, h: Int) {
+    fun upload(buf: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat) {
         if (texW != w || texH != h) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
-            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
+            GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, format.unpackAlignment)
             val sp = buf.position(); val sl = buf.limit()
-            buf.limit(sp + w * h * 3)
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
-                GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf)
+            buf.limit(sp + w * h * format.bytesPerPixel)
+            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, format.glFormat, w, h, 0,
+                format.glFormat, GL11.GL_UNSIGNED_BYTE, buf)
             buf.limit(sl); buf.position(sp)
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
             texW = w; texH = h
             return
         }
-        uploader.upload(texId, buf, w, h)
+        uploader.upload(texId, buf, w, h, format)
     }
 
     fun draw(vw: Int, vh: Int, content: ContentRect, fw: Int, fh: Int) {

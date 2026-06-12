@@ -10,6 +10,7 @@ name = "dreamdisplays_native"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+kanal = "0.1.1"
 rayon = "1.12.0"
 
 [profile.release]

@@ -1,5 +1,6 @@
 package com.dreamdisplays.player.pipeline
 
+import com.dreamdisplays.render.UploadPixelFormat
 import com.mojang.blaze3d.textures.GpuTexture
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicLong
@@ -13,8 +14,8 @@ internal interface FramePipe {
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     val lastFrameReceivedNanos: AtomicLong
 
-    /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
-    var popoutFrameSink: ((ByteBuffer, Int, Int) -> Unit)?
+    /** Set by the popout window to receive raw frames. Called on the reader thread. */
+    var popoutFrameSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
 
     /** Returns true once a frame is available for upload or has already been uploaded to the GPU texture. */
     fun textureFilled(): Boolean

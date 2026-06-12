@@ -13,6 +13,7 @@ import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.player.process.MediaProcess
 import com.dreamdisplays.player.stream.MediaStreamSelector
 import com.dreamdisplays.player.stream.ActiveStreams
+import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.player.util.joinSafely
 import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
@@ -84,8 +85,8 @@ internal class PlaybackSessionManager(
     /** Timestamp of the last decoded video frame; read by [StreamWatchdog]. */
     val lastFrameNanos: AtomicLong get() = video.lastFrameReceivedNanos
 
-    /** Routes raw RGB frames to the popout window. Null = no popout active. */
-    var popoutFrameSink: ((java.nio.ByteBuffer, Int, Int) -> Unit)?
+    /** Routes raw frames to the popout window. Null = no popout active. */
+    var popoutFrameSink: ((java.nio.ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
         get() = video.popoutFrameSink
         set(value) { video.popoutFrameSink = value }
 

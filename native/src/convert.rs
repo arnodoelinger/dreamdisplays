@@ -9,7 +9,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::OnceLock;
 
 const PARALLEL_PIXEL_THRESHOLD: usize = 1280 * 720;
-const MAX_CONVERT_THREADS: usize = 4;
+const MAX_CONVERT_THREADS: usize = 8;
 
 /// Builds a 256-entry brightness lookup table for `factor = milli / 1000`.
 /// `milli` is clamped to `[0, 2000]` (matching the Kotlin-side brightness range 0.0..2.0).
@@ -101,6 +101,19 @@ pub fn nv12_to_rgba32_identity(raw: &[u8], w: usize, h: usize, dst: &mut [u8]) {
 
 /// Expands RGB24 into RGBA32 with brightness applied and alpha fixed at 255.
 pub fn rgb24_to_rgba32(src: &[u8], dst: &mut [u8], lut: &[u8; 256]) {
+    let pixels = src.len().min(dst.len() / 4 * 3) / 3;
+    if pixels >= PARALLEL_PIXEL_THRESHOLD {
+        src[..pixels * 3]
+            .par_chunks_exact(3)
+            .zip(dst[..pixels * 4].par_chunks_exact_mut(4))
+            .for_each(|(rgb, rgba)| {
+                rgba[0] = lut[rgb[0] as usize];
+                rgba[1] = lut[rgb[1] as usize];
+                rgba[2] = lut[rgb[2] as usize];
+                rgba[3] = 0xff;
+            });
+        return;
+    }
     for (rgb, rgba) in src.chunks_exact(3).zip(dst.chunks_exact_mut(4)) {
         rgba[0] = lut[rgb[0] as usize];
         rgba[1] = lut[rgb[1] as usize];
@@ -111,6 +124,19 @@ pub fn rgb24_to_rgba32(src: &[u8], dst: &mut [u8], lut: &[u8; 256]) {
 
 /// Expands RGB24 into RGBA32 without brightness adjustment.
 pub fn rgb24_to_rgba32_identity(src: &[u8], dst: &mut [u8]) {
+    let pixels = src.len().min(dst.len() / 4 * 3) / 3;
+    if pixels >= PARALLEL_PIXEL_THRESHOLD {
+        src[..pixels * 3]
+            .par_chunks_exact(3)
+            .zip(dst[..pixels * 4].par_chunks_exact_mut(4))
+            .for_each(|(rgb, rgba)| {
+                rgba[0] = rgb[0];
+                rgba[1] = rgb[1];
+                rgba[2] = rgb[2];
+                rgba[3] = 0xff;
+            });
+        return;
+    }
     for (rgb, rgba) in src.chunks_exact(3).zip(dst.chunks_exact_mut(4)) {
         rgba[0] = rgb[0];
         rgba[1] = rgb[1];
@@ -348,7 +374,7 @@ fn convert_pool() -> Option<&'static ThreadPool> {
         let threads = match cores {
             0..=2 => return None,
             3..=5 => 2,
-            _ => MAX_CONVERT_THREADS,
+            _ => (cores - 2).clamp(4, MAX_CONVERT_THREADS),
         };
         ThreadPoolBuilder::new()
             .num_threads(threads)

@@ -9,10 +9,14 @@ fn bench_nv12_1080p() {
     bench_nv12_case(1280, 720, 900, false);
     bench_nv12_case(1920, 1080, 1000, false);
     bench_nv12_case(1920, 1080, 900, false);
+    bench_nv12_case(3840, 2160, 1000, false);
+    bench_nv12_case(3840, 2160, 900, false);
     bench_nv12_case(1280, 720, 1000, true);
     bench_nv12_case(1280, 720, 900, true);
     bench_nv12_case(1920, 1080, 1000, true);
     bench_nv12_case(1920, 1080, 900, true);
+    bench_nv12_case(3840, 2160, 1000, true);
+    bench_nv12_case(3840, 2160, 900, true);
 }
 
 fn bench_nv12_case(w: usize, h: usize, brightness_milli: u32, rgba: bool) {

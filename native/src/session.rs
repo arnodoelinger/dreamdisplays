@@ -12,6 +12,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::convert;
+use kanal::{Receiver, Sender};
 
 /// Max bytes of `FFmpeg` stderr retained per session (the JVM parses it for retry decisions).
 const STDERR_CAP: usize = 128 * 1024;
@@ -24,7 +25,8 @@ pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
 
 /// Wire pixel format coming out of the FFmpeg pipe.
-#[derive(Clone, Copy, PartialEq, Eq)] pub enum PixFmt {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum PixFmt {
     Rgb24,
     Nv12,
 }
@@ -48,11 +50,57 @@ impl PixFmt {
 
 /// Mutable read-side state; locked only by the (single) reader thread.
 struct ReadState {
-    stdout: ChildStdout,
+    stdout: Option<ChildStdout>,
+    prefetch: Option<Nv12Prefetch>,
     /// Scratch buffer holding one wire-format frame read from the pipe.
     raw: Vec<u8>,
     lut: [u8; 256],
     lut_milli: u32,
+}
+
+enum PrefetchedFrame {
+    Frame(Vec<u8>),
+    Eof,
+    Error,
+}
+
+struct Nv12Prefetch {
+    ready: Receiver<PrefetchedFrame>,
+    recycle: Sender<Vec<u8>>,
+}
+
+impl Nv12Prefetch {
+    fn spawn(mut stdout: ChildStdout, frame_size: usize) -> Option<Nv12Prefetch> {
+        let (ready_tx, ready) = kanal::bounded(2);
+        let (recycle, recycle_rx) = kanal::bounded(2);
+        recycle.send(vec![0u8; frame_size]).ok()?;
+        recycle.send(vec![0u8; frame_size]).ok()?;
+
+        std::thread::Builder::new()
+            .name("dd-nv12-prefetch".into())
+            .spawn(move || {
+                while let Ok(mut raw) = recycle_rx.recv() {
+                    match read_exact_eof(&mut stdout, &mut raw) {
+                        ReadOutcome::Frame => {
+                            if ready_tx.send(PrefetchedFrame::Frame(raw)).is_err() {
+                                break;
+                            }
+                        }
+                        ReadOutcome::Eof => {
+                            let _ = ready_tx.send(PrefetchedFrame::Eof);
+                            break;
+                        }
+                        ReadOutcome::Error => {
+                            let _ = ready_tx.send(PrefetchedFrame::Error);
+                            break;
+                        }
+                    }
+                }
+            })
+            .ok()?;
+
+        Some(Nv12Prefetch { ready, recycle })
+    }
 }
 
 pub struct Session {
@@ -145,17 +193,26 @@ impl Sessions {
                 .ok();
         }
 
+        let frame_size = pix.frame_size(w, h);
+        let (stdout, prefetch) = if pix == PixFmt::Nv12 {
+            (None, Nv12Prefetch::spawn(stdout, frame_size))
+        } else {
+            (Some(stdout), None)
+        };
+        if pix == PixFmt::Nv12 && prefetch.is_none() {
+            let _ = child.kill();
+            return 0;
+        }
+        let raw = Vec::new();
+
         let session = Arc::new(Session {
             w,
             h,
             pix,
             read: Mutex::new(ReadState {
                 stdout,
-                raw: if pix == PixFmt::Nv12 {
-                    vec![0u8; pix.frame_size(w, h)]
-                } else {
-                    Vec::new()
-                },
+                prefetch,
+                raw,
                 lut: convert::build_lut(1000),
                 lut_milli: 1000,
             }),
@@ -195,20 +252,42 @@ impl Sessions {
 
         match session.pix {
             PixFmt::Nv12 => {
-                match read_exact_eof(&mut state.stdout, &mut state.raw) {
-                    ReadOutcome::Frame => {}
-                    ReadOutcome::Eof => return READ_EOF,
-                    ReadOutcome::Error => return ERR_IO,
-                }
-                if convert::lut_is_identity(brightness_milli) {
-                    convert::nv12_to_rgb24_identity(&state.raw, session.w, session.h, dst);
+                if let Some(prefetch) = &state.prefetch {
+                    let raw = match prefetch.ready.recv() {
+                        Ok(PrefetchedFrame::Frame(raw)) => raw,
+                        Ok(PrefetchedFrame::Eof) => return READ_EOF,
+                        Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
+                    };
+                    if convert::lut_is_identity(brightness_milli) {
+                        convert::nv12_to_rgb24_identity(&raw, session.w, session.h, dst);
+                    } else {
+                        convert::nv12_to_rgb24(&raw, session.w, session.h, dst, &state.lut);
+                    }
+                    let _ = prefetch.recycle.send(raw);
                 } else {
-                    convert::nv12_to_rgb24(&state.raw, session.w, session.h, dst, &state.lut);
+                    let stdout = match state.stdout.as_mut() {
+                        Some(stdout) => stdout,
+                        None => return ERR_IO,
+                    };
+                    match read_exact_eof(stdout, &mut state.raw) {
+                        ReadOutcome::Frame => {}
+                        ReadOutcome::Eof => return READ_EOF,
+                        ReadOutcome::Error => return ERR_IO,
+                    }
+                    if convert::lut_is_identity(brightness_milli) {
+                        convert::nv12_to_rgb24_identity(&state.raw, session.w, session.h, dst);
+                    } else {
+                        convert::nv12_to_rgb24(&state.raw, session.w, session.h, dst, &state.lut);
+                    }
                 }
             }
             PixFmt::Rgb24 => {
                 let n = session.w * session.h * 3;
-                match read_exact_eof(&mut state.stdout, &mut dst[..n]) {
+                let stdout = match state.stdout.as_mut() {
+                    Some(stdout) => stdout,
+                    None => return ERR_IO,
+                };
+                match read_exact_eof(stdout, &mut dst[..n]) {
                     ReadOutcome::Frame => {}
                     ReadOutcome::Eof => return READ_EOF,
                     ReadOutcome::Error => return ERR_IO,
@@ -246,22 +325,44 @@ impl Sessions {
 
         match session.pix {
             PixFmt::Nv12 => {
-                match read_exact_eof(&mut state.stdout, &mut state.raw) {
-                    ReadOutcome::Frame => {}
-                    ReadOutcome::Eof => return READ_EOF,
-                    ReadOutcome::Error => return ERR_IO,
-                }
-                if convert::lut_is_identity(brightness_milli) {
-                    convert::nv12_to_rgba32_identity(&state.raw, session.w, session.h, dst);
+                if let Some(prefetch) = &state.prefetch {
+                    let raw = match prefetch.ready.recv() {
+                        Ok(PrefetchedFrame::Frame(raw)) => raw,
+                        Ok(PrefetchedFrame::Eof) => return READ_EOF,
+                        Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
+                    };
+                    if convert::lut_is_identity(brightness_milli) {
+                        convert::nv12_to_rgba32_identity(&raw, session.w, session.h, dst);
+                    } else {
+                        convert::nv12_to_rgba32(&raw, session.w, session.h, dst, &state.lut);
+                    }
+                    let _ = prefetch.recycle.send(raw);
                 } else {
-                    convert::nv12_to_rgba32(&state.raw, session.w, session.h, dst, &state.lut);
+                    let stdout = match state.stdout.as_mut() {
+                        Some(stdout) => stdout,
+                        None => return ERR_IO,
+                    };
+                    match read_exact_eof(stdout, &mut state.raw) {
+                        ReadOutcome::Frame => {}
+                        ReadOutcome::Eof => return READ_EOF,
+                        ReadOutcome::Error => return ERR_IO,
+                    }
+                    if convert::lut_is_identity(brightness_milli) {
+                        convert::nv12_to_rgba32_identity(&state.raw, session.w, session.h, dst);
+                    } else {
+                        convert::nv12_to_rgba32(&state.raw, session.w, session.h, dst, &state.lut);
+                    }
                 }
             }
             PixFmt::Rgb24 => {
                 if state.raw.len() < rgb_len {
                     state.raw.resize(rgb_len, 0);
                 }
-                match read_exact_eof(&mut state.stdout, &mut state.raw[..rgb_len]) {
+                let stdout = match state.stdout.as_mut() {
+                    Some(stdout) => stdout,
+                    None => return ERR_IO,
+                };
+                match read_exact_eof(stdout, &mut state.raw[..rgb_len]) {
                     ReadOutcome::Frame => {}
                     ReadOutcome::Eof => return READ_EOF,
                     ReadOutcome::Error => return ERR_IO,

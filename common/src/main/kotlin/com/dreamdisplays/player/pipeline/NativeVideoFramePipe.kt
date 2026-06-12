@@ -7,7 +7,6 @@ import com.dreamdisplays.render.UploadPixelFormat
 import com.mojang.blaze3d.textures.GpuTexture
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -33,8 +32,8 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     override val lastFrameReceivedNanos = AtomicLong(0)
 
-    /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
-    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int) -> Unit)? = null
+    /** Set by the popout window to receive raw frames. Called on the reader thread. */
+    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)? = null
 
     @Volatile var expectedW = 0
         private set
@@ -44,7 +43,6 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
     private val outputFormat: UploadPixelFormat =
         if (NativeMedia.rgbaFramesEnabled) UploadPixelFormat.RGBA32 else UploadPixelFormat.RGB24
     private val surface = FrameSurface(debugLabel, outputFormat)
-    private var popoutRgbScratch: ByteBuffer? = null
 
     @Volatile private var handle = 0L
 
@@ -55,10 +53,7 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
 
     override fun clear() = surface.clear()
 
-    override fun cleanup() {
-        surface.cleanup()
-        popoutRgbScratch = null
-    }
+    override fun cleanup() = surface.cleanup()
 
     /**
      * Opens a native FFmpeg session for [args] and starts the reader thread.
@@ -137,7 +132,7 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
                 continue
             }
 
-            sendPopoutFrame(spare, w, h)
+            popoutFrameSink?.let { sink -> sink(spare, w, h, outputFormat); spare.rewind() }
 
             if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
 
@@ -172,33 +167,5 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
         val h = handle
         handle = 0L
         if (h != 0L) NativeMedia.videoClose(h)
-    }
-
-    private fun sendPopoutFrame(frame: ByteBuffer, w: Int, h: Int) {
-        val sink = popoutFrameSink ?: return
-        if (outputFormat == UploadPixelFormat.RGB24) {
-            sink(frame, w, h)
-            frame.rewind()
-            return
-        }
-
-        val rgbSize = w * h * UploadPixelFormat.RGB24.bytesPerPixel
-        val scratch = popoutRgbScratch?.takeIf { it.capacity() >= rgbSize }
-            ?: ByteBuffer.allocateDirect(rgbSize).order(ByteOrder.nativeOrder()).also { popoutRgbScratch = it }
-        rgbaToRgb(frame, scratch, w * h)
-        sink(scratch, w, h)
-        frame.rewind()
-    }
-
-    private fun rgbaToRgb(src: ByteBuffer, dst: ByteBuffer, pixels: Int) {
-        dst.clear()
-        val savedPos = src.position()
-        for (i in 0 until pixels) {
-            val p = savedPos + i * UploadPixelFormat.RGBA32.bytesPerPixel
-            dst.put(src.get(p))
-            dst.put(src.get(p + 1))
-            dst.put(src.get(p + 2))
-        }
-        dst.flip()
     }
 }

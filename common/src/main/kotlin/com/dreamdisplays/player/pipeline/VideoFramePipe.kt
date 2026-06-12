@@ -3,6 +3,7 @@ package com.dreamdisplays.player.pipeline
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.player.util.MediaUtil
 import com.dreamdisplays.player.util.daemon
+import com.dreamdisplays.render.UploadPixelFormat
 import com.mojang.blaze3d.textures.GpuTexture
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
@@ -32,7 +33,7 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
     override val lastFrameReceivedNanos = AtomicLong(0)
 
     /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
-    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int) -> Unit)? = null
+    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)? = null
 
     @Volatile var expectedW = 0
         private set
@@ -176,7 +177,7 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
                         continue
                     }
 
-                    popoutFrameSink?.let { sink -> sink(spare, w, h); spare.rewind() }
+                    popoutFrameSink?.let { sink -> sink(spare, w, h, UploadPixelFormat.RGB24); spare.rewind() }
 
                     if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
 

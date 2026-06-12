@@ -67,6 +67,7 @@ object TextureUploadUtil {
                     "writeToTexture",
                     GpuTexture::class.java,
                     ByteBuffer::class.java,
+                    NativeImage.Format::class.java,
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
@@ -74,7 +75,7 @@ object TextureUploadUtil {
                     Int::class.javaPrimitiveType,
                     Int::class.javaPrimitiveType,
                 )
-                .invokeOrThrowTarget(encoder, texture, pixels, 0, 0, 0, 0, w, h)
+                .invokeOrThrowTarget(encoder, texture, pixels, format, 0, 0, 0, 0, w, h)
             return
         } catch (_: NoSuchMethodException) {}
 
@@ -83,15 +84,14 @@ object TextureUploadUtil {
                 "writeToTexture",
                 GpuTexture::class.java,
                 ByteBuffer::class.java,
-                NativeImage.Format::class.java,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
                 Int::class.javaPrimitiveType,
-                )
-            .invokeOrThrowTarget(encoder, texture, pixels, format, 0, 0, 0, 0, w, h)
+            )
+            .invokeOrThrowTarget(encoder, texture, pixels, 0, 0, 0, 0, w, h)
     }
 
     private fun java.lang.reflect.Method.invokeOrThrowTarget(target: Any, vararg args: Any?) {
