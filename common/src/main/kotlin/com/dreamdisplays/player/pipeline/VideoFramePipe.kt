@@ -16,9 +16,9 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Producer-consumer frame buffer and FFmpeg video reader loop (pure-JVM pipeline).
+ * Producer-consumer frame buffer and `FFmpeg` video reader loop (pure-JVM pipeline).
  *
- * The reader thread parses PPM frames from the FFmpeg pipe, fills a "spare" buffer, then
+ * The reader thread parses PPM frames from the `FFmpeg` pipe, fills a "spare" buffer, then
  * atomically swaps it into the shared [FrameSurface]; the render thread reads from the
  * surface without blocking the reader.
  */
@@ -74,7 +74,7 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
     /**
      * Starts the video reader thread and returns it (already running).
      *
-     * @param seekOffsetNanos initial playback position (must match the FFmpeg `-ss` offset)
+     * @param seekOffsetNanos initial playback position (must match the `FFmpeg` `-ss` offset)
      * @param sourceFps       frame rate reported by yt-dlp for the chosen stream
      * @param getAudioClock   returns current audio position in nanos, or -1 if unavailable
      * @param onFirstFrame    called once when the first frame arrives (starts the wall clock)
@@ -165,11 +165,6 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
                     spare.flip()
 
                     lastFrameReceivedNanos.set(System.nanoTime())
-                    if (!firstFrame) {
-                        firstFrame = true
-                        onFirstFrame()
-                        if (MediaPlayer.DEBUG) logger.info("$debugLabel First frame ${w}x${h}.")
-                    }
 
                     if (FramePacing.pace(videoPts, getAudioClock())) {
                         if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
@@ -183,6 +178,11 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
 
                     spare = surface.publish(spare, requiredFrameSize)
                     if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
+                    if (!firstFrame) {
+                        firstFrame = true
+                        onFirstFrame()
+                        if (MediaPlayer.DEBUG) logger.info("$debugLabel First frame ${w} x ${h}.")
+                    }
 
                     videoPts += frameNs
                 }

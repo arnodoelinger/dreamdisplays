@@ -23,6 +23,13 @@ internal interface FramePipe {
     /** Uploads the ready frame to [texture] if one is available. Must be called from the render thread. */
     fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int)
 
+    /**
+     * Uploads the ready I420 frame into the three plane textures if one is available. Only
+     * meaningful for pipes producing planar output (GPU-YUV mode); no-op otherwise.
+     * Must be called from the render thread.
+     */
+    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, actualW: Int, actualH: Int) {}
+
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clear()
 

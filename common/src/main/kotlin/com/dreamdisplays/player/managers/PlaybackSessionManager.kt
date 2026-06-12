@@ -19,6 +19,7 @@ import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
@@ -45,7 +46,7 @@ internal class PlaybackSessionManager(
     private val logger = LoggerFactory.getLogger("DreamDisplays/PlaybackSession")
 
     private data class Session(
-        /** The owned video FFmpeg process; null when the native pipeline owns it instead. */
+        /** The owned video `FFmpeg` process; null when the native pipeline owns it instead. */
         val videoProcess: Process?,
         val audioProcess: Process,
         val videoThread: Thread,
@@ -72,6 +73,10 @@ internal class PlaybackSessionManager(
 
     /** Uploads the latest frame to [texture]. Must be called from the render thread. */
     fun updateFrame(texture: GpuTexture, w: Int, h: Int) = video.updateFrame(texture, w, h)
+
+    /** Uploads the latest planar I420 frame into the three plane textures. Render thread only. */
+    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, w: Int, h: Int) =
+        video.updateFramePlanar(y, u, v, w, h)
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clearFrame() = video.clear()
@@ -114,9 +119,38 @@ internal class PlaybackSessionManager(
 
         try {
             val vStop = AtomicBoolean(); val aStop = AtomicBoolean()
+            val firstVideoFrame = CountDownLatch(1)
+            fun pacingClockNanos(): Long {
+                val fp = audio.framePosition
+                if (fp >= 0) return clock.audioClockNanos(fp, AudioSink.SAMPLE_RATE)
+                return if (clock.isRunning) clock.currentTime() else -1L
+            }
+            fun markFirstVideoFrame() {
+                clock.markFirstFrame()
+                firstVideoFrame.countDown()
+            }
             val vp: Process?
             val vt: Thread
-            if (nativeVideo != null) {
+            // Experimental in-process libav path: no FFmpeg process, no pipe. Falls back to
+            // the process pipeline when the session cannot be opened (missing system FFmpeg
+            // libraries, unsupported stream, ...).
+            val lavThread = if (nativeVideo != null && NativeMedia.lavInProcessEnabled) {
+                nativeVideo.startInProcess(
+                    url = streamSet.currentVideo.url, w = w, h = h,
+                    seekOffsetNanos = offsetNanos,
+                    sourceFps = streamSet.currentVideo.fps ?: 30.0,
+                    hwAccel = hwAccel,
+                    stopFlag = vStop, terminated = terminated,
+                    getAudioClock = ::pacingClockNanos,
+                    onFirstFrame = ::markFirstVideoFrame,
+                    getBrightness = getBrightness,
+                    onEos = onStreamEnd,
+                )
+            } else null
+            if (lavThread != null) {
+                vp = null
+                vt = lavThread
+            } else if (nativeVideo != null) {
                 val nv12 = NativeMedia.nv12Enabled
                 val transport = if (nv12) MediaProcess.VideoTransport.RAW_NV12 else MediaProcess.VideoTransport.RAW_RGB24
                 val args = MediaProcess.videoArgs(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel, transport)
@@ -125,8 +159,8 @@ internal class PlaybackSessionManager(
                     args = args, w = w, h = h, nv12 = nv12, seekOffsetNanos = offsetNanos,
                     sourceFps = streamSet.currentVideo.fps ?: 30.0,
                     stopFlag = vStop, terminated = terminated,
-                    getAudioClock = { clock.audioClockNanos(audio.framePosition, AudioSink.SAMPLE_RATE) },
-                    onFirstFrame = { clock.markFirstFrame() },
+                    getAudioClock = ::pacingClockNanos,
+                    onFirstFrame = ::markFirstVideoFrame,
                     getBrightness = getBrightness,
                     onEos = onStreamEnd,
                 ) ?: throw IOException("Native FFmpeg session failed to start")
@@ -136,8 +170,8 @@ internal class PlaybackSessionManager(
                     proc = vp, w = w, h = h, seekOffsetNanos = offsetNanos,
                     sourceFps = streamSet.currentVideo.fps ?: 30.0,
                     stopFlag = vStop, terminated = terminated,
-                    getAudioClock = { clock.audioClockNanos(audio.framePosition, AudioSink.SAMPLE_RATE) },
-                    onFirstFrame = { clock.markFirstFrame() },
+                    getAudioClock = ::pacingClockNanos,
+                    onFirstFrame = ::markFirstVideoFrame,
                     getBrightness = getBrightness,
                     onEos = onStreamEnd,
                 )
@@ -153,7 +187,7 @@ internal class PlaybackSessionManager(
                 nativeVideo?.release()
                 throw e
             }
-            val at = audio.start(ap, terminated, aStop)
+            val at = audio.start(ap, terminated, aStop, startGate = firstVideoFrame)
             session = Session(vp, ap, vt, at, vStop, aStop)
             isPlaying = true
         } catch (e: IOException) {

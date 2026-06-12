@@ -199,6 +199,10 @@ class MediaPlayer(
     fun updateFrame(texture: GpuTexture) =
         sessionManager.updateFrame(texture, displayScreen.textureWidth, displayScreen.textureHeight)
 
+    /** Uploads the latest planar I420 frame into the three plane textures. Render thread only. */
+    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture) =
+        sessionManager.updateFramePlanar(y, u, v, displayScreen.textureWidth, displayScreen.textureHeight)
+
     /** Sets the user-controlled volume (0.0–2.0). Distance attenuation is applied on top. */
     fun setVolume(volume: Float) = this.volume.setUserVolume(volume)
 

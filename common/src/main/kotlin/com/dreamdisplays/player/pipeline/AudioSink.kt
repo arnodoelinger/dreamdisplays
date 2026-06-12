@@ -7,6 +7,8 @@ import com.dreamdisplays.player.util.daemon
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.OutputStream
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.sound.sampled.*
 
@@ -33,9 +35,14 @@ internal class AudioSink(private val debugLabel: String) {
     @Volatile private var line: SourceDataLine? = null
 
     /** Starts the audio reading / writing loop. */
-    fun start(proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean): Thread {
+    fun start(
+        proc: Process,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean,
+        startGate: CountDownLatch? = null,
+    ): Thread {
         drainStderr(proc)
-        return daemon({ run(proc, terminated, stopFlag) }, "MediaPlayer-audio").also { it.start() }
+        return daemon({ run(proc, terminated, stopFlag, startGate) }, "MediaPlayer-audio").also { it.start() }
     }
 
     /** Flushes and closes the audio line immediately. Safe to call from any thread. */
@@ -50,7 +57,7 @@ internal class AudioSink(private val debugLabel: String) {
     /**
      * Runs the audio reading / writing loop until the process ends or [terminated] / [stopFlag] is set.
      */
-    private fun run(proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
+    private fun run(proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean, startGate: CountDownLatch?) {
         var ln: SourceDataLine? = null
         try {
             proc.inputStream.use { input ->
@@ -65,6 +72,7 @@ internal class AudioSink(private val debugLabel: String) {
                 }
                 ln = openLine(info, fmt) ?: return
                 if (terminated.get() || stopFlag.get()) return
+                if (!awaitStartGate(startGate, terminated, stopFlag)) return
                 ln.start()
                 line = ln
 
@@ -98,6 +106,25 @@ internal class AudioSink(private val debugLabel: String) {
             }
         }
     }
+
+    /** Waits for video to publish its first frame, polling so stop() can interrupt quickly. */
+    private fun awaitStartGate(
+        gate: CountDownLatch?,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean,
+    ): Boolean {
+        if (gate == null || gate.count == 0L) return true
+        while (!terminated.get() && !stopFlag.get()) {
+            try {
+                if (gate.await(50L, TimeUnit.MILLISECONDS)) return true
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+        return false
+    }
+
     /**
      * Opens and returns a [SourceDataLine] with the specified format, retrying a few times if the line is temporarily unavailable.
      */
