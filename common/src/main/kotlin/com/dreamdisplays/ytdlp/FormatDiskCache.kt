@@ -26,7 +26,7 @@ object FormatDiskCache {
     private val GSON: Gson = GsonBuilder().create()
     private val STREAM_LIST_TYPE = object : TypeToken<List<YtStream>>() {}.type
     private const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
-    private const val SCHEMA_VERSION = 2
+    private const val SCHEMA_VERSION = 3
 
     private val WRITER = Executors.newSingleThreadExecutor { r ->
         Thread(r, "DD-FormatCache-writer").apply { isDaemon = true }

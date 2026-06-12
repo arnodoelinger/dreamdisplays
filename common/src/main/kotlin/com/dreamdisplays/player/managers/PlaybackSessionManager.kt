@@ -3,13 +3,17 @@ package com.dreamdisplays.player.managers
 import com.dreamdisplays.player.process.FFmpegBinary
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.player.events.PlayerEvents
+import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.pipeline.AudioSink
+import com.dreamdisplays.player.pipeline.FramePipe
+import com.dreamdisplays.player.pipeline.NativeVideoFramePipe
 import com.dreamdisplays.player.pipeline.PlaybackClock
 import com.dreamdisplays.player.pipeline.VideoFramePipe
 import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.player.process.MediaProcess
 import com.dreamdisplays.player.stream.MediaStreamSelector
 import com.dreamdisplays.player.stream.ActiveStreams
+import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.player.util.joinSafely
 import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
@@ -41,7 +45,8 @@ internal class PlaybackSessionManager(
     private val logger = LoggerFactory.getLogger("DreamDisplays/PlaybackSession")
 
     private data class Session(
-        val videoProcess: Process,
+        /** The owned video FFmpeg process; null when the native pipeline owns it instead. */
+        val videoProcess: Process?,
         val audioProcess: Process,
         val videoThread: Thread,
         val audioThread: Thread,
@@ -50,7 +55,12 @@ internal class PlaybackSessionManager(
     )
 
     private val audio = AudioSink(debugLabel)
-    private val video = VideoFramePipe(debugLabel)
+
+    /** Native pipe when the Rust library is available, otherwise null and [jvmVideo] is used. */
+    private val nativeVideo: NativeVideoFramePipe? =
+        if (NativeMedia.isAvailable) NativeVideoFramePipe(debugLabel) else null
+    private val jvmVideo: VideoFramePipe? = if (nativeVideo == null) VideoFramePipe(debugLabel) else null
+    private val video: FramePipe = nativeVideo ?: jvmVideo!!
 
     @Volatile var isPlaying = false
         private set
@@ -75,8 +85,8 @@ internal class PlaybackSessionManager(
     /** Timestamp of the last decoded video frame; read by [StreamWatchdog]. */
     val lastFrameNanos: AtomicLong get() = video.lastFrameReceivedNanos
 
-    /** Routes raw RGB frames to the popout window. Null = no popout active. */
-    var popoutFrameSink: ((java.nio.ByteBuffer, Int, Int) -> Unit)?
+    /** Routes raw frames to the popout window. Null = no popout active. */
+    var popoutFrameSink: ((java.nio.ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
         get() = video.popoutFrameSink
         set(value) { video.popoutFrameSink = value }
 
@@ -104,17 +114,45 @@ internal class PlaybackSessionManager(
 
         try {
             val vStop = AtomicBoolean(); val aStop = AtomicBoolean()
-            val vp = MediaProcess.buildVideo(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel)
-            val ap = MediaProcess.buildAudio(ffmpeg, streamSet.currentAudio.url, offsetNanos, AudioSink.SAMPLE_RATE)
-            val vt = video.start(
-                proc = vp, w = w, h = h, seekOffsetNanos = offsetNanos,
-                sourceFps = streamSet.currentVideo.fps ?: 30.0,
-                stopFlag = vStop, terminated = terminated,
-                getAudioClock = { clock.audioClockNanos(audio.framePosition, AudioSink.SAMPLE_RATE) },
-                onFirstFrame = { clock.markFirstFrame() },
-                getBrightness = getBrightness,
-                onEos = onStreamEnd,
-            )
+            val vp: Process?
+            val vt: Thread
+            if (nativeVideo != null) {
+                val nv12 = NativeMedia.nv12Enabled
+                val transport = if (nv12) MediaProcess.VideoTransport.RAW_NV12 else MediaProcess.VideoTransport.RAW_RGB24
+                val args = MediaProcess.videoArgs(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel, transport)
+                vp = null
+                vt = nativeVideo.start(
+                    args = args, w = w, h = h, nv12 = nv12, seekOffsetNanos = offsetNanos,
+                    sourceFps = streamSet.currentVideo.fps ?: 30.0,
+                    stopFlag = vStop, terminated = terminated,
+                    getAudioClock = { clock.audioClockNanos(audio.framePosition, AudioSink.SAMPLE_RATE) },
+                    onFirstFrame = { clock.markFirstFrame() },
+                    getBrightness = getBrightness,
+                    onEos = onStreamEnd,
+                ) ?: throw IOException("Native FFmpeg session failed to start")
+            } else {
+                vp = MediaProcess.buildVideo(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel)
+                vt = jvmVideo!!.start(
+                    proc = vp, w = w, h = h, seekOffsetNanos = offsetNanos,
+                    sourceFps = streamSet.currentVideo.fps ?: 30.0,
+                    stopFlag = vStop, terminated = terminated,
+                    getAudioClock = { clock.audioClockNanos(audio.framePosition, AudioSink.SAMPLE_RATE) },
+                    onFirstFrame = { clock.markFirstFrame() },
+                    getBrightness = getBrightness,
+                    onEos = onStreamEnd,
+                )
+            }
+            val ap = try {
+                MediaProcess.buildAudio(ffmpeg, streamSet.currentAudio.url, offsetNanos, AudioSink.SAMPLE_RATE)
+            } catch (e: IOException) {
+                // The video side is already running; tear it down before propagating
+                vStop.set(true)
+                nativeVideo?.kill()
+                MediaProcess.gracefulDestroy(vp)
+                joinSafely(vt)
+                nativeVideo?.release()
+                throw e
+            }
             val at = audio.start(ap, terminated, aStop)
             session = Session(vp, ap, vt, at, vStop, aStop)
             isPlaying = true
@@ -132,10 +170,13 @@ internal class PlaybackSessionManager(
         isPlaying = false
         session?.let { s ->
             s.videoStop.set(true); s.audioStop.set(true)
+            nativeVideo?.kill()
             MediaProcess.gracefulDestroy(s.videoProcess)
             MediaProcess.gracefulDestroy(s.audioProcess)
             audio.stop()
             joinSafely(s.videoThread); joinSafely(s.audioThread)
+            // The reader thread is joined; the native session (if any) can be freed safely
+            nativeVideo?.release()
         }
         session = null
     }
@@ -146,6 +187,7 @@ internal class PlaybackSessionManager(
      * Schedules the GL cleanup on the render thread.
      */
     fun cleanup() {
+        nativeVideo?.release()
         Minecraft.getInstance().execute { video.cleanup() }
     }
 }

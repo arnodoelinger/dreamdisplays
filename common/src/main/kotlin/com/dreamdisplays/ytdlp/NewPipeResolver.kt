@@ -66,12 +66,30 @@ object NewPipeResolver : MediaResolver {
             likeCount = info.likeCount.takeIf { it > 0 },
             uploadDate = null,
         )
+        val streams = mapStreams(info)
+        // YouTube often exposes only the muxed 360p track to this client (adaptive tracks are
+        // SABR/DASH-only); failing here lets the resolver chain fall through to yt-dlp, which
+        // still gets the full quality ladder.
+        if (!isLive && !offersQualityLadder(streams)) {
+            val heights = streams.filter { it.hasVideo() }.mapNotNull { it.height }.distinct()
+            throw IllegalStateException("NewPipe returned no quality ladder (heights=$heights); deferring to yt-dlp")
+        }
         return ResolvedMedia(
-            streams = mapStreams(info).map { it.toMediaStream() },
+            streams = streams.map { it.toMediaStream() },
             metadata = metadata,
             isLive = isLive,
             isSeekable = !isLive && info.duration > 0,
         )
+    }
+
+    /** True when [streams] gives the player an actual quality choice (>=2 heights or >=720p). */
+    private fun offersQualityLadder(streams: List<YtStream>): Boolean {
+        val heights = streams.asSequence()
+            .filter { it.hasVideo() }
+            .mapNotNull { it.height }
+            .distinct()
+            .toList()
+        return heights.size >= 2 || (heights.maxOrNull() ?: 0) >= 720
     }
 
     /** Initializes NewPipeExtractor with our HTTP downloader exactly once. Safe to call repeatedly. */

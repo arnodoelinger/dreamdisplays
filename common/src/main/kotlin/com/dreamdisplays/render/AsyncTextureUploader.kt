@@ -7,10 +7,12 @@ import com.mojang.blaze3d.opengl.GlStateManager
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
 import org.lwjgl.opengl.GL21
+import org.lwjgl.opengl.GL30
+import org.lwjgl.system.MemoryUtil
 import java.nio.ByteBuffer
 
 /**
- * Async, zero-stall RGB texture uploader based on a ring buffer of `Pixel Buffer Objects` (`PBO`).
+ * Async, low-stall texture uploader based on a ring buffer of `Pixel Buffer Objects` (`PBO`).
  *
  * Workflow:
  * 1. Data is copied from system memory to `PBO`.
@@ -21,11 +23,11 @@ import java.nio.ByteBuffer
  */
 class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
 
-    /** [PBO_COUNT] persistent buffer IDs that we rotate through. */
+    /** [PBO_COUNT] buffer IDs that we rotate through. */
     private val pboIds: IntArray = IntArray(PBO_COUNT) { GL15.glGenBuffers() }
 
-    /** Tracks the largest allocated size so that reallocating the same size is efficient. */
-    private var pboCapacity: Int = 0
+    /** Tracks allocated size per PBO so steady-state uploads do not reallocate every frame. */
+    private val pboCapacities: IntArray = IntArray(PBO_COUNT)
 
     /** Index of the `PBO` to write into; advanced on each upload. */
     private var ringIndex: Int = 0
@@ -50,13 +52,15 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
         if (w != managedTexW || h != managedTexH) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
-            GL11.glTexImage2D(GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
-                GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf)
+            GL11.glTexImage2D(
+                GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
+                GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf,
+            )
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
             managedTexW = w; managedTexH = h
         } else {
-            upload(managedTexId, buf, w, h)
+            upload(managedTexId, buf, w, h, UploadPixelFormat.RGB24)
         }
         return TextureHandle(managedTexId)
     }
@@ -77,53 +81,41 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
     }
 
     /**
-     * Uploads `w * h * 3` bytes from [src] into the next `PBO` in the ring, then schedules an async
-     * copy from that PBO into [textureId] at mipmap level 0 as `GL_RGB` / `GL_UNSIGNED_BYTE`.
+     * Uploads one decoded frame from [src] into the next `PBO` in the ring, then schedules an async
+     * copy from that PBO into [textureId] at mipmap level 0.
      *
-     * [src] must be a direct `ByteBuffer` whose position points to the start of the pixel data.
+     * [src] should be a direct `ByteBuffer` whose position points to the start of the pixel data.
      * Position and limit are restored on return.
      *
      * This call never blocks the GPU!
      */
-    fun upload(textureId: Int, src: ByteBuffer, w: Int, h: Int) {
-        val size = w * h * 3
+    fun upload(textureId: Int, src: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat = UploadPixelFormat.RGB24) {
+        val size = w * h * format.bytesPerPixel
         if (size <= 0 || src.remaining() < size) return
 
         // Pick the next PBO and advance the ring. By the time we return to this PBO
         // in N frames (N = PBO_COUNT), the GPU is guaranteed to have finished reading from it.
+        val slot = ringIndex
         val pbo = pboIds[ringIndex]
         ringIndex = (ringIndex + 1) % PBO_COUNT
 
         bindBuffer(GL21.GL_PIXEL_UNPACK_BUFFER, pbo)
 
-        // Orphaning: tell the driver that we no longer need the previous contents.
-        // This allows the driver to allocate a new memory region for writing without waiting
-        // for the GPU to finish with the old one. If the size matches, the driver can reuse memory efficiently.
-        if (size > pboCapacity) {
+        if (size > pboCapacities[slot]) {
             GL15.glBufferData(GL21.GL_PIXEL_UNPACK_BUFFER, size.toLong(), GL15.GL_STREAM_DRAW)
-            pboCapacity = size
-        } else {
-            GL15.glBufferData(GL21.GL_PIXEL_UNPACK_BUFFER, pboCapacity.toLong(), GL15.GL_STREAM_DRAW)
+            pboCapacities[slot] = size
         }
 
-        // Copy pixels into the freshly allocated (orphaned) PBO
-        val savedLimit = src.limit()
-        val savedPos = src.position()
-        src.limit(savedPos + size)
-        GL15.glBufferSubData(GL21.GL_PIXEL_UNPACK_BUFFER, 0L, src)
-        src.limit(savedLimit)
-        src.position(savedPos)
+        copyIntoMappedPbo(src, size)
 
         bindTexture(textureId)
 
-        // GL_UNPACK_ALIGNMENT must be 1, 2, 4, or 8.
-        // RGB rows have no natural alignment, so we set it to 1.
-        pixelStore(GL11.GL_UNPACK_ALIGNMENT, 1)
+        pixelStore(GL11.GL_UNPACK_ALIGNMENT, format.unpackAlignment)
         pixelStore(GL11.GL_UNPACK_ROW_LENGTH, 0)
         pixelStore(GL11.GL_UNPACK_SKIP_ROWS, 0)
         pixelStore(GL11.GL_UNPACK_SKIP_PIXELS, 0)
 
-        texSubImage2DFromPbo(w, h)
+        texSubImage2DFromPbo(w, h, format.glFormat)
 
         // Restore default alignment (4 bytes) and unbind the buffer.
         pixelStore(GL11.GL_UNPACK_ALIGNMENT, 4)
@@ -133,7 +125,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
     /** Releases `PBO` IDs. Must be called in the same OpenGL context where they were created. */
     fun cleanup() {
         for (id in pboIds) if (id != 0) GL15.glDeleteBuffers(id)
-        pboCapacity = 0
+        pboCapacities.fill(0)
     }
 
     /** Binds a buffer to the specified target. */
@@ -155,14 +147,43 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
      * Copies data from the currently bound `PBO` to the texture.
      * The offset parameter (0L) indicates that data is taken from the `PBO` buffer, not RAM.
      */
-    private fun texSubImage2DFromPbo(w: Int, h: Int) {
+    private fun copyIntoMappedPbo(src: ByteBuffer, size: Int) {
+        val savedLimit = src.limit()
+        val savedPos = src.position()
+        val view = src.duplicate()
+        view.limit(savedPos + size)
+        view.position(savedPos)
+
+        val mapped = GL30.glMapBufferRange(
+            GL21.GL_PIXEL_UNPACK_BUFFER,
+            0L,
+            size.toLong(),
+            GL30.GL_MAP_WRITE_BIT or GL30.GL_MAP_INVALIDATE_BUFFER_BIT or GL30.GL_MAP_UNSYNCHRONIZED_BIT,
+        )
+        if (mapped != null) {
+            mapped.limit(size)
+            if (view.isDirect) {
+                MemoryUtil.memCopy(MemoryUtil.memAddress(view), MemoryUtil.memAddress(mapped), size.toLong())
+            } else {
+                mapped.put(view)
+            }
+            GL30.glUnmapBuffer(GL21.GL_PIXEL_UNPACK_BUFFER)
+        } else {
+            GL15.glBufferSubData(GL21.GL_PIXEL_UNPACK_BUFFER, 0L, view)
+        }
+
+        src.limit(savedLimit)
+        src.position(savedPos)
+    }
+
+    private fun texSubImage2DFromPbo(w: Int, h: Int, glFormat: Int) {
         if (stateCache) {
             GlStateManager._texSubImage2D(
-                GL11.GL_TEXTURE_2D, 0, 0, 0, w, h, GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, 0L,
+                GL11.GL_TEXTURE_2D, 0, 0, 0, w, h, glFormat, GL11.GL_UNSIGNED_BYTE, 0L,
             )
         } else {
             GL11.glTexSubImage2D(
-                GL11.GL_TEXTURE_2D, 0, 0, 0, w, h, GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, 0L,
+                GL11.GL_TEXTURE_2D, 0, 0, 0, w, h, glFormat, GL11.GL_UNSIGNED_BYTE, 0L,
             )
         }
     }

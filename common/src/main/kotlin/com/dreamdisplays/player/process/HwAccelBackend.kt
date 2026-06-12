@@ -67,6 +67,8 @@ enum class HwAccelBackend(val ffmpegName: String?, val hwOutputFormat: String?) 
             "device creation failed",
             "no usable hwaccel",
             "decoder does not support",
+            "scale_vt",
+            "no such filter",
         )
     }
 }

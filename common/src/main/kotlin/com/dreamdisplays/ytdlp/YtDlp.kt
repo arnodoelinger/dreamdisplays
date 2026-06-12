@@ -140,7 +140,14 @@ object YtDlp {
     @Throws(IOException::class)
     private fun fetchUncached(videoUrl: String): List<YtStream> {
         val viaNewPipe = NewPipeResolver.fetch(videoUrl)
-        if (viaNewPipe.isNotEmpty()) return viaNewPipe
+        if (offersQualityLadder(viaNewPipe)) return viaNewPipe
+        if (viaNewPipe.isNotEmpty()) {
+            logger.info(
+                "NewPipe returned no quality ladder for $videoUrl " +
+                        "(heights=${viaNewPipe.filter { it.hasVideo() }.mapNotNull { it.height }.distinct()}); " +
+                        "falling back to yt-dlp."
+            )
+        }
 
         var lastError: IOException? = null
         for (attempt in 0 until 2) {
@@ -155,12 +162,32 @@ object YtDlp {
             try {
                 return fetchUncachedOnce(videoUrl, attempt)
             } catch (e: IOException) {
-                if (e.message?.contains("timed out") == true) throw e
+                logger.warn("yt-dlp fetch attempt $attempt failed for $videoUrl: ${e.message?.take(500)}.")
+                if (e.message?.contains("timed out", ignoreCase = true) == true) throw e
                 if (e.message?.contains("DRM protected", ignoreCase = true) == true) throw e
                 lastError = e
             }
         }
+        // yt-dlp failed entirely; a 360p-only NewPipe result still beats no playback at all
+        if (viaNewPipe.isNotEmpty()) {
+            logger.warn("yt-dlp failed for $videoUrl; using NewPipe streams without a quality ladder.")
+            return viaNewPipe
+        }
         throw lastError!!
+    }
+
+    /**
+     * True when [streams] gives the player an actual quality choice. YouTube's adaptive
+     * (video-only) tracks are often unavailable to the NewPipe fast path, leaving only the
+     * muxed 360p stream; in that case the slower yt-dlp path is worth the fallback.
+     */
+    private fun offersQualityLadder(streams: List<YtStream>): Boolean {
+        val heights = streams.asSequence()
+            .filter { it.hasVideo() }
+            .mapNotNull { it.height }
+            .distinct()
+            .toList()
+        return heights.size >= 2 || (heights.maxOrNull() ?: 0) >= 720
     }
 
     /**

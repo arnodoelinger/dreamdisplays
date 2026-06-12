@@ -46,6 +46,7 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "dreamdisplays"
+include(":native")
 include(":protocol")
 include(":common")
 include(":client")

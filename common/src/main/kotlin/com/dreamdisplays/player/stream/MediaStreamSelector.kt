@@ -43,9 +43,25 @@ object MediaStreamSelector {
             .filter { it.height != null }
             .minWithOrNull(
                 compareBy<MediaStream> { abs(parseQuality(it) - target) }
+                    .thenBy { codecRank(it) }
                     .thenBy { if (it.type == MediaStreamType.VIDEO_AUDIO) 0 else 1 }
                     .thenBy { if (it.type.hasAudio) 0 else 1 }
             )
+    }
+
+    /**
+     * Decode-cost rank used as a tie-break between equal-height streams: h264 hardware decoders
+     * are universal, hevc/vp9 are common, av1 is still missing from many decode blocks (and from
+     * FFmpeg's VideoToolbox hwaccel entirely), which silently pushes playback onto the CPU.
+     */
+    private fun codecRank(stream: MediaStream): Int {
+        val c = stream.codec?.lowercase() ?: return 3
+        return when {
+            c.startsWith("avc") || c.startsWith("h264") -> 0
+            c.startsWith("hvc") || c.startsWith("hev") || c.startsWith("vp9") || c.startsWith("vp09") -> 1
+            c.startsWith("av01") || c.startsWith("av1") -> 2
+            else -> 3
+        }
     }
 
     /** Pick the best audio stream for [lang], falling back to default / first available. */

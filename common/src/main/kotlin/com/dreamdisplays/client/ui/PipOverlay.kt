@@ -9,6 +9,7 @@ import com.dreamdisplays.client.overlay.OverlayRenderContext
 import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.render.AsyncTextureUploader
 import com.dreamdisplays.render.TextureUploadUtil
+import com.dreamdisplays.render.UploadPixelFormat
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 //? if >=26 {
@@ -39,6 +40,7 @@ class PipOverlay(
     @Volatile var frameH = 0
     @Volatile private var frameVersion = 0L
     @Volatile private var contentAspect = 0.0
+    @Volatile private var frameFormat = UploadPixelFormat.RGB24
     private var uploadedVersion = 0L
 
     private var dynamicTexture: DynamicTexture? = null
@@ -118,8 +120,8 @@ class PipOverlay(
         else -> false
     }
 
-    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double) {
-        val size = w * h * 3
+    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat = UploadPixelFormat.RGB24) {
+        val size = w * h * format.bytesPerPixel
         if (size <= 0 || buf.remaining() < size) return
         var back = backBuf
         if (back.capacity() < size) {
@@ -138,6 +140,7 @@ class PipOverlay(
         frontBuf = back
         backBuf = if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
         contentAspect = aspect
+        frameFormat = format
         frameW = w; frameH = h
         frameVersion++
     }
@@ -147,7 +150,8 @@ class PipOverlay(
         val v = frameVersion
         if (v == uploadedVersion) return
         val buf = frontBuf
-        val size = fw * fh * 3
+        val format = frameFormat
+        val size = fw * fh * format.bytesPerPixel
         if (fw <= 0 || fh <= 0 || buf.remaining() < size) return
 
         val mc = Minecraft.getInstance()
@@ -163,11 +167,12 @@ class PipOverlay(
             dynamicTexture = tex; texW = fw; texH = fh
         }
 
-        TextureUploadUtil.uploadRgb(
+        TextureUploadUtil.upload(
             texture = tex.getTexture(),
             src = buf,
             w = fw,
             h = fh,
+            format = format,
             glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
             rgbaScratch = rgbaUploadBuffer,
             setRgbaScratch = { rgbaUploadBuffer = it },

@@ -64,6 +64,19 @@ tasks.processResources {
     filesMatching("assets/dreamdisplays/version.txt") {
         expand(mapOf("version" to projectVersion))
     }
+    // Bundles the optional Rust media library for the host platform when it has been
+    // built locally. Multi-platform bundles come from CI.
+    val os = System.getProperty("os.name").lowercase()
+    val arch = System.getProperty("os.arch").lowercase()
+    val nativeKey = when {
+        os.contains("win") -> if (arch.contains("aarch64") || arch.contains("arm")) "windows-aarch64" else "windows-x64"
+        os.contains("mac") -> if (arch.contains("aarch64") || arch.contains("arm")) "macos-aarch64" else "macos-x64"
+        else -> if (arch.contains("aarch64") || arch.contains("arm")) "linux-aarch64" else "linux-x64"
+    }
+    val nativeLib = rootProject.file("native/target/release/" + System.mapLibraryName("dreamdisplays_native"))
+    if (nativeLib.isFile) {
+        from(nativeLib) { into("dreamdisplays-natives/$nativeKey") }
+    }
 }
 
 java {

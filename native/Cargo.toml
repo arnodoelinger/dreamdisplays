@@ -1,0 +1,19 @@
+[package]
+name = "dreamdisplays-native"
+version = "1.0.0"
+edition = "2021"
+description = "Native media pipeline kernels for Dream Displays."
+license = "LGPL-3.0"
+
+[lib]
+name = "dreamdisplays_native"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+kanal = "0.1.1"
+rayon = "1.12.0"
+
+[profile.release]
+lto = true
+codegen-units = 1
+opt-level = 3

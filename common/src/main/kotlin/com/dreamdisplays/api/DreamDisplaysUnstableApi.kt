@@ -19,6 +19,5 @@ package com.dreamdisplays.api
     AnnotationTarget.PROPERTY,
     AnnotationTarget.FIELD,
     AnnotationTarget.TYPEALIAS,
-    AnnotationTarget.FILE,
 )
 annotation class DreamDisplaysUnstableApi

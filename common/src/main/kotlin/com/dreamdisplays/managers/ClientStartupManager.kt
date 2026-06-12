@@ -13,6 +13,7 @@ import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.process.FFmpegBinary
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
@@ -55,6 +56,7 @@ object ClientStartupManager {
 
         YtDlp.prewarmAsync()
         FFmpegBinary.prewarmAsync()
+        NativeMedia.prewarmAsync()
 
         Thread({ FormatDiskCache.sweepExpired() }, "dreamdisplays-cache-sweep").start()
         Focuser().start()

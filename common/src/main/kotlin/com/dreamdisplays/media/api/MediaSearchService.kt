@@ -1,4 +1,4 @@
-@file:DreamDisplaysUnstableApi
+@file:OptIn(DreamDisplaysUnstableApi::class)
 
 package com.dreamdisplays.media.api
 

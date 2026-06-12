@@ -18,8 +18,10 @@ import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.media.api.MediaStream
 import com.dreamdisplays.media.api.VideoQuality
+import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.ytdlp.YtDlp
 import com.mojang.blaze3d.textures.GpuTexture
+import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
@@ -186,7 +188,7 @@ class MediaPlayer(
     fun isClockRunning(): Boolean = clock.isRunning
 
     /** Connects or disconnects the popout window sink. Pass null to detach. */
-    fun setPopoutSink(sink: ((ByteBuffer, Int, Int) -> Unit)?) {
+    fun setPopoutSink(sink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?) {
         sessionManager.popoutFrameSink = sink
     }
 
@@ -410,7 +412,12 @@ class MediaPlayer(
         streams = newSs
         lastQuality = MediaStreamSelector.parseQuality(newSs.currentVideo)
         displayScreen.videoContentAspect = newSs.currentVideo.contentAspect()
-        if (sessionManager.isPlaying) startStreams(newSs, pos) else clock.seekOffsetNanos = pos
+        Minecraft.getInstance().execute {
+            displayScreen.reloadTexture()
+            safeExecute {
+                if (sessionManager.isPlaying) startStreams(newSs, pos) else clock.seekOffsetNanos = pos
+            }
+        }
     }
 
     private fun MediaStream.contentAspect(): Double {
