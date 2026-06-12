@@ -45,7 +45,8 @@ object TextureUploadUtil {
             return
         }
 
-        if (format == UploadPixelFormat.RGBA32) {
+        // RGBA32 and R8 are uploaded as-is; only RGB24 needs the expansion pass below
+        if (format != UploadPixelFormat.RGB24) {
             writeToTexture(texture, src, w, h, format.nativeImageFormat)
             return
         }
