@@ -13,7 +13,7 @@ use std::time::{Duration, Instant};
 
 use crate::convert;
 
-/// Max bytes of FFmpeg stderr retained per session (the JVM parses it for retry decisions).
+/// Max bytes of `FFmpeg` stderr retained per session (the JVM parses it for retry decisions).
 const STDERR_CAP: usize = 128 * 1024;
 
 /// Read result codes shared with the JVM bridge.
@@ -24,8 +24,7 @@ pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
 
 /// Wire pixel format coming out of the FFmpeg pipe.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PixFmt {
+#[derive(Clone, Copy, PartialEq, Eq)] pub enum PixFmt {
     Rgb24,
     Nv12,
 }

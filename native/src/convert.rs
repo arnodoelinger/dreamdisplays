@@ -60,6 +60,7 @@ pub fn nv12_to_rgb24(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8; 
             let d = uv_row[2 * (x / 2)] as i32 - 128;
             let e = uv_row[2 * (x / 2) + 1] as i32 - 128;
 
+            // RGB range is [0, 255], so we need to round to [0, 254] and clamp.
             let r = (c + 459 * e + 128) >> 8;
             let g = (c - 55 * d - 136 * e + 128) >> 8;
             let b = (c + 541 * d + 128) >> 8;
@@ -71,8 +72,7 @@ pub fn nv12_to_rgb24(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8; 
     }
 }
 
-#[cfg(test)]
-mod tests {
+#[cfg(test)] mod tests {
     use super::*;
 
     const IDENTITY_MILLI: u32 = 1000;
@@ -88,8 +88,7 @@ mod tests {
         raw
     }
 
-    #[test]
-    fn lut_identity_is_passthrough() {
+    #[test] fn lut_identity_is_passthrough() {
         let lut = build_lut(IDENTITY_MILLI);
         for i in 0..=255usize {
             assert_eq!(lut[i], i as u8);
@@ -97,22 +96,19 @@ mod tests {
         assert!(lut_is_identity(IDENTITY_MILLI));
     }
 
-    #[test]
-    fn lut_half_brightness_scales_down() {
+    #[test] fn lut_half_brightness_scales_down() {
         let lut = build_lut(500);
         assert_eq!(lut[0], 0);
         assert_eq!(lut[200], 100);
         assert_eq!(lut[255], 128);
     }
 
-    #[test]
-    fn lut_overbright_clamps() {
+    #[test] fn lut_overbright_clamps() {
         let lut = build_lut(2000);
         assert_eq!(lut[200], 255);
     }
 
-    #[test]
-    fn nv12_black_white_gray() {
+    #[test] fn nv12_black_white_gray() {
         let lut = build_lut(IDENTITY_MILLI);
         let mut dst = vec![0u8; 2 * 2 * 3];
 
@@ -129,8 +125,7 @@ mod tests {
         assert!(dst.iter().all(|&b| b == 128), "gray: {dst:?}");
     }
 
-    #[test]
-    fn nv12_bt709_red() {
+    #[test] fn nv12_bt709_red() {
         // Pure red RGB(255,0,0) in BT.709 limited range is approx Y=63, U=102, V=240.
         let lut = build_lut(IDENTITY_MILLI);
         let mut dst = vec![0u8; 2 * 2 * 3];
@@ -141,8 +136,7 @@ mod tests {
         assert!(b.abs() <= 3, "b={b}");
     }
 
-    #[test]
-    fn nv12_odd_dimensions() {
+    #[test] fn nv12_odd_dimensions() {
         // 3x3: chroma plane is 2x2 blocks of UV pairs (stride 4). Must not panic and
         // must produce a fully written 3*3*3 output.
         let lut = build_lut(IDENTITY_MILLI);
@@ -153,8 +147,7 @@ mod tests {
         assert!(dst.iter().all(|&b| b == 128), "{dst:?}");
     }
 
-    #[test]
-    fn rgb24_lut_applies() {
+    #[test] fn rgb24_lut_applies() {
         let lut = build_lut(500);
         let src = [10u8, 100, 200, 255];
         let mut dst = [0u8; 4];
