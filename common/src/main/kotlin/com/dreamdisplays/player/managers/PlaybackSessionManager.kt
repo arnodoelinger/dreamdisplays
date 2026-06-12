@@ -19,6 +19,7 @@ import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
@@ -90,10 +91,37 @@ internal class PlaybackSessionManager(
     /** Timestamp of the last decoded video frame; read by [StreamWatchdog]. */
     val lastFrameNanos: AtomicLong get() = video.lastFrameReceivedNanos
 
+    @Volatile private var popoutSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)? = null
+    @Volatile private var previewSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)? = null
+
     /** Routes raw frames to the popout window. Null = no popout active. */
-    var popoutFrameSink: ((java.nio.ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
-        get() = video.popoutFrameSink
-        set(value) { video.popoutFrameSink = value }
+    var popoutFrameSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
+        get() = popoutSink
+        set(value) {
+            popoutSink = value
+            updateRawFrameSink()
+        }
+
+    /** Routes raw frames to the display menu preview when the main texture is GPU-YUV only. */
+    var previewFrameSink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?
+        get() = previewSink
+        set(value) {
+            previewSink = value
+            updateRawFrameSink()
+        }
+
+    private fun updateRawFrameSink() {
+        val popout = popoutSink
+        val preview = previewSink
+        video.popoutFrameSink = if (popout == null && preview == null) null else { buf, w, h, format ->
+            val pos = buf.position()
+            val limit = buf.limit()
+            popout?.invoke(buf, w, h, format)
+            buf.position(pos).limit(limit)
+            preview?.invoke(buf, w, h, format)
+            buf.position(pos).limit(limit)
+        }
+    }
 
     /**
      * Stops any running session, then launches new `FFmpeg` processes for [streamSet]

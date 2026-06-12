@@ -419,6 +419,11 @@ class DisplayMenu private constructor(
 
     override fun isPauseScreen(): Boolean = false
 
+    override fun removed() {
+        if (::preview.isInitialized) preview.close()
+        super.removed()
+    }
+
     /**
      * The menu needs roughly this much logical space for the normal (non-compact) layout — preview and
      * settings side by side on top, suggestions strip below. On smaller windows (e.g. high GUI scale)

@@ -192,6 +192,11 @@ class MediaPlayer(
         sessionManager.popoutFrameSink = sink
     }
 
+    /** Connects or disconnects the display menu preview sink. Pass null to detach. */
+    fun setPreviewSink(sink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?) {
+        sessionManager.previewFrameSink = sink
+    }
+
     /** True once the first decoded frame is ready for GPU upload. */
     fun textureFilled(): Boolean = sessionManager.textureFilled()
 

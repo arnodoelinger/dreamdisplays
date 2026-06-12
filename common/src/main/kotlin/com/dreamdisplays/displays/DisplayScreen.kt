@@ -10,6 +10,7 @@ import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.render.DisplayGeometry
 import com.dreamdisplays.render.DisplayTextureResource
+import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.protocol.DisplaySync
 import com.dreamdisplays.protocol.RequestSync
@@ -24,6 +25,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
+import java.nio.ByteBuffer
 import java.util.*
 
 /** Represents a video display screen in the game world. */
@@ -163,6 +165,11 @@ class DisplayScreen(
     /** Re-attaches the popout sink chain to a freshly created [player]. */
     internal fun attachPopout(player: MediaPlayer) {
         popoutManager.attachTo(player) { videoContentAspect }
+    }
+
+    /** Attaches or clears the menu preview raw-frame sink on the current player. */
+    fun setPreviewFrameSink(sink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?) {
+        mediaPlayer?.setPreviewSink(sink)
     }
 
     /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
