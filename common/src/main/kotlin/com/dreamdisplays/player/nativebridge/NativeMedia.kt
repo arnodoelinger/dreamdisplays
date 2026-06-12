@@ -429,19 +429,41 @@ internal object NativeMedia {
      */
     private fun preloadLavDependencies(dir: File?) {
         if (dir == null || !dir.isDirectory) return
-        val libraries = dir.listFiles()?.filter { it.isFile && isFfmpegSharedLibrary(it.name) } ?: return
+        val libraries = dir.listFiles()?.filter { it.isFile && isSharedLibrary(it.name) && !isDreamDisplaysLibrary(it.name) } ?: return
         if (libraries.isEmpty()) return
-        libraries.sortedWith(compareBy<File> { ffmpegSharedLibraryOrder(it.name) }.thenBy { it.name }).forEach { lib ->
-            runCatching { SymbolLookup.libraryLookup(lib.toPath(), Arena.global()) }
-                .onFailure { logger.debug("Could not preload LAV dependency ${lib.name}: ${it.message}") }
+        val pending = libraries
+            .sortedWith(compareBy<File> { sharedLibraryLoadOrder(it.name) }.thenBy { it.name })
+            .toMutableList()
+
+        repeat(3) {
+            if (pending.isEmpty()) return
+            val iterator = pending.iterator()
+            while (iterator.hasNext()) {
+                val lib = iterator.next()
+                if (runCatching { SymbolLookup.libraryLookup(lib.toPath(), Arena.global()) }.isSuccess) {
+                    iterator.remove()
+                }
+            }
+        }
+
+        pending.forEach { lib ->
+            logger.debug("Could not preload LAV dependency ${lib.name}.")
         }
     }
 
-    private fun isFfmpegSharedLibrary(name: String): Boolean {
+    private fun isSharedLibrary(name: String): Boolean {
         val lower = name.lowercase()
-        val component = FFMPEG_SHARED_LIBRARY_ORDER.keys.any { lower.contains(it) }
-        if (!component) return false
         return lower.endsWith(".dll") || lower.endsWith(".dylib") || lower.contains(".so")
+    }
+
+    private fun isDreamDisplaysLibrary(name: String): Boolean {
+        val lower = name.lowercase()
+        return lower.contains("dreamdisplays_native") || lower.contains("dreamdisplays_lav")
+    }
+
+    private fun sharedLibraryLoadOrder(name: String): Int {
+        val ffmpegOrder = ffmpegSharedLibraryOrder(name)
+        return if (ffmpegOrder == Int.MAX_VALUE) 0 else 100 + ffmpegOrder
     }
 
     private fun ffmpegSharedLibraryOrder(name: String): Int {
