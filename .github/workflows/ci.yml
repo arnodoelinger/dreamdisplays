@@ -1,0 +1,23 @@
+name: CI
+
+# Runs on every push to main and every PR. Always builds and uploads artifacts,
+# with no conditional/skipped jobs, so the check set is complete and consistent.
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/_build.yml
+    with:
+      pull_request: ${{ github.event_name == 'pull_request' }}

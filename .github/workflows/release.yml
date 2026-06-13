@@ -1,0 +1,320 @@
+name: Release
+
+# Publishing pipeline. Triggers only on a push to main whose head commit message contains [release]
+# (or a manual maintainer dispatch).
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release]')
+    uses: ./.github/workflows/_build.yml
+    with:
+      pull_request: false
+
+  github-prerelease:
+    name: Publish GitHub pre-release
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_snapshot == 'true'
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.3
+        with:
+          fetch-depth: 0
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: build-jars-*
+          path: build/libs
+          merge-multiple: true
+
+      - name: Extract snapshot changelog
+        if: needs.build.outputs.is_snapshot == 'true'
+        run: |
+          python3 - <<'EOF'
+          import re
+          import sys
+
+          with open("CHANGELOG.md") as f:
+              content = f.read()
+
+          version = "${{ needs.build.outputs.version }}"
+          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+
+          if not match:
+              with open("changelog.md", "w") as f:
+                  f.write("")
+              sys.exit(0)
+
+          block = match.group(1)
+          sections = re.split(r"^## ", block, flags=re.MULTILINE)
+          lines = []
+
+          for section in sections:
+              if not section.strip():
+                  continue
+
+              header, _, body = section.partition("\n")
+              lines.append(f"## {header.strip()}")
+
+              for item in body.splitlines():
+                  item = item.strip()
+                  if item:
+                      lines.append(item)
+
+              lines.append("")
+
+          with open("changelog.md", "w") as f:
+              f.write("\n".join(lines).strip() + "\n")
+          EOF
+
+      - name: Publish dev pre-release
+        if: needs.build.outputs.is_dev == 'true'
+        run: |
+          TAG="v${{ needs.build.outputs.version }}"
+          gh release delete "$TAG" --repo "${{ github.repository }}" --yes 2>/dev/null || true
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease --notes "" build/libs/dreamdisplays-*.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish snapshot pre-release
+        if: needs.build.outputs.is_snapshot == 'true'
+        run: |
+          TAG="v${{ needs.build.outputs.version }}"
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease --notes-file changelog.md build/libs/dreamdisplays-*.jar \
+          || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --repo "${{ github.repository }}" --clobber
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    name: Publish ${{ matrix.task.kind }} ${{ matrix.task.mc }}
+    runs-on: ubuntu-latest
+    needs: build
+    if: needs.build.outputs.is_marketplace_publishable == 'true'
+    strategy:
+      fail-fast: false
+      max-parallel: 1
+      matrix:
+        task: ${{ fromJSON(needs.build.outputs.marketplace_publish_tasks) }}
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: build-jars-${{ matrix.task.mc }}
+          path: build/libs
+
+      - name: Extract versions
+        id: versions
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+
+          mc = "${{ matrix.task.mc }}"
+          props = {}
+
+          with open(f"versions/{mc}/gradle.properties") as f:
+              for line in f:
+                  line = line.strip()
+                  if not line or line.startswith("#") or "=" not in line:
+                      continue
+
+                  key, value = line.split("=", 1)
+                  props[key.strip()] = value.strip()
+
+          minecraft_version = props.get("minecraft.version", mc)
+          base_mc = minecraft_version.split("-", 1)[0]
+          publish_mc = "1.21" if base_mc.startswith("1.21.") else base_mc
+          curseforge_publishable = (
+              re.fullmatch(r"\d+(?:\.\d+)*", minecraft_version) is not None
+              and minecraft_version != "1.21.11"
+          )
+
+          paper_1_21 = ["1.21"] + [f"1.21.{p}" for p in range(1, 12)]
+          paper_26_1 = ["26.1", "26.1.1", "26.1.2"]
+          paper_versions = paper_1_21 + paper_26_1
+
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"mc={mc}\n")
+              f.write(f"publish_mc={publish_mc}\n")
+              f.write(f"curseforge_publishable={str(curseforge_publishable).lower()}\n")
+              f.write("mc_versions<<VERSIONS_EOF\n")
+              f.write(minecraft_version + "\n")
+              f.write("VERSIONS_EOF\n")
+              f.write("paper_versions<<VERSIONS_EOF\n")
+              f.write("\n".join(paper_versions) + "\n")
+              f.write("VERSIONS_EOF\n")
+          EOF
+
+      - name: Extract changelog
+        if: needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true'
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+          import sys
+
+          with open("CHANGELOG.md") as f:
+              content = f.read()
+
+          version = "${{ needs.build.outputs.version }}"
+          is_snapshot = "${{ needs.build.outputs.is_snapshot }}" == "true"
+
+          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+
+          if not match:
+              if is_snapshot:
+                  with open("changelog.md", "w") as f:
+                      f.write("")
+                  sys.exit(0)
+
+              sys.exit(f"Version {version} not found in CHANGELOG.md")
+
+          block = match.group(1)
+          sections = re.split(r"^## ", block, flags=re.MULTILINE)
+          lines = []
+
+          for section in sections:
+              if not section.strip():
+                  continue
+
+              header, _, body = section.partition("\n")
+              lines.append(f"## {header.strip()}")
+
+              for item in body.splitlines():
+                  item = item.strip()
+                  if item:
+                      lines.append(item)
+
+              lines.append("")
+
+          with open("changelog.md", "w") as f:
+              f.write("\n".join(lines).strip() + "\n")
+          EOF
+
+      - name: Publish Paper
+        if: matrix.task.kind == 'paper'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[Paper] Dream Displays ${{ needs.build.outputs.version }}'
+          version: paper-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-paper-${{ needs.build.outputs.version }}.jar
+          changelog-file: changelog.md
+          modrinth-id: dreamdisplays
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          loaders: |
+            folia
+            paper
+            purpur
+          game-versions: ${{ steps.versions.outputs.paper_versions }}
+          game-version-filter: none
+
+      - name: Publish Fabric to Modrinth
+        if: matrix.task.kind == 'fabric'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
+          changelog-file: changelog.md
+          modrinth-id: dreamdisplays
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          loaders: |
+            fabric
+            quilt
+          game-versions: ${{ steps.versions.outputs.mc_versions }}
+          game-version-filter: none
+          dependencies: |
+            fabric-api(required){modrinth:P7dR8mSH}
+
+      - name: Publish Fabric to CurseForge
+        if: matrix.task.kind == 'fabric' && steps.versions.outputs.curseforge_publishable == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[Fabric ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
+          changelog-file: changelog.md
+          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          loaders: |
+            fabric
+            quilt
+          game-versions: ${{ steps.versions.outputs.mc_versions }}
+          dependencies: |
+            fabric-api(required){curseforge:306612}
+
+      - name: Publish NeoForge to Modrinth
+        if: matrix.task.kind == 'neoforge'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
+          changelog-file: changelog.md
+          modrinth-id: dreamdisplays
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          loaders: neoforge
+          game-versions: ${{ steps.versions.outputs.mc_versions }}
+          game-version-filter: none
+
+      - name: Publish NeoForge to CurseForge
+        if: matrix.task.kind == 'neoforge' && steps.versions.outputs.curseforge_publishable == 'true'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          name: '[NeoForge ${{ steps.versions.outputs.publish_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
+          changelog-file: changelog.md
+          curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          loaders: neoforge
+          game-versions: ${{ steps.versions.outputs.mc_versions }}
+
+      - name: Download all build artifacts for GitHub Release
+        if: needs.build.outputs.is_release == 'true' && matrix.task.kind == 'paper'
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: build-jars-*
+          path: build/libs
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        if: needs.build.outputs.is_release == 'true' && matrix.task.kind == 'paper'
+        uses: Kir-Antipov/mc-publish@v3.3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-tag: v${{ needs.build.outputs.version }}
+          github-generate-changelog: false
+          github-draft: false
+          files: build/libs/dreamdisplays-*.jar
+          changelog-file: changelog.md
