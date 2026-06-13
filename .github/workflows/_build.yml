@@ -214,12 +214,7 @@ jobs:
           tar -xf "${RUNNER_TEMP}/ffmpeg.tar.xz" -C "${RUNNER_TEMP}/ffmpeg-extract"
           inner="$(find "${RUNNER_TEMP}/ffmpeg-extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
           mv "$inner" "$dest"
-          for so in "$dest"/lib/lib*.so.*; do
-            [ -e "$so" ] || continue
-            link="${so%.so.*}.so"
-            [ -e "$link" ] || ln -s "$(basename "$so")" "$link"
-          done
-          echo "FFMPEG_DIR=${dest}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=${dest}/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=${dest}/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Install FFmpeg dependencies on macOS
