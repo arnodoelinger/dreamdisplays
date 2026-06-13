@@ -112,33 +112,41 @@ object ScreenRenderer : ClientRenderService {
             255
         }
         drawQuad(displayScreen.renderType!!) { pose, builder ->
-            builder.addVertex(pose, 0f, 0f, 0f).setColor(c, c, c, 255).setUv(0f, 1f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 0f, 0f).setColor(c, c, c, 255).setUv(1f, 1f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 1f, 0f).setColor(c, c, c, 255).setUv(1f, 0f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 0f, 1f, 0f).setColor(c, c, c, 255).setUv(0f, 0f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
+            appendQuad(pose, builder, c, c, c)
         }
     }
 
     /** Draws a unit quad filled with a solid RGB color (used for loading / error state). */
     private fun renderColor(drawQuad: QuadRenderer, type: RenderType, r: Int, g: Int, b: Int) {
         drawQuad(type) { pose, builder ->
-            builder.addVertex(pose, 0f, 0f, 0f).setColor(r, g, b, 255).setUv(0f, 1f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 0f, 0f).setColor(r, g, b, 255).setUv(1f, 1f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 1f, 1f, 0f).setColor(r, g, b, 255).setUv(1f, 0f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
-            builder.addVertex(pose, 0f, 1f, 0f).setColor(r, g, b, 255).setUv(0f, 0f).setLight(0xF000F0)
-                .setNormal(0f, 0f, 1f)
+            appendQuad(pose, builder, r, g, b)
         }
     }
 
+    private fun appendQuad(pose: PoseStack.Pose, builder: VertexConsumer, r: Int, g: Int, b: Int) {
+        addVertex(pose, builder, 0f, 0f, 0f, r, g, b, 0f, 1f)
+        addVertex(pose, builder, 1f, 0f, 0f, r, g, b, 1f, 1f)
+        addVertex(pose, builder, 1f, 1f, 0f, r, g, b, 1f, 0f)
+        addVertex(pose, builder, 0f, 1f, 0f, r, g, b, 0f, 0f)
+    }
+
+    private fun addVertex(
+        pose: PoseStack.Pose,
+        builder: VertexConsumer,
+        x: Float,
+        y: Float,
+        z: Float,
+        r: Int,
+        g: Int,
+        b: Int,
+        u: Float,
+        v: Float,
+    ) {
+        builder.addVertex(pose, x, y, z).setColor(r, g, b, 255).setUv(u, v)
+    }
+
     private fun drawImmediate(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-        val builder = Tesselator.getInstance().begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.BLOCK)
+        val builder = Tesselator.getInstance().begin(type.mode(), type.format())
         appendVertices(stack.last(), builder)
         type.draw(builder.buildOrThrow())
     }

@@ -3,8 +3,6 @@ package com.dreamdisplays.render
 import com.dreamdisplays.Initializer
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.RenderPipelines
-import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -51,7 +49,7 @@ class DisplayTextureResource(private val uuid: UUID) {
 
     /**
      * [RenderType] for the loading / error color quads. Identical to [renderType] in RGBA mode;
-     * in YUV mode a plain solid-block type over a white texture (the YUV shader would
+     * in YUV mode a plain unlit type over a white texture (the YUV shader would
      * misinterpret a flat color quad as chroma).
      */
     var fallbackRenderType: RenderType? = null
@@ -151,14 +149,7 @@ class DisplayTextureResource(private val uuid: UUID) {
     }
 
     companion object {
-        /** Creates a custom [RenderType] that samples texture [id] through the solid-block pipeline. */
-        private fun createRenderType(id: Identifier): RenderType = RenderType.create(
-            "dream-displays",
-            RenderSetup.builder(RenderPipelines.SOLID_BLOCK)
-                .withTexture("Sampler0", id)
-                .affectsCrumbling()
-                .useLightmap()
-                .createRenderSetup(),
-        )
+        /** Creates a custom unlit [RenderType] that samples texture [id] without block light/fog. */
+        private fun createRenderType(id: Identifier): RenderType = DisplayUnlitRenderTypes.create("dream-displays", id)
     }
 }

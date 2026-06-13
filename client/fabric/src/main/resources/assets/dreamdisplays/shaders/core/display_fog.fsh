@@ -16,14 +16,11 @@ layout(std140) uniform Fog {
     float FogCloudsEnd;
 };
 
-// I420 planes: Y at full resolution, U / V at half
-uniform sampler2D Sampler0; // Y
-uniform sampler2D Sampler1; // U
-uniform sampler2D Sampler3; // V
+uniform sampler2D Sampler0;
 
 in float cylindricalVertexDistance;
-in vec4 vertexColor;
 in vec2 texCoord0;
+in vec4 vertexColor;
 
 out vec4 fragColor;
 
@@ -34,18 +31,11 @@ float linear_fog(float dist, float start, float end) {
 }
 
 void main() {
-    // BT.709 limited range; the FFmpeg filter chain pins the stream to bt709
-    float y = (texture(Sampler0, texCoord0).r - 0.0625) * 1.164384;
-    float u = texture(Sampler1, texCoord0).r - 0.5;
-    float v = texture(Sampler3, texCoord0).r - 0.5;
-    vec3 rgb = clamp(vec3(
-        y + 1.792741 * v,
-        y - 0.213249 * u - 0.532909 * v,
-        y + 2.112402 * u
-    ), 0.0, 1.0);
-
-    // Brightness (0..2) arrives halved in the vertex color so it fits a normalized byte
-    vec4 color = vec4(rgb * vertexColor.rgb * 2.0, vertexColor.a) * ColorModulator;
+    vec4 color = texture(Sampler0, texCoord0) * vertexColor;
+    if (color.a == 0.0) {
+        discard;
+    }
+    color *= ColorModulator;
 
     // Render-distance fog only: fades the display toward the fog color as it nears the view
     // distance, fully gone beyond it. No environmental fog, so nearby displays stay untinted.

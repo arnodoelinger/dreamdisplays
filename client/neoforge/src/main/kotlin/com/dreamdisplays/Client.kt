@@ -8,6 +8,7 @@ import com.dreamdisplays.net.V2Payload
 import com.dreamdisplays.platform.NeoForgePlatform
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
+import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.neoforged.api.distmarker.Dist
@@ -96,10 +97,17 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     }
 
     //? if >=26 {
-    @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterTranslucentParticles) {
+    @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterLevel) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
-        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+        val modelViewStack = RenderSystem.getModelViewStack()
+        modelViewStack.pushMatrix()
+        try {
+            modelViewStack.mul(event.modelViewMatrix)
+            ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+        } finally {
+            modelViewStack.popMatrix()
+        }
     }
     //?} else
     /*@SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterParticles) {

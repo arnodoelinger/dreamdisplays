@@ -228,6 +228,18 @@ class MediaPlayer(
     /** Switches to the closest available stream for [quality]. */
     fun setQuality(quality: VideoQuality) = safeExecute { changeQuality(quality) }
 
+    /** Reopens the current stream without changing URL/quality; used when render backend requirements change. */
+    fun restartVideoPipeline() = safeExecute {
+        val ss = streams ?: return@safeExecute
+        val pos = if (liveStream) 0L else getCurrentTime()
+        Minecraft.getInstance().execute {
+            displayScreen.reloadTexture()
+            safeExecute {
+                if (sessionManager.isPlaying) startStreams(ss, pos) else clock.seekOffsetNanos = pos
+            }
+        }
+    }
+
     /**
      * Updates distance-based volume attenuation. Call every tick from the game thread.
      *

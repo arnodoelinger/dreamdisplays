@@ -4,7 +4,9 @@ import com.dreamdisplays.Initializer
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
-import com.mojang.blaze3d.textures.GpuTextureView
+import com.mojang.blaze3d.pipeline.BlendFunction
+import com.mojang.blaze3d.pipeline.ColorTargetState
+import com.mojang.blaze3d.pipeline.DepthStencilState
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.renderer.texture.AbstractTexture
@@ -17,9 +19,9 @@ import net.minecraft.resources.Identifier
  * `BindGroupLayout` / `GpuFormat` API instead, so one binary serves every loader and version.
  *
  * Reflection only runs once per session (pipeline and texture-method handles are resolved on
- * first use); the per-frame hot path is untouched. The layout chain mirrors vanilla's BLOCK
- * snippet (GLOBALS, FOG, samplers, MATRICES_PROJECTION) with the sampler group widened to the
- * three video planes plus the lightmap.
+ * first use); the per-frame hot path is untouched. The layout chain mirrors vanilla's fogged
+ * snippet (GLOBALS, MATRICES_PROJECTION, FOG, samplers), widened to the three video planes, so
+ * the `display_fog` vertex shader can feed vanilla distance fog without any lightmap or normals.
  */
 internal object Yuv262Reflect {
     /** True when the 26.2+ API classes are present at runtime. */
@@ -41,11 +43,11 @@ internal object Yuv262Reflect {
     private fun vanillaLayout(name: String): Any =
         Class.forName("net.minecraft.client.renderer.BindGroupLayouts").getField(name).get(null)
 
-    /** Builds the BindGroupLayout holding the three plane samplers plus the lightmap. */
+    /** Builds the BindGroupLayout holding the three plane samplers. */
     private fun samplerLayout(): Any {
         val builder = bglClass.getMethod("builder").invoke(null)
         val withSampler = builder.javaClass.getMethod("withSampler", String::class.java)
-        for (name in listOf("Sampler0", "Sampler1", "Sampler2", "Sampler3")) {
+        for (name in listOf("Sampler0", "Sampler1", "Sampler3")) {
             withSampler.invoke(builder, name)
         }
         return builder.javaClass.getMethod("build").invoke(builder)
@@ -62,25 +64,24 @@ internal object Yuv262Reflect {
 
         val withBindGroupLayout = builderClass.getMethod("withBindGroupLayout", bglClass)
         withBindGroupLayout.invoke(builder, vanillaLayout("GLOBALS"))
+        withBindGroupLayout.invoke(builder, vanillaLayout("MATRICES_PROJECTION"))
         withBindGroupLayout.invoke(builder, vanillaLayout("FOG"))
         withBindGroupLayout.invoke(builder, samplerLayout())
-        withBindGroupLayout.invoke(builder, vanillaLayout("MATRICES_PROJECTION"))
 
         builderClass.getMethod("withVertexBinding", Int::class.javaPrimitiveType, VertexFormat::class.java)
-            .invoke(builder, 0, DefaultVertexFormat.BLOCK)
+            .invoke(builder, 0, DefaultVertexFormat.POSITION_TEX_COLOR)
 
         val topologyClass = Class.forName("com.mojang.blaze3d.PrimitiveTopology")
         @Suppress("UNCHECKED_CAST")
         val quads = java.lang.Enum.valueOf(topologyClass as Class<out Enum<*>>, "QUADS")
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)
 
-        val depthStateClass = Class.forName("com.mojang.blaze3d.pipeline.DepthStencilState")
-        builderClass.getMethod("withDepthStencilState", depthStateClass)
-            .invoke(builder, depthStateClass.getField("DEFAULT").get(null))
-
         builder.withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
-        builder.withVertexShader(Identifier.fromNamespaceAndPath("minecraft", "core/block"))
+        builder.withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
         builder.withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
+        builder.withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+        builder.withDepthStencilState(DepthStencilState.DEFAULT)
+        builder.withCull(false)
         return builder.build()
     }
 
@@ -103,7 +104,7 @@ internal object Yuv262Reflect {
                     GpuTexture.USAGE_TEXTURE_BINDING or GpuTexture.USAGE_COPY_DST,
                     gpuFormatR8, width, height, 1, 1,
                 ) as GpuTexture
-                textureView = device.createTextureView(texture!!) as GpuTextureView
+                textureView = device.createTextureView(texture!!)
                 sampler = DisplayYuvRenderTypes.planeSampler()
             }
         }

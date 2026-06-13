@@ -10,6 +10,7 @@ import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.render.DisplayGeometry
 import com.dreamdisplays.render.DisplayTextureResource
+import com.dreamdisplays.render.DisplayYuvRenderTypes
 import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.protocol.DisplaySync
@@ -101,6 +102,7 @@ class DisplayScreen(
     private var clientUrlOverride: Boolean = false
 
     @Transient private var blockPos: BlockPos? = null
+    @Transient private var shaderPackYuvFallbackRequested = false
     var lang: String? = null
         private set
 
@@ -247,6 +249,14 @@ class DisplayScreen(
     /** Uploads the latest decoded frame to the GPU texture(s). Called on the render thread once per frame. */
     fun fitTexture() {
         val mp = mediaPlayer ?: return
+        if (textureResource.isYuv && !DisplayYuvRenderTypes.active) {
+            if (!shaderPackYuvFallbackRequested) {
+                shaderPackYuvFallbackRequested = true
+                mp.restartVideoPipeline()
+            }
+            return
+        }
+        if (!textureResource.isYuv) shaderPackYuvFallbackRequested = false
         try {
             if (textureResource.isYuv) {
                 val y = textureResource.yPlane ?: return

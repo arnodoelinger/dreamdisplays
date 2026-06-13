@@ -1,20 +1,37 @@
 #version 330
 
-#moj_import <minecraft:fog.glsl>
-#moj_import <minecraft:dynamictransforms.glsl>
+layout(std140) uniform DynamicTransforms {
+    mat4 ModelViewMat;
+    vec4 ColorModulator;
+    vec3 ModelOffset;
+    mat4 TextureMat;
+};
+layout(std140) uniform Fog {
+    vec4 FogColor;
+    float FogEnvironmentalStart;
+    float FogEnvironmentalEnd;
+    float FogRenderDistanceStart;
+    float FogRenderDistanceEnd;
+    float FogSkyEnd;
+    float FogCloudsEnd;
+};
 
-// I420 planes: Y at full resolution, U / V at half. Sampler2 is the vanilla lightmap
-// (consumed by the vertex stage); the names must match the pipeline's sampler list.
+// I420 planes: Y at full resolution, U / V at half
 uniform sampler2D Sampler0; // Y
 uniform sampler2D Sampler1; // U
 uniform sampler2D Sampler3; // V
 
-in float sphericalVertexDistance;
 in float cylindricalVertexDistance;
 in vec4 vertexColor;
 in vec2 texCoord0;
 
 out vec4 fragColor;
+
+float linear_fog(float dist, float start, float end) {
+    if (dist <= start) return 0.0;
+    if (dist >= end) return 1.0;
+    return (dist - start) / (end - start);
+}
 
 void main() {
     // BT.709 limited range; the FFmpeg filter chain pins the stream to bt709
@@ -29,5 +46,11 @@ void main() {
 
     // Brightness (0..2) arrives halved in the vertex color so it fits a normalized byte
     vec4 color = vec4(rgb * vertexColor.rgb * 2.0, vertexColor.a) * ColorModulator;
-    fragColor = apply_fog(color, sphericalVertexDistance, cylindricalVertexDistance, FogEnvironmentalStart, FogEnvironmentalEnd, FogRenderDistanceStart, FogRenderDistanceEnd, FogColor);
+
+    // Render-distance fog only: fades the display toward the fog color as it nears the view
+    // distance, fully gone beyond it. No environmental fog, so nearby displays stay untinted.
+    float fogValue = linear_fog(cylindricalVertexDistance, FogRenderDistanceStart, FogRenderDistanceEnd);
+    // Fade out to transparency (not to the fog color) so a distant display simply disappears
+    // instead of turning into a black rectangle.
+    fragColor = vec4(color.rgb, color.a * (1.0 - fogValue));
 }

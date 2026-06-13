@@ -2,13 +2,15 @@ package com.dreamdisplays.render
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.player.nativebridge.NativeMedia
+import com.mojang.blaze3d.pipeline.BlendFunction
+import com.mojang.blaze3d.pipeline.ColorTargetState
+import com.mojang.blaze3d.pipeline.DepthStencilState
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.shaders.UniformType
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -19,9 +21,11 @@ import net.minecraft.resources.Identifier
  * (Y / U / V as RED8 textures) and converts them to RGB in the fragment shader, plus the
  * [RenderType] factories that bind a display's plane textures to it.
  *
- * The vertex stage reuses vanilla `core/block`; only the fragment shader is custom
- * (`assets/dreamdisplays/shaders/core/display_yuv.fsh`). Brightness rides in on the vertex
- * color, scaled by 0.5 so the 0..2 range fits a normalized byte (the shader multiplies by 2).
+ * The vertex stage uses the mod's unlit `core/display_fog` (it emits the spherical/cylindrical
+ * vertex distances so the fragment shader can apply vanilla distance fog without any lightmap or
+ * normals); the fragment shader is `assets/dreamdisplays/shaders/core/display_yuv.fsh`. Brightness
+ * rides in on the vertex color, scaled by 0.5 so the 0..2 range fits a normalized byte (the shader
+ * multiplies by 2).
  */
 object DisplayYuvRenderTypes {
     private var sharedPlaneSampler: com.mojang.blaze3d.textures.GpuSampler? = null
@@ -40,7 +44,7 @@ object DisplayYuvRenderTypes {
             com.mojang.blaze3d.textures.FilterMode.LINEAR,
             1, java.util.OptionalDouble.empty(),
         ).also { sharedPlaneSampler = it }
-    /** Sampler names bound to the Y / U / V planes ("Sampler2" stays the vanilla lightmap). */
+    /** Sampler names bound to the Y / U / V planes. */
     private const val SAMPLER_Y = "Sampler0"
     private const val SAMPLER_U = "Sampler1"
     private const val SAMPLER_V = "Sampler3"
@@ -66,7 +70,9 @@ object DisplayYuvRenderTypes {
      * can never disagree.
      */
     val active: Boolean
-        get() = (isSupported || Yuv262Reflect.isAvailable) && NativeMedia.yuvGpuEnabled
+        get() = !ShaderPackCompat.isShaderPackActive
+                && (isSupported || Yuv262Reflect.isAvailable)
+                && NativeMedia.yuvGpuEnabled
 
     /** Creates one RED8 plane texture through the built-in (26.1-era) or reflective 26.2 API. */
     fun createPlaneTexture(label: String, width: Int, height: Int): net.minecraft.client.renderer.texture.AbstractTexture =
@@ -78,16 +84,18 @@ object DisplayYuvRenderTypes {
         if (!isSupported) return@lazy Yuv262Reflect.createPipeline()
         RenderPipeline.builder()
             .withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
-            .withVertexShader(Identifier.fromNamespaceAndPath("minecraft", "core/block"))
+            .withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
             .withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withUniform("Projection", UniformType.UNIFORM_BUFFER)
             .withUniform("Fog", UniformType.UNIFORM_BUFFER)
             .withSampler(SAMPLER_Y)
             .withSampler(SAMPLER_U)
-            .withSampler("Sampler2")
             .withSampler(SAMPLER_V)
-            .withVertexFormat(DefaultVertexFormat.BLOCK, VertexFormat.Mode.QUADS)
+            .withColorTargetState(ColorTargetState(BlendFunction.TRANSLUCENT))
+            .withDepthStencilState(DepthStencilState.DEFAULT)
+            .withCull(false)
+            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
             .build()
     }
 
@@ -98,15 +106,13 @@ object DisplayYuvRenderTypes {
             .withTexture(SAMPLER_Y, yId) { planeSampler() }
             .withTexture(SAMPLER_U, uId) { planeSampler() }
             .withTexture(SAMPLER_V, vId) { planeSampler() }
-            .affectsCrumbling()
-            .useLightmap()
             .createRenderSetup(),
     )
 
     private var whiteTextureId: Identifier? = null
 
     /**
-     * A plain solid-block [RenderType] over a shared 1x1 white texture, used for the loading /
+     * A plain unlit [RenderType] over a shared 1x1 white texture, used for the loading /
      * error quads in YUV mode (the YUV pipeline would misinterpret a flat color as chroma).
      * Must be called on the render thread.
      */
@@ -121,13 +127,6 @@ object DisplayYuvRenderTypes {
             whiteTextureId = newId
             newId
         }
-        return RenderType.create(
-            "dream-displays-fallback",
-            RenderSetup.builder(RenderPipelines.SOLID_BLOCK)
-                .withTexture("Sampler0", id)
-                .affectsCrumbling()
-                .useLightmap()
-                .createRenderSetup(),
-        )
+        return DisplayUnlitRenderTypes.create("dream-displays-fallback", id)
     }
 }
