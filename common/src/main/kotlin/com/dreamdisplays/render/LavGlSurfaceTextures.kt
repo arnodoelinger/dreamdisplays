@@ -1,7 +1,6 @@
 package com.dreamdisplays.render
 
 import com.dreamdisplays.player.nativebridge.NativeMedia
-import com.mojang.blaze3d.systems.RenderSystem
 import org.lwjgl.opengl.GL11
 
 /**
@@ -21,7 +20,7 @@ internal class LavGlSurfaceTextures : AutoCloseable {
      * Returns a native result code (`NativeMedia.READ_OK` on success).
      */
     fun import(desc: NativeMedia.LavSurfaceDescriptor): Int {
-        if (!isOpenGlBackend()) return NativeMedia.READ_UNSUPPORTED
+        if (!RenderBackendCompat.canUseDirectOpenGl()) return NativeMedia.READ_UNSUPPORTED
         if (desc.textureTarget != NativeMedia.GL_TEXTURE_RECTANGLE
             || desc.format != NativeMedia.LAV_SURFACE_FORMAT_NV12_8
             || desc.planeCount < 2
@@ -43,11 +42,6 @@ internal class LavGlSurfaceTextures : AutoCloseable {
                 textureIds[i] = GL11.glGenTextures()
             }
         }
-    }
-
-    private fun isOpenGlBackend(): Boolean {
-        val deviceClass = RenderSystem.getDevice().javaClass.name.lowercase()
-        return ".opengl." in deviceClass || deviceClass.substringAfterLast('.').startsWith("gl")
     }
 
     override fun close() {

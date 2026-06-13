@@ -142,7 +142,7 @@ object ScreenRenderer : ClientRenderService {
         u: Float,
         v: Float,
     ) {
-        builder.addVertex(pose, x, y, z).setColor(r, g, b, 255).setUv(u, v)
+        builder.addVertex(pose, x, y, z).setUv(u, v).setColor(r, g, b, 255)
     }
 
     private fun drawImmediate(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {

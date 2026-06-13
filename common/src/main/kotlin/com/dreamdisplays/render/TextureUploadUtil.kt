@@ -40,7 +40,7 @@ object TextureUploadUtil {
         setRgbaScratch: (ByteBuffer) -> Unit,
     ) {
         if (texture.isClosed) return
-        if (texture is GlTexture) {
+        if (texture is GlTexture && RenderBackendCompat.canUseDirectOpenGl()) {
             glUploader().upload(texture.glId(), src, texture.getWidth(0), texture.getHeight(0), format)
             return
         }
