@@ -10,6 +10,9 @@ import com.dreamdisplays.client.ui.kit.drawOutline
 import com.dreamdisplays.client.ui.kit.renderChild
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.ytdlp.Thumbnails
+//? if >=26 {
+import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.components.EditBox
@@ -46,6 +49,8 @@ class SuggestionsPanel(
     private var vertical: Boolean = false
     private var compactCards: Boolean = false
     private var lastStripH: Int = CARD_H
+
+    override fun handlesWholeWidgetCursor(): Boolean = false
 
     init {
         val f = Minecraft.getInstance().font
@@ -194,6 +199,9 @@ class SuggestionsPanel(
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
         g.disableScissor()
+        //? if >=26 {
+        if (hoveredCard in cards.indices) g.requestCursor(CursorTypes.POINTING_HAND)
+        //?}
 
         drawScrollbar(g, stripLeft, stripTop, stripRight, stripBottom, maxOff, viewportW, viewportH)
     }
@@ -306,13 +314,43 @@ class SuggestionsPanel(
             return handled
         }
         searchBox.isFocused = false
-        if (hoveredCard in controller.cards.indices) {
+        val card = if (event.button() == 0) cardAt(mouseX, mouseY) else -1
+        if (card in controller.cards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
             Minecraft.getInstance().soundManager.play(s)
-            onPick(controller.cards[hoveredCard])
+            onPick(controller.cards[card])
             return true
         }
-        return super.mouseClicked(event, dbl)
+        return false
+    }
+
+    private fun cardAt(mouseX: Double, mouseY: Double): Int {
+        if (controller.statusKey != null) return -1
+        val stripTop = stripTop()
+        val stripBottom = stripBottom()
+        val stripLeft = stripLeft()
+        val stripRight = stripRight()
+        if (mouseX < stripLeft || mouseX >= stripRight || mouseY < stripTop || mouseY >= stripBottom) return -1
+
+        val viewportW = stripRight - stripLeft
+        val viewportH = stripBottom - stripTop
+        if (viewportW <= 0 || viewportH <= 0) return -1
+
+        val cw = cardW(viewportW)
+        val ch = cardH(viewportW)
+        val rowY = if (vertical) 0 else stripTop + max(0, (viewportH - ch) / 2)
+        var pos = (if (vertical) stripTop else stripLeft) - scrollOffset
+        for (i in controller.cards.indices) {
+            val cardX = if (vertical) stripLeft else pos
+            val cardY = if (vertical) pos else rowY
+            if (mouseX >= max(cardX, stripLeft) && mouseX < min(cardX + cw, stripRight) &&
+                mouseY >= max(cardY, stripTop) && mouseY < min(cardY + ch, stripBottom)
+            ) {
+                return i
+            }
+            pos += (if (vertical) ch else cw) + CARD_GAP
+        }
+        return -1
     }
 
     override fun keyPressed(event: KeyEvent): Boolean {

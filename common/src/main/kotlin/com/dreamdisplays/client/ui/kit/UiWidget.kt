@@ -39,10 +39,13 @@ abstract class UiWidget(message: Component) : AbstractWidget(0, 0, 0, 0, message
     /** Version-neutral render body; implement all drawing here. */
     protected abstract fun draw(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float)
 
+    /** True for simple controls; composite widgets should request cursors only for their interactive parts. */
+    protected open fun handlesWholeWidgetCursor(): Boolean = true
+
     //? if >=26 {
     final override fun extractWidgetRenderState(g: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float) {
         draw(g, mouseX, mouseY, partialTick)
-        handleCursor(g)
+        if (handlesWholeWidgetCursor()) handleCursor(g)
     }
 
     /** Draws [text] centered over the widget with vanilla scrolling-on-overflow behavior. */
