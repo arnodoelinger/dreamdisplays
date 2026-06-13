@@ -30,6 +30,28 @@ message ClientHello {
   optional bool supportsPip = 8;
   // WARNING: a default value decoded when value is missing
   optional bool supportsAudio = 9;
+  // WARNING: a default value decoded when value is missing
+  optional string renderBackend = 10;
+  // WARNING: a default value decoded when value is missing
+  optional string shaderBackend = 11;
+  // WARNING: a default value decoded when value is missing
+  optional string textureUploadPath = 12;
+  // WARNING: a default value decoded when value is missing
+  optional string hwAccelBackend = 13;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeBackendAvailable = 14;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeRgbaFramesEnabled = 15;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeYuvGpuEnabled = 16;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavAvailable = 17;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavInProcessEnabled = 18;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavSurfaceInteropAvailable = 19;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavZeroCopyEnabled = 20;
 }
 
 // serial name 'com.dreamdisplays.protocol.ServerHello'

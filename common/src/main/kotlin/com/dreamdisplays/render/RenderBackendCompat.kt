@@ -10,6 +10,19 @@ internal object RenderBackendCompat {
 
     fun canUseDirectOpenGl(): Boolean = isOpenGlBackend() && !isVulkanModLoaded
 
+    fun backendName(): String = runCatching {
+        val deviceClass = RenderSystem.getDevice().javaClass.name.lowercase()
+        when {
+            isVulkanModLoaded -> "vulkanmod"
+            "vulkan" in deviceClass -> "vulkan"
+            ".opengl." in deviceClass || deviceClass.substringAfterLast('.').startsWith("gl") -> "opengl"
+            else -> "other"
+        }
+    }.getOrDefault("unknown")
+
+    fun textureUploadPath(): String =
+        if (canUseDirectOpenGl()) "direct_opengl_pbo" else "command_encoder"
+
     fun isOpenGlBackend(): Boolean {
         val deviceClass = RenderSystem.getDevice().javaClass.name.lowercase()
         return ".opengl." in deviceClass || deviceClass.substringAfterLast('.').startsWith("gl")

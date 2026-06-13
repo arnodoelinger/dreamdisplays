@@ -11,6 +11,7 @@ import com.dreamdisplays.server.managers.StateManager
 import com.dreamdisplays.server.managers.StorageManager
 import com.dreamdisplays.server.meta.FabricUpdater
 import com.dreamdisplays.server.meta.Scheduler
+import com.dreamdisplays.server.metrics.TelemetryMetrics
 import com.dreamdisplays.server.registrar.ChannelRegistrar
 import com.dreamdisplays.server.registrar.CommandRegistrar
 import com.dreamdisplays.server.registrar.FabricCommandRegistrar
@@ -88,7 +89,7 @@ import org.slf4j.LoggerFactory
         ChannelRegistrar.registerChannels(this)
         SchedulerRegistrar.runRepeatingTasks(this)
 
-        Metrics(this, 26488)
+        TelemetryMetrics.register(this, Metrics(this, 26488))
     }
 
     /** Persists state and tears down resources. Safe to call from a reload. */

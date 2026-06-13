@@ -29,6 +29,17 @@ import kotlinx.serialization.protobuf.ProtoType
     @ProtoNumber(7) val supportedCodecs: List<String> = emptyList(),
     @ProtoNumber(8) val supportsPip: Boolean = false,
     @ProtoNumber(9) val supportsAudio: Boolean = true,
+    @ProtoNumber(10) val renderBackend: String = "",
+    @ProtoNumber(11) val shaderBackend: String = "",
+    @ProtoNumber(12) val textureUploadPath: String = "",
+    @ProtoNumber(13) val hwAccelBackend: String = "",
+    @ProtoNumber(14) val nativeBackendAvailable: Boolean = false,
+    @ProtoNumber(15) val nativeRgbaFramesEnabled: Boolean = false,
+    @ProtoNumber(16) val nativeYuvGpuEnabled: Boolean = false,
+    @ProtoNumber(17) val lavAvailable: Boolean = false,
+    @ProtoNumber(18) val lavInProcessEnabled: Boolean = false,
+    @ProtoNumber(19) val lavSurfaceInteropAvailable: Boolean = false,
+    @ProtoNumber(20) val lavZeroCopyEnabled: Boolean = false,
 ) : DreamPacket
 
 /**

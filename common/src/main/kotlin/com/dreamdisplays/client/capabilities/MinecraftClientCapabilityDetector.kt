@@ -1,8 +1,11 @@
 package com.dreamdisplays.client.capabilities
 
 import com.dreamdisplays.client.ui.VideoPopoutWindow
+import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.protocol.ClientHello
+import com.dreamdisplays.render.RenderBackendCompat
+import com.dreamdisplays.render.ShaderPackCompat
 
 /**
  * Probes the running client for [ClientHello] capabilities. Popout support comes from the `GLFW`
@@ -26,13 +29,34 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
     override val supportedCodecs: List<String> = listOf("h264", "hevc", "vp9", "av1")
 
     /** Snapshots all probes into an immutable [ClientHello] for the handshake. */
-    override fun detect(): ClientHello = ClientHello(
-        supportsPopout = supportsPopout,
-        supportsHardwareDecode = supportsHardwareDecode,
-        supportsHighResolution = maxTextureSize >= 4096,
-        maxTextureSize = maxTextureSize,
-        supportedCodecs = supportedCodecs,
-        supportsPip = true,
-        supportsAudio = true,
-    )
+    override fun detect(): ClientHello {
+        val hwAccel = HwAccelBackend.detectDefault()
+        val nativeAvailable = safeBool { NativeMedia.isAvailable }
+        val lavAvailable = safeBool { NativeMedia.lavAvailable }
+        return ClientHello(
+            supportsPopout = supportsPopout,
+            supportsHardwareDecode = hwAccel != HwAccelBackend.NONE,
+            supportsHighResolution = maxTextureSize >= 4096,
+            maxTextureSize = maxTextureSize,
+            supportedCodecs = supportedCodecs,
+            supportsPip = true,
+            supportsAudio = true,
+            renderBackend = safeString("unknown") { RenderBackendCompat.backendName() },
+            shaderBackend = safeString("unknown") { ShaderPackCompat.shaderBackendName() },
+            textureUploadPath = safeString("unknown") { RenderBackendCompat.textureUploadPath() },
+            hwAccelBackend = hwAccel.name.lowercase(),
+            nativeBackendAvailable = nativeAvailable,
+            nativeRgbaFramesEnabled = nativeAvailable && safeBool { NativeMedia.rgbaFramesEnabled },
+            nativeYuvGpuEnabled = nativeAvailable && safeBool { NativeMedia.yuvGpuEnabled },
+            lavAvailable = lavAvailable,
+            lavInProcessEnabled = lavAvailable && safeBool { NativeMedia.lavInProcessEnabled },
+            lavSurfaceInteropAvailable = lavAvailable && safeBool { NativeMedia.lavSurfaceInteropAvailable },
+            lavZeroCopyEnabled = lavAvailable && safeBool { NativeMedia.lavZeroCopyEnabled },
+        )
+    }
+
+    private fun safeBool(block: () -> Boolean): Boolean = runCatching(block).getOrDefault(false)
+
+    private fun safeString(default: String, block: () -> String): String =
+        runCatching(block).getOrDefault(default).ifBlank { default }
 }

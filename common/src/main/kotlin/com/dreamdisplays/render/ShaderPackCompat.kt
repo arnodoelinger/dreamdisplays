@@ -9,7 +9,14 @@ package com.dreamdisplays.render
  */
 internal object ShaderPackCompat {
     val isShaderPackActive: Boolean
-        get() = irisShaderPackActive() || optifineShaderPackActive() || canvasRendererActive()
+        get() = shaderBackendName() != "none"
+
+    fun shaderBackendName(): String = when {
+        irisShaderPackActive() -> "iris"
+        optifineShaderPackActive() -> "optifine"
+        canvasRendererActive() -> "canvas"
+        else -> "none"
+    }
 
     /** Iris shaders. */
     private fun irisShaderPackActive(): Boolean = runCatching {

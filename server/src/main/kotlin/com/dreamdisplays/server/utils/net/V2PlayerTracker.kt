@@ -23,6 +23,9 @@ object V2PlayerTracker {
     /** The capabilities [uuid] advertised, or null for v1 peers. */
     fun helloOf(uuid: UUID): ClientHello? = players[uuid]
 
+    /** Snapshot of all currently remembered v2 peers and their advertised capabilities. */
+    fun snapshot(): Map<UUID, ClientHello> = players.toMap()
+
     /** Drops the per-player state on disconnect. */
     fun clear(uuid: UUID) {
         players.remove(uuid)
