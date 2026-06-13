@@ -377,6 +377,7 @@ internal object NativeMedia {
         }
         return try {
             val linker = Linker.nativeLinker()
+            LavFfmpeg.ensure(lib.parentFile)
             preloadLavDependencies(lib.parentFile)
             val lookup = SymbolLookup.libraryLookup(lib.toPath(), Arena.global())
 

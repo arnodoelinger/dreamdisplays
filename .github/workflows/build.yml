@@ -179,20 +179,24 @@ jobs:
       - name: Install FFmpeg dependencies on Linux
         if: runner.os == 'Linux'
         run: |
+          set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y \
-            clang \
-            ffmpeg \
-            libavcodec-dev \
-            libavdevice-dev \
-            libavfilter-dev \
-            libavformat-dev \
-            libavutil-dev \
-            libclang-dev \
-            libswresample-dev \
-            libswscale-dev \
-            patchelf \
-            pkg-config
+          sudo apt-get install -y clang libclang-dev patchelf pkg-config xz-utils curl
+          case "${{ matrix.native.target }}" in
+            x86_64-*) ffmpeg_arch=linux64 ;;
+            aarch64-*) ffmpeg_arch=linuxarm64 ;;
+            *) echo "Unsupported Linux target: ${{ matrix.native.target }}" >&2; exit 1 ;;
+          esac
+          build="ffmpeg-n8.1-latest-${ffmpeg_arch}-lgpl-shared-8.1"
+          url="https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/${build}.tar.xz"
+          dest="${RUNNER_TEMP}/ffmpeg"
+          curl -fL --retry 3 --retry-all-errors -o "${RUNNER_TEMP}/ffmpeg.tar.xz" "$url"
+          mkdir -p "${RUNNER_TEMP}/ffmpeg-extract"
+          tar -xf "${RUNNER_TEMP}/ffmpeg.tar.xz" -C "${RUNNER_TEMP}/ffmpeg-extract"
+          inner="$(find "${RUNNER_TEMP}/ffmpeg-extract" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          mv "$inner" "$dest"
+          echo "FFMPEG_DIR=${dest}" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=${dest}/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
 
       - name: Install FFmpeg dependencies on macOS
         if: runner.os == 'macOS'
@@ -256,7 +260,6 @@ jobs:
           target="${{ matrix.native.target }}"
           native_library="${{ matrix.native.native_library }}"
           lav_library="${{ matrix.native.lav_library }}"
-          ffmpeg_dir="${FFMPEG_DIR:-}"
 
           release_dir="native/target/$target/release"
           out="native-artifact/dreamdisplays-natives/$platform"
@@ -265,269 +268,14 @@ jobs:
           cp "$release_dir/$native_library" "$out/"
           cp "$release_dir/$lav_library" "$out/"
 
-          shared_library_name() {
-            local name
-            name="$(basename "$1" | tr '[:upper:]' '[:lower:]')"
-            [[ "$name" == *.dll || "$name" == *.dylib || "$name" == *".so"* ]]
-          }
-
-          copy_once() {
-            local src="$1"
-            local dst="$out/$(basename "$src")"
-            [[ -f "$src" ]] || return 0
-            [[ -f "$dst" ]] || cp "$src" "$dst"
-          }
-
-          linux_skip_dependency() {
-            local name
-            name="$(basename "$1")"
-            case "$name" in
-              linux-vdso*|ld-linux*|ld64*|libc.so*|libm.so*|libpthread.so*|libdl.so*|librt.so*|libresolv.so*|libgcc_s.so*|libstdc++.so*)
-                return 0
-                ;;
-              *)
-                return 1
-                ;;
-            esac
-          }
-
-          collect_linux_dependencies() {
-            local queue=("$out/$native_library" "$out/$lav_library")
-            local seen=()
-
-            while ((${#queue[@]})); do
-              local item="${queue[0]}"
-              queue=("${queue[@]:1}")
-              if ((${#seen[@]})); then
-                [[ " ${seen[*]} " == *" $item "* ]] && continue
-              fi
-              seen+=("$item")
-
-              while IFS= read -r dep; do
-                [[ -n "$dep" && -f "$dep" ]] || continue
-                linux_skip_dependency "$dep" && continue
-                copy_once "$dep"
-                queue+=("$out/$(basename "$dep")")
-              done < <(
-                ldd "$item" 2>/dev/null |
-                  awk '/=> \// { print $(NF - 1); next } /^[[:space:]]*\// { print $1 }'
-              )
+          if [[ "${RUNNER_OS:-}" == "Linux" ]] && command -v patchelf >/dev/null 2>&1; then
+            for lib in "$out/$native_library" "$out/$lav_library"; do
+              patchelf --set-rpath '$ORIGIN' "$lib" || true
             done
+          fi
 
-            if command -v patchelf >/dev/null 2>&1; then
-              while IFS= read -r lib; do
-                patchelf --set-rpath '$ORIGIN' "$lib" || true
-              done < <(find "$out" -maxdepth 1 -type f -name '*.so*' -print)
-            fi
-          }
-
-          macos_skip_dependency() {
-            case "$1" in
-              /System/Library/*|/usr/lib/*)
-                return 0
-                ;;
-              *)
-                return 1
-                ;;
-            esac
-          }
-
-          macos_resolve_dependency() {
-            local dep="$1"
-            local origin="$2"
-
-            case "$dep" in
-              @loader_path/*)
-                dep="$(dirname "$origin")/${dep#@loader_path/}"
-                ;;
-              @rpath/*)
-                local name="${dep#@rpath/}"
-                local candidate
-                for candidate in "$(dirname "$origin")/$name" "/opt/homebrew/lib/$name" "/usr/local/lib/$name" /opt/homebrew/opt/*/lib/"$name" /usr/local/opt/*/lib/"$name"; do
-                  if [[ -f "$candidate" ]]; then
-                    dep="$candidate"
-                    break
-                  fi
-                done
-                ;;
-            esac
-
-            [[ -f "$dep" ]] && printf '%s\n' "$dep"
-          }
-
-          collect_macos_dependencies() {
-            local queue=("$out/$native_library" "$out/$lav_library")
-            local seen=()
-
-            while ((${#queue[@]})); do
-              local item="${queue[0]}"
-              queue=("${queue[@]:1}")
-              if ((${#seen[@]})); then
-                [[ " ${seen[*]} " == *" $item "* ]] && continue
-              fi
-              seen+=("$item")
-
-              while IFS= read -r dep; do
-                [[ -n "$dep" ]] || continue
-                macos_skip_dependency "$dep" && continue
-                local resolved
-                resolved="$(macos_resolve_dependency "$dep" "$item" || true)"
-                [[ -n "$resolved" ]] || continue
-                copy_once "$resolved"
-                queue+=("$out/$(basename "$resolved")")
-              done < <(otool -L "$item" | tail -n +2 | awk '{ print $1 }')
-            done
-
-            while IFS= read -r binary; do
-              install_name_tool -id "@loader_path/$(basename "$binary")" "$binary" 2>/dev/null || true
-              while IFS= read -r dep; do
-                [[ -n "$dep" ]] || continue
-                macos_skip_dependency "$dep" && continue
-                local resolved
-                resolved="$(macos_resolve_dependency "$dep" "$binary" || true)"
-                [[ -n "$resolved" ]] || continue
-                install_name_tool -change "$dep" "@loader_path/$(basename "$resolved")" "$binary" 2>/dev/null || true
-              done < <(otool -L "$binary" | tail -n +2 | awk '{ print $1 }')
-              codesign --force --sign - "$binary" >/dev/null 2>&1 || true
-            done < <(find "$out" -maxdepth 1 -type f \( -name '*.dylib' -o -name "$lav_library" \) -print)
-          }
-
-          collect_windows_dependencies() {
-            local bin="$ffmpeg_dir/bin"
-            if [[ ! -d "$bin" ]]; then
-              echo "Missing FFmpeg bin directory: $bin" >&2
-              exit 1
-            fi
-
-            local dumpbin=""
-            if command -v dumpbin.exe >/dev/null 2>&1; then
-              dumpbin="$(command -v dumpbin.exe)"
-            else
-              dumpbin="$(find "/c/Program Files/Microsoft Visual Studio" "/c/Program Files (x86)/Microsoft Visual Studio" \
-                -path '*/VC/Tools/MSVC/*/bin/Host*/x64/dumpbin.exe' -o \
-                -path '*/VC/Tools/MSVC/*/bin/Host*/arm64/dumpbin.exe' 2>/dev/null | head -n 1 || true)"
-            fi
-
-            if [[ -n "$dumpbin" && -f "$dumpbin" ]]; then
-              local queue=("$out/$native_library" "$out/$lav_library")
-              local seen=()
-
-              while ((${#queue[@]})); do
-                local item="${queue[0]}"
-                queue=("${queue[@]:1}")
-                if ((${#seen[@]})); then
-                  [[ " ${seen[*]} " == *" $item "* ]] && continue
-                fi
-                seen+=("$item")
-
-                while IFS= read -r dep; do
-                  [[ -n "$dep" ]] || continue
-                  local src="$bin/$dep"
-                  [[ -f "$src" ]] || continue
-                  copy_once "$src"
-                  queue+=("$out/$dep")
-                done < <(
-                  "$dumpbin" //DEPENDENTS "$item" 2>/dev/null |
-                    tr -d '\r' |
-                    awk '/^[[:space:]]*[A-Za-z0-9_.-]+\.dll$/ { print $1 }'
-                )
-              done
-              return
-            fi
-
-            local allowlist='(avutil|swresample|swscale|avcodec|avformat|avfilter|avdevice|x264|x265|vpx|dav1d|opus|mp3lame|ssl|crypto|zlib|bz2|lzma|brotli|iconv|zstd|xml2|ass|freetype|fribidi|harfbuzz|vorbis|ogg|theora|webp|svtav1|aom|soxr|speex|openjp2|srt|ssh)'
-            while IFS= read -r dll; do
-              name="$(basename "$dll" | tr '[:upper:]' '[:lower:]')"
-              if [[ "$name" =~ $allowlist ]]; then
-                copy_once "$dll"
-              fi
-            done < <(find "$bin" -maxdepth 1 -type f -name '*.dll' -print)
-          }
-
-          collect_license_metadata() {
-            local license_dir="$out/licenses"
-            mkdir -p "$license_dir"
-
-            # On Windows we bundle the prebuilt BtbN ffmpeg, so its license must
-            # come from that build's LICENSE below — never from a stray system
-            # ffmpeg on the runner image (a different build = wrong attribution).
-            if [[ "${RUNNER_OS:-}" != "Windows" ]] && command -v ffmpeg >/dev/null 2>&1; then
-              ffmpeg -hide_banner -version > "$license_dir/ffmpeg-version.txt" 2>&1 || true
-              ffmpeg -hide_banner -L > "$license_dir/ffmpeg-license.txt" 2>&1 || true
-            fi
-
-            case "${RUNNER_OS:-}" in
-              Linux)
-                cp /usr/share/doc/ffmpeg/copyright "$license_dir/ffmpeg-debian-copyright.txt" 2>/dev/null || true
-                ;;
-              macOS)
-                if command -v brew >/dev/null 2>&1; then
-                  brew info --json=v2 ffmpeg > "$license_dir/ffmpeg-homebrew.json" 2>/dev/null || true
-                fi
-                ;;
-              Windows)
-                btbn_license="$(find "$ffmpeg_dir" -maxdepth 1 -iname 'LICENSE*' -type f | head -n 1)"
-                [[ -n "$btbn_license" ]] && cp "$btbn_license" "$license_dir/ffmpeg-btbn-license.txt" || true
-                ;;
-            esac
-
-            # The prebuilt Windows ffmpeg ships no CLI, so `ffmpeg -L` is
-            # unavailable there. Fall back to the build's bundled LICENSE as the
-            # canonical license record.
-            if [[ ! -s "$license_dir/ffmpeg-license.txt" ]]; then
-              for fallback in \
-                "$license_dir/ffmpeg-btbn-license.txt" \
-                "$license_dir/ffmpeg-debian-copyright.txt"; do
-                if [[ -s "$fallback" ]]; then
-                  cp "$fallback" "$license_dir/ffmpeg-license.txt"
-                  break
-                fi
-              done
-            fi
-
-            if [[ ! -s "$license_dir/ffmpeg-license.txt" ]]; then
-              echo "Missing FFmpeg license metadata for $platform" >&2
-              exit 1
-            fi
-          }
-
-          case "${RUNNER_OS:-}" in
-            Linux)
-              collect_linux_dependencies
-              ;;
-            macOS)
-              collect_macos_dependencies
-              ;;
-            Windows)
-              collect_windows_dependencies
-              ;;
-            *)
-              echo "Unsupported RUNNER_OS=${RUNNER_OS:-}" >&2
-              exit 1
-              ;;
-          esac
-          collect_license_metadata
-
-          required_components=(avutil swresample swscale avcodec avformat)
           for required in "$native_library" "$lav_library"; do
             test -f "$out/$required"
-          done
-
-          for component in "${required_components[@]}"; do
-            found=false
-            for lib in "$out"/*; do
-              [[ -f "$lib" ]] || continue
-              shared_library_name "$lib" || continue
-              name="$(basename "$lib" | tr '[:upper:]' '[:lower:]')"
-              if [[ "$name" == *"$component"* ]]; then
-                found=true
-                break
-              fi
-            done
-            if [[ "$found" != true ]]; then
-              echo "Missing FFmpeg component $component in $out" >&2
-              exit 1
-            fi
           done
 
           find "$out" -maxdepth 1 -type f -print | sort
@@ -617,11 +365,6 @@ jobs:
           for platform in $REQUIRED_NATIVE_PLATFORMS; do
             test -f "native/build/ci-bundle/dreamdisplays-natives/$platform/$(native_name "$platform")"
             test -f "native/build/ci-bundle/dreamdisplays-natives/$platform/$(lav_name "$platform")"
-            test -s "native/build/ci-bundle/dreamdisplays-natives/$platform/licenses/ffmpeg-license.txt"
-            for component in avutil swresample swscale avcodec avformat; do
-              find "native/build/ci-bundle/dreamdisplays-natives/$platform" -maxdepth 1 -type f \
-                | grep -E "(${component}).*(\\.dll|\\.dylib|\\.so)" >/dev/null
-            done
           done
           find native/build/ci-bundle/dreamdisplays-natives -maxdepth 2 -type f -print | sort
         env:
@@ -650,7 +393,6 @@ jobs:
 
           mc = "${{ matrix.mc }}"
           version = "${{ needs.metadata.outputs.version }}"
-          ffmpeg_components = ["avutil", "swresample", "swscale", "avcodec", "avformat"]
           platforms = os.environ["REQUIRED_NATIVE_PLATFORMS"].split()
 
           def native_name(platform: str) -> str:
@@ -670,7 +412,7 @@ jobs:
           expected = [
               f"{platform}/{name}"
               for platform in platforms
-              for name in (native_name(platform), lav_name(platform), "licenses/ffmpeg-license.txt")
+              for name in (native_name(platform), lav_name(platform))
           ]
 
           for loader in ("fabric", "neoforge"):
@@ -688,20 +430,6 @@ jobs:
               ]
               if missing:
                   raise SystemExit(f"{jar} is missing native entries: {missing}.")
-
-              for platform in platforms:
-                  platform_entries = [
-                      name.rsplit("/", 1)[-1].lower()
-                      for name in names
-                      if name.startswith(f"dreamdisplays-natives/{platform}/")
-                  ]
-                  missing_components = [
-                      component
-                      for component in ffmpeg_components
-                      if not any(component in entry and (entry.endswith(".dll") or entry.endswith(".dylib") or ".so" in entry) for entry in platform_entries)
-                  ]
-                  if missing_components:
-                      raise SystemExit(f"{jar} is missing FFmpeg components for {platform}: {missing_components}.")
           EOF
         env:
           REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
