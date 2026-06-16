@@ -31,9 +31,6 @@ data class DisplaySettings(
     /** The display's render distance in blocks. Must be a multiple of 16 in the range [32, 192] (2–12 chunks). */
     val renderDistance: Int = 96,
 
-    /** Indicates if synchronization is enabled. */
-    val syncEnabled: Boolean = true,
-
     /** The URL to override the default display URL. */
     val urlOverride: String? = null,
 
