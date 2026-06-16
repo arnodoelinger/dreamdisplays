@@ -48,14 +48,18 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         player = null
         videoStarted = false
         screen.mediaError = null
-        screen.syncController.reset()
+        screen.timelineFollower.reset()
         oldPlayer?.stop()
 
         screen.onVideoSwapped(videoUrl, lang)
         DisplayRegistry.emit(DisplayEvent.UrlChanged(DisplayId(screen.uuid), videoUrl))
         val shouldBePaused = preservePausedState && screen.paused
-        val newPlayer = MediaPlayer(videoUrl, lang, screen)
+        val newPlayer = MediaPlayer(videoUrl, lang, screen, screen.takeReplayBootstrap(videoUrl))
         player = newPlayer
+        screen.timelineFollower.onPlayerCreated()
+        // Set the effective volume (incl. distance) now, before the bridge prelude (which starts at
+        // construction) becomes audible — otherwise its first moment plays at the un-attenuated level.
+        screen.primeNewPlayerVolume(newPlayer)
         screen.prepareTextureDimensions()
 
         screen.attachPopout(newPlayer)
@@ -81,8 +85,11 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
             mp.play()
             screen.paused = false
         }
-        screen.restoreSavedTime()
-        screen.syncController.bootstrapIfNeeded()
+        // A replay-bootstrap player already resumes at the saved position; restoreSavedTime()'s
+        // corrective seek would cold-restart the session and destroy the seamless replay -> live bridge.
+        if (!mp.isResumingFromReplay()) screen.restoreSavedTime()
+        // screen.syncController.bootstrapIfNeeded();
+        // No bootstrap needed for sync since 1.8.0.
     }
 
     /** Runs [action] once the current player is initialized; guards against stale generations. */
