@@ -6,6 +6,7 @@ import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.render.DisplayYuvRenderTypes
 import com.dreamdisplays.render.UploadPixelFormat
+import com.dreamdisplays.utils.OsInfo
 import com.mojang.blaze3d.textures.GpuTexture
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
@@ -33,6 +34,20 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
         private const val LAV_HW_AUTO = 1
         private const val LAV_PTS_ORIGIN_TOLERANCE_NS = 10_000_000_000L
         private const val LAV_PREROLL_MARGIN_NS = 50_000_000L
+        // Rolling reappearance cache, enabled by default: ~30 s of recent stream so a returning
+        // display can replay locally (network-free) while the live source re-resolves. Capped by bytes.
+        private const val DEFAULT_CACHE_WINDOW_MS = 30_000L
+        private const val DEFAULT_CACHE_MAX_BYTES = 96L * 1024L * 1024L
+
+        /** Rolling encoded-packet cache window for live LAV sessions; 0 disables it. */
+        private val cacheWindowMs: Long =
+            System.getProperty("dreamdisplays.cache.windowMs")?.toLongOrNull()?.coerceIn(0, 120_000)
+                ?: DEFAULT_CACHE_WINDOW_MS
+
+        /** Hard byte cap for one live LAV packet ring. */
+        private val cacheMaxBytes: Long =
+            System.getProperty("dreamdisplays.cache.maxBytes")?.toLongOrNull()?.coerceAtLeast(0)
+                ?: DEFAULT_CACHE_MAX_BYTES
     }
 
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
@@ -52,6 +67,7 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
     private val outputFormat: UploadPixelFormat =
         if (NativeMedia.rgbaFramesEnabled) UploadPixelFormat.RGBA32 else UploadPixelFormat.RGB24
     private val surface = FrameSurface(debugLabel, outputFormat)
+    @Volatile private var activePrebuffer: FramePrebuffer? = null
 
     /** Scratch RGBA buffer for the popout window in planar mode (it still wants RGBA frames). */
     private var popoutRgba: ByteBuffer? = null
@@ -61,15 +77,26 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
     /** Handle of the in-process libav session, when [startInProcess] is used instead of FFmpeg. */
     @Volatile private var lavHandle = 0L
 
+    /** When set and true, the reader idles (no decode) while keeping the native session open — used to keep
+     *  the in-process LAV decoder warm while a display is parked out of render distance. Null = not parkable. */
+    @Volatile private var parked: AtomicBoolean? = null
+
     override fun textureFilled(): Boolean = surface.textureFilled()
 
-    override fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int) =
+    override fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int): Boolean =
         surface.updateFrame(texture, actualW, actualH, expectedW, expectedH)
 
-    override fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, actualW: Int, actualH: Int) =
+    override fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, actualW: Int, actualH: Int): Boolean =
         surface.updateFramePlanar(y, u, v, actualW, actualH, expectedW, expectedH)
 
     override fun clear() = surface.clear()
+
+    /** Drops parked raw buffers while preserving the already-uploaded GPU texture. */
+    override fun trimForPark() {
+        activePrebuffer?.trimForPark()
+        surface.clear()
+        popoutRgba = null
+    }
 
     override fun cleanup() = surface.cleanup()
 
@@ -104,8 +131,11 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
         }
         handle = hnd
         val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        val prebuffer = FramePrebuffer.createIfEnabled(
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+        ).also { activePrebuffer = it }
         return daemon(
-            { read(hnd, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos) },
+            { read(hnd, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
             "MediaPlayer-video",
         ).also { it.start() }
     }
@@ -117,13 +147,14 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
      */
     fun startInProcess(url: String, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, hwAccel: HwAccelBackend,
         stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
-        getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit, parkFlag: AtomicBoolean? = null,
     ): Thread? {
         if (!planarOutput) return null
         release()
         clear()
         expectedW = w
         expectedH = h
+        parked = parkFlag
         lastFrameReceivedNanos.set(System.nanoTime())
 
         val hnd = NativeMedia.lavOpen(url, w, h, seekOffsetNanos / 1_000L, lavHwCode(hwAccel))
@@ -132,11 +163,54 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
             return null
         }
         lavHandle = hnd
+        enableLavCache(hnd)
         val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        val prebuffer = FramePrebuffer.createIfEnabled(
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+        ).also { activePrebuffer = it }
         return daemon(
-            { read(0L, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos) },
+            { read(0L, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
             "MediaPlayer-video",
         ).also { it.start() }
+    }
+
+    /**
+     * Opens a local replay session from a packet-ring [snapshot] and starts the reader thread.
+     * Returns null when the replay ABI is unavailable or the snapshot cannot be opened.
+     */
+    fun startReplay(snapshot: ByteArray, w: Int, h: Int, resumeNanos: Long, sourceFps: Double,
+        stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
+        getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit,
+    ): Thread? {
+        if (!planarOutput || !NativeMedia.lavReplayCacheAvailable) return null
+        release()
+        clear()
+        expectedW = w
+        expectedH = h
+        lastFrameReceivedNanos.set(System.nanoTime())
+
+        val hnd = NativeMedia.lavOpenReplay(snapshot, w, h, resumeNanos)
+        if (hnd == 0L) {
+            logger.warn("$debugLabel Native replay session failed to open.")
+            return null
+        }
+        lavHandle = hnd
+        val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        val prebuffer = FramePrebuffer.createIfEnabled(
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+        ).also { activePrebuffer = it }
+        return daemon(
+            { read(0L, w, h, frameNs, resumeNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
+            "MediaPlayer-video-replay",
+        ).also { it.start() }
+    }
+
+    /** Captures the live LAV packet-ring snapshot, or null when no cache data is ready. */
+    fun lavCacheSnapshot(positionNanos: Long): ByteArray? {
+        if (cacheWindowMs <= 0 || cacheMaxBytes <= 0) return null
+        val lh = lavHandle
+        if (lh == 0L || !NativeMedia.lavReplayCacheAvailable) return null
+        return NativeMedia.lavRingSnapshot(lh, positionNanos)
     }
 
     /**
@@ -145,7 +219,7 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
      */
     private fun read(handle: Long, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
-        onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
     ) {
         // Planar mode carries I420 (w*h Y + two quarter-size chroma planes); brightness is
         // applied in the fragment shader instead of a CPU LUT pass.
@@ -167,6 +241,16 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
         val prerollMarginNs = maxOf(frameNs * 2L, LAV_PREROLL_MARGIN_NS)
         val metrics = NativeReadMetrics(debugLabel, if (lav) "lav" else "process", w, h, frameSize)
         while (!terminated.get() && !stopFlag.get()) {
+            // Parked (display out of render distance): idle without decoding, keeping the native session
+            // open so resuming reads the next frame instantly. Refresh the stall timestamp on wake.
+            val pk = parked
+            if (pk != null && pk.get()) {
+                while (pk.get() && !terminated.get() && !stopFlag.get()) {
+                    try { Thread.sleep(20) } catch (_: InterruptedException) { Thread.currentThread().interrupt(); break }
+                }
+                lastFrameReceivedNanos.set(System.nanoTime())
+                continue
+            }
             spare.clear()
             val readStartNs = System.nanoTime()
             var rawLavPtsNanos = NativeMedia.LAV_NO_PTS_NANOS
@@ -224,6 +308,23 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
                 continue
             }
 
+            feedPopout(spare, w, h, frameSize, metrics)
+
+            if (!MediaPlayer.captureSamples) {
+                if (MediaPlayer.DEBUG) metrics.recordNotPublished()
+                videoPts = framePts + frameNs
+                if (MediaPlayer.DEBUG) metrics.maybeLog()
+                continue
+            }
+
+            if (prebuffer != null) {
+                // Producer path: the jitter buffer's consumer thread paces and presents (and fires onFirstFrame).
+                spare = prebuffer.submit(spare, framePts, frameSize)
+                if (MediaPlayer.DEBUG) { MediaPlayer.samplesIn.incrementAndGet(); metrics.recordPublished(); metrics.maybeLog() }
+                videoPts = framePts + frameNs
+                continue
+            }
+
             val audioClock = getAudioClock()
             val avDiffNs = if (audioClock >= 0) framePts - audioClock else 0L
             if (FramePacing.pace(framePts, audioClock)) {
@@ -234,32 +335,6 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
                 continue
             }
             if (MediaPlayer.DEBUG) metrics.recordPaced(avDiffNs)
-
-            popoutFrameSink?.let { sink ->
-                val popoutStartNs = if (MediaPlayer.DEBUG) System.nanoTime() else 0L
-                if (planarOutput) {
-                    // The popout window consumes RGBA; convert the planar frame natively.
-                    val rgbaSize = w * h * 4
-                    val rgba = popoutRgba?.takeIf { it.capacity() >= rgbaSize }
-                        ?: surface.allocateFrameBuffer(rgbaSize).also { popoutRgba = it }
-                    rgba.clear()
-                    if (NativeMedia.i420ToRgba(spare, frameSize, rgba, w, h) == 0) {
-                        rgba.limit(rgbaSize).position(0)
-                        sink(rgba, w, h, UploadPixelFormat.RGBA32)
-                    }
-                    spare.rewind()
-                } else {
-                    sink(spare, w, h, outputFormat); spare.rewind()
-                }
-                if (MediaPlayer.DEBUG) metrics.recordPopout(System.nanoTime() - popoutStartNs)
-            }
-
-            if (!MediaPlayer.captureSamples) {
-                if (MediaPlayer.DEBUG) metrics.recordNotPublished()
-                videoPts = framePts + frameNs
-                if (MediaPlayer.DEBUG) metrics.maybeLog()
-                continue
-            }
 
             spare = surface.publish(spare, frameSize)
             if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
@@ -274,6 +349,16 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
             if (MediaPlayer.DEBUG) metrics.maybeLog()
         }
 
+        // On normal EOF (notably cached replay) let the consumer drain queued frames; abort only for
+        // teardown / errors. Otherwise replay decodes its whole snapshot, hits EOF, and discards the
+        // buffered bridge before live video is ready.
+        if (!terminated.get() && !stopFlag.get() && rc == NativeMedia.READ_EOF) {
+            prebuffer?.finish()
+        } else {
+            prebuffer?.abort()
+        }
+        if (activePrebuffer === prebuffer) activePrebuffer = null
+
         if (!terminated.get() && !stopFlag.get()) {
             if (MediaPlayer.DEBUG) metrics.logFinal(rc)
             if (lav) {
@@ -284,6 +369,39 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
                         && NativeMedia.videoExitCode(handle, EXIT_WAIT_MILLIS) == 0
                 onEos(stderr, normalEos)
             }
+        }
+    }
+
+    /** Feeds the current [spare] frame to the popout sink, converting planar I420 -> RGBA when needed. */
+    private fun feedPopout(spare: ByteBuffer, w: Int, h: Int, frameSize: Int, metrics: NativeReadMetrics) {
+        val sink = popoutFrameSink ?: return
+        val popoutStartNs = if (MediaPlayer.DEBUG) System.nanoTime() else 0L
+        if (planarOutput) {
+            // The popout window consumes RGBA; convert the planar frame natively
+            val rgbaSize = w * h * 4
+            val rgba = popoutRgba?.takeIf { it.capacity() >= rgbaSize }
+                ?: surface.allocateFrameBuffer(rgbaSize).also { popoutRgba = it }
+            rgba.clear()
+            if (NativeMedia.i420ToRgba(spare, frameSize, rgba, w, h) == 0) {
+                rgba.limit(rgbaSize).position(0)
+                sink(rgba, w, h, UploadPixelFormat.RGBA32)
+            }
+            spare.rewind()
+        } else {
+            sink(spare, w, h, outputFormat); spare.rewind()
+        }
+        if (MediaPlayer.DEBUG) metrics.recordPopout(System.nanoTime() - popoutStartNs)
+    }
+
+    /** Enables the native encoded-packet ring for a live LAV session when configured. */
+    private fun enableLavCache(handle: Long) {
+        if (cacheWindowMs <= 0 || cacheMaxBytes <= 0) return
+        val ok = NativeMedia.lavEnableCache(handle, cacheWindowMs, cacheMaxBytes)
+        if (MediaPlayer.DEBUG) {
+            logger.info(
+                "$debugLabel LAV packet cache ${if (ok) "enabled" else "unavailable"} " +
+                        "(windowMs=$cacheWindowMs maxBytes=$cacheMaxBytes).",
+            )
         }
     }
 
@@ -303,6 +421,7 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
      * joined (the handle must not be in use). Safe to call repeatedly.
      */
     fun release() {
+        parked = null
         val h = handle
         handle = 0L
         if (h != 0L) NativeMedia.videoClose(h)
@@ -318,7 +437,9 @@ internal class NativeVideoFramePipe(private val debugLabel: String) : FramePipe 
      */
     private fun lavHwCode(hwAccel: HwAccelBackend): Int {
         if (hwAccel == HwAccelBackend.NONE) return HwAccelBackend.NONE.lavCode
-        return when (System.getProperty("dreamdisplays.native.libav.hw", "auto").lowercase()) {
+        val configured = System.getProperty("dreamdisplays.native.libav.hw")?.lowercase()
+        val mode = configured ?: if (OsInfo.isMac) "none" else "auto"
+        return when (mode) {
             "auto" -> LAV_HW_AUTO
             "videotoolbox", "vt" -> HwAccelBackend.VIDEOTOOLBOX.lavCode
             "d3d11va", "d3d11" -> HwAccelBackend.D3D11VA.lavCode
