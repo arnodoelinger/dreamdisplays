@@ -1,6 +1,6 @@
 //! Optional in-process libav decode backend, shipped as its own cdylib so the main
 //! `dreamdisplays_native` library stays free of libav link dependencies (this one fails to
-//! load on machines without the FFmpeg shared libraries, and the JVM treats that as
+//! load on machines without the `FFmpeg` shared libraries, and the JVM treats that as
 //! "feature unavailable" instead of losing the whole native pipeline).
 //!
 //! One session replaces the video `FFmpeg` process: libavformat reads the network stream,
@@ -17,6 +17,7 @@
 //! ABI mirrors the main library's conventions: panic-safe entry points, opaque `i64`
 //! handles, blocking reads unblocked by `dd_lav_kill`.
 
+pub mod cache;
 pub mod session;
 pub mod surface;
 
@@ -26,7 +27,7 @@ use std::sync::OnceLock;
 use surface::{LavSurfaceDesc, SURFACE_ABI_VERSION};
 
 /// Bumped on any breaking change of this ABI.
-pub const LAV_ABI_VERSION: u32 = 2;
+pub const LAV_ABI_VERSION: u32 = 4;
 
 static SESSIONS: OnceLock<LavSessions> = OnceLock::new();
 
@@ -71,6 +72,32 @@ pub unsafe extern "C" fn dd_lav_open(
     catch_unwind(AssertUnwindSafe(|| {
         let url = String::from_utf8_lossy(bytes).into_owned();
         sessions().open(&url, w as usize, h as usize, start_micros, hw_accel)
+    }))
+    .unwrap_or(0)
+}
+
+/// Opens a replay decode session from a serialized packet-ring snapshot.
+///
+/// `resume_nanos` is the normalized playback timestamp to resume at; decoding starts from the
+/// nearest cached keyframe at or before it, and pre-roll frames older than it are discarded before
+/// they reach the caller. The returned handle is read with [`dd_lav_read_frame_i420_pts`] and closed
+/// with [`dd_lav_close`], same as a live session.
+///
+/// Safety: `blob` must point to `blob_len` readable bytes.
+#[no_mangle]
+pub unsafe extern "C" fn dd_lav_open_replay(
+    blob: *const u8,
+    blob_len: u64,
+    w: u32,
+    h: u32,
+    resume_nanos: i64,
+) -> i64 {
+    if blob.is_null() || blob_len == 0 || w == 0 || h == 0 {
+        return 0;
+    }
+    let bytes = std::slice::from_raw_parts(blob, blob_len as usize);
+    catch_unwind(AssertUnwindSafe(|| {
+        sessions().open_replay(bytes, w as usize, h as usize, resume_nanos)
     }))
     .unwrap_or(0)
 }
@@ -180,6 +207,66 @@ pub unsafe extern "C" fn dd_lav_error(handle: i64, dst: *mut u8, dst_len: u64) -
     }
     let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
     catch_unwind(AssertUnwindSafe(|| sessions().error(handle, dst))).unwrap_or(ERR_IO)
+}
+
+/// Enables the rolling encoded-packet cache on `handle`: retains roughly the most recent
+/// `window_ms` of stream (capped at `max_bytes`) for an instant, network-free resume on display
+/// reappearance. Capture starts with the next demuxed packet.
+///
+/// `window_ms = 0` or `max_bytes = 0` is a no-op. Returns 0 on success, negative on a bad handle.
+#[no_mangle]
+pub extern "C" fn dd_lav_enable_cache(handle: i64, window_ms: u32, max_bytes: u64) -> i32 {
+    if window_ms == 0 || max_bytes == 0 {
+        return ERR_BAD_ARGS;
+    }
+    let window_nanos = (window_ms as i64).saturating_mul(1_000_000);
+    let max_bytes = max_bytes.min(usize::MAX as u64) as usize;
+    catch_unwind(AssertUnwindSafe(|| {
+        sessions().enable_cache(handle, window_nanos, max_bytes)
+    }))
+    .unwrap_or(ERR_IO)
+}
+
+/// Copies the cache snapshot for `handle` into `dst` and returns the total blob length. When the
+/// return value exceeds `dst_len` nothing was copied: size a buffer to the returned length and call
+/// again (pass `dst_len = 0` first to query the size). Returns 0 when no cache/data is present.
+///
+/// The blob is self-contained (codec params + keyframe-aligned packets); the JVM retains it across a
+/// soft unload and later hands it to a replay session.
+///
+/// Safety: `dst` must point to `dst_len` writable bytes (or be null when `dst_len == 0`).
+#[no_mangle]
+pub unsafe extern "C" fn dd_lav_ring_snapshot(handle: i64, dst: *mut u8, dst_len: u64) -> i32 {
+    let dst_slice: &mut [u8] = if dst.is_null() || dst_len == 0 {
+        &mut []
+    } else {
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().snapshot(handle, dst_slice))).unwrap_or(ERR_IO)
+}
+
+/// Like [`dd_lav_ring_snapshot`], but the native side first tops the packet ring up toward
+/// `position_nanos + cache_window` by demuxing ahead. This is intended for display unload, where
+/// mutating the live demuxer is safe because the session is about to be closed.
+///
+/// Safety: `dst` must point to `dst_len` writable bytes (or be null when `dst_len == 0`).
+#[no_mangle]
+pub unsafe extern "C" fn dd_lav_ring_snapshot_at(
+    handle: i64,
+    position_nanos: i64,
+    dst: *mut u8,
+    dst_len: u64,
+) -> i32 {
+    let dst_slice: &mut [u8] = if dst.is_null() || dst_len == 0 {
+        &mut []
+    } else {
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    let top_up = dst_len == 0;
+    catch_unwind(AssertUnwindSafe(|| {
+        sessions().snapshot_at(handle, position_nanos, dst_slice, top_up)
+    }))
+    .unwrap_or(ERR_IO)
 }
 
 /// Interrupts the session's network/decode loop, unblocking any reader stuck in

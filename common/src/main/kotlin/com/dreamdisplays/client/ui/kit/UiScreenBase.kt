@@ -18,7 +18,7 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
 
     /**
      * Current downscale factor in (0, 1]; 1.0 means the window is large enough and nothing is scaled.
-     * Mouse coordinates are divided by this to map real → virtual space.
+     * Mouse coordinates are divided by this to map real -> virtual space.
      */
     protected var uiScale: Double = 1.0
         private set

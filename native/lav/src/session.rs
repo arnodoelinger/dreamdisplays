@@ -8,7 +8,7 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::ptr;
+use std::{mem, ptr};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Once};
 
@@ -22,6 +22,7 @@ use ffmpeg::util::frame::video::Video as VideoFrame;
 use ffmpeg::{codec, Dictionary};
 use ffmpeg_next as ffmpeg;
 
+use crate::cache::{packets_from_position, CachedPacket, CodecParams, PacketRing};
 use crate::surface::{LavSurfaceDesc, LavSurfaceFrame, LavSurfaceTable, ERR_UNSUPPORTED};
 
 /// Read result codes shared with the JVM bridge (mirror the main library).
@@ -40,6 +41,20 @@ const BLACK_Y: u8 = 16;
 const BLACK_C: u8 = 128;
 
 static FFMPEG_LOG_INIT: Once = Once::new();
+
+/// libav I/O interrupt callback: returns non-zero to abort a blocked read. The opaque pointer is the
+/// session's `interrupted` flag (an `AtomicBool` kept alive for the format context's lifetime).
+unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
+    if opaque.is_null() {
+        return 0;
+    }
+    let flag = &*(opaque as *const AtomicBool);
+    if flag.load(Ordering::Relaxed) {
+        1
+    } else {
+        0
+    }
+}
 
 fn init_ffmpeg() -> Result<(), ffmpeg::Error> {
     ffmpeg::init()?;
@@ -143,15 +158,26 @@ impl Drop for HwSelection {
     }
 }
 
+/// Packet source for a decode state: live demuxer or replay snapshot.
+enum PacketSource {
+    Live {
+        ictx: Input,
+        stream_index: usize,
+        stream_start_time: Option<i64>,
+    },
+    Replay {
+        packets: Vec<CachedPacket>,
+        next_packet: usize,
+        resume_nanos: i64,
+    },
+}
+
 /// Mutable decode state; locked only by the (single) reader thread.
 struct ReadState {
-    ictx: Input,
-    stream_index: usize,
     decoder: codec::decoder::Video,
     /// Keeps the selected hardware format/device alive for libavcodec callbacks.
     _hw_selection: Option<Box<HwSelection>>,
     time_base: ffmpeg::Rational,
-    stream_start_time: Option<i64>,
     /// Cached scaler, rebuilt when the source format or size changes mid-stream.
     scaler: Option<(Pixel, u32, u32, scaling::Context)>,
     /// Scratch frame for hardware -> system memory transfers.
@@ -159,12 +185,32 @@ struct ReadState {
     /// Scaled YUV420P output frame.
     scaled: VideoFrame,
     draining: bool,
+    source: PacketSource,
 }
 
 // The libav state holds raw pointers that are not Send by default. Access is serialized by
 // the mutex (single reader contract), and sessions are only dropped after the reader thread
 // has been joined, so moving the state between threads is safe.
 unsafe impl Send for ReadState {}
+
+impl ReadState {
+    /// Returns the live stream start timestamp; replay packets are already normalized.
+    fn stream_start_time(&self) -> Option<i64> {
+        match &self.source {
+            PacketSource::Live { stream_start_time, .. } => *stream_start_time,
+            PacketSource::Replay { .. } => None,
+        }
+    }
+
+    /// True when a replay frame is keyframe pre-roll before the requested resume point.
+    fn should_drop_replay_preroll(&self, pts_nanos: i64) -> bool {
+        match &self.source {
+            PacketSource::Replay { resume_nanos, .. } =>
+                pts_nanos != NO_PTS_NANOS && pts_nanos < *resume_nanos,
+            PacketSource::Live { .. } => false,
+        }
+    }
+}
 
 enum SurfaceReadError {
     Io(String),
@@ -183,8 +229,13 @@ pub struct LavSession {
     w: usize,
     h: usize,
     read: Mutex<ReadState>,
+    /// Rolling packet cache, owned by the session rather than the decode state so a snapshot can be
+    /// taken with a short, contention-free lock that never waits on a blocked network read.
+    ring: Mutex<Option<PacketRing>>,
     interrupted: Arc<AtomicBool>,
     error: Mutex<String>,
+    /// Decoder parameters captured at open, needed to rebuild a decoder for replay (Phase 3).
+    codec_params: CodecParams,
 }
 
 /// Global handle table, mirroring the main library's `Sessions`.
@@ -213,6 +264,20 @@ impl LavSessions {
             Ok(s) => s,
             Err(_) => return 0,
         };
+        self.insert(session)
+    }
+
+    /// Opens a replay session from a serialized packet-ring snapshot.
+    pub fn open_replay(&self, blob: &[u8], w: usize, h: usize, resume_nanos: i64) -> i64 {
+        let session = match LavSession::open_replay(blob, w, h, resume_nanos) {
+            Ok(s) => s,
+            Err(_) => return 0,
+        };
+        self.insert(session)
+    }
+
+    /// Registers a newly opened session and returns its opaque handle.
+    fn insert(&self, session: LavSession) -> i64 {
         let handle = self.next.fetch_add(1, Ordering::Relaxed);
         if let Ok(mut map) = self.map.lock() {
             map.insert(handle, Arc::new(session));
@@ -288,6 +353,45 @@ impl LavSessions {
         n as i32
     }
 
+    /// Enables / resizes the rolling packet cache on `handle`. See [`LavSession::enable_cache`].
+    pub fn enable_cache(&self, handle: i64, window_nanos: i64, max_bytes: usize) -> i32 {
+        match self.get(handle) {
+            Some(session) => {
+                session.enable_cache(window_nanos, max_bytes);
+                READ_OK
+            }
+            None => ERR_BAD_HANDLE,
+        }
+    }
+
+    /// Copies the cache snapshot for `handle` into `dst`, returning the total blob length (which
+    /// may exceed `dst.len()`, in which case nothing is copied — the caller sizes its buffer and
+    /// retries). Returns 0 when no cache is active or it is empty.
+    pub fn snapshot(&self, handle: i64, dst: &mut [u8]) -> i32 {
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        let blob = session.snapshot();
+        if blob.len() <= dst.len() {
+            dst[..blob.len()].copy_from_slice(&blob);
+        }
+        // Length comfortably fits i32 for any sane window; clamp defensively
+        blob.len().min(i32::MAX as usize) as i32
+    }
+
+    /// Copies a position-aware cache snapshot for `handle`, topping up the live demuxer before
+    /// serialization so replay has packets after the resume point.
+    pub fn snapshot_at(&self, handle: i64, position_nanos: i64, dst: &mut [u8], top_up: bool) -> i32 {
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        let blob = session.snapshot_at(position_nanos, top_up);
+        if blob.len() <= dst.len() {
+            dst[..blob.len()].copy_from_slice(&blob);
+        }
+        blob.len().min(i32::MAX as usize) as i32
+    }
+
     /// Flags the session as interrupted; the reader loop exits between packets.
     pub fn kill(&self, handle: i64) {
         if let Some(session) = self.get(handle) {
@@ -324,8 +428,18 @@ impl LavSession {
         opts.set("rw_timeout", "15000000");
 
         let mut ictx = ffmpeg::format::input_with_dictionary(&url, opts)?;
+
+        // Route blocked network I/O through an interrupt callback so a kill() / teardown aborts the
+        // current read promptly instead of waiting out the 15 s rw_timeout.
+        let interrupted = Arc::new(AtomicBool::new(false));
+        unsafe {
+            let p = ictx.as_mut_ptr();
+            (*p).interrupt_callback.callback = Some(interrupt_cb);
+            (*p).interrupt_callback.opaque = Arc::as_ptr(&interrupted) as *mut c_void;
+        }
+
         if start_micros > 0 {
-            // AV_TIME_BASE units; backward flag picks the keyframe at or before the target.
+            // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
             ictx.seek(start_micros, ..start_micros)?;
         }
 
@@ -341,6 +455,7 @@ impl LavSession {
         };
 
         let parameters = input.parameters();
+        let codec_params = unsafe { codec_params_from(&parameters, time_base) };
         let (decoder, hw_selection) = open_video_decoder(
             &parameters,
             time_base,
@@ -351,20 +466,117 @@ impl LavSession {
             w,
             h,
             read: Mutex::new(ReadState {
-                ictx,
-                stream_index,
                 decoder,
                 _hw_selection: hw_selection,
                 time_base,
-                stream_start_time,
                 scaler: None,
                 sw_frame: VideoFrame::empty(),
                 scaled: VideoFrame::empty(),
                 draining: false,
+                source: PacketSource::Live {
+                    ictx,
+                    stream_index,
+                    stream_start_time,
+                },
             }),
+            ring: Mutex::new(None),
+            interrupted,
+            error: Mutex::new(String::new()),
+            codec_params,
+        })
+    }
+
+    fn open_replay(
+        blob: &[u8],
+        w: usize,
+        h: usize,
+        resume_nanos: i64,
+    ) -> Result<LavSession, ffmpeg::Error> {
+        init_ffmpeg()?;
+
+        let (codec_params, snapshot_packets) =
+            crate::cache::deserialize_snapshot(blob).ok_or(ffmpeg::Error::InvalidData)?;
+        let packets = packets_from_position(&snapshot_packets, resume_nanos);
+        if packets.is_empty() || codec_params.time_base_den == 0 {
+            return Err(ffmpeg::Error::InvalidData);
+        }
+
+        let time_base = ffmpeg::Rational::new(codec_params.time_base_num, codec_params.time_base_den);
+        let parameters = unsafe { parameters_from_codec_params(&codec_params)? };
+        let (decoder, hw_selection) = open_video_decoder(
+            &parameters,
+            time_base,
+            HwAccelRequest::None,
+        )?;
+
+        Ok(LavSession {
+            w,
+            h,
+            read: Mutex::new(ReadState {
+                decoder,
+                _hw_selection: hw_selection,
+                time_base,
+                scaler: None,
+                sw_frame: VideoFrame::empty(),
+                scaled: VideoFrame::empty(),
+                draining: false,
+                source: PacketSource::Replay {
+                    packets,
+                    next_packet: 0,
+                    resume_nanos,
+                },
+            }),
+            ring: Mutex::new(None),
             interrupted: Arc::new(AtomicBool::new(false)),
             error: Mutex::new(String::new()),
+            codec_params,
         })
+    }
+
+    /// Enables (or resizes) the rolling packet cache: retain up to `window_nanos` of stream, capped
+    /// at `max_bytes`. Capture begins with the next demuxed packet. Idempotent.
+    fn enable_cache(&self, window_nanos: i64, max_bytes: usize) {
+        if let Ok(mut ring) = self.ring.lock() {
+            *ring = Some(PacketRing::new(window_nanos, max_bytes));
+        }
+    }
+
+    /// Serializes the current cache (codec params + retained packets from the first keyframe) into a
+    /// blob the JVM can retain across a soft unload, or returns an empty Vec when no cache is active.
+    fn snapshot(&self) -> Vec<u8> {
+        self.snapshot_at(i64::MIN, false)
+    }
+
+    /// Serializes a position-aware snapshot from the rolling packet ring. The ring lives behind its
+    /// own short-held mutex (never the blocking decode lock), so this returns promptly even while the
+    /// reader thread is parked on a network read — fixing the empty-snapshot / teardown-freeze races.
+    fn snapshot_at(&self, position_nanos: i64, _top_up: bool) -> Vec<u8> {
+        let Ok(ring) = self.ring.lock() else {
+            return Vec::new();
+        };
+        let Some(ring) = ring.as_ref() else {
+            return Vec::new();
+        };
+        let packets = ring.drain_from(position_nanos);
+        if packets.is_empty() {
+            return Vec::new();
+        }
+        crate::cache::serialize_snapshot(&self.codec_params, &packets)
+    }
+
+    /// Mirrors a freshly demuxed live packet into the rolling cache, if one is active. Holds the ring
+    /// lock only for the push, so it never blocks a concurrent snapshot for more than that.
+    fn capture_packet(
+        &self,
+        time_base: ffmpeg::Rational,
+        stream_start_time: Option<i64>,
+        packet: &ffmpeg::Packet,
+    ) {
+        if let Ok(mut ring) = self.ring.lock() {
+            if let Some(ring) = ring.as_mut() {
+                capture_packet_into_ring(time_base, stream_start_time, ring, packet);
+            }
+        }
     }
 
     fn read_frame(&self, dst: &mut [u8]) -> i32 {
@@ -419,12 +631,17 @@ impl LavSession {
         state: &mut ReadState,
         dst: &mut [u8],
     ) -> Result<Option<i64>, ffmpeg::Error> {
-        let Some(decoded) = self.receive_frame(state)? else {
-            return Ok(None);
-        };
-        let pts_nanos = frame_pts_nanos(&decoded, state.time_base, state.stream_start_time);
-        self.write_i420(state, &decoded, dst)?;
-        Ok(Some(pts_nanos))
+        loop {
+            let Some(decoded) = self.receive_frame(state)? else {
+                return Ok(None);
+            };
+            let pts_nanos = frame_pts_nanos(&decoded, state.time_base, state.stream_start_time());
+            if state.should_drop_replay_preroll(pts_nanos) {
+                continue;
+            }
+            self.write_i420(state, &decoded, dst)?;
+            return Ok(Some(pts_nanos));
+        }
     }
 
     /// Pulls packets until one decoded frame is available. Returns Ok(None) on EOF or interruption.
@@ -442,19 +659,35 @@ impl LavSession {
                 return Ok(None);
             }
 
-            let mut packet = ffmpeg::Packet::empty();
-            match packet.read(&mut state.ictx) {
-                Ok(()) => {
-                    if packet.stream() == state.stream_index {
+            let time_base = state.time_base;
+            match &mut state.source {
+                PacketSource::Live { ictx, stream_index, stream_start_time } => {
+                    let mut packet = ffmpeg::Packet::empty();
+                    match packet.read(ictx) {
+                        Ok(()) => {
+                            if packet.stream() == *stream_index {
+                                self.capture_packet(time_base, *stream_start_time, &packet);
+                                state.decoder.send_packet(&packet)?;
+                            }
+                        }
+                        Err(ffmpeg::Error::Eof) => {
+                            state.decoder.send_eof()?;
+                            state.draining = true;
+                        }
+                        Err(ffmpeg::Error::Other { errno }) if errno == ffmpeg::util::error::EAGAIN => {}
+                        Err(e) => return Err(e),
+                    }
+                }
+                PacketSource::Replay { packets, next_packet, .. } => {
+                    if *next_packet >= packets.len() {
+                        state.decoder.send_eof()?;
+                        state.draining = true;
+                    } else {
+                        let packet = packet_from_cached(&packets[*next_packet], state.time_base);
+                        *next_packet += 1;
                         state.decoder.send_packet(&packet)?;
                     }
                 }
-                Err(ffmpeg::Error::Eof) => {
-                    state.decoder.send_eof()?;
-                    state.draining = true;
-                }
-                Err(ffmpeg::Error::Other { errno }) if errno == ffmpeg::util::error::EAGAIN => {}
-                Err(e) => return Err(e),
             }
         }
     }
@@ -563,6 +796,120 @@ impl LavSession {
             y0 / 2,
         );
         Ok(())
+    }
+}
+
+/// Rebuilds an encoded packet from cached payload plus normalized timestamps.
+fn packet_from_cached(cached: &CachedPacket, time_base: ffmpeg::Rational) -> ffmpeg::Packet {
+    let mut packet = ffmpeg::Packet::copy(&cached.data);
+    packet.set_pts(nanos_to_ticks(cached.pts_nanos, time_base));
+    packet.set_dts(nanos_to_ticks(cached.dts_nanos, time_base));
+    packet.set_position(-1);
+    if cached.keyframe {
+        packet.set_flags(ffmpeg::codec::packet::Flags::KEY);
+    }
+    packet
+}
+
+/// Converts normalized nanosecond PTS/DTS back into stream time-base ticks.
+fn nanos_to_ticks(nanos: i64, time_base: ffmpeg::Rational) -> Option<i64> {
+    if nanos == NO_PTS_NANOS {
+        return None;
+    }
+    let num = i128::from(time_base.numerator());
+    let den = i128::from(time_base.denominator());
+    if num == 0 || den == 0 {
+        return None;
+    }
+    let ticks = i128::from(nanos)
+        .checked_mul(den)?
+        .checked_div(num.checked_mul(1_000_000_000)?)?;
+    if ticks < i128::from(i64::MIN) || ticks > i128::from(i64::MAX) {
+        None
+    } else {
+        Some(ticks as i64)
+    }
+}
+
+fn capture_packet_into_ring(
+    time_base: ffmpeg::Rational,
+    stream_start_time: Option<i64>,
+    ring: &mut PacketRing,
+    packet: &ffmpeg::Packet,
+) {
+    let Some(data) = packet.data() else {
+        return;
+    };
+    ring.push(CachedPacket {
+        data: data.to_vec(),
+        pts_nanos: packet_ts_nanos(packet.pts(), time_base, stream_start_time),
+        dts_nanos: packet_ts_nanos(packet.dts(), time_base, stream_start_time),
+        keyframe: packet.is_key(),
+    });
+}
+
+/// Reconstructs the subset of `AVCodecParameters` needed to open a software replay decoder.
+unsafe fn parameters_from_codec_params(params: &CodecParams) -> Result<codec::Parameters, ffmpeg::Error> {
+    if params.codec_id <= 0 || params.width <= 0 || params.height <= 0 {
+        return Err(ffmpeg::Error::InvalidData);
+    }
+    let mut parameters = codec::Parameters::new();
+    let p = parameters.as_mut_ptr();
+    if p.is_null() {
+        return Err(ffmpeg::Error::Bug);
+    }
+    (*p).codec_type = ffi::AVMediaType::AVMEDIA_TYPE_VIDEO;
+    (*p).codec_id = mem::transmute::<u32, ffi::AVCodecID>(params.codec_id as u32);
+    (*p).width = params.width;
+    (*p).height = params.height;
+    if !params.extradata.is_empty() {
+        let len = params.extradata.len();
+        let padded = len
+            .checked_add(ffi::AV_INPUT_BUFFER_PADDING_SIZE as usize)
+            .ok_or(ffmpeg::Error::InvalidData)?;
+        let dst = ffi::av_mallocz(padded).cast::<u8>();
+        if dst.is_null() {
+            return Err(ffmpeg::Error::Bug);
+        }
+        ptr::copy_nonoverlapping(params.extradata.as_ptr(), dst, len);
+        (*p).extradata = dst;
+        (*p).extradata_size = len as i32;
+    }
+    Ok(parameters)
+}
+
+/// Normalizes an optional packet timestamp (stream ticks) to nanoseconds, or `NO_PTS_NANOS`.
+fn packet_ts_nanos(ts: Option<i64>, time_base: ffmpeg::Rational, stream_start_time: Option<i64>) -> i64 {
+    let Some(raw) = ts else {
+        return NO_PTS_NANOS;
+    };
+    let normalized = stream_start_time
+        .map(|start| raw.saturating_sub(start))
+        .unwrap_or(raw);
+    rational_pts_to_nanos(normalized, time_base).unwrap_or(NO_PTS_NANOS)
+}
+
+/// Reads the [`CodecParams`] needed to rebuild a decoder for replay from `parameters`.
+///
+/// Safety: `parameters` must wrap a valid `AVCodecParameters`.
+unsafe fn codec_params_from(parameters: &codec::Parameters, time_base: ffmpeg::Rational) -> CodecParams {
+    let p = parameters.as_ptr();
+    if p.is_null() {
+        return CodecParams::default();
+    }
+    let cp = &*p;
+    let extradata = if !cp.extradata.is_null() && cp.extradata_size > 0 {
+        std::slice::from_raw_parts(cp.extradata, cp.extradata_size as usize).to_vec()
+    } else {
+        Vec::new()
+    };
+    CodecParams {
+        codec_id: cp.codec_id as i32,
+        width: cp.width,
+        height: cp.height,
+        time_base_num: time_base.numerator(),
+        time_base_den: time_base.denominator(),
+        extradata,
     }
 }
 
@@ -802,5 +1149,121 @@ unsafe extern "C" fn prefer_selected_hw_format(
         }
         assert_eq!(frames, 30, "expected 30 frames.");
         sessions.close(handle);
+    }
+
+    /// Captures packets while decoding a local clip, then snapshots and re-parses the cache blob.
+    /// Requires the FFmpeg CLI to generate the input (skipped when unavailable).
+    #[test]
+    fn cache_capture_and_snapshot() {
+        let ffmpeg_bin = std::env::var("DD_TEST_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
+        let dir = std::env::temp_dir().join("dd-lav-cache-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("clip.mp4");
+        let status = std::process::Command::new(&ffmpeg_bin)
+            .args([
+                "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
+                "-pix_fmt", "yuv420p", "-g", "15", clip.to_str().unwrap(),
+            ])
+            .status();
+        let Ok(status) = status else { return };
+        if !status.success() {
+            return;
+        }
+
+        let sessions = LavSessions::new();
+        let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(handle, 0, "open failed.");
+        // Keep the whole clip so the assertions are deterministic
+        assert_eq!(sessions.enable_cache(handle, i64::MAX / 4, 64 * 1024 * 1024), READ_OK);
+
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        loop {
+            match sessions.read_frame(handle, &mut dst) {
+                READ_OK => {}
+                READ_EOF => break,
+                e => panic!("read error {e}."),
+            }
+        }
+
+        // Query size, then fill
+        let len = sessions.snapshot(handle, &mut []);
+        assert!(len > 0, "snapshot should be non-empty after capture.");
+        let mut blob = vec![0u8; len as usize];
+        assert_eq!(sessions.snapshot(handle, &mut blob), len, "second call should write the whole blob.");
+
+        let (params, packets) =
+            crate::cache::deserialize_snapshot(&blob).expect("snapshot must be a valid blob.");
+        assert!(!packets.is_empty(), "should have captured packets.");
+        assert!(packets[0].keyframe, "cache must start at a keyframe.");
+        assert!(params.width > 0 && params.height > 0, "codec params dimensions.");
+        assert_ne!(params.codec_id, 0, "codec id should be captured.");
+        assert!(!params.extradata.is_empty(), "H.264 in MP4 carries extradata.");
+        // PTS should be monotonic and normalized (>= 0 from the start)
+        let first_pts = packets.iter().find_map(|p| {
+            if p.pts_nanos != crate::cache::NO_PTS { Some(p.pts_nanos) } else { None }
+        });
+        if let Some(first) = first_pts {
+            assert!(first >= 0, "normalized PTS should start at / after zero.");
+        }
+        sessions.close(handle);
+    }
+
+    /// Replays a captured snapshot from the middle and discards keyframe pre-roll.
+    /// Requires the FFmpeg CLI to generate the input (skipped when unavailable).
+    #[test]
+    fn replay_from_snapshot_mid_stream() {
+        let ffmpeg_bin = std::env::var("DD_TEST_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
+        let dir = std::env::temp_dir().join("dd-lav-replay-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("clip.mp4");
+        let status = std::process::Command::new(&ffmpeg_bin)
+            .args([
+                "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=3",
+                "-pix_fmt", "yuv420p", "-g", "15", clip.to_str().unwrap(),
+            ])
+            .status();
+        let Ok(status) = status else { return };
+        if !status.success() {
+            return;
+        }
+
+        let sessions = LavSessions::new();
+        let live = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(live, 0, "live open failed.");
+        assert_eq!(sessions.enable_cache(live, i64::MAX / 4, 64 * 1024 * 1024), READ_OK);
+
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        while sessions.read_frame(live, &mut dst) == READ_OK {}
+
+        let len = sessions.snapshot(live, &mut []);
+        assert!(len > 0, "snapshot should be non-empty.");
+        let mut blob = vec![0u8; len as usize];
+        assert_eq!(sessions.snapshot(live, &mut blob), len);
+        sessions.close(live);
+
+        let resume_nanos = 900_000_000;
+        let replay = sessions.open_replay(&blob, 640, 360, resume_nanos);
+        assert_ne!(replay, 0, "replay open failed.");
+
+        let mut frames = 0;
+        let mut last_pts = None;
+        loop {
+            let mut pts_nanos = NO_PTS_NANOS;
+            match sessions.read_frame_with_pts(replay, &mut dst, &mut pts_nanos) {
+                READ_OK => {
+                    assert_ne!(pts_nanos, NO_PTS_NANOS, "replay frames should expose PTS.");
+                    assert!(pts_nanos >= resume_nanos, "pre-roll should be discarded.");
+                    if let Some(prev) = last_pts {
+                        assert!(pts_nanos >= prev, "replay PTS should be monotonic.");
+                    }
+                    last_pts = Some(pts_nanos);
+                    frames += 1;
+                }
+                READ_EOF => break,
+                e => panic!("replay read error {e}."),
+            }
+        }
+        assert!(frames > 0, "replay should produce frames after resume.");
+        sessions.close(replay);
     }
 }

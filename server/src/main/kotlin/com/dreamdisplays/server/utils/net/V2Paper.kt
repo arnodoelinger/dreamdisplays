@@ -2,20 +2,24 @@ package com.dreamdisplays.server.utils.net
 
 import com.dreamdisplays.protocol.ClientHello
 import com.dreamdisplays.protocol.DisplayDelete
-import com.dreamdisplays.protocol.DisplaySync
 import com.dreamdisplays.protocol.DreamPacket
 import com.dreamdisplays.protocol.PacketRegistry
+import com.dreamdisplays.protocol.PlaybackAction
+import com.dreamdisplays.protocol.PlaybackCommand
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.ReportDisplay
 import com.dreamdisplays.protocol.RequestSync
 import com.dreamdisplays.protocol.ServerHello
 import com.dreamdisplays.protocol.SetDisplaysEnabled
 import com.dreamdisplays.protocol.SetLocked
+import com.dreamdisplays.protocol.SetMode
 import com.dreamdisplays.protocol.SetVideo
+import com.dreamdisplays.protocol.WatchPartyAction
+import com.dreamdisplays.protocol.WatchPartyControl
+import com.dreamdisplays.protocol.WatchPartyStart
 import com.dreamdisplays.server.Main
-import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
-import com.dreamdisplays.server.managers.StateManager
 import io.github.arsmotorin.ofrat.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
@@ -50,6 +54,7 @@ const val V2_CHANNEL: String = "dreamdisplays:v2"
         isPremium = player.hasPermission(Main.config.permissions.premium),
         isAdmin = player.hasPermission(Main.config.permissions.delete),
         isReportingEnabled = Main.config.settings.webhookUrl.isNotEmpty(),
+        allowedFeatures = PLAYBACK_FEATURES,
     )
 
     /** Decodes an envelope frame and dispatches the packet; unknown type ids are skipped. */
@@ -61,19 +66,26 @@ const val V2_CHANNEL: String = "dreamdisplays:v2"
 
         when (packet) {
             is ClientHello -> handleHello(player, packet)
-            is DisplaySync -> StateManager.processSyncPacket(
-                SyncData(packet.id, packet.isSync, packet.isPaused, packet.currentTimeMs, packet.durationMs),
-                player,
-            )
-            is RequestSync -> StateManager.sendSyncPacket(packet.id, player)
+            is RequestSync -> DisplayActions.requestSync(player, packet.id)
             is DisplayDelete -> DisplayActions.delete(player, packet.id)
             is ReportDisplay -> DisplayManager.report(packet.id, player)
             is SetVideo -> DisplayActions.setVideo(player, packet.id, packet.url, packet.lang)
             is SetLocked -> DisplayActions.setLocked(player, packet.id, packet.locked)
+            is SetMode -> DisplayActions.setMode(player, packet.id, PlaybackMode.fromWire(packet.mode), packet.positionMs)
+            is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
+                DisplayActions.playbackCommand(player, packet.id, it, packet.positionMs)
+            }
+            is WatchPartyStart -> DisplayActions.watchPartyStart(player, packet.id, packet.url, packet.lang)
+            is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
+                DisplayActions.watchPartyControl(player, packet.id, it, packet.positionMs)
+            }
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }
     }
+
+    /** v2 feature flags advertised to clients so they only surface modes / parties on capable servers. */
+    private val PLAYBACK_FEATURES = listOf("modes", "watch_party", "broadcast")
 
     /**
      * Marks [player] as a v2 peer, replies with the [ServerHello] and the display batch, and runs

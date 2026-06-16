@@ -60,7 +60,7 @@ object ScreenRenderer : ClientRenderService {
     fun render(stack: PoseStack, camera: Camera, drawQuad: QuadRenderer) {
         val cameraPos = camera.position()
         for (displayScreen in DisplayRegistry.getScreens()) {
-            if (!displayScreen.hasTexture) continue
+            if (displayScreen.isDormant || !displayScreen.hasTexture) continue
 
             stack.pushPose()
 

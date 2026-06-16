@@ -83,9 +83,30 @@ object ClientTickManager {
 
         for (displayScreen in DisplayRegistry.getScreens()) {
             val outOfRange = displayScreen.renderDistance < displayScreen.getDistanceToScreen(playerPos)
-            if ((outOfRange || !ClientStateManager.displaysEnabled) && !displayScreen.isPopoutActive) {
-                DisplayRegistry.saveScreenData(displayScreen)
-                DisplayRegistry.unregisterScreen(displayScreen)
+            val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) && !displayScreen.isPopoutActive
+
+            // Already parked warm: wake it when back in range, or tear it down once it has been dormant
+            // past the pool TTL (freeing its decoder + texture; the snapshot cache then bridges a return).
+            if (displayScreen.isDormant) {
+                when {
+                    !shouldUnload -> displayScreen.wake()
+                    displayScreen.dormantExpired(WarmParkPolicy.ttlNanos) -> compressDormant(displayScreen)
+                    displayScreen.dormantExpired(WarmParkPolicy.demoteAfterNanos) -> compressDormant(displayScreen)
+                }
+                continue
+            }
+
+            if (shouldUnload) {
+                // Keep a bounded pool of Local VOD displays warm (decoder + audio open, frozen), so walking
+                // back is instant. Older / out-of-budget warm parks are compressed into replay snapshots.
+                // Only the natural "left render distance" case parks; disabling displays tears down fully.
+                val warmEligible = outOfRange && ClientStateManager.displaysEnabled
+                if (warmEligible && displayScreen.canWarmPark() && reserveWarmSlot(displayScreen)) {
+                    displayScreen.goDormant()
+                } else {
+                    DisplayRegistry.saveScreenData(displayScreen)
+                    DisplayRegistry.unregisterScreen(displayScreen)
+                }
                 if (hoveredDisplayScreen === displayScreen) {
                     hoveredDisplayScreen = null
                     ClientStateManager.isOnScreen = false
@@ -100,7 +121,7 @@ object ClientTickManager {
         }
 
         // The menu-open button comes from the KeyBindingRegistry; the click itself is routed
-        // through the InputHandler chain (DisplayMenuInputHandler consumes sneak+click-on-display).
+        // through the InputHandler chain (DisplayMenuInputHandler consumes sneak + click-on-display).
         val window = minecraft.window.handle()
         val menuButton = DreamServices.registry.getOrNull<KeyBindingRegistry>()
             ?.findById(DisplayMenuInputHandler.OPEN_MENU_BINDING_ID)?.defaultKey
@@ -121,6 +142,24 @@ object ClientTickManager {
             player.removeEffect(MobEffects.BLINDNESS)
             wasFocused = false
         }
+    }
+
+    /** Frees a fully warm dormant display, keeping only its cheap replay snapshot for fast reappearance. */
+    private fun compressDormant(displayScreen: DisplayScreen) {
+        DisplayRegistry.saveScreenData(displayScreen)
+        DisplayRegistry.unregisterScreen(displayScreen)
+    }
+
+    /** Ensures there is budget for [candidate], evicting oldest parked displays into snapshots when needed. */
+    private fun reserveWarmSlot(candidate: DisplayScreen): Boolean {
+        if (WarmParkPolicy.maxFullWarmDisplays <= 0) return false
+        repeat(WarmParkPolicy.maxFullWarmDisplays + 1) {
+            val dormant = DisplayRegistry.dormantScreens()
+            if (WarmParkPolicy.fits(dormant, candidate)) return true
+            val victim = dormant.minByOrNull { it.dormantSinceNanos() } ?: return false
+            compressDormant(victim)
+        }
+        return false
     }
 
     /** Emits [DisplayInteraction.Looked] / [DisplayInteraction.LookedAway] when the crosshair target changes. */

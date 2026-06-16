@@ -1,6 +1,7 @@
 package com.dreamdisplays.displays.store
 
 import com.dreamdisplays.api.DisplayFacing
+import com.dreamdisplays.protocol.PlaybackMode
 import java.util.UUID
 
 /**
@@ -23,7 +24,7 @@ class FullDisplayData(
     var quality: String,
     var brightness: Float,
     var muted: Boolean,
-    var isSync: Boolean,
+    var mode: PlaybackMode?,
     var ownerUuid: UUID,
     var renderDistance: Int = 96,
     var currentTimeNanos: Long = 0,

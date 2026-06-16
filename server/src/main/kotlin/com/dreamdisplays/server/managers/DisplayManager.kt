@@ -13,6 +13,8 @@ import com.dreamdisplays.server.datatypes.PaperDisplayData
 import com.dreamdisplays.server.datatypes.PaperSelectionData
 import com.dreamdisplays.server.meta.Scheduler.runAsync
 import com.dreamdisplays.server.meta.Scheduler.runSync
+import com.dreamdisplays.server.playback.TimelineManager
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.RegionUtil
 import com.dreamdisplays.server.utils.RegionUtil.calculateRegion
@@ -148,6 +150,7 @@ import java.util.function.Consumer
             players as MutableList<Player?>,
             display.id, display.ownerId, display.box.min, display.width, display.height,
             display.url, display.lang, display.facing, display.isSync, display.isLocked,
+            display.mode, display.qualityCap,
         )
     }
 
@@ -170,6 +173,8 @@ import java.util.function.Consumer
         runAsync { getInstance().storage.deleteDisplay(displayData) }
         @Suppress("UNCHECKED_CAST")
         sendDelete(getReceivers(displayData) as MutableList<Player?>, displayData.id)
+        TimelineManager.remove(displayData.id)
+        WatchPartyManager.remove(displayData.id)
         displays.remove(displayData.id)
     }
 
@@ -296,6 +301,8 @@ import java.util.function.Consumer
     /** Removes [data] from storage and the registry. */
     @FabricOnly fun delete(data: FabricDisplayData) {
         displays.remove(data.id)
+        TimelineManager.remove(data.id)
+        WatchPartyManager.remove(data.id)
         Server.storage?.deleteDisplay(data)
     }
 

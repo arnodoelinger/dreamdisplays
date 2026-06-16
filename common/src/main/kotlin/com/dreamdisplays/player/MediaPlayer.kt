@@ -11,6 +11,7 @@ import com.dreamdisplays.player.pipeline.PlaybackClock
 import com.dreamdisplays.player.policy.RetryPolicy
 import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.player.preparation.MediaPreparationService
+import com.dreamdisplays.player.preparation.PreparedMedia
 import com.dreamdisplays.player.stream.MediaStreamSelector
 import com.dreamdisplays.player.stream.ActiveStreams
 import com.dreamdisplays.player.util.MediaUtil
@@ -44,7 +45,16 @@ class MediaPlayer(
     private val youtubeUrl: String,
     private val lang: String,
     private val displayScreen: DisplayScreen,
+    private val replayBootstrap: ReplayBootstrap? = null,
 ) {
+    /** One-shot native packet-cache bootstrap used when a local display reappears.
+     *  [audioPcm] is the cached raw PCM for the same window, played during the bridge (null = silent bridge). */
+    data class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long, val audioPcm: ByteArray? = null) {
+        /** Cached resolved streams for this URL, reused on reappear to skip the network `prepare()` so the
+         *  live source warms in ~decoder-open time instead of ~seconds (null = none / re-resolve). */
+        internal var prepared: PreparedMedia? = null
+    }
+
     companion object {
         private val logger = LoggerFactory.getLogger("DreamDisplays/MediaPlayer")
         val DEBUG: Boolean = System.getProperty("dreamdisplays.debug")?.toBoolean() == true
@@ -53,11 +63,19 @@ class MediaPlayer(
         internal val samplesIn = AtomicLong()
         internal val framesToGpu = AtomicLong()
         internal val framesDropped = AtomicLong()
-        private const val STOP_WAIT_TIMEOUT_SECONDS = 3L
         private const val MAX_FETCH_RETRIES = 3
 
         /** Hwaccel failures show up within the first few seconds, past this window assume the stream is just unreliable. */
         private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
+
+        /**
+         * On reappearance, cached replay resumes this far before the saved position. Default 0 =
+         * zero rewind: the saved frame is held (no backward jump) while the live source warms up, then live
+         * continues forward from the saved position. A non-zero lead trades a short re-watch of cached
+         * motion for a shorter hold; tunable via `-Ddreamdisplays.replayLeadMs` (must be <= the cache window).
+         */
+        private val REPLAY_LEAD_NS: Long =
+            (System.getProperty("dreamdisplays.replayLeadMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L) * 1_000_000L
         private val INIT_THREAD_COUNTER = AtomicInteger()
         private val INIT_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(
             Runtime.getRuntime().availableProcessors().coerceIn(2, 4),
@@ -70,6 +88,18 @@ class MediaPlayer(
 
     private val clock = PlaybackClock()
     private val state = AtomicReference(PlaybackState.IDLE)
+    private val replayBootstrapRef = AtomicReference(replayBootstrap)
+    private val primedStartPositionNanos = AtomicLong(-1L)
+
+    /** One-shot cached prepared streams from the bootstrap: consumed by the first [initialize] to skip the
+     *  network resolve. Cleared after use so a retry (e.g. expired cached URLs) re-resolves fresh. */
+    private val preparedBootstrapRef = AtomicReference(replayBootstrap?.prepared)
+
+    /** True once replay-only video is rendering, so [startStreams] attaches live instead of cold-starting. */
+    private val replayVideoActive = AtomicBoolean(false)
+    /** True when this player was created from a replay bootstrap: it already resumes at the saved position,
+     *  so the controller must NOT also fire restoreSavedTime (its corrective seek would cold-restart the bridge). */
+    private val startedFromReplay = replayBootstrap != null
     private val retryPolicy = RetryPolicy(MAX_FETCH_RETRIES)
 
     private val events = PlayerEvents(
@@ -104,6 +134,7 @@ class MediaPlayer(
         getTextureSize = { displayScreen.textureWidth to displayScreen.textureHeight },
         getBrightness = { brightness },
         onStreamEnd = ::handleStreamEnd,
+        onQualitySwitchAborted = { displayScreen.cancelQualityHandoff() },
     )
 
     private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
@@ -122,7 +153,12 @@ class MediaPlayer(
         sessionManager.setVolume(it)
     }
 
-    init { INIT_EXECUTOR.submit { initialize() } }
+    init {
+        // Show cached replay video immediately (network-free) so a reappearing display is instant,
+        // in parallel with the live stream resolve happening on the init executor.
+        replayBootstrap?.let { boot -> safeExecute { startReplayBootstrapVideo(boot) } }
+        INIT_EXECUTOR.submit { initialize() }
+    }
 
     /** Resumes playback from the current seek position. No-op if already playing. */
     fun play() = safeExecute(::doPlay)
@@ -130,13 +166,43 @@ class MediaPlayer(
     /** Pauses playback, capturing the current position for later resume. */
     fun pause() = safeExecute(::doPause)
 
+    /** True when the session can be parked warm (steady in-process-libav playback). Read from any thread. */
+    fun canPark(): Boolean = isReady && sessionManager.canPark()
+
+    /**
+     * Parks the player warm while its display sits out of render distance: the decoder + audio line stay
+     * open and idle (position frozen), so [unpark] resumes instantly with no re-resolve or cold-decode.
+     * No-op (and the caller should fall back to a full stop) when the session is not parkable.
+     */
+    fun park() = safeExecute {
+        watchdog.stop()
+        if (!sessionManager.suspend()) watchdog.start() // not parkable after all → keep playing normally
+    }
+
+    /** Resumes a [park]ed player from its frozen position. */
+    fun unpark() = safeExecute {
+        if (sessionManager.isParked()) {
+            sessionManager.resume()
+            watchdog.start()
+        }
+    }
+
     /** Stops playback permanently; the instance must not be used after this call. */
     fun stop() {
         if (terminated.getAndSet(true)) return
         state.set(PlaybackState.STOPPED)
-        val future = runCatching { controlExecutor.submit(::doStop) }.getOrNull()
-        runCatching { future?.get(STOP_WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS) }.onFailure { doStop() }
-        controlExecutor.shutdownNow()
+        val submitted = runCatching {
+            controlExecutor.submit {
+                try {
+                    doStop()
+                } finally {
+                    controlExecutor.shutdown()
+                }
+            }
+        }.isSuccess
+        if (!submitted) {
+            daemon({ doStop() }, "MediaPlayer-stop").start()
+        }
     }
 
     /** Seeks to an absolute position in nanos. [fire] triggers [DisplayScreen.afterSeek]. */
@@ -156,6 +222,15 @@ class MediaPlayer(
         return clock.currentTime()
     }
 
+    /**
+     * Position to save / resume from. Identical to [getCurrentTime] in normal playback, but while a
+     * replay -> live bridge is in flight it returns the live edge instead of the replay playhead (which sits
+     * up to [REPLAY_LEAD_NS] behind). This keeps the saved position from regressing — and from
+     * compounding ~5 s per cycle — when a display is unloaded mid-bridge (rapid leave / return).
+     */
+    fun getResumePositionNanos(): Long =
+        sessionManager.parkedPositionNanos() ?: sessionManager.activeBridgeEdgeNanos() ?: getCurrentTime()
+
     /** Stream duration in nanos, or 0 for live streams. */
     fun getDuration(): Long = if (liveStream) 0L else durationHintNanos
 
@@ -164,6 +239,14 @@ class MediaPlayer(
 
     /** Returns true once stream selection is complete and playback is active or paused. */
     fun isInitialized(): Boolean = isReady
+
+    /** Primes the first live start offset before initialization opens the decoder. */
+    fun primeStartPosition(nanos: Long) {
+        if (nanos >= 0L && !sessionManager.isPlaying) primedStartPositionNanos.set(nanos)
+    }
+
+    /** True when this player resumed from a cached replay bootstrap (already positioned at the saved time). */
+    fun isResumingFromReplay(): Boolean = startedFromReplay
 
     /**
      * Runs [callback] immediately if already initialized, otherwise queues it for when
@@ -200,16 +283,48 @@ class MediaPlayer(
     /** True once the first decoded frame is ready for GPU upload. */
     fun textureFilled(): Boolean = sessionManager.textureFilled()
 
-    /** Uploads the latest decoded frame to [texture]. Must be called from the render thread. */
-    fun updateFrame(texture: GpuTexture) =
-        sessionManager.updateFrame(texture, displayScreen.textureWidth, displayScreen.textureHeight)
+    /** Discards any ready raw frame so the renderer will not show stale content after a timeline jump. */
+    fun clearFrame() = sessionManager.clearFrame()
 
-    /** Uploads the latest planar I420 frame into the three plane textures. Render thread only. */
-    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture) =
-        sessionManager.updateFramePlanar(y, u, v, displayScreen.textureWidth, displayScreen.textureHeight)
+    /**
+     * Uploads the latest decoded frame to [texture]. [w] / [h] are the expected frame dimensions
+     * (the texture being uploaded into — the active texture, or the pending one during a quality
+     * handoff). Returns true when a frame was actually uploaded. Render thread only.
+     */
+    fun updateFrame(texture: GpuTexture, w: Int, h: Int): Boolean =
+        sessionManager.updateFrame(texture, w, h)
+
+    /** Uploads the latest planar I420 frame into the three plane textures. Returns true if uploaded. Render thread only. */
+    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, w: Int, h: Int): Boolean =
+        sessionManager.updateFramePlanar(y, u, v, w, h)
+
+    /** True while a parallel quality switch is warming up the new resolution. */
+    fun hasIncomingVideo(): Boolean = sessionManager.hasIncoming()
+
+    /** Uploads the latest incoming (quality-switch) frame to [texture]. Returns true if uploaded. Render thread only. */
+    fun updateIncomingFrame(texture: GpuTexture, w: Int, h: Int): Boolean =
+        sessionManager.updateIncomingFrame(texture, w, h)
+
+    /** Uploads the latest incoming planar I420 frame into the staged plane textures. Returns true if uploaded. */
+    fun updateIncomingFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, w: Int, h: Int): Boolean =
+        sessionManager.updateIncomingFramePlanar(y, u, v, w, h)
+
+    /** Promotes the warmed-up quality-switch channel to live; returns false if it was already aborted. */
+    fun promoteIncomingVideo(): Boolean = sessionManager.promoteIncoming()
 
     /** Sets the user-controlled volume (0.0–2.0). Distance attenuation is applied on top. */
     fun setVolume(volume: Float) = this.volume.setUserVolume(volume)
+
+    /**
+     * Seeds the effective volume (user level + distance attenuation) up-front, before any audio starts.
+     * The reappearance bridge's cached prelude begins at construction — before [start] or [tick] run — so
+     * without this the first moment plays at the default (un-attenuated) level, audible as a loud burst.
+     * Bypasses the [tick] ready-state guard.
+     */
+    fun primeVolume(userVolume: Float, distance: Double, maxRadius: Double) {
+        volume.setUserVolume(userVolume)
+        volume.updateAttenuation(distance, maxRadius)
+    }
 
     /** Sets the brightness multiplier applied to each frame before GPU upload (0.0-2.0). */
     fun setBrightness(brightness: Float) {
@@ -240,6 +355,20 @@ class MediaPlayer(
         }
     }
 
+    /** Captures the active native LAV packet-ring snapshot (whole window), if the live channel has one. */
+    fun captureReplaySnapshot(): ByteArray? = sessionManager.captureVideoCacheSnapshot()
+
+    /** Captures the recent PCM window (matching the replay video lead) for the reappearance audio bridge. */
+    fun captureReplayAudio(): ByteArray? = sessionManager.captureAudioPcm(REPLAY_LEAD_NS)
+
+    /** Captures the resolved streams so a reappearing player can skip the network resolve. Null while not
+     *  yet initialized or for live streams (which are never cache-bridged). */
+    internal fun capturePreparedMedia(): PreparedMedia? {
+        if (liveStream) return null
+        val ss = streams ?: return null
+        return PreparedMedia(ss, liveStream, seekable, durationHintNanos)
+    }
+
     /**
      * Updates distance-based volume attenuation. Call every tick from the game thread.
      *
@@ -260,7 +389,9 @@ class MediaPlayer(
         state.set(PlaybackState.INITIALIZING)
         var success = false
         try {
-            val prepared = MediaPreparationService.prepare(youtubeUrl, lang, displayScreen.quality)
+            val cached = preparedBootstrapRef.getAndSet(null)
+            if (cached != null) logger.info("$debugLabel [reappear] reusing cached prepared streams; skipping prepare().")
+            val prepared = cached ?: MediaPreparationService.prepare(youtubeUrl, lang, displayScreen.quality)
             if (terminated.get()) return
 
             liveStream = prepared.isLive
@@ -278,7 +409,9 @@ class MediaPlayer(
             }
             success = true
             val ss = prepared.streamSet
-            safeExecute { if (!terminated.get()) startStreams(ss, 0) }
+            val primed = primedStartPositionNanos.get().takeIf { it >= 0L } ?: 0L
+            val initialOffset = replayBootstrapRef.get()?.positionNanos ?: primed
+            safeExecute { if (!terminated.get()) startStreams(ss, initialOffset) }
         } catch (e: DreamMediaException) {
             logger.error("$debugLabel Initialization failed: ${e.message}")
             state.set(PlaybackState.ERROR)
@@ -298,6 +431,21 @@ class MediaPlayer(
      */
     private fun startStreams(streamSet: ActiveStreams, offsetNanos: Long) {
         if (terminated.get()) return
+        // Replay-only video may already be on screen (started at construction): attach the live source
+        // and hand off by PTS instead of cold-starting, so the picture never blanks.
+        val bootstrap = replayBootstrapRef.getAndSet(null)
+        logger.info(
+            "$debugLabel [reappear] startStreams offset=${"%.1f".format(offsetNanos / 1_000_000.0)}ms " +
+                    "replayActive=${replayVideoActive.get()} bootstrap=${bootstrap != null} live=$liveStream",
+        )
+        if (replayVideoActive.get() && bootstrap != null && !liveStream) {
+            if (attachLiveToReplay(streamSet, bootstrap.positionNanos)) return
+            logger.info("$debugLabel [reappear] attachLiveToReplay failed; falling back to cold start.")
+            replayVideoActive.set(false) // Attach failed: fall through to a normal cold start
+        }
+        // A full restart decodes at the current texture's dimensions, so any staged quality handoff
+        // (which expects new dimensions) would never match and must be dropped to avoid a frozen frame.
+        displayScreen.cancelQualityHandoff()
         val hwAccel =
             if (ClientStateManager.config.useHwAccel && !hwAccelDisabled) HwAccelBackend.detectDefault()
             else HwAccelBackend.NONE
@@ -307,6 +455,61 @@ class MediaPlayer(
             state.set(PlaybackState.PLAYING)
             watchdog.start()
         }
+    }
+
+    /**
+     * Immediately starts cached replay video (no network, no audio) so a returning display shows frames
+     * before [initialize] finishes resolving the live stream. Resumes [REPLAY_LEAD_NS] before the saved
+     * position so the buffered window can bridge the live re-resolve. Runs on the control thread.
+     */
+    private fun startReplayBootstrapVideo(boot: ReplayBootstrap) {
+        if (terminated.get()) return
+        val resume = (boot.positionNanos - REPLAY_LEAD_NS).coerceAtLeast(0L)
+        if (sessionManager.startReplayVideoOnly(boot.snapshot, resume, boot.positionNanos, boot.audioPcm)) {
+            replayVideoActive.set(true)
+            state.set(PlaybackState.PLAYING)
+            logger.info("$debugLabel Replay bootstrap shown instantly, resuming at ${"%.1f".format(resume / 1_000_000.0)}ms.")
+        }
+        // On failure the bootstrap is left in place (replayVideoActive stays false): startStreams then
+        // cold-starts at the saved position instead of attaching live to a replay that never started.
+    }
+
+    /**
+     * The live stream is resolved while replay video is still playing: warm the live audio + video and
+     * hand the picture off by PTS at the saved live edge. Returns false when live cannot be attached,
+     * letting [startStreams] fall back to a cold start.
+     */
+    private fun attachLiveToReplay(streamSet: ActiveStreams, liveOffsetNanos: Long): Boolean {
+        Minecraft.getInstance().execute { displayScreen.beginQualityHandoff() }
+        val hwAccel =
+            if (ClientStateManager.config.useHwAccel && !hwAccelDisabled) HwAccelBackend.detectDefault()
+            else HwAccelBackend.NONE
+        sessionStartNanos = System.nanoTime()
+        if (!sessionManager.attachLiveAfterReplay(streamSet, liveOffsetNanos, lastQuality, hwAccel)) {
+            Minecraft.getInstance().execute { displayScreen.cancelQualityHandoff() }
+            return false
+        }
+        state.set(PlaybackState.PLAYING)
+        watchdog.start()
+        logger.info("$debugLabel Attached live after replay at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)}ms.")
+        return true
+    }
+
+    /**
+     * Seamless quality switch: warms up the new-quality video as a parallel channel while audio, the
+     * clock, and the currently rendered video all keep running. The render thread swaps to the new
+     * channel on its first frame, so the picture never freezes. Must be called from the control thread.
+     */
+    private fun beginQualitySwitch(
+        streamSet: ActiveStreams,
+        offsetNanos: Long,
+        hwAccelOverride: HwAccelBackend? = null,
+    ) {
+        if (terminated.get()) return
+        val hwAccel = hwAccelOverride
+            ?: if (ClientStateManager.config.useHwAccel && !hwAccelDisabled) HwAccelBackend.detectDefault()
+            else HwAccelBackend.NONE
+        sessionManager.beginQualitySwitch(streamSet, offsetNanos, lastQuality, hwAccel)
     }
 
     /**
@@ -427,16 +630,26 @@ class MediaPlayer(
     private fun changeQuality(desired: VideoQuality) {
         val ss = streams ?: return
         val target = desired.targetHeight ?: return
-        if (target == lastQuality) return
+        if (target == lastQuality) {
+            if (DEBUG) logger.info("$debugLabel Quality switch no-op target=$target last=$lastQuality.")
+            return
+        }
         val newSs = MediaStreamSelector.switchQuality(ss, target, lang) ?: return
         val pos = if (liveStream) 0L else getCurrentTime()
         streams = newSs
         lastQuality = MediaStreamSelector.parseQuality(newSs.currentVideo)
         displayScreen.videoContentAspect = newSs.currentVideo.contentAspect()
         Minecraft.getInstance().execute {
-            displayScreen.reloadTexture()
-            safeExecute {
-                if (sessionManager.isPlaying) startStreams(newSs, pos) else clock.seekOffsetNanos = pos
+            if (sessionManager.isPlaying) {
+                // Parallel quality switch: stage the new-resolution texture, but the live video keeps
+                // decoding and rendering. The new resolution warms up in a second channel; fitTexture
+                // promotes both (channel + texture) on its first frame, so the picture never freezes.
+                displayScreen.beginQualityHandoff()
+                safeExecute { beginQualitySwitch(newSs, pos) }
+            } else {
+                // Nothing decoding (so, just paused): no frames would arrive to drive a handoff, so swap directly.
+                displayScreen.reloadTexture()
+                safeExecute { clock.seekOffsetNanos = pos }
             }
         }
     }

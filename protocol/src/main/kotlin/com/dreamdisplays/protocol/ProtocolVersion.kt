@@ -2,7 +2,7 @@ package com.dreamdisplays.protocol
 
 /** Protocol-v2 version constants and compatibility checks. */
 object ProtocolVersion {
-    const val CURRENT = 4
+    const val CURRENT = 5
     const val MINIMUM_SUPPORTED = 2
 
     fun isCompatible(version: Int): Boolean = version in MINIMUM_SUPPORTED..CURRENT

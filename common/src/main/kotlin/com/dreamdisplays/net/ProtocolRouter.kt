@@ -1,6 +1,7 @@
 package com.dreamdisplays.net
 
 import com.dreamdisplays.managers.ClientPacketManager
+import com.dreamdisplays.protocol.DisplaySync
 import com.dreamdisplays.protocol.DreamPacket
 import com.dreamdisplays.protocol.PacketRegistry
 import com.dreamdisplays.protocol.ServerHello
@@ -17,12 +18,17 @@ object ProtocolRouter {
     var v2Negotiated: Boolean = false
         private set
 
-    /** Sends [packet] over v2 when negotiated, otherwise as the equivalent frozen-v1 payload. */
+    /**
+     * Sends [packet] over v2 when negotiated, otherwise as the equivalent frozen-v1 payload.
+     * v2-only packets (playback modes / watch parties) have no legacy form and are dropped on v1.
+     */
     fun send(packet: DreamPacket) {
         if (v2Negotiated) {
             sendV2(packet)
         } else {
-            ClientPacketManager.send(LegacyAdapter.toLegacy(packet))
+            val legacy = LegacyAdapter.toLegacy(packet)
+            if (legacy != null) ClientPacketManager.send(legacy)
+            else logger.debug("Dropping v2-only packet {} on a v1 server.", packet::class.simpleName)
         }
     }
 
@@ -46,6 +52,10 @@ object ProtocolRouter {
     /** Dispatches a packet adapted from a frozen-v1 payload; never flips the v2 switch. */
     @Deprecated("Protocol v1 dispatch path; remove when v1 client support is dropped.")
     fun onLegacyReceived(packet: DreamPacket) {
+        if (v2Negotiated && packet is DisplaySync) {
+            logger.debug("Ignoring legacy sync packet after protocol v2 negotiation.")
+            return
+        }
         ClientPacketManager.handle(packet)
     }
 

@@ -12,6 +12,10 @@ import com.dreamdisplays.server.managers.StorageManager
 import com.dreamdisplays.server.meta.FabricUpdater
 import com.dreamdisplays.server.meta.Scheduler
 import com.dreamdisplays.server.metrics.TelemetryMetrics
+import com.dreamdisplays.server.playback.FabricPlaybackTransport
+import com.dreamdisplays.server.playback.PaperPlaybackTransport
+import com.dreamdisplays.server.playback.TimelineManager
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.registrar.ChannelRegistrar
 import com.dreamdisplays.server.registrar.CommandRegistrar
 import com.dreamdisplays.server.registrar.FabricCommandRegistrar
@@ -85,6 +89,9 @@ import org.slf4j.LoggerFactory
         storage.createSchema()
         DisplayManager.register(storage.loadAllPaperDisplays())
 
+        WatchPartyManager.init(PaperPlaybackTransport)
+        TimelineManager.init(PaperPlaybackTransport)
+
         ListenerRegistrar.registerListeners(this)
         ChannelRegistrar.registerChannels(this)
         SchedulerRegistrar.runRepeatingTasks(this)
@@ -155,6 +162,9 @@ import org.slf4j.LoggerFactory
             )
             storageInstance!!.createSchema()
             DisplayManager.register(storageInstance!!.loadAllFabricDisplays())
+            FabricPlaybackTransport.bind(server)
+            WatchPartyManager.init(FabricPlaybackTransport)
+            TimelineManager.init(FabricPlaybackTransport)
             logger.info("Server started. Storage connected.")
             startRepeatingTasks(server)
         }
@@ -224,6 +234,8 @@ import org.slf4j.LoggerFactory
                     server.execute {
                         DisplayManager.updateAllDisplays(server)
                         StateManager.tickBroadcast(server)
+                        TimelineManager.tick()
+                        WatchPartyManager.tick()
                     }
                 }
             }

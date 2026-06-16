@@ -22,8 +22,12 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 @Deprecated("Protocol v1 adapter; remove along with Packets when v1 client support is dropped.")
 object LegacyAdapter {
 
-    /** Maps an outgoing v2 [packet] to its frozen-v1 payload for servers without v2. */
-    fun toLegacy(packet: DreamPacket): CustomPacketPayload = when (packet) {
+    /**
+     * Maps an outgoing v2 [packet] to its frozen-v1 payload for servers without v2, or null for
+     * v2-only packets (playback modes / watch parties) that have no legacy equivalent and are simply
+     * dropped on v1 servers.
+     */
+    fun toLegacy(packet: DreamPacket): CustomPacketPayload? = when (packet) {
         is ClientHello -> Packets.Version(packet.modVersion)
         is DisplaySync -> Packets.Sync(packet.id, packet.isSync, packet.isPaused, packet.currentTimeMs, packet.durationMs)
         is RequestSync -> Packets.RequestSync(packet.id)
@@ -32,7 +36,7 @@ object LegacyAdapter {
         is DisplayDelete -> Packets.Delete(packet.id)
         is ReportDisplay -> Packets.Report(packet.id)
         is SetDisplaysEnabled -> Packets.DisplayEnabled(packet.enabled)
-        else -> error("No legacy equivalent for ${packet::class.simpleName}.")
+        else -> null
     }
 
     /**

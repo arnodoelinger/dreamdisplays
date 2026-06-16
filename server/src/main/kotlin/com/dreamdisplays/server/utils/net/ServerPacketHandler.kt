@@ -1,12 +1,19 @@
 package com.dreamdisplays.server.utils.net
 
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.PlaybackAction
+import com.dreamdisplays.protocol.PlaybackMode
+import com.dreamdisplays.protocol.PlaybackPermissions
+import com.dreamdisplays.protocol.WatchPartyAction
 import com.dreamdisplays.server.Server
 import com.dreamdisplays.server.datatypes.FabricDisplayData
 import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
 import com.dreamdisplays.server.managers.StateManager
+import com.dreamdisplays.server.playback.PlaybackContexts
+import com.dreamdisplays.server.playback.TimelineManager
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.YouTubeUtil
 import io.github.arsmotorin.ofrat.FabricOnly
@@ -99,11 +106,10 @@ import org.slf4j.LoggerFactory
         MessageUtil.sendMessage(player, "displayDeleted")
     }
 
-    /** Applies a client-supplied URL / language to a display, broadcasting and resetting sync state. */
+    /** Applies a client-supplied URL / language to a display, broadcasting and resetting the timeline. */
     fun setVideo(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
-
-        if (displayData.isLocked && displayData.ownerId != player.uuid && !isOpLevel2(player)) return
+        if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
 
         val wasSync = displayData.isSync
         displayData.url = url
@@ -111,15 +117,15 @@ import org.slf4j.LoggerFactory
 
         val receivers = DisplayManager.getReceivers(displayData, server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
-        if (wasSync) StateManager.resetAndBroadcast(displayId, receivers)
+        if (wasSync) StateManager.resetAndBroadcast(displayId, receivers) // frozen-v1 clock
+        TimelineManager.onVideoChanged(displayData)
     }
 
     /** Updates the locked flag of a display owned by [player] and rebroadcasts. */
     fun setLocked(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, locked: Boolean) {
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData
             ?: return MessageUtil.sendMessage(player, "noDisplay")
-
-        if (displayData.ownerId != player.uuid && !isOpLevel2(player)) {
+        if (!PlaybackPermissions.canToggleLock(context(displayData, player))) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
         }
@@ -130,6 +136,47 @@ import org.slf4j.LoggerFactory
         val receivers = DisplayManager.getReceivers(displayData, server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
     }
+
+    /** Switches a display's persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`) and re-anchors its clock. */
+    fun setMode(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, mode: PlaybackMode, positionMs: Long) {
+        if (!PlaybackMode.isBaseMode(mode)) return
+        val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
+        if (!PlaybackPermissions.canSetMode(context(displayData, player))) return
+
+        displayData.mode = mode
+        Server.storage?.saveDisplay(displayData)
+        FabricPacketUtil.sendDisplayInfo(DisplayManager.getReceivers(displayData, server), displayData)
+        TimelineManager.onModeChanged(displayData, positionMs)
+    }
+
+    /** Applies a playback intent (play / pause / seek / restart) to a `SYNCED` display's server clock. */
+    fun playbackCommand(player: ServerPlayer, displayId: java.util.UUID, action: PlaybackAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
+        TimelineManager.onCommand(displayData, player.uuid, action, positionMs)
+    }
+
+    /** Starts a watch-party session with [player] as host. */
+    fun watchPartyStart(player: ServerPlayer, displayId: java.util.UUID, url: String, lang: String) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
+        WatchPartyManager.start(displayData, player.uuid, url, lang)
+    }
+
+    /** Routes a watch-party control (ready / host action) to the session manager. */
+    fun watchPartyControl(player: ServerPlayer, displayId: java.util.UUID, action: WatchPartyAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
+        WatchPartyManager.control(displayData, player.uuid, action, positionMs)
+    }
+
+    /** Replies to a client's catch-up request with the current timeline and any live session. */
+    fun requestSync(player: ServerPlayer, displayId: java.util.UUID) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.sendCurrent(displayData, player.uuid)
+        WatchPartyManager.sendCurrent(displayData, player.uuid)
+    }
+
+    /** Builds the permission context for [player] acting on [display]. */
+    private fun context(display: FabricDisplayData, player: ServerPlayer) =
+        PlaybackContexts.of(display, player.uuid, isOpLevel2(player))
 
     /** Registers all frozen v1 packet receivers for Fabric servers. */
     @Deprecated("Protocol v1 receivers; remove when v1 client support is dropped.")
@@ -163,7 +210,7 @@ import org.slf4j.LoggerFactory
                 limitTime = payload.limitTime
             )
             runCatching {
-                StateManager.processSyncPacket(syncData, player, server)
+                StateManager.processSyncPacket(syncData, player, server, isOpLevel2(player))
             }.onFailure { e ->
                 logger.warn("Failed to handle sync packet", e)
             }

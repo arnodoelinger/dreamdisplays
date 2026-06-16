@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Místní",
+  "dreamdisplays.mode.synced": "Synchronizovaný",
+  "dreamdisplays.mode.watch_party": "Společné sledování",
+  "dreamdisplays.mode.broadcast": "Vysílání",
   "dreamdisplays.button.enabled": "Zapnuto",
   "dreamdisplays.button.disabled": "Vypnuto",
   "dreamdisplays.error.loadingerror.1": "Jejda! Toto video se nám nepodařilo načíst.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Hledat na YouTube...",
   "dreamdisplays.suggestions.loading": "Načítání...",
   "dreamdisplays.suggestions.empty": "Nenalezen žádný výsledek.",
-  "dreamdisplays.suggestions.error": "Načítání se nezdařilo."
+  "dreamdisplays.suggestions.error": "Načítání se nezdařilo.",
+  "dreamdisplays.suggestions.unavailable": "Návrhy nejsou dostupné."
 }

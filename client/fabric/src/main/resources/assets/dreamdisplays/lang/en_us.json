@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Local",
+  "dreamdisplays.mode.synced": "Synced",
+  "dreamdisplays.mode.watch_party": "Watch Party",
+  "dreamdisplays.mode.broadcast": "Broadcast",
   "dreamdisplays.button.enabled": "Enabled",
   "dreamdisplays.button.disabled": "Disabled",
   "dreamdisplays.error.loadingerror.1": "Oops! We can't load this video.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Search YouTube...",
   "dreamdisplays.suggestions.loading": "Loading...",
   "dreamdisplays.suggestions.empty": "No results found.",
-  "dreamdisplays.suggestions.error": "Failed to load."
+  "dreamdisplays.suggestions.error": "Failed to load.",
+  "dreamdisplays.suggestions.unavailable": "Suggestions unavailable."
 }

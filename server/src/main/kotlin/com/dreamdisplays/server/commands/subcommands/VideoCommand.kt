@@ -1,8 +1,11 @@
 package com.dreamdisplays.server.commands.subcommands
 
+import com.dreamdisplays.protocol.PlaybackPermissions
 import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.StateManager
+import com.dreamdisplays.server.playback.PlaybackContexts
+import com.dreamdisplays.server.playback.TimelineManager
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.RegionUtil
 import com.dreamdisplays.server.utils.YouTubeUtil
@@ -58,7 +61,10 @@ import java.util.*
             return
         }
 
-        if (data.ownerId != player.uniqueId) {
+        if (!PlaybackPermissions.canSetVideo(
+                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
+            )
+        ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return
         }
@@ -73,6 +79,7 @@ import java.util.*
         val receivers = DisplayManager.getReceivers(data)
         DisplayManager.sendUpdate(data, receivers)
         if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
+        TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
     }
@@ -149,7 +156,10 @@ import java.util.*
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !ServerPacketHandler.isOpLevel2(player)) {
+        if (!PlaybackPermissions.canSetVideo(
+                PlaybackContexts.of(data, player.uuid, ServerPacketHandler.isOpLevel2(player))
+            )
+        ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return 0
         }
@@ -162,6 +172,7 @@ import java.util.*
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
         FabricPacketUtil.sendDisplayInfo(receivers, data)
         if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
+        TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
         return 1

@@ -4,6 +4,7 @@ package com.dreamdisplays.api
 
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.displays.toRuntimeState
+import com.dreamdisplays.protocol.PlaybackMode
 import kotlin.time.Duration
 
 /**
@@ -50,7 +51,17 @@ class DefaultPlaybackService : PlaybackService {
     /** Restarts the video for [displayId]. */
     override fun restart(displayId: DisplayId) {
         val screen = DisplayRegistry.screens[displayId.uuid] ?: return
+        if (!screen.canSeekHere) return
         val url = screen.videoUrl ?: return
         screen.loadVideo(url, screen.lang ?: "")
+    }
+
+    /** Returns the effective playback mode for [displayId]. */
+    override fun getMode(displayId: DisplayId): PlaybackMode =
+        DisplayRegistry.screens[displayId.uuid]?.effectiveMode ?: PlaybackMode.LOCAL
+
+    /** Requests a new base mode for [displayId]; the server enforces permission and echoes the change. */
+    override fun setMode(displayId: DisplayId, mode: PlaybackMode) {
+        DisplayRegistry.screens[displayId.uuid]?.requestMode(mode)
     }
 }

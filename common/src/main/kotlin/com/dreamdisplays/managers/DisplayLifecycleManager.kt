@@ -8,6 +8,7 @@ import com.dreamdisplays.displays.store.FullDisplayData
 import com.dreamdisplays.displays.store.ServerDisplayStore
 import com.dreamdisplays.media.api.VideoQuality
 import com.dreamdisplays.protocol.DisplayInfo
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.utils.FacingUtil
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
@@ -57,17 +58,19 @@ object DisplayLifecycleManager {
 
         createScreen(
             packet.id, packet.ownerId, Vector3i(packet.x, packet.y, packet.z), facing,
-            packet.width, packet.height, packet.url, packet.lang, packet.isSync
+            packet.width, packet.height, packet.url, packet.lang,
+            PlaybackMode.fromWire(packet.mode), packet.qualityCap,
         )
     }
 
     fun createScreen(
         uuid: UUID, ownerUuid: UUID, pos: Vector3i, facingUtil: FacingUtil,
-        width: Int, height: Int, code: String, lang: String, isSync: Boolean,
+        width: Int, height: Int, code: String, lang: String,
+        mode: PlaybackMode, qualityCap: Int,
     ) {
         val displayScreen = DisplayScreen(
             uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toDisplayFacing(),
-            width, height, isSync
+            width, height, mode, qualityCap
         )
 
         val savedData = ServerDisplayStore.getDisplayData(uuid)
@@ -97,7 +100,7 @@ object DisplayLifecycleManager {
 
         val displayScreen = DisplayScreen(
             data.uuid, data.ownerUuid, data.x, data.y, data.z, data.facing,
-            data.width, data.height, data.isSync
+            data.width, data.height, data.mode ?: PlaybackMode.LOCAL
         )
         displayScreen.renderDistance = data.renderDistance
         displayScreen.savedTimeNanos = data.currentTimeNanos

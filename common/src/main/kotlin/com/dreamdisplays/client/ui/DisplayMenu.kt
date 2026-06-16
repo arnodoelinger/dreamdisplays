@@ -16,7 +16,7 @@ import com.dreamdisplays.client.ui.menu.SettingsSection
 import com.dreamdisplays.client.ui.widgets.IconButton
 import com.dreamdisplays.client.ui.widgets.SeekBar
 import com.dreamdisplays.client.ui.widgets.SuggestionsPanel
-import com.dreamdisplays.client.ui.widgets.ToggleSwitch
+import com.dreamdisplays.client.ui.widgets.SyncModeSlider
 import com.dreamdisplays.client.ui.widgets.ValueSlider
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.displays.DisplayScreen
@@ -26,6 +26,7 @@ import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.media.api.VideoQuality
 import com.dreamdisplays.protocol.DisplayDelete
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.ReportDisplay
 import com.dreamdisplays.protocol.SetLocked
 import com.dreamdisplays.utils.MinecraftScreenUtil
@@ -58,7 +59,7 @@ class DisplayMenu private constructor(
     private lateinit var renderD: ValueSlider
     private lateinit var quality: ValueSlider
     private lateinit var brightness: ValueSlider
-    private lateinit var sync: ToggleSwitch
+    private lateinit var sync: SyncModeSlider
     private lateinit var progress: SeekBar
     private lateinit var suggestions: SuggestionsPanel
     private lateinit var preview: PreviewSection
@@ -103,13 +104,19 @@ class DisplayMenu private constructor(
         quality = addUi(ValueSlider(
             initial = qualityFraction(ds.quality.serialize()),
             label = {
-                if (ds.qualityList.isNotEmpty()) Component.literal("${qualityFromFraction(it)}p")
-                else Component.literal("${ds.quality.serialize()}p")
+                when {
+                    // Broadcast pins everyone to the highest quality within the cap; show that, not the saved setting
+                    ds.qualityCap > 0 -> Component.literal("${broadcastQuality()}p")
+                    ds.qualityList.isNotEmpty() -> Component.literal("${qualityFromFraction(it)}p")
+                    else -> Component.literal("${ds.quality.serialize()}p")
+                }
             },
+            // Commit on release: a quality change restarts the video, so don't fire on every drag step
+            live = false,
         ) {
             if (ds.qualityList.isNotEmpty()) ds.quality = VideoQuality.parse(qualityFromFraction(it))
         })
-        quality.enabledWhen = { videoReady() && ds.qualityList.isNotEmpty() }
+        quality.enabledWhen = { videoReady() && ds.qualityList.isNotEmpty() && ds.canChangeQualityHere }
         quality.visibleWhen = notErrored
 
         brightness = addUi(ValueSlider(
@@ -119,16 +126,27 @@ class DisplayMenu private constructor(
         brightness.enabledWhen = { videoReady() && (!ds.isSync || ds.canEdit) }
         brightness.visibleWhen = notErrored
 
-        sync = addUi(ToggleSwitch(
-            initial = ds.isSync,
-            label = { Component.translatable(if (it) "dreamdisplays.button.enabled" else "dreamdisplays.button.disabled") },
-        ) {
-            if (ds.canEdit) {
-                ds.isSync = it
-                ds.waitForMFInit { ds.sendSync() }
+        sync = addUi(SyncModeSlider(
+            initial = ds.effectiveMode,
+            current = { ds.effectiveMode },
+            enabledFor = {
+                if (ds.watchParty != null) {
+                    it == PlaybackMode.LOCAL && ds.canCloseWatchPartyHere
+                } else {
+                    it != PlaybackMode.WATCH_PARTY && ds.canSetModeHere
+                }
+            },
+            label = { Component.translatable(syncModeLabel(it)) },
+        ) { mode ->
+            when {
+                mode == ds.effectiveMode -> Unit
+                ds.watchParty != null && mode == PlaybackMode.LOCAL -> ds.closeWatchParty()
+                PlaybackMode.isBaseMode(mode) -> ds.requestMode(mode)
             }
         })
-        sync.enabledWhen = { videoReady() && ds.canEdit }
+        sync.enabledWhen = {
+            videoReady() && (ds.canSetModeHere || (ds.watchParty != null && ds.canCloseWatchPartyHere))
+        }
         sync.visibleWhen = notErrored
 
         val volumeReset = addUi(IconButton("refresh") {
@@ -154,7 +172,7 @@ class DisplayMenu private constructor(
             ds.quality = VideoQuality.DEFAULT
             quality.value = qualityFraction(VideoQuality.DEFAULT.serialize())
         })
-        qualityReset.enabledWhen = { videoReady() && ds.quality != VideoQuality.DEFAULT }
+        qualityReset.enabledWhen = { videoReady() && ds.canChangeQualityHere && ds.quality != VideoQuality.DEFAULT }
         qualityReset.visibleWhen = notErrored
 
         val brightnessReset = addUi(IconButton("refresh") {
@@ -165,12 +183,12 @@ class DisplayMenu private constructor(
         brightnessReset.visibleWhen = notErrored
 
         val syncReset = addUi(IconButton("refresh") {
-            if (ds.canEdit) sync.set(false)
+            if (ds.canSetModeHere) ds.requestMode(PlaybackMode.LOCAL)
         })
-        syncReset.enabledWhen = { videoReady() && ds.canEdit && ds.isSync }
+        syncReset.enabledWhen = { videoReady() && ds.canSetModeHere && ds.effectiveMode != PlaybackMode.LOCAL }
         syncReset.visibleWhen = notErrored
 
-        val canSeekNow = { !(ds.isSync && !ds.canEdit) && ds.canSeek() }
+        val canSeekNow = { ds.canSeekHere && ds.canSeek() }
         val backButton = addUi(IconButton("left") { ds.seekBackward() })
         backButton.enabledWhen = canSeekNow
         backButton.visibleWhen = notErrored
@@ -192,24 +210,24 @@ class DisplayMenu private constructor(
                 dropdown.toggle()
             }
         })
-        popoutButton.enabledWhen = videoReady
+        popoutButton.enabledWhen = { videoReady() && (ds.canPopoutHere || ds.isPopoutActive) }
         popoutButton.visibleWhen = notErrored
 
         val pauseButton = addUi(IconButton(
             icon = { IconButton.modIcon(if (ds.isPaused) "play" else "pause") },
         ) { ds.setPaused(!ds.isPaused) })
-        pauseButton.enabledWhen = { !(ds.isSync && !ds.canEdit) }
+        pauseButton.enabledWhen = { ds.canControlPlayback }
         pauseButton.visibleWhen = notErrored
 
         progress = addUi(SeekBar(
             current = { ds.currentTimeNanos },
             duration = { ds.mediaPlayerDurationNanos },
         ) { nanos ->
-            if (ds.canSeek() && !ds.isLive && (!ds.isSync || ds.owner)) {
+            if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
                 ds.seekToMillis(nanos / 1_000_000L)
             }
         })
-        progress.enabledWhen = { videoReady() && ds.canSeek() && !ds.isLive && (!ds.isSync || ds.canEdit) }
+        progress.enabledWhen = { videoReady() && ds.canSeek() && !ds.isLive && ds.canSeekHere }
         progress.visibleWhen = notErrored
 
         val lockButton = addUi(IconButton(
@@ -220,7 +238,7 @@ class DisplayMenu private constructor(
             ds.isLocked = newLocked
             Initializer.sendPacket(SetLocked(ds.uuid, newLocked))
         })
-        lockButton.enabledWhen = { ds.owner || ds.isAdmin }
+        lockButton.enabledWhen = { ds.canToggleLockHere }
         lockButton.visibleWhen = { ds.isLocked != null && !ds.errored }
 
         val deleteButton = addUi(IconButton(
@@ -246,6 +264,9 @@ class DisplayMenu private constructor(
 
         suggestions = addUi(SuggestionsPanel(::onPickSuggested))
         suggestions.visibleWhen = { !ds.errored && suggestionsRect != null }
+        // Locked / Broadcast / Watch party displays only let the owner / admin change the video, so
+        // the panel shows an "unavailable" notice to everyone else instead of pickable suggestions.
+        suggestions.available = { ds.canSetVideoHere }
 
         preview = PreviewSection(ds, backButton, forwardButton, muteButton, popoutButton, pauseButton, progress, dropdown)
         settings = SettingsSection(
@@ -255,9 +276,9 @@ class DisplayMenu private constructor(
                 lockButton to {
                     ds.isLocked?.let { locked ->
                         listOf(
-                            Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.1" else "dreamdisplays.button.unlock.tooltip.1")
+                            Component.translatable(if (locked) "dreamdisplays.button.unlock.tooltip.1" else "dreamdisplays.button.lock.tooltip.1")
                                 .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                            Component.translatable(if (locked) "dreamdisplays.button.lock.tooltip.2" else "dreamdisplays.button.unlock.tooltip.2")
+                            Component.translatable(if (locked) "dreamdisplays.button.unlock.tooltip.2" else "dreamdisplays.button.lock.tooltip.2")
                                 .withStyle { it.withColor(ChatFormatting.GRAY) },
                         )
                     }
@@ -324,7 +345,7 @@ class DisplayMenu private constructor(
                     Component.literal(""),
                     tooltipValue(
                         "dreamdisplays.button.synchronization.tooltip.5",
-                        Component.translatable(if (sync.value) "dreamdisplays.button.enabled" else "dreamdisplays.button.disabled"),
+                        Component.translatable(syncModeLabel(sync.mode)),
                     ),
                 )
             },
@@ -346,10 +367,11 @@ class DisplayMenu private constructor(
         tooltipBody("$prefix.tooltip.2"),
     )
 
-    /** Plays [info] on the display as a client-side suggestion and reloads the related list. */
+    /** Requests [info] as the display video and reloads the related list once the intent is sent. */
     private fun onPickSuggested(info: MediaSearchResult) {
         val ds = displayScreen
-        ds.playSuggestedVideo(info.getWatchUrl(), ds.lang ?: "")
+        if (!ds.canSetVideoHere) return
+        if (!ds.playSuggestedVideo(info.getWatchUrl(), ds.lang ?: "")) return
         VideoTitleCache.put(info.id, info.title)
         VideoMetadataCache.put(info.id, info)
         lastSuggestedVideoId = info.id
@@ -362,6 +384,7 @@ class DisplayMenu private constructor(
 
         modLabel.draw(g, UiTheme.SCREEN_PADDING, 6)
         resyncQualitySlider()
+        resyncModeSlider()
 
         if (ds.errored) {
             dropdown.hide()
@@ -401,9 +424,17 @@ class DisplayMenu private constructor(
         if (qualityList.size != prevQualityListSize) {
             prevQualityListSize = qualityList.size
             if (qualityList.isNotEmpty()) {
-                quality.value = qualityFraction(ds.quality.serialize())
+                // In Broadcast the handle should sit on the capped quality, not the user's saved value.
+                quality.value = qualityFraction(
+                    if (ds.qualityCap > 0) broadcastQuality().toString() else ds.quality.serialize()
+                )
             }
         }
+    }
+
+    /** Keeps the synchronization mode slider aligned with server echoes and watch-party state. */
+    private fun resyncModeSlider() {
+        sync.syncToCurrent()
     }
 
     /** Points the suggestions panel at the currently playing video when it changes. */
@@ -441,6 +472,13 @@ class DisplayMenu private constructor(
      */
     override fun minContentSize(): Pair<Int, Int> = MIN_CONTENT_W to MIN_CONTENT_H
 
+    /** The highest available quality within Broadcast's cap — what every client is actually pinned to. */
+    private fun broadcastQuality(): Int {
+        val ds = displayScreen
+        val cap = ds.qualityCap
+        return ds.qualityList.filter { it <= cap }.maxOrNull() ?: cap
+    }
+
     /** Maps a quality string (e.g. "720") to its fractional position within the available quality list. */
     private fun qualityFraction(q: String): Double {
         val list = displayScreen.qualityList
@@ -475,6 +513,14 @@ class DisplayMenu private constructor(
         /** Converts a slider fraction (0.0–1.0) to a snapped chunk count (2–12). */
         private fun fractionToChunks(fraction: Double): Int =
             (fraction * CHUNK_STEPS).roundToInt() + MIN_CHUNKS
+
+        /** Translation key for the compact mode label shown inside the sync slider. */
+        private fun syncModeLabel(mode: PlaybackMode): String = when (mode) {
+            PlaybackMode.LOCAL -> "dreamdisplays.mode.local"
+            PlaybackMode.SYNCED -> "dreamdisplays.mode.synced"
+            PlaybackMode.WATCH_PARTY -> "dreamdisplays.mode.watch_party"
+            PlaybackMode.BROADCAST -> "dreamdisplays.mode.broadcast"
+        }
 
         /** Opens the menu for [displayScreen]. */
         fun open(displayScreen: DisplayScreen) {

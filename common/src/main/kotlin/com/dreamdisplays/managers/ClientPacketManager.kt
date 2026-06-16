@@ -13,6 +13,7 @@ import com.dreamdisplays.protocol.DisplaySync
 import com.dreamdisplays.protocol.DreamPacket
 import com.dreamdisplays.protocol.ServerHello
 import com.dreamdisplays.protocol.SetDisplaysEnabled
+import com.dreamdisplays.protocol.WatchPartyState
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 
@@ -46,6 +47,7 @@ object ClientPacketManager {
             is SetDisplaysEnabled -> applyDisplaysEnabled(packet.enabled)
             is DisplayInfo -> DisplayLifecycleManager.handleInfoPacket(packet)
             is DisplaySync -> DisplayRegistry.screens[packet.id]?.updateData(packet)
+            is WatchPartyState -> DisplayRegistry.screens[packet.id]?.updateWatchParty(packet)
             is DisplayDelete -> handleDelete(packet)
             is ClearCache -> handleClearCache(packet)
             else -> logger.debug("Ignoring non-clientbound packet {}.", packet::class.simpleName)

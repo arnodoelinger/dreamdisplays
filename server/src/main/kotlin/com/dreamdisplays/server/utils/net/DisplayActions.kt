@@ -1,11 +1,18 @@
 package com.dreamdisplays.server.utils.net
 
+import com.dreamdisplays.protocol.PlaybackAction
+import com.dreamdisplays.protocol.PlaybackMode
+import com.dreamdisplays.protocol.PlaybackPermissions
+import com.dreamdisplays.protocol.WatchPartyAction
 import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.datatypes.PaperDisplayData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
 import com.dreamdisplays.server.managers.StateManager
 import com.dreamdisplays.server.meta.Scheduler
+import com.dreamdisplays.server.playback.PlaybackContexts
+import com.dreamdisplays.server.playback.TimelineManager
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.YouTubeUtil
 import com.google.gson.Gson
@@ -43,14 +50,10 @@ import java.util.UUID
         MessageUtil.sendMessage(player, "displayDeleted")
     }
 
-    /** Applies a client-supplied URL / language to a display, broadcasting and resetting sync state. */
+    /** Applies a client-supplied URL / language to a display, broadcasting and resetting the timeline. */
     fun setVideo(player: Player, displayId: UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
-
-        if (displayData.isLocked &&
-            displayData.ownerId != player.uniqueId &&
-            !player.hasPermission(Main.config.permissions.delete)
-        ) return
+        if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
 
         val wasSync = displayData.isSync
         displayData.url = url
@@ -58,22 +61,60 @@ import java.util.UUID
 
         val receivers = DisplayManager.getReceivers(displayData)
         DisplayManager.sendUpdate(displayData, receivers)
-        if (wasSync) StateManager.resetAndBroadcast(displayData.id, receivers)
+        if (wasSync) StateManager.resetAndBroadcast(displayData.id, receivers) // frozen-v1 clock
+        TimelineManager.onVideoChanged(displayData)
     }
 
     /** Updates the locked flag of a display owned by [player] and rebroadcasts. */
     fun setLocked(player: Player, displayId: UUID, locked: Boolean) {
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
-
-        if (displayData.ownerId != player.uniqueId &&
-            !player.hasPermission(Main.config.permissions.delete)
-        ) return
+        if (!PlaybackPermissions.canToggleLock(context(displayData, player))) return
 
         displayData.isLocked = locked
 
         val receivers = DisplayManager.getReceivers(displayData)
         DisplayManager.sendUpdate(displayData, receivers)
     }
+
+    /** Switches a display's persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`) and re-anchors its clock. */
+    fun setMode(player: Player, displayId: UUID, mode: PlaybackMode, positionMs: Long) {
+        if (!PlaybackMode.isBaseMode(mode)) return
+        val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
+        if (!PlaybackPermissions.canSetMode(context(displayData, player))) return
+
+        displayData.mode = mode
+        DisplayManager.sendUpdate(displayData, DisplayManager.getReceivers(displayData))
+        TimelineManager.onModeChanged(displayData, positionMs)
+    }
+
+    /** Applies a playback intent (play / pause / seek / restart) to a `SYNCED` display's server clock. */
+    fun playbackCommand(player: Player, displayId: UUID, action: PlaybackAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
+        TimelineManager.onCommand(displayData, player.uniqueId, action, positionMs)
+    }
+
+    /** Starts a watch-party session with [player] as host. */
+    fun watchPartyStart(player: Player, displayId: UUID, url: String, lang: String) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
+        WatchPartyManager.start(displayData, player.uniqueId, url, lang)
+    }
+
+    /** Routes a watch-party control (ready / host action) to the session manager. */
+    fun watchPartyControl(player: Player, displayId: UUID, action: WatchPartyAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
+        WatchPartyManager.control(displayData, player.uniqueId, action, positionMs)
+    }
+
+    /** Replies to a client's catch-up request with the current timeline and any live session. */
+    fun requestSync(player: Player, displayId: UUID) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.sendCurrent(displayData, player.uniqueId)
+        WatchPartyManager.sendCurrent(displayData, player.uniqueId)
+    }
+
+    /** Builds the permission context for [player] acting on [display]. */
+    private fun context(display: PaperDisplayData, player: Player) =
+        PlaybackContexts.of(display, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
 
     /** Records the player's reported mod version and runs the mod / plugin update checks. */
     fun recordVersionAndCheckUpdates(player: Player, versionString: String) {
@@ -123,7 +164,9 @@ import java.util.UUID
                 display.lang,
                 display.facing,
                 display.isSync,
-                display.isLocked
+                display.isLocked,
+                display.mode,
+                display.qualityCap,
             )
         }
     }

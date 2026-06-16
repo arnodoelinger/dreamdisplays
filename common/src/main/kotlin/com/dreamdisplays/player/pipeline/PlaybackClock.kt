@@ -32,9 +32,28 @@ internal class PlaybackClock {
         if (startWallNanos == NOT_STARTED) startWallNanos = System.nanoTime()
     }
 
+    /**
+     * Shifts the wall-clock origin forward by [nanos] so a paused (parked) interval is excluded from
+     * elapsed time — used on un-park so [currentTime] resumes from where it froze instead of jumping
+     * ahead by the time the display sat dormant. No-op when the clock isn't running.
+     */
+    fun addPausedDuration(nanos: Long) {
+        if (startWallNanos != NOT_STARTED && nanos > 0) startWallNanos += nanos
+    }
+
     /** Resets the clock to a new seek position (pauses the wall clock). */
     fun reset(offsetNanos: Long) {
         seekOffsetNanos = offsetNanos
         startWallNanos = NOT_STARTED
+    }
+
+    /**
+     * Atomically re-anchors a *running* clock to [offsetNanos] as of now — used at the replay -> live
+     * handoff so the wall clock and the live audio (offset at the same position) agree without a gap.
+     * Unlike [reset] the clock stays running, so pacing never momentarily reads "not started".
+     */
+    fun rebaseTo(offsetNanos: Long) {
+        seekOffsetNanos = offsetNanos
+        startWallNanos = System.nanoTime()
     }
 }

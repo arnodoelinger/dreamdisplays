@@ -29,16 +29,15 @@ class DefaultDisplayService : DisplayService {
         screen.mute(settings.muted)
         screen.setPaused(settings.paused)
         screen.renderDistance = settings.renderDistance
-        screen.isSync = settings.syncEnabled
         val override = settings.urlOverride
-        if (override != null) screen.loadVideo(override, settings.audioTrackName ?: "")
+        if (!override.isNullOrBlank()) screen.playSuggestedVideo(override, settings.audioTrackName ?: screen.lang ?: "")
     }
 
     /** Sets the URL for [id]. */
     override fun setUrl(id: DisplayId, url: String?) {
         val screen = DisplayRegistry.screens[id.uuid] ?: return
         if (url.isNullOrBlank()) return
-        screen.loadVideo(url, screen.lang ?: "")
+        screen.playSuggestedVideo(url, screen.lang ?: "")
     }
 
     /** Registers a listener for display events. */

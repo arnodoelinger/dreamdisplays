@@ -2,6 +2,8 @@
 
 package com.dreamdisplays.api
 
+import com.dreamdisplays.protocol.PlaybackMode
+
 /**
  * Represents a display that can be rendered on the client.
  *
@@ -22,6 +24,12 @@ data class Display(
 
     /** The current runtime state of the display. */
     val state: DisplayRuntimeState,
+
+    /** The effective playback mode (`WATCH_PARTY` while a session is live, otherwise the base mode). */
+    val mode: PlaybackMode = PlaybackMode.LOCAL,
+
+    /** The live watch-party session over this display, or null when none is running. */
+    val watchParty: WatchPartySession? = null,
 ) {
     /** Returns true if the display is currently playing. */
     val isPlaying: Boolean get() = state is DisplayRuntimeState.Playing

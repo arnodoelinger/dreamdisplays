@@ -20,18 +20,24 @@ internal interface FramePipe {
     /** Returns true once a frame is available for upload or has already been uploaded to the GPU texture. */
     fun textureFilled(): Boolean
 
-    /** Uploads the ready frame to [texture] if one is available. Must be called from the render thread. */
-    fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int)
+    /**
+     * Uploads the ready frame to [texture] if one is available. Must be called from the render thread.
+     * Returns true when a frame was actually uploaded (drives the dual-texture quality handoff).
+     */
+    fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int): Boolean
 
     /**
      * Uploads the ready I420 frame into the three plane textures if one is available. Only
      * meaningful for pipes producing planar output (GPU-YUV mode); no-op otherwise.
-     * Must be called from the render thread.
+     * Must be called from the render thread. Returns true when a frame was actually uploaded.
      */
-    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, actualW: Int, actualH: Int) {}
+    fun updateFramePlanar(y: GpuTexture, u: GpuTexture, v: GpuTexture, actualW: Int, actualH: Int): Boolean = false
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clear()
+
+    /** Drops non-essential raw frame buffers while a session is fully warm-parked. */
+    fun trimForPark() = clear()
 
     /** Releases GPU resources. Must be called from the render thread on permanent shutdown. */
     fun cleanup()

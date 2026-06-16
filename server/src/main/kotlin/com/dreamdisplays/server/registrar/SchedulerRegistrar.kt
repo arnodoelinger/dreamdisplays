@@ -6,6 +6,8 @@ import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.StateManager
 import com.dreamdisplays.server.meta.Updater.checkForUpdates
+import com.dreamdisplays.server.playback.TimelineManager
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.scheduler.ProviderScheduler
 
 /**
@@ -25,6 +27,8 @@ import com.dreamdisplays.server.scheduler.ProviderScheduler
         ) {
             DisplayManager.updateAllDisplays()
             StateManager.tickBroadcast()
+            TimelineManager.tick()
+            WatchPartyManager.tick()
         }
         val settings = Main.config.settings
         if (settings.updatesEnabled) {

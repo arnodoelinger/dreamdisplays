@@ -63,13 +63,12 @@ tasks.withType<ProcessResources>().configureEach {
         }
     } else {
         val nativeKey = hostNativeKey()
-        nativeLibraryBaseNames.forEach { libBaseName ->
-            val nativeLib = rootProject.file("native/target/release/" + System.mapLibraryName(libBaseName))
-            if (nativeLib.isFile) {
-                from(nativeLib) {
-                    into("dreamdisplays-natives/$nativeKey")
-                }
-            }
+        val hostReleaseNatives = nativeLibraryBaseNames.map { libBaseName ->
+            rootProject.file("native/target/release/" + System.mapLibraryName(libBaseName))
+        }
+        inputs.files(hostReleaseNatives).optional()
+        from({ hostReleaseNatives.filter { it.isFile } }) {
+            into("dreamdisplays-natives/$nativeKey")
         }
     }
 

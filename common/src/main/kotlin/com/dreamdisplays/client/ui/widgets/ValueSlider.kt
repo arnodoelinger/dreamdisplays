@@ -25,13 +25,20 @@ import net.minecraft.util.Mth
  *
  * @param initial starting fraction.
  * @param label formats the on-slider text for a given fraction.
+ * @param live when true (default) [onApply] fires continuously as the user drags; when false it
+ *   fires only once the drag/click is released. Use `live = false` for expensive actions (e.g. a
+ *   quality switch that restarts the video) so a single drag across levels doesn't fire a burst.
  * @param onApply invoked when the user changes the value (after clamping).
  */
 class ValueSlider(
     initial: Double,
     private val label: (Double) -> Component,
+    private val live: Boolean = true,
     private val onApply: (Double) -> Unit,
 ) : UiWidget(Component.empty()) {
+
+    /** True while a drag/click that changed the value is in progress but not yet committed (non-live). */
+    private var pendingCommit: Boolean = false
 
     /** Current fraction in [0, 1]. Settable from outside (e.g. reset buttons); does not fire [onApply]. */
     var value: Double = initial
@@ -98,11 +105,23 @@ class ValueSlider(
         }
     }
 
-    /** Converts [mouseX] to a fraction, applies it, and fires [onApply] if it changed. */
+    override fun onRelease(event: MouseButtonEvent) {
+        // Non-live sliders defer the (expensive) apply until the drag / click is released
+        if (!live && pendingCommit) {
+            pendingCommit = false
+            onApply(value)
+        }
+    }
+
+    /**
+     * Converts [mouseX] to a fraction and updates [value]. For live sliders fires [onApply]
+     * immediately on change; for non-live sliders marks the change for commit on release.
+     */
     private fun setValueFromMouse(mouseX: Double) {
         val old = value
         value = (mouseX - (x + 4).toDouble()) / (width - 8).toDouble()
-        if (!Mth.equal(old, value)) onApply(value)
+        if (Mth.equal(old, value)) return
+        if (live) onApply(value) else pendingCommit = true
     }
 
     companion object {

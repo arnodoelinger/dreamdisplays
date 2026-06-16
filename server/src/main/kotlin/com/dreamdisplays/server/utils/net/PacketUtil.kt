@@ -7,7 +7,7 @@ import com.dreamdisplays.net.Packets
 import com.dreamdisplays.protocol.ClearCache
 import com.dreamdisplays.protocol.DisplayDelete
 import com.dreamdisplays.protocol.DisplayInfo
-import com.dreamdisplays.protocol.DisplaySync
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.SetDisplaysEnabled
 import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.datatypes.FabricDisplayData
@@ -60,6 +60,8 @@ import java.util.*
         facing: BlockFace,
         isSync: Boolean,
         isLocked: Boolean = true,
+        mode: PlaybackMode = if (isSync) PlaybackMode.SYNCED else PlaybackMode.LOCAL,
+        qualityCap: Int = 0,
     ) {
         val (v2, players) = partition(players)
         PaperV2Networking.send(
@@ -70,6 +72,7 @@ import java.util.*
                 width = width, height = height, url = url,
                 facing = facing.toPacketByte().toInt(),
                 isSync = isSync, lang = lang, isLocked = isLocked,
+                mode = mode.wire, qualityCap = qualityCap,
             ),
         )
         if (players.isEmpty()) return
@@ -95,15 +98,14 @@ import java.util.*
         }
     }
 
-    /** Encodes and broadcasts a `sync` packet carrying the current playback state. */
+    /**
+     * Encodes and broadcasts a frozen-v1 `sync` packet. v2 timelines are server-authoritative
+     * (see [com.dreamdisplays.server.playback.TimelineManager]), so this path serves v1 peers only.
+     */
     fun sendSync(players: List<Player?>, syncData: SyncData) {
         val id = syncData.id ?: return
 
-        val (v2, players) = partition(players)
-        PaperV2Networking.send(
-            v2,
-            DisplaySync(id, syncData.isSync, syncData.currentState, syncData.currentTime, syncData.limitTime),
-        )
+        val (_, players) = partition(players)
         if (players.isEmpty()) return
         runCatching {
             val packet = buildPacket { output ->
@@ -322,6 +324,7 @@ import java.util.*
                 width = display.width, height = display.height, url = display.url,
                 facing = directionToFacingUtil(display.facing).toPacket().toInt(),
                 isSync = display.isSync, lang = display.lang, isLocked = display.isLocked,
+                mode = display.mode.wire, qualityCap = display.qualityCap,
             ),
         )
         if (legacy.isEmpty()) return
@@ -343,14 +346,13 @@ import java.util.*
         }
     }
 
-    /** Encodes and broadcasts a `sync` packet carrying the current playback state. */
+    /**
+     * Encodes and broadcasts a frozen-v1 `sync` packet. v2 timelines are server-authoritative
+     * (see [com.dreamdisplays.server.playback.TimelineManager]), so this path serves v1 peers only.
+     */
     fun sendSync(players: List<ServerPlayer>, syncData: SyncData) {
         val id = syncData.id ?: return
-        val (v2, legacy) = partition(players)
-        FabricV2Networking.send(
-            v2,
-            DisplaySync(id, syncData.isSync, syncData.currentState, syncData.currentTime, syncData.limitTime),
-        )
+        val (_, legacy) = partition(players)
         if (legacy.isEmpty()) return
         val packet = Packets.Sync(
             uuid = id,

@@ -31,6 +31,12 @@ internal class FrameSurface(
         private const val MAX_REUSABLE_FRAME_BUFFERS = 4
     }
 
+    /** Pool retention cap; raised by the prebuffer so its in-flight buffers are reused, not churned. */
+    @Volatile private var maxReusableBuffers = MAX_REUSABLE_FRAME_BUFFERS
+
+    /** Raises the reusable-buffer pool size (used when a [FramePrebuffer] keeps many frames in flight). */
+    fun setMaxReusableBuffers(n: Int) { maxReusableBuffers = n.coerceAtLeast(MAX_REUSABLE_FRAME_BUFFERS) }
+
     private val readyBufferRef = AtomicReference<ByteBuffer?>(null)
     private val textureReady = AtomicBoolean(false)
     private val readyDrops = AtomicLong()
@@ -53,16 +59,19 @@ internal class FrameSurface(
      * Uploads the ready frame to [texture] if one is available.
      * [actualW] / [actualH] must match [expectedW] / [expectedH] the pipe was started with.
      *
+     * Returns true when a frame was actually uploaded to [texture] (used by the dual-texture
+     * quality handoff to detect when the new-resolution texture has received its first frame).
+     *
      * Warning: this is one of the most expensive operations in the pipeline. It's critical to call this as soon as
      * possible after [textureFilled] returns true, to minimize the chance of the reader thread overwriting the ready
      * buffer before upload.
      */
-    fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int, expectedW: Int, expectedH: Int) {
-        val buf = readyBufferRef.getAndSet(null) ?: return
+    fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int, expectedW: Int, expectedH: Int): Boolean {
+        val buf = readyBufferRef.getAndSet(null) ?: return false
         if (actualW != expectedW || actualH != expectedH || Minecraft.getInstance().window.isMinimized) {
             if (MediaPlayer.DEBUG) skippedUploads++
             recycleFrameBuffer(buf)
-            return
+            return false
         }
         buf.rewind()
         val start = System.nanoTime()
@@ -82,6 +91,7 @@ internal class FrameSurface(
                 recordUpload(System.nanoTime() - start, "Upload", texture.getWidth(0), texture.getHeight(0))
                 MediaPlayer.framesToGpu.incrementAndGet()
             }
+            return true
         } finally {
             recycleFrameBuffer(buf)
         }
@@ -96,12 +106,12 @@ internal class FrameSurface(
     fun updateFramePlanar(
         y: GpuTexture, u: GpuTexture, v: GpuTexture,
         actualW: Int, actualH: Int, expectedW: Int, expectedH: Int,
-    ) {
-        val buf = readyBufferRef.getAndSet(null) ?: return
+    ): Boolean {
+        val buf = readyBufferRef.getAndSet(null) ?: return false
         if (actualW != expectedW || actualH != expectedH || Minecraft.getInstance().window.isMinimized) {
             if (MediaPlayer.DEBUG) skippedUploads++
             recycleFrameBuffer(buf)
-            return
+            return false
         }
         val start = System.nanoTime()
         try {
@@ -127,6 +137,7 @@ internal class FrameSurface(
                 recordUpload(System.nanoTime() - start, "Planar upload", y.getWidth(0), y.getHeight(0))
                 MediaPlayer.framesToGpu.incrementAndGet()
             }
+            return true
         } finally {
             recycleFrameBuffer(buf)
         }
@@ -179,6 +190,20 @@ internal class FrameSurface(
         return takeReusableFrameBuffer(nextSize) ?: allocateFrameBuffer(nextSize)
     }
 
+    /**
+     * Consumer-side present (used by [FramePrebuffer]): swaps [frame] into the ready slot, recycling any
+     * frame the render thread hadn't picked up yet. Unlike [publish] it returns no spare — the prebuffer's
+     * producer owns spare allocation.
+     */
+    fun present(frame: ByteBuffer) {
+        val dropped = readyBufferRef.getAndSet(frame)
+        if (dropped !== frame) dropped?.let {
+            readyDrops.incrementAndGet()
+            if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
+            recycleFrameBuffer(it)
+        }
+    }
+
     /** Returns a pooled or freshly allocated direct buffer of at least [size] bytes. */
     fun takeOrAllocate(size: Int): ByteBuffer = takeReusableFrameBuffer(size) ?: allocateFrameBuffer(size)
 
@@ -206,7 +231,7 @@ internal class FrameSurface(
      */
     fun recycleFrameBuffer(buffer: ByteBuffer) {
         buffer.clear()
-        if (reusableFrameBuffers.size < MAX_REUSABLE_FRAME_BUFFERS) {
+        if (reusableFrameBuffers.size < maxReusableBuffers) {
             reusableFrameBuffers.offer(buffer)
         }
     }

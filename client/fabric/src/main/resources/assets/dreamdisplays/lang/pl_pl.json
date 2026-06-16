@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Lokalny",
+  "dreamdisplays.mode.synced": "Zsynchronizowany",
+  "dreamdisplays.mode.watch_party": "Wspólne oglądanie",
+  "dreamdisplays.mode.broadcast": "Transmisja",
   "dreamdisplays.button.enabled": "Aktywne",
   "dreamdisplays.button.disabled": "Nieaktywne",
   "dreamdisplays.error.loadingerror.1": "Ups! Nie możemy załadować ten filmik.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Szukaj na YouTube...",
   "dreamdisplays.suggestions.loading": "Ładowanie...",
   "dreamdisplays.suggestions.empty": "Nie znaleziono żadnych wyników.",
-  "dreamdisplays.suggestions.error": "Nie udało się załadować."
+  "dreamdisplays.suggestions.error": "Nie udało się załadować.",
+  "dreamdisplays.suggestions.unavailable": "Sugestie niedostępne."
 }

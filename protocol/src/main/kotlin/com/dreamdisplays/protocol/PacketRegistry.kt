@@ -50,6 +50,11 @@ object PacketRegistry {
         Entry(9, ReportDisplay::class, ReportDisplay.serializer(), PacketDirection.CLIENT_TO_SERVER),
         Entry(10, SetDisplaysEnabled::class, SetDisplaysEnabled.serializer(), PacketDirection.BIDIRECTIONAL),
         Entry(11, ClearCache::class, ClearCache.serializer(), PacketDirection.SERVER_TO_CLIENT),
+        Entry(12, PlaybackCommand::class, PlaybackCommand.serializer(), PacketDirection.CLIENT_TO_SERVER),
+        Entry(13, SetMode::class, SetMode.serializer(), PacketDirection.CLIENT_TO_SERVER),
+        Entry(14, WatchPartyStart::class, WatchPartyStart.serializer(), PacketDirection.CLIENT_TO_SERVER),
+        Entry(15, WatchPartyControl::class, WatchPartyControl.serializer(), PacketDirection.CLIENT_TO_SERVER),
+        Entry(16, WatchPartyState::class, WatchPartyState.serializer(), PacketDirection.SERVER_TO_CLIENT),
     )
 
     private val byId = entries.associateBy { it.id }

@@ -24,10 +24,12 @@ internal fun DisplayScreen.toDisplay(): Display = Display(
     settings = ApiDisplaySettings(
         volume = volume, quality = quality, brightness = brightness,
         muted = muted, paused = isPaused, renderDistance = renderDistance.coerceIn(32, 192),
-        syncEnabled = isSync, urlOverride = null, audioTrackName = lang,
+        urlOverride = null, audioTrackName = lang,
     ),
     url = videoUrl,
     state = toRuntimeState(),
+    mode = effectiveMode,
+    watchParty = watchParty,
 )
 
 /** Derives the current [DisplayRuntimeState] from the screen's media / error / playback state. */
@@ -47,5 +49,5 @@ internal fun DisplayScreen.toRuntimeState(): DisplayRuntimeState = when {
 internal fun DisplayScreen.toFullDisplayData(): FullDisplayData = FullDisplayData(
     uuid, pos.x, pos.y, pos.z, facing, width, height,
     videoUrl ?: "", lang ?: "", volume, quality.serialize(), brightness,
-    muted, isSync, ownerUuid, renderDistance, currentTimeNanos,
+    muted, mode, ownerUuid, renderDistance, currentTimeNanos,
 )

@@ -41,6 +41,7 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
         private set
 
     private val surface = FrameSurface(debugLabel)
+    @Volatile private var activePrebuffer: FramePrebuffer? = null
 
     /**
      * Returns true once a frame is available for upload or has already been uploaded to the GPU texture.
@@ -59,11 +60,17 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
      * It does not block or wait for a frame to be ready, and it does not guarantee that the same frame will still be
      * ready by the time it executes.
      */
-    override fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int) =
+    override fun updateFrame(texture: GpuTexture, actualW: Int, actualH: Int): Boolean =
         surface.updateFrame(texture, actualW, actualH, expectedW, expectedH)
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     override fun clear() = surface.clear()
+
+    /** Drops parked raw buffers while preserving the already-uploaded GPU texture. */
+    override fun trimForPark() {
+        activePrebuffer?.trimForPark()
+        surface.clear()
+    }
 
     /**
      * Releases the PBO ring. Must be called from the render thread when this pipe is permanently
@@ -90,8 +97,11 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
         expectedH = h
         lastFrameReceivedNanos.set(System.nanoTime())
         val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        val prebuffer = FramePrebuffer.createIfEnabled(
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+        ).also { activePrebuffer = it }
         return daemon(
-            { read(proc, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos) },
+            { read(proc, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
             "MediaPlayer-video",
         ).also { it.start() }
     }
@@ -101,7 +111,7 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
      */
     private fun read(proc: Process, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
-        onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
     ) {
         var frameSize = w * h * 3
         var spare = surface.allocateFrameBuffer(frameSize)
@@ -166,6 +176,17 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
 
                     lastFrameReceivedNanos.set(System.nanoTime())
 
+                    if (prebuffer != null) {
+                        // Producer path: hand the decoded frame to the jitter buffer; the consumer thread
+                        // paces and presents it (and fires onFirstFrame after the prefill).
+                        popoutFrameSink?.let { sink -> sink(spare, w, h, UploadPixelFormat.RGB24); spare.rewind() }
+                        if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
+                        spare = prebuffer.submit(spare, videoPts, requiredFrameSize)
+                        if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
+                        videoPts += frameNs
+                        continue
+                    }
+
                     if (FramePacing.pace(videoPts, getAudioClock())) {
                         if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
                         videoPts += frameNs
@@ -192,6 +213,15 @@ internal class VideoFramePipe(private val debugLabel: String) : FramePipe {
                 logger.warn("$debugLabel Read: ${e.message}")
             }
         }
+
+        // Normal EOF should drain queued frames; abort only for teardown / errors. This matters for
+        // short replay / cached sources that can fill the prebuffer and EOF before live video is ready.
+        if (!terminated.get() && !stopFlag.get() && normalEos) {
+            prebuffer?.finish()
+        } else {
+            prebuffer?.abort()
+        }
+        if (activePrebuffer === prebuffer) activePrebuffer = null
 
         var exitCode = -1
         if (normalEos) {

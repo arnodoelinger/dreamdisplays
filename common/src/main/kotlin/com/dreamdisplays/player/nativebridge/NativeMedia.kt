@@ -39,7 +39,7 @@ internal object NativeMedia {
     private const val LAV_BASE_NAME = "dreamdisplays_lav"
 
     /** Must match `LAV_ABI_VERSION` in `native/lav/src/lib.rs`. */
-    private const val LAV_ABI_VERSION = 2
+    private const val LAV_ABI_VERSION = 4
     private const val LAV_SURFACE_ABI_VERSION = 1
     private const val LAV_SURFACE_DESC_BYTES = 80L
     private const val CACHE_ROOT = "./dreamdisplays/native"
@@ -61,11 +61,15 @@ internal object NativeMedia {
     private var i420ToRgbaHandle: MethodHandle? = null
 
     private var lavOpenHandle: MethodHandle? = null
+    private var lavOpenReplayHandle: MethodHandle? = null
     private var lavReadFrameHandle: MethodHandle? = null
     private var lavReadFramePtsHandle: MethodHandle? = null
     private var lavErrorHandle: MethodHandle? = null
     private var lavKillHandle: MethodHandle? = null
     private var lavCloseHandle: MethodHandle? = null
+    private var lavEnableCacheHandle: MethodHandle? = null
+    private var lavRingSnapshotHandle: MethodHandle? = null
+    private var lavRingSnapshotAtHandle: MethodHandle? = null
     private var lavReadSurfaceHandle: MethodHandle? = null
     private var lavBindSurfacePlaneGlHandle: MethodHandle? = null
     private var lavReleaseSurfaceHandle: MethodHandle? = null
@@ -125,6 +129,13 @@ internal object NativeMedia {
                 && lavReadSurfaceHandle != null
                 && lavBindSurfacePlaneGlHandle != null
                 && lavReleaseSurfaceHandle != null
+
+    /** True when the LAV packet-cache and replay ABI is available. */
+    val lavReplayCacheAvailable: Boolean
+        get() = lavAvailable
+                && lavOpenReplayHandle != null
+                && lavEnableCacheHandle != null
+                && lavRingSnapshotAtHandle != null
 
     data class LavSurfaceDescriptor(
         val handle: Long,
@@ -205,6 +216,45 @@ internal object NativeMedia {
             MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
             return lavOpenHandle!!.invoke(seg, bytes.size.toLong(), w, h, startMicros, hwAccelCode) as Long
         }
+    }
+
+    /** Opens a native replay decode session from a serialized packet-ring [blob]. */
+    fun lavOpenReplay(blob: ByteArray, w: Int, h: Int, resumeNanos: Long): Long {
+        val openReplay = lavOpenReplayHandle ?: return 0L
+        if (blob.isEmpty()) return 0L
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(blob.size.toLong())
+            MemorySegment.copy(MemorySegment.ofArray(blob), 0L, seg, 0L, blob.size.toLong())
+            return openReplay.invoke(seg, blob.size.toLong(), w, h, resumeNanos) as Long
+        }
+    }
+
+    /** Enables the native rolling packet cache for a live LAV [handle]. */
+    fun lavEnableCache(handle: Long, windowMs: Long, maxBytes: Long): Boolean {
+        val enable = lavEnableCacheHandle ?: return false
+        if (windowMs <= 0 || maxBytes <= 0) return false
+        return (enable.invoke(handle, windowMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), maxBytes) as Int) == READ_OK
+    }
+
+    /** Captures the live LAV packet-ring snapshot for [handle], or null when no data is ready. */
+    fun lavRingSnapshot(handle: Long, positionNanos: Long): ByteArray? {
+        val snapshot = lavRingSnapshotAtHandle ?: return null
+        var size = snapshot.invoke(handle, positionNanos, MemorySegment.NULL, 0L) as Int
+        if (size <= 0) return null
+        repeat(3) {
+            Arena.ofConfined().use { arena ->
+                val seg = arena.allocate(size.toLong())
+                val written = snapshot.invoke(handle, positionNanos, seg, size.toLong()) as Int
+                if (written <= 0) return null
+                if (written <= size) {
+                    val out = ByteArray(written)
+                    MemorySegment.copy(seg, 0L, MemorySegment.ofArray(out), 0L, written.toLong())
+                    return out
+                }
+                size = written
+            }
+        }
+        return null
     }
 
     /** Blocking in-process decode of the next frame into [dst] as raw I420 planes. */
@@ -400,11 +450,15 @@ internal object NativeMedia {
                 return false
             }
             lavOpenHandle = bind("dd_lav_open", FunctionDescriptor.of(long, addr, long, int, int, long, int))
+            lavOpenReplayHandle = bind("dd_lav_open_replay", FunctionDescriptor.of(long, addr, long, int, int, long))
             lavReadFrameHandle = bind("dd_lav_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
             lavReadFramePtsHandle = bindOptional("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(int, long, addr, long, addr))
             lavErrorHandle = bind("dd_lav_error", FunctionDescriptor.of(int, long, addr, long))
             lavKillHandle = bind("dd_lav_kill", FunctionDescriptor.ofVoid(long))
             lavCloseHandle = bind("dd_lav_close", FunctionDescriptor.ofVoid(long))
+            lavEnableCacheHandle = bind("dd_lav_enable_cache", FunctionDescriptor.of(int, long, int, long))
+            lavRingSnapshotHandle = bind("dd_lav_ring_snapshot", FunctionDescriptor.of(int, long, addr, long))
+            lavRingSnapshotAtHandle = bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(int, long, long, addr, long))
             val surfaceAbi = bindOptional("dd_lav_surface_abi_version", FunctionDescriptor.of(int))
             if (surfaceAbi != null && surfaceAbi.invoke() as Int == LAV_SURFACE_ABI_VERSION) {
                 lavReadSurfaceHandle = bindOptional("dd_lav_read_surface", FunctionDescriptor.of(int, long, addr))
@@ -414,7 +468,10 @@ internal object NativeMedia {
             val surfaceInterop = lavReadSurfaceHandle != null
                     && lavBindSurfacePlaneGlHandle != null
                     && lavReleaseSurfaceHandle != null
-            logger.info("In-process libav backend available: $lib (surfaceInterop=$surfaceInterop).")
+            val replayCache = lavOpenReplayHandle != null
+                    && lavEnableCacheHandle != null
+                    && lavRingSnapshotAtHandle != null
+            logger.info("In-process libav backend available: $lib (surfaceInterop=$surfaceInterop, replayCache=$replayCache).")
             true
         } catch (t: Throwable) {
             // Typically UnsatisfiedLinkError when the system FFmpeg dylibs are missing.

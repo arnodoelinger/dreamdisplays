@@ -5,6 +5,7 @@ import com.dreamdisplays.server.Server
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
 import com.dreamdisplays.server.meta.Scheduler
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.PlatformUtil
 import com.dreamdisplays.server.utils.net.FabricPacketUtil
@@ -65,6 +66,7 @@ import org.jspecify.annotations.NullMarked
     @EventHandler fun onPlayerLeave(event: PlayerQuitEvent) {
         PlayerManager.removeVersion(event.player)
         V2PlayerTracker.clear(event.player.uniqueId)
+        WatchPartyManager.onPlayerQuit(event.player.uniqueId)
     }
 }
 
@@ -110,6 +112,7 @@ import org.jspecify.annotations.NullMarked
         ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
             PlayerManager.removeVersion(handler.player)
             V2PlayerTracker.clear(handler.player.uuid)
+            WatchPartyManager.onPlayerQuit(handler.player.uuid)
         }
     }
 }

@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Лакальны",
+  "dreamdisplays.mode.synced": "Сінхранізаваны",
+  "dreamdisplays.mode.watch_party": "Сумесны прагляд",
+  "dreamdisplays.mode.broadcast": "Трансляцыя",
   "dreamdisplays.button.enabled": "Уключана",
   "dreamdisplays.button.disabled": "Выключана",
   "dreamdisplays.error.loadingerror.1": "Упс! Мы не можам загрузіць гэтае відэа.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Пошук на YouTube...",
   "dreamdisplays.suggestions.loading": "Загрузка...",
   "dreamdisplays.suggestions.empty": "Ничего не найдено.",
-  "dreamdisplays.suggestions.error": "Не удалось загрузить."
+  "dreamdisplays.suggestions.error": "Не удалось загрузить.",
+  "dreamdisplays.suggestions.unavailable": "Рэкамендацыі недаступныя."
 }

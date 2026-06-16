@@ -44,6 +44,9 @@ class SuggestionsPanel(
     private val clearButton: IconButton
     private val searchButton: IconButton
 
+    /** When this returns false the panel is locked: it shows an "unavailable" notice and ignores input. */
+    var available: () -> Boolean = { true }
+
     private var scrollOffset: Int = 0
     private var hoveredCard: Int = -1
     private var vertical: Boolean = false
@@ -142,6 +145,12 @@ class SuggestionsPanel(
 
         val f = Minecraft.getInstance().font
         g.drawText(f, message, x + 10, y + 10, UiTheme.TEXT_PRIMARY, false)
+
+        if (!available()) {
+            val notice = Component.translatable("dreamdisplays.suggestions.unavailable").string
+            g.drawText(f, notice, x + 10, stripTop() + 6, UiTheme.TEXT_SECONDARY, false)
+            return
+        }
 
         layoutChildren()
         searchBox.renderChild(g, mouseX, mouseY, partialTick)
@@ -292,6 +301,7 @@ class SuggestionsPanel(
     }
 
     override fun mouseScrolled(mouseX: Double, mouseY: Double, dx: Double, dy: Double): Boolean {
+        if (!available()) return false
         if (!isMouseOver(mouseX, mouseY)) return false
         val stripTop = stripTop()
         val stripBottom = stripBottom()
@@ -304,6 +314,7 @@ class SuggestionsPanel(
     }
 
     override fun mouseClicked(event: MouseButtonEvent, dbl: Boolean): Boolean {
+        if (!available()) return false
         val mouseX = event.x()
         val mouseY = event.y()
         if (clearButton.isMouseOver(mouseX, mouseY)) return clearButton.mouseClicked(event, dbl)
@@ -354,6 +365,7 @@ class SuggestionsPanel(
     }
 
     override fun keyPressed(event: KeyEvent): Boolean {
+        if (!available()) return super.keyPressed(event)
         if (searchBox.isFocused) {
             if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
                 controller.runSearch(searchBox.value)

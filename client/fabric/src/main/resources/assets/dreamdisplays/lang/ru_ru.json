@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Локальный",
+  "dreamdisplays.mode.synced": "Синхронизированный",
+  "dreamdisplays.mode.watch_party": "Совместный просмотр",
+  "dreamdisplays.mode.broadcast": "Трансляция",
   "dreamdisplays.button.enabled": "Включено",
   "dreamdisplays.button.disabled": "Выключено",
   "dreamdisplays.error.loadingerror.1": "Упс! Мы не можем загрузить это видео.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Поиск YouTube...",
   "dreamdisplays.suggestions.loading": "Загрузка...",
   "dreamdisplays.suggestions.empty": "Ничего не найдено.",
-  "dreamdisplays.suggestions.error": "Не удалось загрузить."
+  "dreamdisplays.suggestions.error": "Не удалось загрузить.",
+  "dreamdisplays.suggestions.unavailable": "Рекомендации недоступны."
 }

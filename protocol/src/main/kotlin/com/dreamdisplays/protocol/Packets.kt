@@ -40,6 +40,10 @@ import kotlinx.serialization.protobuf.ProtoType
     @ProtoNumber(18) val lavInProcessEnabled: Boolean = false,
     @ProtoNumber(19) val lavSurfaceInteropAvailable: Boolean = false,
     @ProtoNumber(20) val lavZeroCopyEnabled: Boolean = false,
+    @ProtoNumber(21) val systemRamMb: Int = 0,
+    @ProtoNumber(22) val maxJvmMemoryMb: Int = 0,
+    @ProtoNumber(23) val dedicatedVramMb: Int = 0,
+    @ProtoNumber(24) val warmDisplayLimit: Int = 0,
 ) : DreamPacket
 
 /**
@@ -56,7 +60,7 @@ import kotlinx.serialization.protobuf.ProtoType
     @ProtoNumber(7) val allowedFeatures: List<String> = emptyList(),
 ) : DreamPacket
 
-/** Full description of a single display; `facing` uses the legacy byte mapping 0=N 1=E 2=S 3=W. */
+/** Full description of a single display. */
 @Serializable data class DisplayInfo(
     @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
     @ProtoNumber(2) val ownerId: ProtoUuid = ZERO_UUID,
@@ -70,6 +74,8 @@ import kotlinx.serialization.protobuf.ProtoType
     @ProtoNumber(10) val isSync: Boolean = false,
     @ProtoNumber(11) val lang: String = "",
     @ProtoNumber(12) val isLocked: Boolean = true,
+    @ProtoNumber(13) val mode: Int = 0,
+    @ProtoNumber(14) val qualityCap: Int = 0,
 ) : DreamPacket
 
 /** Removes a display (server broadcast) or requests its deletion (client action). */
@@ -77,13 +83,23 @@ import kotlinx.serialization.protobuf.ProtoType
     @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
 ) : DreamPacket
 
-/** Playback state for a synchronized display; travels in both directions. */
+/**
+ * Authoritative playback timeline for a display, pushed by the server. [currentTimeMs] is the
+ * position as of [serverTimeMs]; clients extrapolate `position + (estServerNow - serverTimeMs)`
+ * (wrapping by [durationMs] when [loop]) and only seek when their drift exceeds tolerance.
+ *
+ * Still travels in both directions for frozen-v1 compatibility, but v2 clients no longer report
+ * their own clock here — they send intents via [PlaybackCommand] and the server owns the timeline.
+ */
 @Serializable data class DisplaySync(
     @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
     @ProtoNumber(2) val isSync: Boolean = false,
     @ProtoNumber(3) val isPaused: Boolean = false,
     @ProtoNumber(4) val currentTimeMs: Long = 0,
     @ProtoNumber(5) val durationMs: Long = 0,
+    @ProtoNumber(6) val serverTimeMs: Long = 0,
+    @ProtoNumber(7) val loop: Boolean = false,
+    @ProtoNumber(8) val mode: Int = 0,
 ) : DreamPacket
 
 /** Client asks the server for the authoritative playback state of a display. */
@@ -120,4 +136,61 @@ import kotlinx.serialization.protobuf.ProtoType
 /** Server tells the client to evict the listed displays from local caches. */
 @Serializable data class ClearCache(
     @ProtoNumber(1) val ids: List<ProtoUuid> = emptyList(),
+) : DreamPacket
+
+/**
+ * Client playback intent for a server-authoritative timeline (a `SYNCED` display the client may
+ * edit, or a watch-party host). The server validates permission, updates its clock, and rebroadcasts
+ * the new [DisplaySync]. [action] is a [PlaybackAction.wire]; [positionMs] is used by `SEEK`.
+ */
+@Serializable data class PlaybackCommand(
+    @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(2) val action: Int = 0,
+    @ProtoNumber(3) val positionMs: Long = 0,
+) : DreamPacket
+
+/** Client sets a display's persistent base mode; [mode] is a [PlaybackMode.wire] (not `WATCH_PARTY`). */
+@Serializable data class SetMode(
+    @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(2) val mode: Int = 0,
+    @ProtoNumber(3) val positionMs: Long = -1,
+) : DreamPacket
+
+/** Client starts a watch-party session on a display, becoming its host (display must be unlocked, or owner). */
+@Serializable data class WatchPartyStart(
+    @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(2) val url: String = "",
+    @ProtoNumber(3) val lang: String = "",
+) : DreamPacket
+
+/**
+ * Participant readiness ([WatchPartyAction.READY]/[WatchPartyAction.UNREADY], any nearby player) or
+ * host control (everything else) for an active session. [positionMs] is used by `SEEK`.
+ */
+@Serializable data class WatchPartyControl(
+    @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(2) val action: Int = 0,
+    @ProtoNumber(3) val positionMs: Long = 0,
+) : DreamPacket
+
+/**
+ * Server snapshot of a watch-party session, broadcast to nearby clients on every transition.
+ * [state] is a [WatchPartySessionState.wire]; [positionMs] is the timeline position as of
+ * [serverTimeMs]; [countdownStartEpochMs] is the shared instant `COUNTDOWN` resolves to `PLAYING`.
+ */
+@Serializable data class WatchPartyState(
+    @ProtoNumber(1) val id: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(2) val sessionId: String = "",
+    @ProtoNumber(3) val state: Int = 0,
+    @ProtoNumber(4) val hostId: ProtoUuid = ZERO_UUID,
+    @ProtoNumber(5) val hostName: String = "",
+    @ProtoNumber(6) val url: String = "",
+    @ProtoNumber(7) val lang: String = "",
+    @ProtoNumber(8) val readyCount: Int = 0,
+    @ProtoNumber(9) val nearbyCount: Int = 0,
+    @ProtoNumber(10) val countdownStartEpochMs: Long = 0,
+    @ProtoNumber(11) val positionMs: Long = 0,
+    @ProtoNumber(12) val serverTimeMs: Long = 0,
+    @ProtoNumber(13) val durationMs: Long = 0,
+    @ProtoNumber(14) val paused: Boolean = true,
 ) : DreamPacket

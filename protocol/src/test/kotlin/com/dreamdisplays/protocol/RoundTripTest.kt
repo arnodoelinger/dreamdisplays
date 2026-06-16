@@ -24,6 +24,10 @@ class RoundTripTest {
             maxTextureSize = 8192,
             supportedCodecs = listOf("h264", "vp9", "av1"),
             supportsAudio = false,
+            systemRamMb = 16 * 1024,
+            maxJvmMemoryMb = 4 * 1024,
+            dedicatedVramMb = 8 * 1024,
+            warmDisplayLimit = 8,
         )
     )
 
@@ -48,6 +52,8 @@ class RoundTripTest {
             isSync = true,
             lang = "ru",
             isLocked = false,
+            mode = PlaybackMode.BROADCAST.wire,
+            qualityCap = 360,
         )
     )
 
@@ -60,6 +66,12 @@ class RoundTripTest {
     @Test fun remainingPackets() {
         roundTrip(DisplayDelete(id))
         roundTrip(DisplaySync(id, isSync = true, isPaused = true, currentTimeMs = -1, durationMs = Long.MAX_VALUE))
+        roundTrip(
+            DisplaySync(
+                id, isSync = true, isPaused = false, currentTimeMs = 12_345, durationMs = 600_000,
+                serverTimeMs = 1_700_000_000_000, loop = true, mode = PlaybackMode.BROADCAST.wire,
+            )
+        )
         roundTrip(RequestSync(id))
         roundTrip(SetVideo(id, "https://example.com/v.mp4", "en"))
         roundTrip(SetLocked(id, locked = false))
@@ -67,6 +79,21 @@ class RoundTripTest {
         roundTrip(SetDisplaysEnabled(enabled = false))
         roundTrip(ClearCache(listOf(id, owner)))
         roundTrip(ClearCache(emptyList()))
+    }
+
+    @Test fun playbackModePackets() {
+        roundTrip(PlaybackCommand(id, action = PlaybackAction.SEEK.wire, positionMs = 42_000))
+        roundTrip(SetMode(id, mode = PlaybackMode.SYNCED.wire))
+        roundTrip(WatchPartyStart(id, "https://youtu.be/abc", "en"))
+        roundTrip(WatchPartyControl(id, action = WatchPartyAction.BEGIN.wire))
+        roundTrip(
+            WatchPartyState(
+                id = id, sessionId = "s-1", state = WatchPartySessionState.COUNTDOWN.wire,
+                hostId = owner, hostName = "Steve", url = "https://youtu.be/abc", lang = "en",
+                readyCount = 3, nearbyCount = 5, countdownStartEpochMs = 1_700_000_003_000,
+                positionMs = 0, serverTimeMs = 1_700_000_000_000, durationMs = 600_000, paused = true,
+            )
+        )
     }
 
     @Test fun unknownTypeIdIsIgnored() {

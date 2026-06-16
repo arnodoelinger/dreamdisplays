@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "מקומי",
+  "dreamdisplays.mode.synced": "מסונכרן",
+  "dreamdisplays.mode.watch_party": "צפייה משותפת",
+  "dreamdisplays.mode.broadcast": "שידור",
   "dreamdisplays.button.enabled": "מופעל",
   "dreamdisplays.button.disabled": "מושבת",
   "dreamdisplays.error.loadingerror.1": "אופס! לא הצלחנו לטעון את הווידאו הזה.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "חפש ב-YouTube...",
   "dreamdisplays.suggestions.loading": "טוען...",
   "dreamdisplays.suggestions.empty": "לא נמצאו תוצאות.",
-  "dreamdisplays.suggestions.error": "טעינה נכשלה."
+  "dreamdisplays.suggestions.error": "טעינה נכשלה.",
+  "dreamdisplays.suggestions.unavailable": "הצעות לא זמינות."
 }

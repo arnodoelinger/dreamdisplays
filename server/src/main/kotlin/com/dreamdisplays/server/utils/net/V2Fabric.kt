@@ -3,20 +3,24 @@ package com.dreamdisplays.server.utils.net
 import com.dreamdisplays.net.V2Payload
 import com.dreamdisplays.protocol.ClientHello
 import com.dreamdisplays.protocol.DisplayDelete
-import com.dreamdisplays.protocol.DisplaySync
 import com.dreamdisplays.protocol.DreamPacket
 import com.dreamdisplays.protocol.PacketRegistry
+import com.dreamdisplays.protocol.PlaybackAction
+import com.dreamdisplays.protocol.PlaybackCommand
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.ReportDisplay
 import com.dreamdisplays.protocol.RequestSync
 import com.dreamdisplays.protocol.ServerHello
 import com.dreamdisplays.protocol.SetDisplaysEnabled
 import com.dreamdisplays.protocol.SetLocked
+import com.dreamdisplays.protocol.SetMode
 import com.dreamdisplays.protocol.SetVideo
+import com.dreamdisplays.protocol.WatchPartyAction
+import com.dreamdisplays.protocol.WatchPartyControl
+import com.dreamdisplays.protocol.WatchPartyStart
 import com.dreamdisplays.server.Server
-import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
-import com.dreamdisplays.server.managers.StateManager
 import io.github.arsmotorin.ofrat.FabricOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
@@ -24,7 +28,7 @@ import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
 
 /**
- * Protocol-v2 networking for the Fabric flavor: one envelope payload in both directions.
+ * Protocol-v2 networking for the `Fabric` flavor: one envelope payload in both directions.
  * Business logic is shared with the frozen-v1 receivers through [ServerPacketHandler].
  */
 @FabricOnly object FabricV2Networking {
@@ -56,19 +60,26 @@ import org.slf4j.LoggerFactory
     private fun dispatch(player: ServerPlayer, server: MinecraftServer, packet: DreamPacket) {
         when (packet) {
             is ClientHello -> handleHello(player, server, packet)
-            is DisplaySync -> StateManager.processSyncPacket(
-                SyncData(packet.id, packet.isSync, packet.isPaused, packet.currentTimeMs, packet.durationMs),
-                player, server,
-            )
-            is RequestSync -> StateManager.sendSyncPacket(packet.id, player)
+            is RequestSync -> ServerPacketHandler.requestSync(player, packet.id)
             is DisplayDelete -> ServerPacketHandler.delete(player, server, packet.id)
             is ReportDisplay -> DisplayManager.report(packet.id, player, server)
             is SetVideo -> ServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
             is SetLocked -> ServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
+            is SetMode -> ServerPacketHandler.setMode(player, server, packet.id, PlaybackMode.fromWire(packet.mode), packet.positionMs)
+            is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
+                ServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
+            }
+            is WatchPartyStart -> ServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
+            is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
+                ServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
+            }
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }
     }
+
+    /** v2 feature flags advertised to clients so they only surface modes / parties on capable servers. */
+    private val PLAYBACK_FEATURES = listOf("modes", "watch_party", "broadcast")
 
     /** Marks [player] as a v2 peer, replies with the [ServerHello] and the display batch. */
     private fun handleHello(player: ServerPlayer, server: MinecraftServer, hello: ClientHello) {
@@ -79,6 +90,7 @@ import org.slf4j.LoggerFactory
                 isPremium = ServerPacketHandler.isOpLevel2(player),
                 isAdmin = ServerPacketHandler.isOpLevel2(player),
                 isReportingEnabled = Server.config.settings.webhookUrl.isNotEmpty(),
+                allowedFeatures = PLAYBACK_FEATURES,
             ),
         )
         ServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)

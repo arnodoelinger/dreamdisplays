@@ -1,5 +1,9 @@
 {
   "dreamdisplays.ui.title": "Dream Displays",
+  "dreamdisplays.mode.local": "Локальний",
+  "dreamdisplays.mode.synced": "Синхронізований",
+  "dreamdisplays.mode.watch_party": "Спільний перегляд",
+  "dreamdisplays.mode.broadcast": "Трансляція",
   "dreamdisplays.button.enabled": "Увімкнено",
   "dreamdisplays.button.disabled": "Вимкнено",
   "dreamdisplays.error.loadingerror.1": "Упс! Ми не можемо завантажити це відео.",
@@ -58,5 +62,6 @@
   "dreamdisplays.suggestions.search": "Пошук на YouTube...",
   "dreamdisplays.suggestions.loading": "Завантаження...",
   "dreamdisplays.suggestions.empty": "Нічого не знайдено.",
-  "dreamdisplays.suggestions.error": "Не вдалося загрузити."
+  "dreamdisplays.suggestions.error": "Не вдалося загрузити.",
+  "dreamdisplays.suggestions.unavailable": "Рекомендації недоступні."
 }

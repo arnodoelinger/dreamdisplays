@@ -6,8 +6,10 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 import com.dreamdisplays.api.DefaultDisplayService
 import com.dreamdisplays.api.DefaultPlaybackService
+import com.dreamdisplays.api.DefaultWatchPartyService
 import com.dreamdisplays.api.DisplayService
 import com.dreamdisplays.api.PlaybackService
+import com.dreamdisplays.api.WatchPartyService
 import com.dreamdisplays.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.client.capabilities.ClientCapabilityDetector
 import com.dreamdisplays.client.capabilities.DefaultCapabilityNegotiationService
@@ -105,6 +107,7 @@ object DreamServices {
         registry.register<PopoutManager>(DefaultPopoutManager())
         registry.register<DisplayService>(DefaultDisplayService())
         registry.register<PlaybackService>(DefaultPlaybackService())
+        registry.register<WatchPartyService>(DefaultWatchPartyService())
         registry.register<ClientCapabilityDetector>(MinecraftClientCapabilityDetector)
         registry.register<CapabilityNegotiationService>(DefaultCapabilityNegotiationService(MinecraftClientCapabilityDetector))
         registry.register<DisplayRenderer>(DefaultDisplayRenderer())
