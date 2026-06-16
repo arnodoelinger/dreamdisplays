@@ -1,6 +1,7 @@
 package com.dreamdisplays.client.capabilities
 
 import com.dreamdisplays.client.ui.VideoPopoutWindow
+import com.dreamdisplays.managers.WarmParkPolicy
 import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.process.HwAccelBackend
 import com.dreamdisplays.protocol.ClientHello
@@ -33,6 +34,7 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
         val hwAccel = HwAccelBackend.detectDefault()
         val nativeAvailable = safeBool { NativeMedia.isAvailable }
         val lavAvailable = safeBool { NativeMedia.lavAvailable }
+        val memory = ClientMemoryProbe.detected
         return ClientHello(
             supportsPopout = supportsPopout,
             supportsHardwareDecode = hwAccel != HwAccelBackend.NONE,
@@ -52,6 +54,10 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
             lavInProcessEnabled = lavAvailable && safeBool { NativeMedia.lavInProcessEnabled },
             lavSurfaceInteropAvailable = lavAvailable && safeBool { NativeMedia.lavSurfaceInteropAvailable },
             lavZeroCopyEnabled = lavAvailable && safeBool { NativeMedia.lavZeroCopyEnabled },
+            systemRamMb = memory.systemRamMb,
+            maxJvmMemoryMb = memory.maxJvmMemoryMb,
+            dedicatedVramMb = memory.dedicatedVramMb,
+            warmDisplayLimit = WarmParkPolicy.maxFullWarmDisplays,
         )
     }
 
