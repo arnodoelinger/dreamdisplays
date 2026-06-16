@@ -4,9 +4,6 @@ import com.dreamdisplays.Initializer
 import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.NativeImage
-import com.mojang.blaze3d.shaders.UniformType
-import com.mojang.blaze3d.vertex.DefaultVertexFormat
-import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
@@ -47,10 +44,8 @@ object DisplayYuvRenderTypes {
     private const val SAMPLER_V = "Sampler3"
 
     /**
-     * True when the runtime exposes the pipeline-builder API this module was compiled against.
-     * This module compiles against the 26.1-era Blaze3D (NeoForge has no 26.2 build yet); 26.2
-     * replaced `withSampler`/`withUniform`/`TextureFormat` with a Vulkan-style API, so there
-     * the YUV path stays off and playback falls back to the CPU conversion pipeline.
+     * True when the runtime exposes the 26.1-era pipeline-builder API. 26.2 replaced
+     * `withSampler` / `withUniform` / `TextureFormat`, so that path goes through [Yuv262Reflect].
      */
     val isSupported: Boolean by lazy {
         runCatching {
@@ -79,20 +74,12 @@ object DisplayYuvRenderTypes {
     /** Compiled lazily by the backend on first draw; shared by every YUV display. */
     private val pipeline: RenderPipeline by lazy {
         if (!isSupported) return@lazy Yuv262Reflect.createPipeline()
-        RenderPipeline.builder()
-            .withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
-            .withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
-            .withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withUniform("Projection", UniformType.UNIFORM_BUFFER)
-            .withUniform("Fog", UniformType.UNIFORM_BUFFER)
-            .withSampler(SAMPLER_Y)
-            .withSampler(SAMPLER_U)
-            .withSampler(SAMPLER_V)
-            .withDisplayColorAndDepth()
-            .withCull(false)
-            .withVertexFormat(DefaultVertexFormat.POSITION_TEX_COLOR, VertexFormat.Mode.QUADS)
-            .build()
+        RenderPipelineCompat.createDisplayPipeline(
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"),
+            listOf(SAMPLER_Y, SAMPLER_U, SAMPLER_V),
+        )
     }
 
     /** Creates the [RenderType] drawing a display through the YUV pipeline from its three plane textures. */

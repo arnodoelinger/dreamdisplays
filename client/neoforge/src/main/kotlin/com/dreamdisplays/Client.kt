@@ -9,6 +9,7 @@ import com.dreamdisplays.platform.NeoForgePlatform
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.render.ScreenRenderer
 import com.mojang.blaze3d.systems.RenderSystem
+import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.neoforged.api.distmarker.Dist
@@ -104,7 +105,7 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
         modelViewStack.pushMatrix()
         try {
             modelViewStack.mul(event.modelViewMatrix)
-            ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+            ScreenRenderer.render(event.poseStack, mainCamera(mc))
         } finally {
             modelViewStack.popMatrix()
         }
@@ -113,8 +114,15 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.Mod {
     /*@SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterParticles) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
-        ScreenRenderer.render(event.poseStack, mc.gameRenderer.mainCamera)
+        ScreenRenderer.render(event.poseStack, mainCamera(mc))
     }*/
+
+    private fun mainCamera(mc: Minecraft): Camera {
+        val gameRenderer = mc.gameRenderer
+        val method = runCatching { gameRenderer.javaClass.getMethod("mainCamera") }
+            .getOrElse { gameRenderer.javaClass.getMethod("getMainCamera") }
+        return method.invoke(gameRenderer) as Camera
+    }
 
     @SubscribeEvent fun onEndTick(event: ClientTickEvent.Post) {
         Initializer.onEndTick(Minecraft.getInstance())

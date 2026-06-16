@@ -146,8 +146,60 @@ object ScreenRenderer : ClientRenderService {
     }
 
     private fun drawImmediate(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-        val builder = Tesselator.getInstance().begin(type.mode(), type.format())
-        appendVertices(stack.last(), builder)
-        type.draw(builder.buildOrThrow())
+        ImmediateRenderCompat.draw(stack, type, appendVertices)
+    }
+
+    private object ImmediateRenderCompat {
+        private val tesselatorClass: Class<*>? by lazy {
+            runCatching { Class.forName("com.mojang.blaze3d.vertex.Tesselator") }.getOrNull()
+        }
+
+        fun draw(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
+            if (tesselatorClass != null) {
+                drawLegacy(stack, type, appendVertices, tesselatorClass!!)
+            } else {
+                draw262(stack, type, appendVertices)
+            }
+        }
+
+        private fun drawLegacy(
+            stack: PoseStack,
+            type: RenderType,
+            appendVertices: QuadAppender,
+            tesselatorClass: Class<*>,
+        ) {
+            val tesselator = tesselatorClass.getMethod("getInstance").invoke(null)
+            val mode = type.javaClass.getMethod("mode").invoke(type)
+            val builder = tesselatorClass
+                .getMethod("begin", mode.javaClass, VertexFormat::class.java)
+                .invoke(tesselator, mode, type.format()) as VertexConsumer
+            appendVertices(stack.last(), builder)
+            val mesh = builder.javaClass.getMethod("buildOrThrow").invoke(builder)
+            val meshDataClass = Class.forName("com.mojang.blaze3d.vertex.MeshData")
+            type.javaClass.getMethod("draw", meshDataClass).invoke(type, mesh)
+        }
+
+        private fun draw262(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
+            val stagedClass = Class.forName("net.minecraft.client.renderer.StagedVertexBuffer")
+            val staged = stagedClass
+                .getConstructor(java.util.function.Supplier::class.java, Int::class.javaPrimitiveType)
+                .newInstance(java.util.function.Supplier { "dream-displays-immediate" }, 1536)
+            try {
+                val primitiveTopology = type.javaClass.getMethod("primitiveTopology").invoke(type)
+                val draw = stagedClass
+                    .getMethod("appendDraw", VertexFormat::class.java, primitiveTopology.javaClass)
+                    .invoke(staged, type.format(), primitiveTopology)
+                val builder = stagedClass
+                    .getMethod("getVertexBuilder", draw.javaClass)
+                    .invoke(staged, draw) as VertexConsumer
+                appendVertices(stack.last(), builder)
+                stagedClass.getMethod("upload").invoke(staged)
+                val executeInfo = stagedClass.getMethod("getExecuteInfo", draw.javaClass).invoke(staged, draw) ?: return
+                val prepared = type.javaClass.getMethod("prepare").invoke(type)
+                prepared.javaClass.getMethod("drawFromBuffer", executeInfo.javaClass).invoke(prepared, executeInfo)
+            } finally {
+                (staged as AutoCloseable).close()
+            }
+        }
     }
 }

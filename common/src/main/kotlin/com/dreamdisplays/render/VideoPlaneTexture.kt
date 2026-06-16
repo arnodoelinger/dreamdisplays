@@ -2,7 +2,6 @@ package com.dreamdisplays.render
 
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
-import com.mojang.blaze3d.textures.TextureFormat
 import net.minecraft.client.renderer.texture.AbstractTexture
 
 /**
@@ -11,21 +10,34 @@ import net.minecraft.client.renderer.texture.AbstractTexture
  * uploaded raw and the display's fragment shader does the color conversion.
  *
  * Only constructed when [DisplayYuvRenderTypes.isSupported] is true (26.2+ replaced
- * [TextureFormat] with `GpuFormat` and reworked the pipeline builder, so the YUV path is
- * disabled there until the module compiles against the new API).
+ * `TextureFormat` with `GpuFormat` and reworked the pipeline builder).
  *
  * Must be constructed on the render thread.
  */
 class VideoPlaneTexture(label: String, width: Int, height: Int) : AbstractTexture() {
     init {
         val device = RenderSystem.getDevice()
-        texture = device.createTexture(
-            label,
-            GpuTexture.USAGE_TEXTURE_BINDING or GpuTexture.USAGE_COPY_DST,
-            TextureFormat.RED8,
-            width, height, 1, 1,
-        )
+        texture = createRed8Texture(device, label, width, height)
         textureView = device.createTextureView(texture!!)
         sampler = DisplayYuvRenderTypes.planeSampler()
+    }
+
+    private fun createRed8Texture(device: Any, label: String, width: Int, height: Int): GpuTexture {
+        val textureFormatClass = Class.forName("com.mojang.blaze3d.textures.TextureFormat")
+        @Suppress("UNCHECKED_CAST")
+        val red8 = java.lang.Enum.valueOf(textureFormatClass as Class<out Enum<*>>, "RED8")
+        val createTexture = device.javaClass.getMethod(
+            "createTexture",
+            String::class.java, Int::class.javaPrimitiveType, textureFormatClass,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+            Int::class.javaPrimitiveType, Int::class.javaPrimitiveType,
+        )
+        return createTexture.invoke(
+            device,
+            label,
+            GpuTexture.USAGE_TEXTURE_BINDING or GpuTexture.USAGE_COPY_DST,
+            red8,
+            width, height, 1, 1,
+        ) as GpuTexture
     }
 }

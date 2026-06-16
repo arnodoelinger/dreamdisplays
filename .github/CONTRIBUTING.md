@@ -35,4 +35,4 @@ Thank you for helping make Dream Displays better!
 - NeoForge Moddev: https://plugins.gradle.org/plugin/net.neoforged.moddev
 - NeoForge Client: https://neoforged.net/
 - Quilt: https://github.com/QuiltMC/quilt-loader/tags
-- Paper: https://jd.papermc.io/paper/26.1.2/
+- Paper: https://jd.papermc.io/paper/26.2/

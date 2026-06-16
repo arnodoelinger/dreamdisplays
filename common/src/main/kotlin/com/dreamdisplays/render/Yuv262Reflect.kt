@@ -10,10 +10,9 @@ import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.resources.Identifier
 
 /**
- * Reflective GPU-YUV backend for the 26.2+ Blaze3D API. This module compiles against the
- * 26.1-era pipeline builder (`withSampler` / `TextureFormat`), which no longer exists at 26.2
- * runtime; this object rebuilds the same pipeline through reflection over the new
- * `BindGroupLayout` / `GpuFormat` API instead, so one binary serves every loader and version.
+ * Reflective GPU-YUV backend for the 26.2+ Blaze3D API. It rebuilds the same pipeline through
+ * reflection over the new `BindGroupLayout` / `GpuFormat` API, so one binary serves every loader
+ * and version.
  *
  * Reflection only runs once per session (pipeline and texture-method handles are resolved on
  * first use); the per-frame hot path is untouched. The layout chain mirrors vanilla's fogged
@@ -76,7 +75,7 @@ internal object Yuv262Reflect {
         builder.withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
         builder.withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
         builder.withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
-        builder.withDisplayColorAndDepth()
+        RenderPipelineCompat.configureDepth(builder)
         builder.withCull(false)
         return builder.build()
     }

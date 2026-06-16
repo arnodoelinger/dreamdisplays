@@ -11,10 +11,11 @@ object MinecraftScreenUtil {
     private val setScreenFn: (Minecraft, Screen?) -> Unit
 
     init {
-        val hasField = try { Minecraft::class.java.getField("screen"); true } catch (_: NoSuchFieldException) { false }
-        if (hasField) {
-            getScreen = { it.screen }
-            setScreenFn = { mc, s -> mc.setScreen(s) }
+        val screenField = try { Minecraft::class.java.getField("screen") } catch (_: NoSuchFieldException) { null }
+        if (screenField != null) {
+            val setScreenMethod = Minecraft::class.java.getMethod("setScreen", Screen::class.java)
+            getScreen = { mc -> screenField.get(mc) as? Screen }
+            setScreenFn = { mc, s -> setScreenMethod.invoke(mc, s) }
         } else {
             val guiField = Minecraft::class.java.getField("gui")
             val screenMethod = guiField.type.getMethod("screen")
