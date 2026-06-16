@@ -1,5 +1,7 @@
 package com.dreamdisplays.server.datatypes
 
+import com.dreamdisplays.protocol.PlaybackMode
+import com.dreamdisplays.protocol.PlaybackPermissions
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 import net.minecraft.core.BlockPos
@@ -24,9 +26,19 @@ interface DisplayData {
     val height: Int
     var url: String
     var lang: String
-    var isSync: Boolean
+
+    /** The persistent base playback mode. Source of truth; never [PlaybackMode.WATCH_PARTY]. */
+    var mode: PlaybackMode
+
     var isLocked: Boolean
     var duration: Long?
+
+    /** Legacy mirror of [mode] for frozen-v1 peers; true only when the mode is [PlaybackMode.SYNCED]. */
+    val isSync: Boolean get() = mode == PlaybackMode.SYNCED
+
+    /** Max video height clients must not exceed (0 = uncapped, 360 for [PlaybackMode.BROADCAST]). */
+    val qualityCap: Int
+        get() = if (mode == PlaybackMode.BROADCAST) PlaybackPermissions.BROADCAST_QUALITY_CAP else 0
 }
 
 /**
@@ -57,7 +69,7 @@ interface DisplayData {
 ) : DisplayData {
     override var url: String = ""
     override var lang: String = ""
-    override var isSync: Boolean = false
+    override var mode: PlaybackMode = PlaybackMode.LOCAL
     override var isLocked: Boolean = true
     override var duration: Long? = null
 
@@ -86,7 +98,7 @@ interface DisplayData {
 ) : DisplayData {
     override var url: String = ""
     override var lang: String = ""
-    override var isSync: Boolean = false
+    override var mode: PlaybackMode = PlaybackMode.LOCAL
     override var isLocked: Boolean = true
     override var duration: Long? = null
 

@@ -8,10 +8,16 @@ import com.dreamdisplays.server.datatypes.FabricDisplayData
 import com.dreamdisplays.server.datatypes.PaperDisplayData
 import com.dreamdisplays.server.datatypes.StateData
 import com.dreamdisplays.server.datatypes.SyncData
+import com.dreamdisplays.protocol.PlaybackMode
+import com.dreamdisplays.protocol.PlaybackPermissions
+import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.managers.DisplayManager.getDisplayData
 import com.dreamdisplays.server.managers.DisplayManager.getReceivers
+import com.dreamdisplays.server.playback.PlaybackContexts
+import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.server.utils.net.PacketUtil
+import com.dreamdisplays.server.utils.net.V2PlayerTracker
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.entity.Player
@@ -35,23 +41,30 @@ import java.util.concurrent.ConcurrentHashMap
      * the rebroadcast rate limit. Returns true when the caller should rebroadcast to other
      * receivers, false when the packet was rejected, cleared the state, or was throttled.
      */
-    private fun applySyncPacket(packet: SyncData, senderId: UUID): Boolean {
+    private fun applySyncPacket(packet: SyncData, senderId: UUID, isAdmin: Boolean): Boolean {
         val displayId = packet.id ?: return false
         val data = getDisplayData(displayId)
-        if (data != null) data.isSync = packet.isSync
+
+        if (data == null) {
+            playStates.remove(displayId)
+            lastSyncBroadcast.remove(displayId)
+            return false
+        }
+
+        if (data.mode != PlaybackMode.SYNCED || WatchPartyManager.hasSession(displayId)) {
+            playStates.remove(displayId)
+            lastSyncBroadcast.remove(displayId)
+            return false
+        }
+
+        val context = PlaybackContexts.of(data, senderId, isAdmin)
+        if (!PlaybackPermissions.canSeek(context)) return false
 
         if (!packet.isSync) {
             playStates.remove(displayId)
             lastSyncBroadcast.remove(displayId)
             return false
         }
-
-        if (data == null) {
-            playStates.remove(displayId)
-            return false
-        }
-
-        if (data.isLocked && data.ownerId != senderId) return false
 
         if (packet.currentTime < 0 || packet.limitTime < 0
             || packet.currentTime > 24L * 60 * 60 * 1_000_000_000L
@@ -73,7 +86,7 @@ import java.util.concurrent.ConcurrentHashMap
      * and rebroadcasts to other receivers (rate-limited to avoid packet floods).
      */
     @PaperOnly @JvmStatic fun processSyncPacket(packet: SyncData, player: Player) {
-        if (!applySyncPacket(packet, player.uniqueId)) return
+        if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(Main.config.permissions.delete))) return
         val data = getDisplayData(packet.id) ?: return
         val receivers = getReceivers(data as PaperDisplayData)
         PacketUtil.sendSync(
@@ -86,8 +99,8 @@ import java.util.concurrent.ConcurrentHashMap
      * Handles a sync packet from [player]: validates it, updates the per-display state,
      * and rebroadcasts to other receivers (rate-limited to avoid packet floods).
      */
-    @FabricOnly fun processSyncPacket(packet: SyncData, player: ServerPlayer, server: MinecraftServer) {
-        if (!applySyncPacket(packet, player.uuid)) return
+    @FabricOnly fun processSyncPacket(packet: SyncData, player: ServerPlayer, server: MinecraftServer, isAdmin: Boolean) {
+        if (!applySyncPacket(packet, player.uuid, isAdmin)) return
         val data = getDisplayData(packet.id) ?: return
         val receivers = getReceivers(data as FabricDisplayData, server)
             .filter { it.uuid != player.uuid }
@@ -97,6 +110,7 @@ import java.util.concurrent.ConcurrentHashMap
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
     @PaperOnly @JvmStatic fun sendSyncPacket(id: UUID?, player: Player?) {
         val displayId = id ?: return
+        if (player != null && V2PlayerTracker.isV2(player.uniqueId)) return
         val state = playStates[displayId] ?: return
 
         val packet = state.createPacket()
@@ -106,6 +120,7 @@ import java.util.concurrent.ConcurrentHashMap
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
     @FabricOnly fun sendSyncPacket(id: UUID?, player: ServerPlayer) {
         val displayId = id ?: return
+        if (V2PlayerTracker.isV2(player.uuid)) return
         val state = playStates[displayId] ?: return
         val display = getDisplayData(displayId) as? FabricDisplayData
         val packet = state.createPacket(display)
@@ -162,6 +177,7 @@ import java.util.concurrent.ConcurrentHashMap
      */
     @PaperOnly @JvmStatic fun tickBroadcast() = forEachBroadcastDue { state, display ->
         val receivers = getReceivers(display as PaperDisplayData)
+            .filterNot { V2PlayerTracker.isV2(it.uniqueId) }
         if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
     }
 
@@ -172,6 +188,7 @@ import java.util.concurrent.ConcurrentHashMap
     @FabricOnly fun tickBroadcast(server: MinecraftServer) = forEachBroadcastDue { state, display ->
         val fabricDisplay = display as FabricDisplayData
         val receivers = getReceivers(fabricDisplay, server)
+            .filterNot { V2PlayerTracker.isV2(it.uuid) }
         if (receivers.isNotEmpty()) FabricPacketUtil.sendSync(receivers, state.createPacket(fabricDisplay))
     }
 }

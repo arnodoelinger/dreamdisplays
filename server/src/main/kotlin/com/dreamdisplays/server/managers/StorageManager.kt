@@ -1,5 +1,6 @@
 package com.dreamdisplays.server.managers
 
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.server.datatypes.*
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
@@ -40,6 +41,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     val duration = long("duration").nullable()
     val lang = varchar("lang", 255).default("")
     val isLocked = bool("isLocked").default(true)
+    val mode = integer("mode").default(PlaybackMode.LOCAL.wire)
 
     override val primaryKey = PrimaryKey(id)
 }
@@ -169,6 +171,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
                 it[duration] = data.duration
                 it[lang] = data.lang
                 it[isLocked] = data.isLocked
+                it[mode] = data.mode.wire
             }
         }
     }
@@ -179,7 +182,9 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
 
     private fun <T : DisplayData> T.applyCommon(row: ResultRow): T = apply {
         url = row[table.videoCode]
-        isSync = row[table.isSync]
+        val stored = PlaybackMode.fromWire(row[table.mode])
+        mode = if (stored != PlaybackMode.LOCAL) stored
+        else if (row[table.isSync]) PlaybackMode.SYNCED else PlaybackMode.LOCAL
         duration = row[table.duration]
         lang = row[table.lang]
         isLocked = row[table.isLocked]
