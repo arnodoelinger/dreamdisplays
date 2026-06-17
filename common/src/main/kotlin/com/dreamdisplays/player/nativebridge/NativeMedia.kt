@@ -19,7 +19,7 @@ import java.nio.ByteBuffer
  * blocks, converts NV12 -> RGB24 and applies brightness in a single fused native pass,
  * writing straight into the direct `ByteBuffer` that is later uploaded to the GPU.
  *
- * Availability is decided once, lazily: requires Java 22+ (FFM is a preview API on 21),
+ * Availability is decided once, lazily: requires Java 21+ (FFM API exists since 21),
  * a loadable library for the current platform, and a matching ABI version. When any of
  * that fails the media pipeline silently falls back to the pure-JVM [com.dreamdisplays.player.pipeline.VideoFramePipe].
  */
@@ -359,8 +359,8 @@ internal object NativeMedia {
             logger.info("Native pipeline disabled via -Ddreamdisplays.native=false.")
             return false
         }
-        if (Runtime.version().feature() < 22) {
-            logger.warn("Native pipeline requires Java 22+ (running ${Runtime.version().feature()}); using JVM pipeline.")
+        if (Runtime.version().feature() < 21) {
+            logger.warn("Native pipeline requires Java 21+ (running ${Runtime.version().feature()}); using JVM pipeline.")
             return false
         }
         val lib = locateLibrary() ?: run {
