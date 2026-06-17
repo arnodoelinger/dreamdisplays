@@ -31,10 +31,12 @@ import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.loader.api.FabricLoader
 import net.minecraft.server.MinecraftServer
+import net.minecraft.world.level.storage.LevelResource
 import org.bstats.bukkit.Metrics
 import org.bukkit.plugin.java.JavaPlugin
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
+import java.io.File
 
 /**
  * Entry point of `Dream Displays` server-side plugin.
@@ -154,8 +156,11 @@ import org.slf4j.LoggerFactory
         ServerLifecycleEvents.SERVER_STARTED.register { server ->
             serverInstance = server
             val s = configInstance.storage
+            val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
+                .resolve("dreamdisplays").toFile().also { it.mkdirs() }
+            if (s.type.uppercase() == "SQLITE") migrateGlobalDb(dataDir)
             storageInstance = StorageManager(
-                type = s.type, dataDir = FabricLoader.getInstance().configDir.resolve("dreamdisplays").toFile(),
+                type = s.type, dataDir = dataDir,
                 tablePrefix = s.tablePrefix,
                 host = s.host, port = s.port, database = s.database,
                 username = s.username, password = s.password,
@@ -286,5 +291,21 @@ import org.slf4j.LoggerFactory
 
         val storage: StorageManager?
             get() = storageInstance
+
+        /** Copies the pre-1.8.1 global `SQLite DB` into [worldDataDir] on first startup for this world. */
+        private fun migrateGlobalDb(worldDataDir: File) {
+            val oldDb = FabricLoader.getInstance().configDir
+                .resolve("dreamdisplays").resolve("dreamdisplays.db").toFile()
+            val newDb = File(worldDataDir, "dreamdisplays.db")
+            if (!oldDb.exists() || newDb.exists()) return
+            runCatching { oldDb.copyTo(newDb) }
+                .onSuccess {
+                    logger.info(
+                        "Migrated displays from legacy global DB to per-world DB at ${newDb.absolutePath}. " +
+                        "The old file at ${oldDb.absolutePath} can be deleted once all worlds have been started at least once."
+                    )
+                }
+                .onFailure { logger.error("Failed to migrate global DB to ${newDb.absolutePath}", it) }
+        }
     }
 }
