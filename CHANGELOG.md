@@ -1,3 +1,33 @@
+# Version 1.8.1
+
+## Client
+
+### Features
+
+- Added experimental support of native optimizations for 1.21.11
+
+### Improvements
+
+- Improved translations for Russian and Ukrainian languages
+- Improved `FFmpeg` download logging and unpacking flow
+- Adopted Rust 2024 edition for natives and enhanced log handling
+
+### Fixes
+
+- Fixed vertex format crash on `Fabric` 1.21.11
+- Reduced log spam
+
+## Server
+
+### Improvements
+
+- Improved translations for Russian and Ukrainian languages
+
+### Fixes
+
+- Single-player displays are now stored per-world instead of the global database
+- Replaced hardcoded max dimensions with placeholders
+
 # Version 1.8.0
 
 ## Client
