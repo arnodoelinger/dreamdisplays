@@ -66,15 +66,17 @@ internal object RenderPipelineCompat {
             withSampler.invoke(builder, sampler)
         }
 
-        //? if <26 {
-        /*val modeClass = VertexFormat.Mode::class.java
-        val quads = VertexFormat.Mode.QUADS*/
-        //?} else
+        //? if >=26 {
         val modeClass = Class.forName("com.mojang.blaze3d.vertex.VertexFormat\$Mode")
         @Suppress("UNCHECKED_CAST")
         val quads = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, "QUADS")
         builderClass.getMethod("withVertexFormat", VertexFormat::class.java, modeClass)
             .invoke(builder, DefaultVertexFormat.POSITION_TEX_COLOR, quads)
+        //?} else
+        /*val modeClass = VertexFormat.Mode::class.java
+        val quads = VertexFormat.Mode.QUADS
+        builderClass.getMethod("withVertexFormat", VertexFormat::class.java, modeClass)
+            .invoke(builder, DefaultVertexFormat.POSITION_TEX_COLOR, quads)*/
     }
 
     private fun configure262(builder: RenderPipeline.Builder, samplers: List<String>) {
