@@ -57,12 +57,13 @@ object LavFfmpeg {
             val archive = File(dir, "_ffmpeg" + if (source.isTarXz) ".tar.xz" else ".zip")
             try {
                 val url = resolveLatestAssetUrl(source)
-                logger.info("Downloading FFmpeg libraries from $url...")
-                downloadWithRedirects(url, archive)
+                logger.info("FFmpeg not found — downloading from BtbN builds...")
+                downloadWithProgress(url, archive)
+                logger.info("Unpacking FFmpeg libraries...")
                 val count =
                     if (source.isTarXz) extractTarXzLibs(archive, source.libDir, dir)
                     else extractZipLibs(archive, source.libDir, dir)
-                logger.info("Unpacked $count FFmpeg files into $dir.")
+                logger.info("FFmpeg ready ($count files unpacked).")
             } finally {
                 if (archive.exists() && !archive.delete()) archive.deleteOnExit()
             }
@@ -160,9 +161,9 @@ object LavFfmpeg {
         BufferedOutputStream(FileOutputStream(dest)).use { out -> input.transferTo(out) }
     }
 
-    /** Downloads [url] to [dest], following up to 10 redirect hops (GitHub releases use several). */
+    /** Downloads [url] to [dest] with periodic progress log lines (every 10 %). */
     @Throws(IOException::class)
-    private fun downloadWithRedirects(url: String, dest: File) {
+    private fun downloadWithProgress(url: String, dest: File) {
         var current = url
         for (hop in 0 until 10) {
             val conn = URI.create(current).toURL().openConnection() as HttpURLConnection
@@ -183,8 +184,29 @@ object LavFfmpeg {
                 conn.disconnect(); throw IOException("HTTP $status for $current.")
             }
             try {
+                val total = conn.contentLengthLong
+                val totalMb = if (total > 0) "%.1f MB".format(total / 1_048_576.0) else "unknown size"
+                logger.info("Downloading FFmpeg ($totalMb)...")
+                var downloaded = 0L
+                var lastLoggedPct = -1
+                val buf = ByteArray(65_536)
                 conn.inputStream.use { input ->
-                    BufferedOutputStream(FileOutputStream(dest)).use { out -> input.transferTo(out) }
+                    BufferedOutputStream(FileOutputStream(dest)).use { out ->
+                        var n = input.read(buf)
+                        while (n >= 0) {
+                            out.write(buf, 0, n)
+                            downloaded += n
+                            if (total > 0) {
+                                val pct = (downloaded * 100 / total).toInt() / 10 * 10
+                                if (pct > lastLoggedPct) {
+                                    lastLoggedPct = pct
+                                    val dlMb = "%.1f".format(downloaded / 1_048_576.0)
+                                    logger.info("Downloading FFmpeg... $pct% ($dlMb / $totalMb).")
+                                }
+                            }
+                            n = input.read(buf)
+                        }
+                    }
                 }
             } finally {
                 conn.disconnect()

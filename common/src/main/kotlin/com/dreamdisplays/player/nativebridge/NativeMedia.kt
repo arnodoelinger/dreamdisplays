@@ -153,9 +153,9 @@ internal object NativeMedia {
 
     data class LavSurfaceReadResult(val code: Int, val descriptor: LavSurfaceDescriptor?)
 
-    /** Touches [isAvailable] on a background thread to keep first playback latency low. */
+    /** Touches [isAvailable] and [lavAvailable] on a background thread to keep first playback latency low. */
     fun prewarmAsync() {
-        Thread({ isAvailable }, "NativeMedia-prewarm").apply { isDaemon = true }.start()
+        Thread({ isAvailable; lavAvailable }, "NativeMedia-prewarm").apply { isDaemon = true }.start()
     }
 
     /**
