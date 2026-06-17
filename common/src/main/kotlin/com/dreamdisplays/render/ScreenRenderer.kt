@@ -159,11 +159,15 @@ object ScreenRenderer : ClientRenderService {
             runCatching { Class.forName("com.mojang.blaze3d.vertex.Tesselator") }.getOrNull()
         }
 
+        private val stagedVertexBufferClass: Class<*>? by lazy {
+            runCatching { Class.forName("net.minecraft.client.renderer.StagedVertexBuffer") }.getOrNull()
+        }
+
         fun draw(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-            if (tesselatorClass != null) {
-                drawLegacy(stack, type, appendVertices, tesselatorClass!!)
-            } else {
-                draw262(stack, type, appendVertices)
+            when {
+                stagedVertexBufferClass != null -> draw262(stack, type, appendVertices)
+                tesselatorClass != null -> drawLegacy(stack, type, appendVertices, tesselatorClass!!)
+                else -> drawBufferBuilder(stack, type, appendVertices)
             }
         }
 
@@ -178,6 +182,18 @@ object ScreenRenderer : ClientRenderService {
             val builder = tesselatorClass
                 .getMethod("begin", mode.javaClass, VertexFormat::class.java)
                 .invoke(tesselator, mode, type.format()) as VertexConsumer
+            appendVertices(stack.last(), builder)
+            val mesh = builder.javaClass.getMethod("buildOrThrow").invoke(builder)
+            val meshDataClass = Class.forName("com.mojang.blaze3d.vertex.MeshData")
+            type.javaClass.getMethod("draw", meshDataClass).invoke(type, mesh)
+        }
+
+        private fun drawBufferBuilder(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
+            val mode = type.javaClass.getMethod("mode").invoke(type)
+            val builderClass = Class.forName("com.mojang.blaze3d.vertex.BufferBuilder")
+            val builder = builderClass
+                .getConstructor(mode.javaClass, VertexFormat::class.java, Int::class.javaPrimitiveType)
+                .newInstance(mode, type.format(), 1536) as VertexConsumer
             appendVertices(stack.last(), builder)
             val mesh = builder.javaClass.getMethod("buildOrThrow").invoke(builder)
             val meshDataClass = Class.forName("com.mojang.blaze3d.vertex.MeshData")
