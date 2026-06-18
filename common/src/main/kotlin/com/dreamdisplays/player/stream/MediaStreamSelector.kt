@@ -43,8 +43,8 @@ object MediaStreamSelector {
     internal fun switchQuality(streams: ActiveStreams, target: Int, lang: String): ActiveStreams? {
         val best = pickVideo(streams.availableVideo, target)
             ?.takeIf { it.url != streams.currentVideo.url } ?: return null
-        val audio = pickAudio(streams.availableAudio, lang, best) ?: streams.currentAudio
-        return streams.copy(currentVideo = best, currentAudio = audio)
+        // keep the current audio so the progressive pick isn't reverted on a quality switch
+        return streams.copy(currentVideo = best, currentAudio = streams.currentAudio)
     }
 
     /** Pick the best video stream closest to [target] quality (height in pixels). */
