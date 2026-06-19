@@ -18,6 +18,9 @@ class DefaultStreamSelector : StreamSelector {
         get() = System.getProperty("dreamdisplays.debug")?.toBoolean() == true
                 || System.getenv("DREAMDISPLAYS_DEBUG").let { it == "1" || it.equals("true", ignoreCase = true) }
 
+    private val preferProgressiveAudio: Boolean =
+        System.getProperty("dreamdisplays.audio.preferProgressive", "true").toBoolean()
+
     override fun select(streams: List<MediaStream>, preferences: StreamPreferences): StreamSet {
         val videoStreams = streams.filter { it.type.hasVideo }
         val audioStreams = streams.filter { it.type == MediaStreamType.AUDIO }
@@ -27,13 +30,17 @@ class DefaultStreamSelector : StreamSelector {
 
         val video = MediaStreamSelector.pickVideo(videoStreams, targetHeight, preferences.preferFps60)
             ?: videoStreams.firstOrNull()
-        val audio = MediaStreamSelector.pickAudio(audioStreams, lang, video)
+        val adaptiveAudio = MediaStreamSelector.pickAudio(audioStreams, lang, video)
             ?: audioStreams.firstOrNull()
+
+        val progressiveAudio = streams.filter { it.type == MediaStreamType.VIDEO_AUDIO }
+            .maxByOrNull { it.bitrate ?: 0 }
+        val audio = if (preferProgressiveAudio && progressiveAudio != null) progressiveAudio else adaptiveAudio
 
         if (debug) {
             logger.debug(
                 "Video stream ${MediaStreamSelector.describeVideoChoice(video, targetHeight, preferences.preferFps60)} " +
-                        "candidates=${videoStreams.size} preferFps60=${preferences.preferFps60}",
+                        "candidates=${videoStreams.size} preferFps60=${preferences.preferFps60}.",
             )
         }
 

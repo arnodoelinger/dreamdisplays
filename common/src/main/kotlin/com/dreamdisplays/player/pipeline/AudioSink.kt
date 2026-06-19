@@ -7,7 +7,6 @@ import com.dreamdisplays.player.util.daemon
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.InputStream
-import java.io.OutputStream
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -307,13 +306,20 @@ internal class AudioSink(private val debugLabel: String) {
     private fun pumpLive(input: InputStream, ln: SourceDataLine, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
         val chunk = ByteArray(CHUNK_BYTES)
         var firstChunk = true
+        var totalBytes = 0L
         while (!terminated.get() && !stopFlag.get()) {
             if (parkIfRequested(ln, terminated, stopFlag)) break
             val n = MediaUtil.readFull(input, chunk, CHUNK_BYTES)
             if (n <= 0) {
-                if (firstChunk) logger.warn("$debugLabel [audio] no PCM data from ffmpeg (EOF on first read).")
+                if (firstChunk) {
+                    logger.warn("$debugLabel [audio] no PCM data from ffmpeg (EOF on first read).")
+                } else if (!terminated.get() && !stopFlag.get()) {
+                    val seconds = totalBytes / (SAMPLE_RATE * BYTES_PER_FRAME).toDouble()
+                    logger.warn("$debugLabel [audio] PCM stream ended after ${"%.1f".format(seconds)}s.")
+                }
                 break
             }
+            totalBytes += n
             if (firstChunk) { logger.debug("$debugLabel [audio] first PCM chunk received ($n bytes)."); firstChunk = false }
             ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
             MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
@@ -388,8 +394,12 @@ internal class AudioSink(private val debugLabel: String) {
         return null
     }
 
-    /** Drains the process's stderr stream to /dev/null. */
+    /** Drains the audio process's stderr and logs each line FFmpeg emits as it arrives (it runs at -loglevel error). */
     private fun drainStderr(proc: Process) = daemon({
-        try { proc.errorStream.transferTo(OutputStream.nullOutputStream()) } catch (_: IOException) {}
+        try {
+            proc.errorStream.bufferedReader().forEachLine { line ->
+                if (line.isNotBlank()) logger.warn("$debugLabel [audio] FFmpeg stderr: ${line.trim()}.")
+            }
+        } catch (_: IOException) {}
     }, "MediaPlayer-astderr").start()
 }

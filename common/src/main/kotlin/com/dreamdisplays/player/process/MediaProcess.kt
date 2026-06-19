@@ -124,6 +124,8 @@ object MediaProcess {
                     "-reconnect_delay_max", "10",
                     "-reconnect_on_network_error", "1",
                     "-reconnect_on_http_error", "4xx,5xx",
+                    // pull googlevideo over one connection with range requests so it doesn't cut at ~10s
+                    "-multiple_requests", "1",
                 )
             )
             addAll(listOf("-rw_timeout", "15000000"))
