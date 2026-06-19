@@ -395,7 +395,10 @@ impl LavSession {
         let mut opts = Dictionary::new();
         opts.set("user_agent", USER_AGENT);
         opts.set("headers", "Referer: https://www.youtube.com/\r\n");
-        opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http");
+
+        #[cfg(not(test))] opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http");
+        #[cfg(test)] opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http,file");
+
         opts.set("reconnect", "1");
         opts.set("reconnect_streamed", "1");
         opts.set("reconnect_delay_max", "10");
