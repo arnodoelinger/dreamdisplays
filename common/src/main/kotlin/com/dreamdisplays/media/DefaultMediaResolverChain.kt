@@ -35,6 +35,7 @@ class DefaultMediaResolverChain : MediaResolverChain {
 
     /** Calls [MediaResolver.prefetch] on every capable resolver for [source]. */
     override fun prefetch(source: MediaSource) {
+        if (isBlockedHost(source)) return
         for (resolver in resolvers) {
             if (resolver.canResolve(source)) resolver.prefetch(source)
         }
@@ -43,9 +44,13 @@ class DefaultMediaResolverChain : MediaResolverChain {
     /**
      * Resolves [source] against each capable resolver in priority order, returning the first success.
      * @throws DreamMediaException.Unknown if no resolver is registered for [source].
+     * @throws DreamMediaException.Unknown if [source] targets a non-public host (SSRF guard).
      * @throws Throwable the last resolver's failure if every capable resolver threw.
      */
     override fun resolve(source: MediaSource): ResolvedMedia {
+        if (isBlockedHost(source)) {
+            throw DreamMediaException.Unknown("Refusing to resolve a media URL on a non-public host.", isFatal = true)
+        }
         var lastError: Throwable? = null
         var attempted = false
         for (resolver in resolvers) {
@@ -59,5 +64,19 @@ class DefaultMediaResolverChain : MediaResolverChain {
         }
         if (!attempted) throw DreamMediaException.Unknown("No resolver registered for source: $source", isFatal = true)
         throw lastError ?: DreamMediaException.Unknown("All resolvers failed for source: $source")
+    }
+
+    /**
+     * SSRF guard: true when [source] carries a client-supplied URL whose host resolves to a
+     * non-public address. Only [MediaSource.Remote] / [MediaSource.DirectStream] are checked;
+     * [MediaSource.YouTube] and [MediaSource.Twitch] are rewritten to fixed, trusted service hosts.
+     */
+    private fun isBlockedHost(source: MediaSource): Boolean {
+        val url = when (source) {
+            is MediaSource.Remote -> source.url
+            is MediaSource.DirectStream -> source.streamUrl
+            else -> return false
+        }
+        return !MediaHostGuard.isAllowed(url)
     }
 }

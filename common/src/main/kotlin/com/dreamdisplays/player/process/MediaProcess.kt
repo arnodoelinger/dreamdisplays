@@ -1,5 +1,6 @@
 package com.dreamdisplays.player.process
 
+import com.dreamdisplays.media.MediaHostGuard
 import java.io.IOException
 import java.util.*
 import java.util.concurrent.TimeUnit
@@ -108,10 +109,13 @@ object MediaProcess {
     }
 
     /** Builds the common part of the `FFmpeg` command line for both video and audio processes. */
-    private fun baseCommand(ffmpeg: String, url: String, offsetNanos: Long, hwAccel: HwAccelBackend): MutableList<String> =
-        mutableListOf<String>().apply {
+    @Throws(IOException::class)
+    private fun baseCommand(ffmpeg: String, url: String, offsetNanos: Long, hwAccel: HwAccelBackend): MutableList<String> {
+        MediaHostGuard.requireAllowed(url)
+        return mutableListOf<String>().apply {
             add(ffmpeg)
             addAll(listOf("-hide_banner", "-loglevel", "error", "-nostats"))
+            addAll(listOf("-protocol_whitelist", "https,tls,tcp,crypto,data,http"))
             if (hwAccel.ffmpegName != null) {
                 addAll(listOf("-hwaccel", hwAccel.ffmpegName))
             }
@@ -134,4 +138,5 @@ object MediaProcess {
             }
             addAll(listOf("-i", url))
         }
+    }
 }

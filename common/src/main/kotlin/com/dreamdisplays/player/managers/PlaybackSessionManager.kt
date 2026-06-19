@@ -1,6 +1,7 @@
 package com.dreamdisplays.player.managers
 
 import com.dreamdisplays.player.process.FFmpegBinary
+import com.dreamdisplays.media.MediaHostGuard
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.player.events.PlayerEvents
@@ -98,6 +99,8 @@ internal class PlaybackSessionManager(
             hwAccel: HwAccelBackend, onFirstFrame: () -> Unit, onEos: (String, Boolean) -> Unit,
             getAudioClock: () -> Long = ::pacingClockNanos, parkFlag: AtomicBoolean? = null,
         ) {
+            // SSRF guard for the in-process libav path, which bypasses MediaProcess.baseCommand
+            MediaHostGuard.requireAllowed(streamSet.currentVideo.url)
             val fps = streamSet.currentVideo.fps ?: 30.0
             val lavThread = if (nativePipe != null && NativeMedia.lavInProcessEnabled) {
                 nativePipe.startInProcess(
