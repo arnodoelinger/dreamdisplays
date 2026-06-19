@@ -1,6 +1,7 @@
 package com.dreamdisplays.server.utils.net
 
 import com.dreamdisplays.protocol.PlaybackAction
+import com.dreamdisplays.protocol.MediaUrlPolicy
 import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.PlaybackPermissions
 import com.dreamdisplays.protocol.WatchPartyAction
@@ -55,6 +56,7 @@ import java.util.UUID
     fun setVideo(player: Player, displayId: UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
+        if (!MediaUrlPolicy.isAllowed(url)) return
 
         val wasSync = displayData.isSync
         displayData.url = url
@@ -105,6 +107,10 @@ import java.util.UUID
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
         if (!player.hasPermission(Main.config.permissions.watchparty)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
+        if (!MediaUrlPolicy.isAllowed(url)) {
+            logger.warn("Rejected unsafe watch-party URL from ${player.name}: ${url.take(120)}")
             return
         }
         WatchPartyManager.start(displayData, player.uniqueId, url, lang)

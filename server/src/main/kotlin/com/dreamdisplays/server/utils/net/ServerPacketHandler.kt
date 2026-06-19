@@ -1,6 +1,7 @@
 package com.dreamdisplays.server.utils.net
 
 import com.dreamdisplays.net.Packets
+import com.dreamdisplays.protocol.MediaUrlPolicy
 import com.dreamdisplays.protocol.PlaybackAction
 import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.protocol.PlaybackPermissions
@@ -111,6 +112,7 @@ import org.slf4j.LoggerFactory
     fun setVideo(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
+        if (!MediaUrlPolicy.isAllowed(url)) return
 
         val wasSync = displayData.isSync
         displayData.url = url
@@ -118,7 +120,7 @@ import org.slf4j.LoggerFactory
 
         val receivers = DisplayManager.getReceivers(displayData, server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
-        if (wasSync) StateManager.resetAndBroadcast(displayId, receivers) // frozen-v1 clock
+        if (wasSync) StateManager.resetAndBroadcast(displayId, receivers) // Frozen-v1 clock
         TimelineManager.onVideoChanged(displayData)
     }
 
@@ -162,6 +164,7 @@ import org.slf4j.LoggerFactory
     /** Starts a watch-party session with [player] as host. */
     fun watchPartyStart(player: ServerPlayer, displayId: java.util.UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
+        if (!MediaUrlPolicy.isAllowed(url)) return
         WatchPartyManager.start(displayData, player.uuid, url, lang)
     }
 

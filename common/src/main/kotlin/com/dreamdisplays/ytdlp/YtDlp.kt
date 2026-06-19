@@ -2,6 +2,7 @@ package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.YouTubeUrls
+import com.dreamdisplays.protocol.MediaUrlPolicy
 import com.dreamdisplays.utils.AsyncMemo
 import com.dreamdisplays.utils.Processes
 import org.slf4j.LoggerFactory
@@ -49,6 +50,10 @@ object YtDlp {
      */
     @Throws(IOException::class)
     fun fetch(videoUrl: String): List<YtStream> {
+        if (!MediaUrlPolicy.isAllowed(videoUrl)) {
+            return emptyList()
+        }
+
         loadFromDisk(videoUrl)?.let { return it }
         return formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
     }
@@ -69,6 +74,7 @@ object YtDlp {
     /** Fires a background fetch for [videoUrl] if not already cached, so it is ready before [fetch] is called. */
     fun prefetchFormats(videoUrl: String) {
         if (videoUrl.isBlank()) return
+        if (!MediaUrlPolicy.isAllowed(videoUrl)) return
         if (formatMemo.peekFresh(videoUrl) != null) return
         if (loadFromDisk(videoUrl) != null) return
         formatMemo.load(videoUrl) { fetchAndPersist(it) }
@@ -215,6 +221,7 @@ object YtDlp {
                 "--ignore-config", "--no-mark-watched",
                 "--extractor-retries", "0",
                 "--socket-timeout", "8",
+                "--",
                 videoUrl,
             )
         )
