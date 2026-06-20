@@ -595,6 +595,15 @@ class DisplayScreen(
         ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
     }
 
+    /** Marks a local VOD as finished without emitting playback commands upstream. */
+    internal fun onPlaybackEnded(positionNanos: Long) {
+        if (effectiveMode != PlaybackMode.LOCAL) return
+        savedTimeNanos = positionNanos.coerceAtLeast(0L)
+        if (paused) return
+        paused = true
+        ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
+    }
+
     /** Emits the upstream intent for the current mode (no-op for Local / Broadcast / non-host). */
     private fun emitPlaybackIntent(action: PlaybackAction, positionMs: Long = currentTimeNanos / 1_000_000L) {
         when (effectiveMode) {

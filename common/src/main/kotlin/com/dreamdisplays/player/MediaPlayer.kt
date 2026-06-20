@@ -19,6 +19,7 @@ import com.dreamdisplays.player.util.daemon
 import com.dreamdisplays.media.api.DreamMediaException
 import com.dreamdisplays.media.api.MediaStream
 import com.dreamdisplays.media.api.VideoQuality
+import com.dreamdisplays.protocol.PlaybackMode
 import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.ytdlp.YtDlp
 import com.mojang.blaze3d.textures.GpuTexture
@@ -85,6 +86,7 @@ class MediaPlayer(
     private val debugLabel = "${displayScreen.uuid}/${Integer.toHexString(System.identityHashCode(this))}"
     private val terminated = AtomicBoolean(false)
     private val restartPending = AtomicBoolean(false)
+    private val endedAtEnd = AtomicBoolean(false)
 
     private val clock = PlaybackClock()
     private val state = AtomicReference(PlaybackState.IDLE)
@@ -431,6 +433,7 @@ class MediaPlayer(
      */
     private fun startStreams(streamSet: ActiveStreams, offsetNanos: Long) {
         if (terminated.get()) return
+        endedAtEnd.set(false)
         // Replay-only video may already be on screen (started at construction): attach the live source
         // and hand off by PTS instead of cold-starting, so the picture never blanks.
         val bootstrap = replayBootstrapRef.getAndSet(null)
@@ -522,7 +525,7 @@ class MediaPlayer(
 
     /**
      * Called by [PlaybackSessionManager] via [onStreamEnd] when a stream finishes.
-     * Delegates the retry decision to [RetryPolicy]; loops the video on normal EOS for VOD;
+     * Delegates the retry decision to [RetryPolicy]; stops Local on normal EOS for VOD;
      * marks the screen as errored on unrecoverable failure.
      */
     private fun handleStreamEnd(stderr: String, normalEos: Boolean) {
@@ -545,18 +548,8 @@ class MediaPlayer(
         }
 
         if (normalEos && !liveStream) {
-            if (restartPending.compareAndSet(false, true)) {
-                safeExecute {
-                    try {
-                        val ss = streams
-                        if (ss != null && !terminated.get() && !displayScreen.isPaused) {
-                            clock.reset(0)
-                            startStreams(ss, 0)
-                            events.onSeek()
-                        }
-                    } finally { restartPending.set(false) }
-                }
-            }
+            if (displayScreen.effectiveMode == PlaybackMode.LOCAL) completeVodPlayback()
+            else restartFromBeginning()
             return
         }
 
@@ -565,6 +558,35 @@ class MediaPlayer(
         }
         state.set(PlaybackState.ERROR)
         displayScreen.mediaError = DreamMediaException.Decode("Unrecoverable stream failure", isFatal = true)
+    }
+
+    /** Keeps the existing restart behavior for non-local VOD modes after normal end. */
+    private fun restartFromBeginning() {
+        if (!restartPending.compareAndSet(false, true)) return
+        safeExecute {
+            try {
+                val ss = streams
+                if (ss != null && !terminated.get() && !displayScreen.isPaused) {
+                    endedAtEnd.set(false)
+                    clock.reset(0)
+                    startStreams(ss, 0)
+                    events.onSeek()
+                }
+            } finally { restartPending.set(false) }
+        }
+    }
+
+    /** Stops a non-looping VOD at its end, keeping the last uploaded frame on screen. */
+    private fun completeVodPlayback() {
+        safeExecute {
+            if (terminated.get()) return@safeExecute
+            val endPosition = durationHintNanos.takeIf { it > 0L } ?: clock.currentTime().coerceAtLeast(0L)
+            endedAtEnd.set(true)
+            clock.seekOffsetNanos = endPosition
+            state.set(PlaybackState.PAUSED)
+            Minecraft.getInstance().execute { displayScreen.onPlaybackEnded(endPosition) }
+            stopSession()
+        }
     }
 
     /**
@@ -586,7 +608,8 @@ class MediaPlayer(
     private fun doPlay() {
         if (!isReady || terminated.get() || sessionManager.isPlaying) return
         val ss = streams ?: return
-        startStreams(ss, clock.seekOffsetNanos)
+        val offset = if (endedAtEnd.getAndSet(false)) 0L else clock.seekOffsetNanos
+        startStreams(ss, offset)
     }
 
     /**
@@ -617,6 +640,7 @@ class MediaPlayer(
      */
     private fun doSeek(nanos: Long, fire: Boolean) {
         if (!isReady || !seekable) return
+        endedAtEnd.set(false)
         clock.seekOffsetNanos = nanos
         val ss = streams ?: return
         if (sessionManager.isPlaying) startStreams(ss, nanos)
