@@ -127,8 +127,8 @@ object MediaProcess {
                     "-reconnect_streamed", "1",
                     "-reconnect_delay_max", "10",
                     "-reconnect_on_network_error", "1",
-                    "-reconnect_on_http_error", "4xx,5xx",
-                    // pull googlevideo over one connection with range requests so it doesn't cut at ~10s
+                    "-reconnect_on_http_error", "5xx",
+                    // Pull googlevideo over one connection with range requests so it doesn't cut at ~10s
                     "-multiple_requests", "1",
                 )
             )

@@ -84,7 +84,7 @@ object YtDlp {
             try {
                 NewPipeResolver.ensureInitialized()
                 NewPipeResolver.prewarmPlayer()
-                YtDlpBinary.resolve(PREWARM_EXECUTOR)
+                YtDlpBinary.resolveCommand(PREWARM_EXECUTOR)
                 cookies.prewarm()
             } catch (e: IOException) {
                 logger.warn("Failed to prewarm yt-dlp", e)
@@ -262,9 +262,8 @@ object YtDlp {
      */
     @Throws(IOException::class)
     private fun runClientFetch(videoUrl: String, client: String?, onStarted: (Process) -> Unit): List<YtStream> {
-        val binary = YtDlpBinary.resolve(PREWARM_EXECUTOR)
         val cmd = ArrayList<String>()
-        cmd.add(binary)
+        cmd.addAll(YtDlpBinary.resolveCommand(PREWARM_EXECUTOR))
         val tempCookies = cookies.appendArgs(cmd)
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }

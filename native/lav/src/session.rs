@@ -403,7 +403,7 @@ impl LavSession {
         opts.set("reconnect_streamed", "1");
         opts.set("reconnect_delay_max", "10");
         opts.set("reconnect_on_network_error", "1");
-        opts.set("reconnect_on_http_error", "4xx,5xx");
+        opts.set("reconnect_on_http_error", "5xx");
         opts.set("rw_timeout", "15000000");
 
         let mut ictx = ffmpeg::format::input_with_dictionary(&url, opts)?;
