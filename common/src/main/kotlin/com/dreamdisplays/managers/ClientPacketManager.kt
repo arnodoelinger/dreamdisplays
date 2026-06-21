@@ -7,7 +7,7 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.displays.DisplayRegistry
-import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.storage.DisplayStorage
 import com.dreamdisplays.protocol.ClearCache
 import com.dreamdisplays.protocol.DisplayDelete
 import com.dreamdisplays.protocol.DisplayInfo

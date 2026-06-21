@@ -12,7 +12,7 @@ import com.dreamdisplays.client.core.register
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.displays.DisplayScreen
-import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.storage.DisplayStorage
 import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.process.FFmpegBinary
 import com.dreamdisplays.ytdlp.FormatDiskCache

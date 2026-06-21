@@ -2,7 +2,7 @@ package com.dreamdisplays.displays
 
 import com.dreamdisplays.Initializer
 import com.dreamdisplays.core.display.DisplayFacing
-import com.dreamdisplays.displays.store.ClientSettingsStore
+import com.dreamdisplays.storage.ClientSettingsStore
 import com.dreamdisplays.client.ui.DisplayMenu
 import com.dreamdisplays.client.ui.PipCorner
 import com.dreamdisplays.managers.ClientPacketManager

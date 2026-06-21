@@ -5,9 +5,9 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.core.display.DisplayEvent
 import com.dreamdisplays.core.display.DisplayId
-import com.dreamdisplays.displays.store.ClientSettingsStore
-import com.dreamdisplays.displays.store.FullDisplayData
-import com.dreamdisplays.displays.store.ServerDisplayStore
+import com.dreamdisplays.storage.ClientSettingsStore
+import com.dreamdisplays.storage.FullDisplayData
+import com.dreamdisplays.storage.ServerDisplayStore
 import com.dreamdisplays.core.media.VideoQuality
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap

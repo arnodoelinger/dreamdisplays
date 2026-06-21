@@ -1,4 +1,4 @@
-package com.dreamdisplays.displays.store
+package com.dreamdisplays.storage
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder

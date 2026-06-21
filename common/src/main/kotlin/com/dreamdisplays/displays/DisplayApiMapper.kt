@@ -5,7 +5,7 @@ import com.dreamdisplays.core.display.DisplayBounds
 import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.core.display.DisplayRuntimeState
 import com.dreamdisplays.core.display.DisplaySettings as ApiDisplaySettings
-import com.dreamdisplays.displays.store.FullDisplayData
+import com.dreamdisplays.storage.FullDisplayData
 
 /**
  * Mapping between the internal mutable [DisplayScreen] and the immutable public API / persistence types

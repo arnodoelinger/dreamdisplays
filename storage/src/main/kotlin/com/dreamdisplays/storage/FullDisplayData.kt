@@ -1,4 +1,4 @@
-package com.dreamdisplays.displays.store
+package com.dreamdisplays.storage
 
 import com.dreamdisplays.core.display.DisplayFacing
 import com.dreamdisplays.core.playback.PlaybackMode

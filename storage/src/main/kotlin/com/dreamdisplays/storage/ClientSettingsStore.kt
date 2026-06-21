@@ -1,4 +1,4 @@
-package com.dreamdisplays.displays.store
+package com.dreamdisplays.storage
 
 import com.dreamdisplays.core.media.VideoQuality
 import com.google.gson.reflect.TypeToken

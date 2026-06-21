@@ -1,4 +1,4 @@
-package com.dreamdisplays.displays.store
+package com.dreamdisplays.storage
 
 /**
  * Per-display, client-local preferences persisted in `client-display-settings.json`.

@@ -3,9 +3,9 @@ package com.dreamdisplays.managers
 import com.dreamdisplays.core.display.DisplayFacing
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.displays.DisplayScreen
-import com.dreamdisplays.displays.store.DisplayStorage
-import com.dreamdisplays.displays.store.FullDisplayData
-import com.dreamdisplays.displays.store.ServerDisplayStore
+import com.dreamdisplays.storage.DisplayStorage
+import com.dreamdisplays.storage.FullDisplayData
+import com.dreamdisplays.storage.ServerDisplayStore
 import com.dreamdisplays.core.media.VideoQuality
 import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.core.playback.PlaybackMode

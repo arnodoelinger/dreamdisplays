@@ -20,7 +20,7 @@ import com.dreamdisplays.client.ui.widgets.SyncModeSlider
 import com.dreamdisplays.client.ui.widgets.ValueSlider
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.displays.DisplayScreen
-import com.dreamdisplays.displays.store.DisplayStorage
+import com.dreamdisplays.storage.DisplayStorage
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.MediaSearchService
