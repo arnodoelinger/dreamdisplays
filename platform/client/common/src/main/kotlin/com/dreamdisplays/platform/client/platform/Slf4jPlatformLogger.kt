@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.platform
 
-import com.dreamdisplays.platform.api.PlatformLogger
+import com.dreamdisplays.api.platform.PlatformLogger
 import org.slf4j.LoggerFactory
 
 /** [PlatformLogger] over slf4j; [child] loggers nest names as `parent/child`. */

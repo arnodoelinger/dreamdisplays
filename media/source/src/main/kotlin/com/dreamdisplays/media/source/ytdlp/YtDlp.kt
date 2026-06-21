@@ -1,7 +1,7 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.dreamdisplays.media.api.MediaSearchResult
-import com.dreamdisplays.media.api.YouTubeUrls
+import com.dreamdisplays.api.media.MediaSearchResult
+import com.dreamdisplays.api.media.YouTubeUrls
 import com.dreamdisplays.core.security.MediaUrlPolicy
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines

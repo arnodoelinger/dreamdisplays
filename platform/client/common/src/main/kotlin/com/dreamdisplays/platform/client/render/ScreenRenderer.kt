@@ -9,8 +9,8 @@ import com.dreamdisplays.platform.client.render.DisplayRenderEntry
 import com.dreamdisplays.platform.client.render.RenderHook
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.render.api.RenderContext
-import com.dreamdisplays.render.api.TextureHandle
+import com.dreamdisplays.api.render.RenderContext
+import com.dreamdisplays.api.render.TextureHandle
 import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.Camera
 import net.minecraft.client.renderer.rendertype.RenderType

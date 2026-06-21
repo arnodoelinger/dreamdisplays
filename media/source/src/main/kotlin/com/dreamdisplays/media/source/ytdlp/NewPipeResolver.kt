@@ -1,10 +1,10 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.dreamdisplays.media.api.MediaMetadata
-import com.dreamdisplays.media.api.MediaResolver
-import com.dreamdisplays.media.api.MediaSource
-import com.dreamdisplays.media.api.ResolvedMedia
-import com.dreamdisplays.media.api.YouTubeUrls
+import com.dreamdisplays.api.media.MediaMetadata
+import com.dreamdisplays.api.media.MediaResolver
+import com.dreamdisplays.api.media.MediaSource
+import com.dreamdisplays.api.media.ResolvedMedia
+import com.dreamdisplays.api.media.YouTubeUrls
 import kotlin.time.Duration.Companion.nanoseconds
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader

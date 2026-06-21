@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.render.api.RenderContext
-import com.dreamdisplays.render.api.TextureHandle
+import com.dreamdisplays.api.render.RenderContext
+import com.dreamdisplays.api.render.TextureHandle
 
 /**
  * Service for rendering displays on the client.

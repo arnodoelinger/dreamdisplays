@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.dreamdisplays.media.api.MediaSearchResult
+import com.dreamdisplays.api.media.MediaSearchResult
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory

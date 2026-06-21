@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.core
 
 import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.platform.api.Platform
+import com.dreamdisplays.api.platform.Platform
 
 /**
  * Default [ClientContext]: the process-wide [DreamServices.registry] and [ClientStateManager],

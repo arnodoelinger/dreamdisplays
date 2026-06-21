@@ -4,7 +4,7 @@ package com.dreamdisplays.platform.client.core
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
-import com.dreamdisplays.platform.api.Platform
+import com.dreamdisplays.api.platform.Platform
 
 /**
  * Context for a client application.

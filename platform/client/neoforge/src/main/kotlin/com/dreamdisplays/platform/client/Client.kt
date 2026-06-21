@@ -6,7 +6,7 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.client.net.V2Payload
 import com.dreamdisplays.platform.client.platform.NeoForgePlatform
-import com.dreamdisplays.platform.api.Platform
+import com.dreamdisplays.api.platform.Platform
 import com.dreamdisplays.platform.client.render.ScreenRenderer
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Camera

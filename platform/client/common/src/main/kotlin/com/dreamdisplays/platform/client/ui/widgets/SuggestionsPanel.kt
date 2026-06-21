@@ -8,7 +8,7 @@ import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.renderChild
-import com.dreamdisplays.media.api.MediaSearchResult
+import com.dreamdisplays.api.media.MediaSearchResult
 import com.dreamdisplays.platform.client.render.Thumbnails
 //? if >=26 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes

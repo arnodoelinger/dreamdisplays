@@ -1,7 +1,7 @@
 package com.dreamdisplays.media.player
 
-import com.dreamdisplays.media.player.api.PlaybackEnvironment
-import com.dreamdisplays.media.player.api.PlaybackHost
+import com.dreamdisplays.api.media.player.PlaybackEnvironment
+import com.dreamdisplays.api.media.player.PlaybackHost
 import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.managers.PlaybackSessionManager
 import com.dreamdisplays.media.player.managers.StatsReporter
@@ -17,11 +17,11 @@ import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.DreamMediaException
-import com.dreamdisplays.media.api.MediaStream
+import com.dreamdisplays.api.media.MediaStream
 import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.media.FramePixelFormat
-import com.dreamdisplays.media.player.api.GpuTextureRef
+import com.dreamdisplays.api.media.player.GpuTextureRef
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.*

@@ -1,7 +1,7 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.dreamdisplays.media.api.MediaStream
-import com.dreamdisplays.media.api.MediaStreamType
+import com.dreamdisplays.api.media.MediaStream
+import com.dreamdisplays.api.media.MediaStreamType
 
 /**
  * YouTube stream information, as returned by `yt-dlp`. It includes methods to check if the stream has video / audio and

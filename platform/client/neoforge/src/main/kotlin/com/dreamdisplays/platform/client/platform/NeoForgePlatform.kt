@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.platform
 
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.platform.api.Platform
-import com.dreamdisplays.platform.api.PlatformLogger
-import com.dreamdisplays.platform.api.PlatformPaths
-import com.dreamdisplays.platform.api.PlatformScheduler
-import com.dreamdisplays.platform.api.PlatformSide
+import com.dreamdisplays.api.platform.Platform
+import com.dreamdisplays.api.platform.PlatformLogger
+import com.dreamdisplays.api.platform.PlatformPaths
+import com.dreamdisplays.api.platform.PlatformScheduler
+import com.dreamdisplays.api.platform.PlatformSide
 import com.dreamdisplays.util.GeneralUtil
 import net.neoforged.fml.ModList
 import net.neoforged.fml.loading.FMLEnvironment

@@ -2,10 +2,10 @@ package com.dreamdisplays.media.source
 
 import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.core.security.MediaHostGuard
-import com.dreamdisplays.media.api.MediaResolver
-import com.dreamdisplays.media.api.MediaResolverChain
-import com.dreamdisplays.media.api.MediaSource
-import com.dreamdisplays.media.api.ResolvedMedia
+import com.dreamdisplays.api.media.MediaResolver
+import com.dreamdisplays.api.media.MediaResolverChain
+import com.dreamdisplays.api.media.MediaSource
+import com.dreamdisplays.api.media.ResolvedMedia
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
 

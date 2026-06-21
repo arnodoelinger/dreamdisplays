@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.media.api.DecodedVideoFrame
-import com.dreamdisplays.render.api.TextureHandle
-import com.dreamdisplays.render.api.TextureUploader
+import com.dreamdisplays.api.media.DecodedVideoFrame
+import com.dreamdisplays.api.render.TextureHandle
+import com.dreamdisplays.api.render.TextureUploader
 import com.mojang.blaze3d.opengl.GlStateManager
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15

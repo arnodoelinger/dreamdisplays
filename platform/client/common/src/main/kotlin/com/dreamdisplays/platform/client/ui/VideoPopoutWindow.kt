@@ -4,7 +4,7 @@ import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutWindow
 import com.dreamdisplays.platform.client.popout.WindowBackend
 import com.dreamdisplays.platform.client.popout.WindowConfig
-import com.dreamdisplays.media.api.VideoFrameSink
+import com.dreamdisplays.api.media.VideoFrameSink
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import net.minecraft.client.Minecraft

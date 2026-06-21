@@ -10,7 +10,7 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
 import com.dreamdisplays.platform.client.core.register
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.api.Platform
+import com.dreamdisplays.api.platform.Platform
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.media.player.nativebridge.NativeMedia

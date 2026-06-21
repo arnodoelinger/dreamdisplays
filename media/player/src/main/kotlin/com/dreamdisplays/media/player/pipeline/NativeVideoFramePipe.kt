@@ -6,8 +6,8 @@ import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.runtime.OsInfo
-import com.dreamdisplays.media.player.api.FrameUploaderFactory
-import com.dreamdisplays.media.player.api.GpuTextureRef
+import com.dreamdisplays.api.media.player.FrameUploaderFactory
+import com.dreamdisplays.api.media.player.GpuTextureRef
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean

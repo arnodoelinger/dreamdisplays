@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.media.player.api.GpuTextureRef
+import com.dreamdisplays.api.media.player.GpuTextureRef
 import com.mojang.blaze3d.textures.GpuTexture
 
 /**

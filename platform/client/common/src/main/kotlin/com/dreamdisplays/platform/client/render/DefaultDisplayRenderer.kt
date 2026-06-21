@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.render.api.DisplayRenderer
-import com.dreamdisplays.render.api.RenderContext
-import com.dreamdisplays.render.api.RenderStats
-import com.dreamdisplays.render.api.RenderSurface
+import com.dreamdisplays.api.render.DisplayRenderer
+import com.dreamdisplays.api.render.RenderContext
+import com.dreamdisplays.api.render.RenderStats
+import com.dreamdisplays.api.render.RenderSurface
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**

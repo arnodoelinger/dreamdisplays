@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.platform
 
-import com.dreamdisplays.platform.api.PlatformScheduler
-import com.dreamdisplays.platform.api.TaskHandle
+import com.dreamdisplays.api.platform.PlatformScheduler
+import com.dreamdisplays.api.platform.TaskHandle
 import net.minecraft.client.Minecraft
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService

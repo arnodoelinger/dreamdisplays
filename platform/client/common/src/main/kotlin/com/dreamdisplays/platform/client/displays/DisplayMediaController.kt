@@ -2,8 +2,8 @@ package com.dreamdisplays.platform.client.displays
 
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.media.api.MediaResolverChain
-import com.dreamdisplays.media.api.MediaSource
+import com.dreamdisplays.api.media.MediaResolverChain
+import com.dreamdisplays.api.media.MediaSource
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment

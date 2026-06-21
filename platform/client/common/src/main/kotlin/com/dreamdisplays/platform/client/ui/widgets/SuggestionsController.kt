@@ -2,8 +2,8 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.get
-import com.dreamdisplays.media.api.MediaSearchResult
-import com.dreamdisplays.media.api.MediaSearchService
+import com.dreamdisplays.api.media.MediaSearchResult
+import com.dreamdisplays.api.media.MediaSearchService
 import com.dreamdisplays.platform.client.render.Thumbnails
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory

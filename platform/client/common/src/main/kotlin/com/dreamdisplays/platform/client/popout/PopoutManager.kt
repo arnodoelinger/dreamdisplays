@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.popout
 
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.media.api.VideoFrameSink
+import com.dreamdisplays.api.media.VideoFrameSink
 
 /**
  * Manages popout windows and picture-in-picture (PiP) for displays. Allows opening and closing popout windows and PiP,

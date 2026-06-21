@@ -11,8 +11,8 @@ import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.media.api.MediaResolverChain
-import com.dreamdisplays.media.api.MediaSource
+import com.dreamdisplays.api.media.MediaResolverChain
+import com.dreamdisplays.api.media.MediaSource
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
 import org.joml.Vector3i

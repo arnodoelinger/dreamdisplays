@@ -19,9 +19,9 @@ import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.player.util.joinSafely
-import com.dreamdisplays.media.player.api.GpuTextureRef
-import com.dreamdisplays.media.player.api.RenderThreadExecutor
-import com.dreamdisplays.media.player.api.FrameUploaderFactory
+import com.dreamdisplays.api.media.player.GpuTextureRef
+import com.dreamdisplays.api.media.player.RenderThreadExecutor
+import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.ByteBuffer

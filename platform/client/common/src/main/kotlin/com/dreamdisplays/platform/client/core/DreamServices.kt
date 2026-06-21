@@ -40,15 +40,15 @@ import com.dreamdisplays.media.source.DefaultMediaResolverChain
 import com.dreamdisplays.media.runtime.DefaultMediaSessionManager
 import com.dreamdisplays.media.source.DefaultStreamSelector
 import com.dreamdisplays.media.source.YtDlpSearchService
-import com.dreamdisplays.media.api.MediaResolverChain
-import com.dreamdisplays.media.api.MediaSearchService
+import com.dreamdisplays.api.media.MediaResolverChain
+import com.dreamdisplays.api.media.MediaSearchService
 import com.dreamdisplays.media.runtime.MediaSessionManager
-import com.dreamdisplays.media.api.StreamSelector
+import com.dreamdisplays.api.media.StreamSelector
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.DefaultDisplayRenderer
 import com.dreamdisplays.platform.client.render.ScreenRenderer
-import com.dreamdisplays.render.api.DisplayRenderer
-import com.dreamdisplays.render.api.TextureUploaderFactory
+import com.dreamdisplays.api.render.DisplayRenderer
+import com.dreamdisplays.api.render.TextureUploaderFactory
 import com.dreamdisplays.media.source.ytdlp.NewPipeResolver
 import com.dreamdisplays.media.source.ytdlp.ResolverConfig
 import com.dreamdisplays.media.source.ytdlp.YtDlpResolver
@@ -89,7 +89,7 @@ object DreamServices {
      * Render: [DisplayRenderer] (orchestrator for API-registered surfaces) and
      * [TextureUploaderFactory] (per-GL-context [AsyncTextureUploader] instances).
      *
-     * The loader entrypoint additionally registers a [com.dreamdisplays.platform.api.Platform];
+     * The loader entrypoint additionally registers a [com.dreamdisplays.api.platform.Platform];
      * when present, [com.dreamdisplays.platform.client.managers.ClientStartupManager] hosts a
      * [ClientApplication] on top of it.
      */

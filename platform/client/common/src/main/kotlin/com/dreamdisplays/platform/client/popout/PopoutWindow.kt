@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.popout
 
-import com.dreamdisplays.media.api.VideoFrameSink
+import com.dreamdisplays.api.media.VideoFrameSink
 
 /**
  * Represents an open popout window. Provides properties for the window's status and dimensions, as well as methods to

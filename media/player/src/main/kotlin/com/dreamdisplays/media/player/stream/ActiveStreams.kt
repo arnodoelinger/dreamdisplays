@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.stream
 
-import com.dreamdisplays.media.api.MediaStream
+import com.dreamdisplays.api.media.MediaStream
 
 /**
  * All currently-selected and available streams for one playback session.

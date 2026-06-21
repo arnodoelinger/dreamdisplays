@@ -1,7 +1,7 @@
 package com.dreamdisplays.media.source
 
-import com.dreamdisplays.media.api.MediaSearchResult
-import com.dreamdisplays.media.api.MediaSearchService
+import com.dreamdisplays.api.media.MediaSearchResult
+import com.dreamdisplays.api.media.MediaSearchService
 import com.dreamdisplays.media.source.ytdlp.YtDlp
 import com.dreamdisplays.media.source.ytdlp.YouTubeInnerTube
 

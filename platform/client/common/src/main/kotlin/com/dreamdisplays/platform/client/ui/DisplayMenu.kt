@@ -25,8 +25,8 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.media.api.MediaSearchResult
-import com.dreamdisplays.media.api.MediaSearchService
+import com.dreamdisplays.api.media.MediaSearchResult
+import com.dreamdisplays.api.media.MediaSearchService
 import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.api.playback.PlaybackMode
