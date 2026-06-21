@@ -1,7 +1,9 @@
 package com.dreamdisplays.ytdlp
 
+import com.dreamdisplays.utils.DreamCoroutines
 import com.dreamdisplays.utils.OsInfo
 import com.dreamdisplays.utils.Processes
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
@@ -11,7 +13,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -64,12 +65,11 @@ object YtDlpBinary {
     /**
      * Returns the path to a usable `yt-dlp` binary, checking the `dreamdisplays.ytdlp` override,
      * well-known system paths, then the bundled directory, and downloading from GitHub as a last
-     * resort. The result is cached for the session.
-     *
-     * @param selfUpdateExecutor where the background self-update runs when the bundled copy is used.
+     * resort. The result is cached for the session. The background self-update of a bundled copy
+     * runs on [DreamCoroutines.clientIo].
      */
     @Throws(IOException::class)
-    fun resolve(selfUpdateExecutor: Executor): String {
+    fun resolve(): String {
         resolved?.let { return it }
         synchronized(this) {
             resolved?.let { return it }
@@ -86,7 +86,7 @@ object YtDlpBinary {
             for (c in candidates) {
                 if (canExecute(c)) {
                     resolved = c
-                    if (c == bundled.toString()) maybeSelfUpdate(bundled, selfUpdateExecutor)
+                    if (c == bundled.toString()) maybeSelfUpdate(bundled)
                     return c
                 }
             }
@@ -103,12 +103,12 @@ object YtDlpBinary {
      * `yt-dlp` arguments to this list.
      */
     @Throws(IOException::class)
-    fun resolveCommand(selfUpdateExecutor: Executor): List<String> {
+    fun resolveCommand(): List<String> {
         resolvedCommand?.let { return it }
         synchronized(this) {
             resolvedCommand?.let { return it }
-            val zipapp = if (hasOverride()) null else zipappCommand(selfUpdateExecutor)
-            val command = zipapp ?: listOf(resolve(selfUpdateExecutor))
+            val zipapp = if (hasOverride()) null else zipappCommand()
+            val command = zipapp ?: listOf(resolve())
             resolvedCommand = command
             return command
         }
@@ -122,9 +122,9 @@ object YtDlpBinary {
     }
 
     /** Builds the `[python, zipapp]` launch prefix, or null when no interpreter / zipapp is available. */
-    private fun zipappCommand(executor: Executor): List<String>? {
+    private fun zipappCommand(): List<String>? {
         val python = usablePython() ?: return null
-        val pyz = provisionZipapp(executor) ?: return null
+        val pyz = provisionZipapp() ?: return null
         logger.info("yt-dlp fast path active: {} {}.", python, pyz.fileName)
         return listOf(python, pyz.toString())
     }
@@ -166,10 +166,10 @@ object YtDlpBinary {
     }
 
     /** Returns the local zipapp path, provisioning it (existing copy or GitHub download) on first use; null on failure. */
-    private fun provisionZipapp(executor: Executor): Path? {
+    private fun provisionZipapp(): Path? {
         val pyz = bundledDir.resolve(ZIPAPP_NAME)
         if (Files.isRegularFile(pyz)) {
-            maybeRefreshZipapp(pyz, executor)
+            maybeRefreshZipapp(pyz)
             return pyz
         }
         return try {
@@ -184,9 +184,9 @@ object YtDlpBinary {
     /**
      * Re-downloads the zipapp once per session when it is older than [BINARY_REFRESH_MS]. A stale
      * yt-dlp is a top cause of extraction failures; the cheap ~3 MB re-download keeps it current
-     * (the binary path has its own `-U` in [maybeSelfUpdate]). Runs on [executor], never blocking.
+     * (the binary path has its own `-U` in [maybeSelfUpdate]). Runs in the background, never blocking.
      */
-    private fun maybeRefreshZipapp(pyz: Path, executor: Executor) {
+    private fun maybeRefreshZipapp(pyz: Path) {
         if (!zipappUpdateChecked.compareAndSet(false, true)) return
         val age = try {
             System.currentTimeMillis() - Files.getLastModifiedTime(pyz).toMillis()
@@ -194,7 +194,7 @@ object YtDlpBinary {
             return
         }
         if (age < BINARY_REFRESH_MS) return
-        executor.execute {
+        DreamCoroutines.clientIo.launch {
             try {
                 logger.debug("Bundled yt-dlp.pyz is ${age / 86_400_000L} days old, refreshing...")
                 downloadAsset(pyz, ZIPAPP_ASSET, executable = false)
@@ -211,7 +211,7 @@ object YtDlpBinary {
      * caller; failures are logged and ignored. The binary's mtime is bumped on a successful run so a
      * no-op update doesn't re-check for another week.
      */
-    private fun maybeSelfUpdate(bundled: Path, executor: Executor) {
+    private fun maybeSelfUpdate(bundled: Path) {
         if (!updateChecked.compareAndSet(false, true)) return
         val age = try {
             System.currentTimeMillis() - Files.getLastModifiedTime(bundled).toMillis()
@@ -219,7 +219,7 @@ object YtDlpBinary {
             return
         }
         if (age < BINARY_REFRESH_MS) return
-        executor.execute {
+        DreamCoroutines.clientIo.launch {
             try {
                 logger.debug("Bundled yt-dlp is ${age / 86_400_000L} days old, running self-update...")
                 val p = ProcessBuilder(bundled.toString(), "-U", "--no-warnings")
@@ -231,7 +231,7 @@ object YtDlpBinary {
                 p.inputStream.use { it.readAllBytes() }
                 if (!p.waitFor(120, TimeUnit.SECONDS)) {
                     Processes.destroyTree(p)
-                    return@execute
+                    return@launch
                 }
                 try {
                     Files.setLastModifiedTime(bundled, FileTime.fromMillis(System.currentTimeMillis()))

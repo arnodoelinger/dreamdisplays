@@ -1,6 +1,7 @@
 package com.dreamdisplays.utils
 
 import com.google.gson.JsonParser
+import kotlinx.coroutines.launch
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
 import java.net.HttpURLConnection
@@ -34,7 +35,7 @@ object UpdateCheck {
     @Synchronized private fun startCheck() {
         if (checked) return
         checked = true
-        Thread(::doCheck, "dreamdisplays-update-check").apply { isDaemon = true }.start()
+        DreamCoroutines.clientIo.launch { doCheck() }
     }
 
     /** Queries the GitHub releases API and sets [latestVersion]. */

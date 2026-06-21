@@ -1,10 +1,14 @@
 package com.dreamdisplays.ytdlp
 
+import com.dreamdisplays.utils.DreamCoroutines
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
@@ -15,7 +19,6 @@ import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
 import java.util.*
-import java.util.concurrent.Executors
 
 /**
  * Persistent on-disk cache for resolved YouTube format URLs.
@@ -30,9 +33,9 @@ object FormatDiskCache {
     const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
     private const val SCHEMA_VERSION = 3
 
-    private val WRITER = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DD-FormatCache-writer").apply { isDaemon = true }
-    }
+    /** Serialises write/delete coroutines so same-file ops keep their submission order (the single-writer
+     *  guarantee the old dedicated writer thread gave). */
+    private val writeMutex = Mutex()
 
     /** Reads the cached streams for [videoUrl] from disk; returns null if absent, expired, or schema-mismatched. */
     fun load(videoUrl: String, maxAgeMs: Long): List<YtStream>? {
@@ -67,10 +70,10 @@ object FormatDiskCache {
         }
     }
 
-    /** Serialises [streams] to disk for [videoUrl] asynchronously via the single-threaded writer executor. */
+    /** Serialises [streams] to disk for [videoUrl] asynchronously, ordered behind any in-flight write. */
     fun saveAsync(videoUrl: String, streams: List<YtStream>) {
         if (streams.isEmpty()) return
-        WRITER.submit { writeNow(videoUrl, streams) }
+        DreamCoroutines.clientIo.launch { writeMutex.withLock { writeNow(videoUrl, streams) } }
     }
 
     /** Atomically writes the stream JSON to disk using a temp file and rename. */
@@ -95,10 +98,10 @@ object FormatDiskCache {
         }
     }
 
-    /** Deletes the cache entry for [videoUrl] asynchronously. */
+    /** Deletes the cache entry for [videoUrl] asynchronously, ordered behind any in-flight write. */
     fun deleteEntry(videoUrl: String) {
-        WRITER.submit {
-            runCatching { Files.deleteIfExists(fileFor(videoUrl).toPath()) }
+        DreamCoroutines.clientIo.launch {
+            writeMutex.withLock { runCatching { Files.deleteIfExists(fileFor(videoUrl).toPath()) } }
         }
     }
 

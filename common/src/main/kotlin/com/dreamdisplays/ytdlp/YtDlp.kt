@@ -4,17 +4,22 @@ import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.protocol.MediaUrlPolicy
 import com.dreamdisplays.utils.AsyncMemo
+import com.dreamdisplays.utils.DreamCoroutines
 import com.dreamdisplays.utils.Processes
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.util.Locale
-import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * `yt-dlp` orchestrator: caching and request deduplication around the NewPipe fast path and the
@@ -54,25 +59,13 @@ object YtDlp {
     private val HEDGE_DELAY_MS: Long =
         System.getProperty("dreamdisplays.ytdlpHedgeMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
 
-    private val PREWARM_EXECUTOR = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "YtDlp-prewarm").apply { isDaemon = true }
-    }
-    private val FETCH_EXECUTOR = Executors.newFixedThreadPool(3) { r ->
-        Thread(r, "YtDlp-fetch").apply { isDaemon = true }
-    }
-    /** Per-client race workers; sized on demand since each waits on a blocking subprocess. */
-    private val RACE_EXECUTOR = Executors.newCachedThreadPool { r ->
-        Thread(r, "YtDlp-race").apply { isDaemon = true }
-    }
-    private val SEARCH_EXECUTOR = Executors.newFixedThreadPool(4) { r ->
-        Thread(r, "YtDlp-search").apply { isDaemon = true }
-    }
+    /** All yt-dlp background work (prewarm, fetch, per-client races, search) runs on the shared
+     *  [DreamCoroutines.clientIo] scope's elastic [kotlinx.coroutines.Dispatchers.IO] pool. */
+    private val cookies = YtCookieManager()
 
-    private val cookies = YtCookieManager(PREWARM_EXECUTOR)
-
-    private val formatMemo = AsyncMemo<String, List<YtStream>>(200, CACHE_TTL_MS, FETCH_EXECUTOR, "fetch")
-    private val searchMemo = AsyncMemo<String, List<MediaSearchResult>>(100, INFO_CACHE_TTL_MS, SEARCH_EXECUTOR, "search")
-    private val relatedMemo = AsyncMemo<String, List<MediaSearchResult>>(200, INFO_CACHE_TTL_MS, SEARCH_EXECUTOR, "related")
+    private val formatMemo = AsyncMemo<String, List<YtStream>>(200, CACHE_TTL_MS, DreamCoroutines.clientIo, "fetch")
+    private val searchMemo = AsyncMemo<String, List<MediaSearchResult>>(100, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "search")
+    private val relatedMemo = AsyncMemo<String, List<MediaSearchResult>>(200, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "related")
 
     /**
      * Returns the stream list for [videoUrl], hitting the in-memory cache, then disk cache, then running `yt-dlp`.
@@ -91,11 +84,11 @@ object YtDlp {
 
     /** Resolves the binary path, cookie browser, and cookie header in the background to reduce first-fetch latency. */
     fun prewarmAsync() {
-        PREWARM_EXECUTOR.submit {
+        DreamCoroutines.clientIo.launch {
             try {
                 NewPipeResolver.ensureInitialized()
                 NewPipeResolver.prewarmPlayer()
-                YtDlpBinary.resolveCommand(PREWARM_EXECUTOR)
+                YtDlpBinary.resolveCommand()
                 cookies.prewarm()
             } catch (e: IOException) {
                 logger.warn("Failed to prewarm yt-dlp", e)
@@ -123,7 +116,7 @@ object YtDlp {
 
     /** Resolves streams for [videoUrl] and mirrors the result into the disk cache. */
     @Throws(IOException::class)
-    private fun fetchAndPersist(videoUrl: String): List<YtStream> {
+    private suspend fun fetchAndPersist(videoUrl: String): List<YtStream> {
         val streams = fetchUncached(videoUrl).toList()
         FormatDiskCache.saveAsync(videoUrl, streams)
         return streams
@@ -180,29 +173,23 @@ object YtDlp {
      * starts after [HEDGE_DELAY_MS], so a fast NewPipe ladder can skip it entirely.
      */
     @Throws(IOException::class)
-    private fun fetchUncached(videoUrl: String): List<YtStream> {
+    private suspend fun fetchUncached(videoUrl: String): List<YtStream> {
         val ytProcesses = CopyOnWriteArrayList<Process>()
         val abandoned = AtomicBoolean(false)
-        val ytdlp = CompletableFuture.supplyAsync({
-            if (HEDGE_DELAY_MS > 0) {
-                try {
-                    Thread.sleep(HEDGE_DELAY_MS)
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                }
-            }
+        val ytdlp = DreamCoroutines.clientIo.async {
+            if (HEDGE_DELAY_MS > 0) delay(HEDGE_DELAY_MS)
             if (abandoned.get()) emptyList()
             else raceClients(videoUrl) { proc ->
                 ytProcesses.add(proc)
                 if (abandoned.get()) Processes.destroyTree(proc) // NewPipeExtractor already won; kill
             } ?: emptyList()
-        }, RACE_EXECUTOR)
+        }
 
         // Aborts the parallel yt-dlp branch and reaps any subprocess it managed to spawn.
         fun abandonYtDlp() {
             abandoned.set(true)
             ytProcesses.forEach { runCatching { Processes.destroyTree(it) } }
-            ytdlp.cancel(false)
+            ytdlp.cancel()
         }
 
         val viaNewPipe = NewPipeResolver.fetch(videoUrl)
@@ -218,7 +205,8 @@ object YtDlp {
         }
 
         val viaYtDlp = try {
-            ytdlp.get(FETCH_TIMEOUT_SECONDS + 15, TimeUnit.SECONDS)
+            withTimeoutOrNull((FETCH_TIMEOUT_SECONDS + 15).seconds) { ytdlp.await() }
+                ?: emptyList<YtStream>().also { abandonYtDlp() }
         } catch (e: Exception) {
             abandonYtDlp()
             logger.debug("yt-dlp resolve did not settle for {}: {}.", videoUrl, e.message?.take(200))
@@ -240,7 +228,7 @@ object YtDlp {
      * back to racing [FALLBACK_CLIENTS] in parallel. With browser cookies configured, a single
      * cookie-backed invocation is run instead (no client arg, no race). Returns null on total failure.
      */
-    private fun raceClients(videoUrl: String, onProcess: (Process) -> Unit): List<YtStream>? {
+    private suspend fun raceClients(videoUrl: String, onProcess: (Process) -> Unit): List<YtStream>? {
         if (!cookies.disabledByConfig()) {
             return runCatchingClient(videoUrl, null, onProcess)?.takeIf { it.isNotEmpty() }
         }
@@ -262,19 +250,19 @@ object YtDlp {
      * immediately and the still-running losers are killed; otherwise, once every client finishes,
      * [bestResult] picks the strongest result. Returns null when every client failed.
      */
-    private fun raceParallel(videoUrl: String, clients: List<String?>, onProcess: (Process) -> Unit): List<YtStream>? {
+    private suspend fun raceParallel(videoUrl: String, clients: List<String?>, onProcess: (Process) -> Unit): List<YtStream>? {
         val processes = CopyOnWriteArrayList<Process>()
         val results = CopyOnWriteArrayList<List<YtStream>>()
-        val winner = CompletableFuture<List<YtStream>>()
+        val winner = CompletableDeferred<List<YtStream>>()
         val remaining = AtomicInteger(clients.size)
 
         for (client in clients) {
-            RACE_EXECUTOR.execute {
+            DreamCoroutines.clientIo.launch {
                 try {
                     val streams = runClientFetch(videoUrl, client) { proc ->
                         processes.add(proc)
                         onProcess(proc)
-                        if (winner.isDone) Processes.destroyTree(proc) // race already won; don't bother finishing
+                        if (winner.isCompleted) Processes.destroyTree(proc) // Race already won; don't bother finishing
                     }
                     if (streams.isNotEmpty()) results.add(streams)
                     if (YtStreams.offersQualityLadder(streams)) winner.complete(streams)
@@ -287,10 +275,10 @@ object YtDlp {
         }
 
         val result = try {
-            winner.get(FETCH_TIMEOUT_SECONDS + 10, TimeUnit.SECONDS)
-        } catch (e: Exception) {
-            logger.warn("yt-dlp race for $videoUrl did not settle: ${e.message}.")
-            emptyList()
+            withTimeoutOrNull((FETCH_TIMEOUT_SECONDS + 10).seconds) { winner.await() } ?: run {
+                logger.warn("yt-dlp race for $videoUrl did not settle.")
+                emptyList()
+            }
         } finally {
             processes.forEach { runCatching { Processes.destroyTree(it) } }
         }
@@ -312,7 +300,7 @@ object YtDlp {
     @Throws(IOException::class)
     private fun runClientFetch(videoUrl: String, client: String?, onStarted: (Process) -> Unit): List<YtStream> {
         val cmd = ArrayList<String>()
-        cmd.addAll(YtDlpBinary.resolveCommand(PREWARM_EXECUTOR))
+        cmd.addAll(YtDlpBinary.resolveCommand())
         val tempCookies = cookies.appendArgs(cmd)
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }
@@ -357,7 +345,7 @@ object YtDlp {
         } catch (e: InterruptedException) {
             process.destroyForcibly()
             Thread.currentThread().interrupt()
-            throw IOException("Interrupted while waiting for yt-dlp", e)
+            throw IOException("Interrupted while waiting for yt-dlp.", e)
         } finally {
             if (tempCookies != null) try {
                 Files.deleteIfExists(tempCookies)

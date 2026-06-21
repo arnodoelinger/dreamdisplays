@@ -12,6 +12,7 @@ bstats = "3.2.1"
 shadow = "9.4.1"
 kotlin = "2.4.0"
 kotlinxSerialization = "1.11.0"
+kotlinxCoroutines = "1.11.0"
 paperweight = "2.0.0-beta.21"
 newpipeExtractor = "v0.26.2"
 
@@ -21,6 +22,7 @@ ofratAnnotations = { module = "com.github.arsmotorin.ofrat:ofrat-annotations", v
 ofratPlugin = { module = "com.github.arsmotorin.ofrat:ofrat-plugin", version.ref = "ofrat" }
 kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlinxSerializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "kotlinxSerialization" }
+kotlinxCoroutinesCore = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 commonsCompress = { module = "org.apache.commons:commons-compress", version.ref = "commonsCompress" }
 tukaaniXz = { module = "org.tukaani:xz", version.ref = "tukaaniXz" }
 tomlj = { module = "org.tomlj:tomlj", version.ref = "tomlj" }
