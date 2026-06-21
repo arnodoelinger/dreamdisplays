@@ -22,8 +22,17 @@ class DefaultDisplayService(
     override fun updateSettings(id: DisplayId, settings: DisplaySettings) =
         mutations.updateSettings(id, settings)
 
-    override fun setUrl(id: DisplayId, url: String?) =
-        mutations.setUrl(id, url)
+    override fun setUrl(id: DisplayId, url: String?, lang: String?) =
+        mutations.setUrl(id, url, lang)
+
+    override fun setLocked(id: DisplayId, locked: Boolean) =
+        mutations.setLocked(id, locked)
+
+    override fun delete(id: DisplayId) =
+        mutations.delete(id)
+
+    override fun report(id: DisplayId) =
+        mutations.report(id)
 
     override fun on(listener: (DisplayEvent) -> Unit): AutoCloseable =
         lookup.onDisplayEvent(listener)

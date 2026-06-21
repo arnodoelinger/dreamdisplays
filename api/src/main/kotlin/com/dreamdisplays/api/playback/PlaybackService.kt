@@ -49,4 +49,7 @@ interface PlaybackService {
 
     /** Requests a new persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`); the server validates it. */
     fun setMode(displayId: DisplayId, mode: PlaybackMode)
+
+    /** Re-resolves and reloads the current video for [displayId] after a load failure (local recovery). */
+    fun retry(displayId: DisplayId)
 }

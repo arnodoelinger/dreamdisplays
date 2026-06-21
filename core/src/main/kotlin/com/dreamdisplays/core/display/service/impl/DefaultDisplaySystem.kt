@@ -58,8 +58,20 @@ class DefaultDisplaySystem(
         apply(commands.updateSettings(id, settings))
     }
 
-    override fun setUrl(id: DisplayId, url: String?) {
-        apply(commands.setUrl(id, url))
+    override fun setUrl(id: DisplayId, url: String?, lang: String?) {
+        apply(commands.setUrl(id, url, lang))
+    }
+
+    override fun setLocked(id: DisplayId, locked: Boolean) {
+        apply(commands.setLocked(id, locked))
+    }
+
+    override fun delete(id: DisplayId) {
+        if (commands.delete(id)) removeDisplay(id)
+    }
+
+    override fun report(id: DisplayId) {
+        apply(commands.report(id))
     }
 
     override fun play(displayId: DisplayId) {
@@ -110,6 +122,10 @@ class DefaultDisplaySystem(
 
     override fun setMode(displayId: DisplayId, mode: PlaybackMode) {
         apply(commands.setMode(displayId, mode))
+    }
+
+    override fun retry(displayId: DisplayId) {
+        apply(commands.retry(displayId))
     }
 
     override fun start(displayId: DisplayId, url: String?): Boolean {

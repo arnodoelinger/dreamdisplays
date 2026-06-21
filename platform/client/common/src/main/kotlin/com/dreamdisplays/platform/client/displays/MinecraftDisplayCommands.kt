@@ -6,6 +6,11 @@ import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.display.model.DisplaySettings
 import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.core.protocol.DisplayDelete
+import com.dreamdisplays.core.protocol.ReportDisplay
+import com.dreamdisplays.core.protocol.SetLocked
+import com.dreamdisplays.core.storage.DisplayStorage
 import kotlin.time.Duration
 
 class MinecraftDisplayCommands : DisplayCommandExecutor {
@@ -26,10 +31,31 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
         return screen.toDisplay()
     }
 
-    override fun setUrl(id: DisplayId, url: String?): Display? {
+    override fun setUrl(id: DisplayId, url: String?, lang: String?): Display? {
         val screen = DisplayRegistry.screens[id.uuid] ?: return null
         if (url.isNullOrBlank()) return screen.toDisplay()
-        screen.playSuggestedVideo(url, screen.lang ?: "")
+        screen.playSuggestedVideo(url, lang ?: screen.lang ?: "")
+        return screen.toDisplay()
+    }
+
+    override fun setLocked(id: DisplayId, locked: Boolean): Display? {
+        val screen = DisplayRegistry.screens[id.uuid] ?: return null
+        screen.isLocked = locked
+        Initializer.sendPacket(SetLocked(id.uuid, locked))
+        return screen.toDisplay()
+    }
+
+    override fun delete(id: DisplayId): Boolean {
+        val screen = DisplayRegistry.screens[id.uuid] ?: return false
+        DisplayStorage.removeDisplay(id.uuid)
+        DisplayRegistry.unregisterScreen(screen)
+        Initializer.sendPacket(DisplayDelete(id.uuid))
+        return true
+    }
+
+    override fun report(id: DisplayId): Display? {
+        val screen = DisplayRegistry.screens[id.uuid] ?: return null
+        Initializer.sendPacket(ReportDisplay(id.uuid))
         return screen.toDisplay()
     }
 
@@ -98,6 +124,12 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
     override fun setMode(displayId: DisplayId, mode: PlaybackMode): Display? {
         val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
         screen.requestMode(mode)
+        return screen.toDisplay()
+    }
+
+    override fun retry(displayId: DisplayId): Display? {
+        val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
+        screen.retryVideo()
         return screen.toDisplay()
     }
 

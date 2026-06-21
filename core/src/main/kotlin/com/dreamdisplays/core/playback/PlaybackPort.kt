@@ -20,4 +20,5 @@ interface PlaybackPort {
     fun restart(displayId: DisplayId)
     fun getMode(displayId: DisplayId): PlaybackMode
     fun setMode(displayId: DisplayId, mode: PlaybackMode)
+    fun retry(displayId: DisplayId)
 }

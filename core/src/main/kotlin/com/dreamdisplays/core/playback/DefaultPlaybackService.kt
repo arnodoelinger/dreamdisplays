@@ -40,4 +40,6 @@ class DefaultPlaybackService(
         playback.getMode(displayId)
 
     override fun setMode(displayId: DisplayId, mode: PlaybackMode) = playback.setMode(displayId, mode)
+
+    override fun retry(displayId: DisplayId) = playback.retry(displayId)
 }

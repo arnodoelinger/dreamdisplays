@@ -1,8 +1,10 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.playback.PlaybackService
+import com.dreamdisplays.api.watchparty.WatchPartyService
+import com.dreamdisplays.api.display.service.DisplayService
+import com.dreamdisplays.platform.client.popout.PopoutManager
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.get
 import com.dreamdisplays.platform.client.core.getOrNull
@@ -23,15 +25,11 @@ import com.dreamdisplays.platform.client.ui.widgets.SyncModeSlider
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.MediaSearchService
 import com.dreamdisplays.media.VideoQuality
-import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.core.protocol.ReportDisplay
-import com.dreamdisplays.core.protocol.SetLocked
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
@@ -55,9 +53,10 @@ class DisplayMenu private constructor(
 ) : UiScreenBase(Component.translatable("dreamdisplays.ui.title")) {
 
     private val modLabel = ModTitleLabel()
+    private val popout = DreamServices.registry.get<PopoutManager>()
     private val dropdown = PopoutDropdown(
-        onWindow = { displayScreen.activateWindowMode() },
-        onPip = { displayScreen.activatePipMode() },
+        onWindow = { popout.openWindow(DisplayId(displayScreen.uuid)) },
+        onPip = { popout.openPip(DisplayId(displayScreen.uuid)) },
     )
 
     private lateinit var volume: ValueSlider
@@ -82,6 +81,8 @@ class DisplayMenu private constructor(
         // the DisplayScreen directly, so the UI no longer reaches into the live screen for these actions.
         val displayId = DisplayId(ds.uuid)
         val playback = DreamServices.registry.get<PlaybackService>()
+        val watchParty = DreamServices.registry.get<WatchPartyService>()
+        val displays = DreamServices.registry.get<DisplayService>()
         val videoReady = { ds.isVideoStarted && !ds.errored }
         val notErrored = { !ds.errored }
 
@@ -149,7 +150,7 @@ class DisplayMenu private constructor(
         ) { mode ->
             when {
                 mode == ds.effectiveMode -> Unit
-                ds.watchParty != null && mode == PlaybackMode.LOCAL -> ds.closeWatchParty()
+                ds.watchParty != null && mode == PlaybackMode.LOCAL -> watchParty.close(displayId)
                 PlaybackMode.isBaseMode(mode) -> playback.setMode(displayId, mode)
             }
         })
@@ -213,7 +214,7 @@ class DisplayMenu private constructor(
 
         val popoutButton = addUi(IconButton("popout") {
             if (ds.isPopoutActive) {
-                ds.deactivatePopout()
+                popout.close(displayId)
                 dropdown.hide()
             } else {
                 dropdown.toggle()
@@ -243,15 +244,13 @@ class DisplayMenu private constructor(
             icon = { IconButton.modIcon(if (ds.isLocked == true) "lock" else "unlock") },
         ) {
             val locked = ds.isLocked ?: return@IconButton
-            val newLocked = !locked
-            ds.isLocked = newLocked
-            Initializer.sendPacket(SetLocked(ds.uuid, newLocked))
+            displays.setLocked(displayId, !locked)
         })
         lockButton.enabledWhen = { ds.canToggleLockHere }
         lockButton.visibleWhen = { ds.isLocked != null && !ds.errored }
 
         val retryButton = addUi(IconButton("refresh") {
-            ds.retryVideo() // Local re-resolve; the error panel clears itself once it succeeds
+            playback.retry(displayId) // Local re-resolve; the error panel clears itself once it succeeds
         })
         // Only the error panel places it; keep it hidden in the normal menu so it never strays to (0,0)
         retryButton.visibleWhen = { ds.errored }
@@ -260,9 +259,7 @@ class DisplayMenu private constructor(
             icon = { IconButton.modIcon("delete") },
             sprites = IconButton.RED_SPRITES,
         ) {
-            DisplayStorage.removeDisplay(ds.uuid)
-            DisplayRegistry.unregisterScreen(ds)
-            Initializer.sendPacket(DisplayDelete(ds.uuid))
+            displays.delete(displayId)
             onClose()
         })
         deleteButton.enabledWhen = { ds.owner || ds.isAdmin }
@@ -272,7 +269,7 @@ class DisplayMenu private constructor(
                 icon = { IconButton.modIcon("report") },
                 sprites = IconButton.RED_SPRITES,
             ) {
-                Initializer.sendPacket(ReportDisplay(ds.uuid))
+                displays.report(displayId)
                 onClose()
             })
         } else null
@@ -386,7 +383,7 @@ class DisplayMenu private constructor(
     private fun onPickSuggested(info: MediaSearchResult) {
         val ds = displayScreen
         if (!ds.canSetVideoHere) return
-        if (!ds.playSuggestedVideo(info.getWatchUrl(), ds.lang ?: "")) return
+        DreamServices.registry.get<DisplayService>().setUrl(DisplayId(ds.uuid), info.getWatchUrl(), ds.lang)
         VideoTitleCache.put(info.id, info.title)
         VideoMetadataCache.put(info.id, info)
         lastSuggestedVideoId = info.id
