@@ -13,7 +13,7 @@ fn find_ffmpeg() -> Option<String> {
         }
     }
     let candidates = [
-        "../client/fabric/run/dreamdisplays/ffmpeg/macos-aarch64/ffmpeg",
+        "../platform/client/fabric/run/dreamdisplays/ffmpeg/macos-aarch64/ffmpeg",
         "/opt/homebrew/bin/ffmpeg",
         "/usr/local/bin/ffmpeg",
         "/usr/bin/ffmpeg",

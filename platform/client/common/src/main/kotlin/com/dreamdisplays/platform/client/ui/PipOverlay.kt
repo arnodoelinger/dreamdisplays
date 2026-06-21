@@ -1,0 +1,472 @@
+package com.dreamdisplays.platform.client.ui
+
+import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.core.display.DisplayId
+import com.dreamdisplays.platform.client.overlay.Overlay
+import com.dreamdisplays.platform.client.overlay.OverlayBounds
+import com.dreamdisplays.platform.client.overlay.OverlayEvent
+import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.render.TextureUploadUtil
+import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.mojang.blaze3d.platform.NativeImage
+import net.minecraft.client.Minecraft
+//? if >=26 {
+import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
+import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.resources.Identifier
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.util.UUID
+
+/**
+ * In-game Picture-in-Picture overlay for one display screen.
+ *
+ *  - Click on body (no drag) – `DisplayMenu`
+ *  - Click + drag the body – free move; on release snaps smoothly to nearest free anchor
+ *  - Click + drag the resize grip – resize (grip is in the corner of the PiP facing screen center)
+ */
+class PipOverlay(
+    val displayScreen: DisplayScreen,
+    initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
+) : Overlay {
+    @Volatile private var frontBuf: ByteBuffer = EMPTY_DIRECT
+    private var backBuf: ByteBuffer = EMPTY_DIRECT
+    @Volatile var frameW = 0
+    @Volatile var frameH = 0
+    @Volatile private var frameVersion = 0L
+    @Volatile private var contentAspect = 0.0
+    @Volatile private var frameFormat = UploadPixelFormat.RGB24
+    private var uploadedVersion = 0L
+
+    private var dynamicTexture: DynamicTexture? = null
+    private var textureId: Identifier? = null
+    private var texW = 0; private var texH = 0
+    private var uploader: AsyncTextureUploader? = null
+    private var rgbaUploadBuffer: ByteBuffer? = null
+
+    var anchor: PipAnchor = PipAnchor.fromCorner(initialCorner)
+    private var sizeFraction: Float = 0.25f
+
+    private var posX: Float = 0f
+    private var posY: Float = 0f
+    private var targetX: Float = 0f
+    private var targetY: Float = 0f
+    private var posInitialized = false
+
+    var lastPipX = 0; private set
+    var lastPipY = 0; private set
+    var lastPipW = 0; private set
+    var lastPipH = 0; private set
+
+    private var animProgress = 0f
+    private var closing = false
+    private var lastRenderNanos = 0L
+
+    private var wasLeftPressed = false
+    private var pressed = false
+    private var pressedInBody = false
+    private var pressedInResize = false
+    private var dragging = false
+    private var resizing = false
+    private var pressMouseX = 0
+    private var pressMouseY = 0
+    private var dragOffsetX = 0
+    private var dragOffsetY = 0
+    private var resizeStartFrac = 0f
+
+    private var hovering = false
+    private var hoveringResize = false
+
+    val isFinished: Boolean get() = closing && animProgress < 0.01f
+    val isDragging: Boolean get() = dragging
+
+    /** Stable identity usable with [Overlay] / [com.dreamdisplays.platform.client.overlay.OverlayManager] contracts. */
+    override val displayId: DisplayId get() = DisplayId(displayScreen.uuid)
+
+    /** Visible until the close animation has fully played out. */
+    override val isVisible: Boolean get() = !isFinished
+
+    /** Current screen-space bounds, valid only after the first [render] call. */
+    override val bounds: OverlayBounds
+        get() = OverlayBounds(
+            x = lastPipX.toFloat(),
+            y = lastPipY.toFloat(),
+            width = lastPipW.toFloat(),
+            height = lastPipH.toFloat(),
+        )
+
+    /**
+     * [Overlay] contract entry point. Bridges the platform-agnostic call into the existing
+     * Minecraft render path by unwrapping a [MinecraftOverlayRenderContext]; a context of any other
+     * type is ignored (this overlay can only draw through Minecraft's HUD).
+     */
+    override fun render(context: OverlayRenderContext) {
+        val mc = context as? MinecraftOverlayRenderContext ?: return
+        render(mc.mc, mc.graphics, mc.mouseX, mc.mouseY, mc.leftPressed, context.partialTick)
+    }
+
+    /**
+     * [Overlay] contract input hook. PiP input is otherwise polled from the render context
+     * (see [handleMouseInput]); this only handles the explicit close request.
+     * @return true if the event was consumed.
+     */
+    override fun onEvent(event: OverlayEvent): Boolean = when (event) {
+        is OverlayEvent.CloseRequested -> { startClose(); true }
+        else -> false
+    }
+
+    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat = UploadPixelFormat.RGB24) {
+        val size = w * h * format.bytesPerPixel
+        if (size <= 0 || buf.remaining() < size) return
+        var back = backBuf
+        if (back.capacity() < size) {
+            back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+        }
+        back.clear()
+        val savedLimit = buf.limit()
+        val savedPos = buf.position()
+        buf.limit(savedPos + size)
+        back.put(buf)
+        buf.limit(savedLimit)
+        buf.position(savedPos)
+        back.flip()
+
+        val prev = frontBuf
+        frontBuf = back
+        backBuf = if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+        contentAspect = aspect
+        frameFormat = format
+        frameW = w; frameH = h
+        frameVersion++
+    }
+
+    fun uploadFrame() {
+        val fw = frameW; val fh = frameH
+        val v = frameVersion
+        if (v == uploadedVersion) return
+        val buf = frontBuf
+        val format = frameFormat
+        val size = fw * fh * format.bytesPerPixel
+        if (fw <= 0 || fh <= 0 || buf.remaining() < size) return
+
+        val mc = Minecraft.getInstance()
+        var tex = dynamicTexture
+        if (tex == null || texW != fw || texH != fh) {
+            tex?.close()
+            textureId?.let { mc.textureManager.release(it) }
+            val img = NativeImage(NativeImage.Format.RGBA, fw, fh, false)
+            tex = DynamicTexture({ "dreamdisplays:pip" }, img)
+            textureId = Identifier.fromNamespaceAndPath(
+                Initializer.MOD_ID, "pip/${displayScreen.uuid}-${UUID.randomUUID()}")
+            mc.textureManager.register(textureId!!, tex)
+            dynamicTexture = tex; texW = fw; texH = fh
+        }
+
+        TextureUploadUtil.upload(
+            texture = tex.getTexture(),
+            src = buf,
+            w = fw,
+            h = fh,
+            format = format,
+            glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
+            rgbaScratch = rgbaUploadBuffer,
+            setRgbaScratch = { rgbaUploadBuffer = it },
+        )
+        uploadedVersion = v
+    }
+
+    /** Returns false when the close animation has finished – caller should discard. */
+    fun render(
+        mc: Minecraft,
+        //? if >=26 {
+        g: GuiGraphicsExtractor,
+        //?} else
+        /*g: GuiGraphics,*/
+        mouseX: Int, mouseY: Int,
+        leftPressed: Boolean,
+        partialTick: Float,
+    ): Boolean {
+        val now = System.nanoTime()
+        val dt = if (lastRenderNanos == 0L) 0.016f
+                 else ((now - lastRenderNanos) / 1e9f).coerceIn(0f, 0.1f)
+        lastRenderNanos = now
+
+        val target = if (closing) 0f else 1f
+        animProgress += (target - animProgress) * minOf(1f, dt * 10f)
+
+        if (isFinished) { cleanup(mc); return false }
+        val id = textureId ?: return true
+
+        val sw = mc.window.guiScaledWidth
+        val sh = mc.window.guiScaledHeight
+        val fw = texW; val fh = texH
+        val content = contentRect(fw, fh, contentAspect)
+        val contentAspect = if (content.w > 0 && content.h > 0) content.w / content.h.toDouble() else 16.0 / 9.0
+        val pipW = (sw * sizeFraction).toInt().coerceAtLeast(80)
+        val pipH = (pipW / contentAspect).toInt().coerceAtLeast(45)
+
+        if (!posInitialized) {
+            val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
+            posX = ax.toFloat(); posY = ay.toFloat()
+            targetX = posX; targetY = posY
+            posInitialized = true
+        }
+
+        handleMouseInput(mouseX, mouseY, leftPressed, sw, sh, pipW, pipH)
+
+        if (!dragging && !resizing) {
+            val lerp = minOf(1f, dt * SNAP_LERP_SPEED)
+            posX += (targetX - posX) * lerp
+            posY += (targetY - posY) * lerp
+        } else if (resizing) {
+            val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
+            posX = ax.toFloat(); posY = ay.toFloat()
+            targetX = posX; targetY = posY
+        }
+
+        val cx = posX.toInt(); val cy = posY.toInt()
+        lastPipX = cx; lastPipY = cy; lastPipW = pipW; lastPipH = pipH
+
+        val (handleX, handleY) = handlePixelPos(pipW, pipH)
+
+        hovering = mouseX in cx..(cx + pipW) && mouseY in cy..(cy + pipH) && animProgress > 0.6f
+        hoveringResize = hovering &&
+            mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
+            mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
+
+        val scale = 0.94f + 0.06f * animProgress
+        val alpha = animProgress
+
+        val matrices = g.pose()
+        matrices.pushMatrix()
+        matrices.translate(cx + pipW / 2f, cy + pipH / 2f)
+        matrices.scale(scale, scale)
+        matrices.translate(-pipW / 2f, -pipH / 2f)
+
+        // Video content only. The main display texture is padded to fit the in-world display.
+        g.blit(
+            RenderPipelines.GUI_TEXTURED,
+            id,
+            0,
+            0,
+            content.x.toFloat(),
+            content.y.toFloat(),
+            pipW,
+            pipH,
+            content.w,
+            content.h,
+            fw,
+            fh,
+            blendColor(0xFFFFFFFF.toInt(), alpha),
+        )
+
+        // Border
+        val active = hovering || dragging || resizing
+        val borderColor = blendColor(if (active) ACCENT else PANEL_BORDER, alpha)
+        outline(g, 0, 0, pipW, pipH, borderColor)
+
+        if (hovering || resizing) {
+            renderResizeHandle(g, handleX, handleY, alpha)
+        }
+
+        matrices.popMatrix()
+        return true
+    }
+
+    private fun handleMouseInput(
+        mx: Int, my: Int, leftPressed: Boolean,
+        sw: Int, sh: Int, pipW: Int, pipH: Int,
+    ) {
+        val cx = posX.toInt(); val cy = posY.toInt()
+        val pressJustDown = leftPressed && !wasLeftPressed
+        val pressJustUp = !leftPressed && wasLeftPressed
+
+        if (pressJustDown) {
+            val inBody = mx in cx..(cx + pipW) && my in cy..(cy + pipH)
+            if (inBody && animProgress > 0.6f) {
+                pressed = true
+                pressMouseX = mx; pressMouseY = my
+                val (hx, hy) = handlePixelPos(pipW, pipH)
+                pressedInResize = mx in (cx + hx)..(cx + hx + RESIZE_SZ) &&
+                                  my in (cy + hy)..(cy + hy + RESIZE_SZ)
+                pressedInBody = !pressedInResize
+                dragOffsetX = mx - cx
+                dragOffsetY = my - cy
+                resizeStartFrac = sizeFraction
+            }
+        }
+
+        if (pressed && leftPressed) {
+            val dx = mx - pressMouseX
+            val dy = my - pressMouseY
+            val dist2 = dx * dx + dy * dy
+            if (pressedInResize) {
+                if (!resizing && dist2 > DRAG_THRESHOLD * DRAG_THRESHOLD) resizing = true
+                if (resizing) {
+                    val (sx, sy) = anchor.centerFacingCorner()
+                    val grow = sx * dx + sy * dy
+                    val activeAxes = (if (sx != 0) 1 else 0) + (if (sy != 0) 1 else 0)
+                    val denom = activeAxes.coerceAtLeast(1) * sw.toFloat()
+                    sizeFraction = (resizeStartFrac + grow / denom).coerceIn(MIN_SIZE_FRAC, MAX_SIZE_FRAC)
+                }
+            } else if (pressedInBody) {
+                if (!dragging && dist2 > DRAG_THRESHOLD * DRAG_THRESHOLD) dragging = true
+                if (dragging) {
+                    posX = (mx - dragOffsetX).toFloat().coerceIn(-pipW * 0.5f, sw - pipW * 0.5f)
+                    posY = (my - dragOffsetY).toFloat().coerceIn(-pipH * 0.5f, sh - pipH * 0.5f)
+                    targetX = posX; targetY = posY
+                }
+            }
+        }
+
+        if (pressJustUp && pressed) {
+            when {
+                dragging -> {
+                    val centerX = posX + pipW / 2f
+                    val centerY = posY + pipH / 2f
+                    anchor = findNearestFreeAnchor(sw, sh, pipW, pipH, centerX, centerY)
+                    val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
+                    targetX = ax.toFloat(); targetY = ay.toFloat()
+                    dragging = false
+                }
+                resizing -> resizing = false
+                pressedInBody -> DisplayMenu.open(displayScreen)
+            }
+            pressed = false
+            pressedInBody = false
+            pressedInResize = false
+        }
+
+        wasLeftPressed = leftPressed
+    }
+
+    private fun findNearestFreeAnchor(sw: Int, sh: Int, pw: Int, ph: Int, cx: Float, cy: Float): PipAnchor {
+        var best = anchor
+        var bestDist = Float.MAX_VALUE
+        for (a in PipAnchor.entries) {
+            if (!PipOverlayManager.canUseAnchor(this, a)) continue
+            val (ax, ay) = a.position(sw, sh, pw, ph, MARGIN)
+            val anchorCx = ax + pw / 2f
+            val anchorCy = ay + ph / 2f
+            val ddx = anchorCx - cx
+            val ddy = anchorCy - cy
+            val d2 = ddx * ddx + ddy * ddy
+            if (d2 < bestDist) { bestDist = d2; best = a }
+        }
+        return best
+    }
+
+    private fun contentRect(frameW: Int, frameH: Int, contentAspect: Double): ContentRect {
+        if (frameW <= 0 || frameH <= 0) return ContentRect(0, 0, frameW, frameH)
+        if (contentAspect <= 0.0 || !contentAspect.isFinite()) return ContentRect(0, 0, frameW, frameH)
+
+        val frameAspect = frameW / frameH.toDouble()
+        return if (contentAspect > frameAspect) {
+            val contentH = (frameW / contentAspect).toInt().coerceIn(1, frameH)
+            ContentRect(0, (frameH - contentH) / 2, frameW, contentH)
+        } else {
+            val contentW = (frameH * contentAspect).toInt().coerceIn(1, frameW)
+            ContentRect((frameW - contentW) / 2, 0, contentW, frameH)
+        }
+    }
+
+    /** Returns the (x, y) top-left position of the resize handle in PiP-local coords. */
+    private fun handlePixelPos(pipW: Int, pipH: Int): Pair<Int, Int> {
+        val (sx, sy) = anchor.centerFacingCorner()
+        val x = when {
+            sx > 0 -> pipW - RESIZE_SZ - RESIZE_INSET
+            sx < 0 -> RESIZE_INSET
+            else   -> (pipW - RESIZE_SZ) / 2
+        }
+        val y = when {
+            sy > 0 -> pipH - RESIZE_SZ - RESIZE_INSET
+            sy < 0 -> RESIZE_INSET
+            else   -> (pipH - RESIZE_SZ) / 2
+        }
+        return x to y
+    }
+
+    private fun renderResizeHandle(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
+        val (sx, sy) = anchor.centerFacingCorner()
+        val color = blendColor(if (hoveringResize) ACCENT else 0xFFFFFFFF.toInt(), alpha)
+        drawCornerBracket(g, hx, hy, sx, sy, 8, 0, color)
+        drawCornerBracket(g, hx, hy, sx, sy, 5, 4, color)
+    }
+
+    private fun drawCornerBracket(
+        //? if >=26 {
+        g: GuiGraphicsExtractor,
+        //?} else
+        /*g: GuiGraphics,*/
+        baseX: Int, baseY: Int,
+        sx: Int, sy: Int,
+        len: Int,
+        inset: Int,
+        color: Int,
+    ) {
+        if (sx != 0 && sy != 0) {
+            val ax = if (sx < 0) baseX + inset else baseX + RESIZE_SZ - 1 - inset
+            val ay = if (sy < 0) baseY + inset else baseY + RESIZE_SZ - 1 - inset
+            val xs = if (sx < 0) ax else ax - len + 1
+            val xe = xs + len
+            g.fill(xs, ay, xe, ay + 1, color)
+            val ys = if (sy < 0) ay else ay - len + 1
+            val ye = ys + len
+            g.fill(ax, ys, ax + 1, ye, color)
+        } else if (sx != 0) {
+            val ax = if (sx < 0) baseX + inset else baseX + RESIZE_SZ - 1 - inset
+            val cy = baseY + RESIZE_SZ / 2
+            g.fill(ax, cy - len / 2, ax + 1, cy + (len + 1) / 2, color)
+        } else if (sy != 0) {
+            val ay = if (sy < 0) baseY + inset else baseY + RESIZE_SZ - 1 - inset
+            val cx = baseX + RESIZE_SZ / 2
+            g.fill(cx - len / 2, ay, cx + (len + 1) / 2, ay + 1, color)
+        }
+    }
+
+    fun startClose() { closing = true }
+
+    fun cleanup(mc: Minecraft) {
+        try { uploader?.cleanup() } catch (_: Exception) {}
+        uploader = null
+        rgbaUploadBuffer = null
+        val id = textureId ?: return
+        textureId = null
+        try { mc.textureManager.release(id) } catch (_: Exception) {}
+        dynamicTexture = null
+    }
+
+    companion object {
+        private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+
+        private const val MARGIN = 12
+        private const val DRAG_THRESHOLD = 4
+        private const val MIN_SIZE_FRAC = 0.12f
+        private const val MAX_SIZE_FRAC = 0.6f
+        private const val RESIZE_SZ = 14
+        private const val RESIZE_INSET = 6
+        private const val SNAP_LERP_SPEED = 8f
+
+        private const val PANEL_BORDER = 0xFF606060.toInt()
+        private const val ACCENT = 0xFF4A90E2.toInt()
+
+        private fun outline(g: GuiGraphicsCompat, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
+            g.fill(x1, y1, x2, y1 + 1, color)
+            g.fill(x1, y2 - 1, x2, y2, color)
+            g.fill(x1, y1, x1 + 1, y2, color)
+            g.fill(x2 - 1, y1, x2, y2, color)
+        }
+
+        private fun blendColor(color: Int, alpha: Float): Int {
+            val a = ((color ushr 24 and 0xFF) * alpha).toInt().coerceIn(0, 255)
+            return (a shl 24) or (color and 0x00FFFFFF)
+        }
+    }
+
+    private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)
+}

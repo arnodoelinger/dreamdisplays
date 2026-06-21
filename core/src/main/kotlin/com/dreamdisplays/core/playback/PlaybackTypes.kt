@@ -3,7 +3,7 @@ package com.dreamdisplays.core.playback
 /*
  * Shared playback enums for protocol v2. These travel on the wire as their [ordinal] int
  * ([wire] / [fromWire]); ordinals are append-only — never reorder or remove an entry, only append.
- * Living here (the lowest shared module) lets both the client (:common) and the server reuse them.
+ * Living here (the lowest shared module) lets both the client (:platform:client:common) and the server reuse them.
  */
 
 /** How a display drives its playback timeline. */

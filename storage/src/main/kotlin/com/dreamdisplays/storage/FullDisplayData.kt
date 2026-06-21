@@ -7,7 +7,7 @@ import java.util.UUID
 /**
  * Full persisted snapshot of a single display on a server, stored in `server-{serverId}-displays.json`.
  *
- * Holds everything needed to recreate a [com.dreamdisplays.displays.DisplayScreen] after a reconnect:
+ * Holds everything needed to recreate a [com.dreamdisplays.platform.client.displays.DisplayScreen] after a reconnect:
  * world placement, dimensions, the resolved video, and the last-known playback settings.
  */
 class FullDisplayData(
@@ -32,6 +32,6 @@ class FullDisplayData(
 
     var rotation: Int = 0,
 
-    /** Broadcast quality clamp (0 = unclamped); see [com.dreamdisplays.displays.DisplayScreen.qualityCap]. */
+    /** Broadcast quality clamp (0 = unclamped); see [com.dreamdisplays.platform.client.displays.DisplayScreen.qualityCap]. */
     var qualityCap: Int = 0,
 )

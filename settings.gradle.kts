@@ -63,11 +63,12 @@ include(":media-player")
 include(":media-source")
 include(":util")
 include(":protocol")
-include(":common")
-include(":client")
-include(":client:fabric")
-include(":client:neoforge")
-include(":server")
+include(":platform")
+include(":platform:client")
+include(":platform:client:common")
+include(":platform:client:fabric")
+include(":platform:client:neoforge")
+include(":platform:server")
 
 stonecutter {
     create(rootProject) {
