@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.storage
 
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import com.google.gson.reflect.TypeToken
 import org.slf4j.LoggerFactory
 import java.util.UUID

@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.player.managers
 
 import com.dreamdisplays.media.player.process.FFmpegBinary
-import com.dreamdisplays.core.net.MediaHostGuard
-import com.dreamdisplays.core.media.DreamMediaException
+import com.dreamdisplays.core.security.MediaHostGuard
+import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
@@ -16,7 +16,7 @@ import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.player.stream.MediaStreamSelector
 import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.util.MediaUtil
-import com.dreamdisplays.core.media.FramePixelFormat
+import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.player.util.joinSafely
 import com.dreamdisplays.media.player.api.GpuTextureRef

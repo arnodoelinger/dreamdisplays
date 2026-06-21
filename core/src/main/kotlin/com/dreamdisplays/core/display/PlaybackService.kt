@@ -1,6 +1,6 @@
 package com.dreamdisplays.core.display
 
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode
 import kotlin.time.Duration
 

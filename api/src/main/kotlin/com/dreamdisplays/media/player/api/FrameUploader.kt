@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.api
 
-import com.dreamdisplays.core.media.FramePixelFormat
+import com.dreamdisplays.media.FramePixelFormat
 import java.nio.ByteBuffer
 
 /**

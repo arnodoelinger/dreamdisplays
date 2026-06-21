@@ -5,7 +5,7 @@ import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.core.security.MediaUrlPolicy
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
-import com.dreamdisplays.core.platform.Processes
+import com.dreamdisplays.media.runtime.Processes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay

@@ -4,8 +4,8 @@ import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.util.daemon
-import com.dreamdisplays.core.media.FramePixelFormat
-import com.dreamdisplays.core.platform.OsInfo
+import com.dreamdisplays.media.FramePixelFormat
+import com.dreamdisplays.media.runtime.OsInfo
 import com.dreamdisplays.media.player.api.FrameUploaderFactory
 import com.dreamdisplays.media.player.api.GpuTextureRef
 import org.slf4j.LoggerFactory

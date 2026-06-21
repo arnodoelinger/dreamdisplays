@@ -8,7 +8,7 @@ import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.core.storage.FullDisplayData
 import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList

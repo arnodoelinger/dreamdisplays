@@ -1,6 +1,6 @@
 package com.dreamdisplays.core.display
 
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 
 /**
  * Represents the settings for a display.

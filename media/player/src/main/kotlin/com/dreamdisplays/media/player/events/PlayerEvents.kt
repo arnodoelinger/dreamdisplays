@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.events
 
-import com.dreamdisplays.core.media.DreamMediaException
+import com.dreamdisplays.media.DreamMediaException
 
 /**
  * Callbacks emitted by `MediaPlayer` to decouple playback logic from the rendering / UI layer.

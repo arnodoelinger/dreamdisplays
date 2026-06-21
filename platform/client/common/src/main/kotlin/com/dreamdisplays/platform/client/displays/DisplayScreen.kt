@@ -33,8 +33,8 @@ import com.dreamdisplays.core.protocol.WatchPartyStart
 import com.dreamdisplays.core.protocol.WatchPartyState
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
-import com.dreamdisplays.core.media.DreamMediaException
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.DreamMediaException
+import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType

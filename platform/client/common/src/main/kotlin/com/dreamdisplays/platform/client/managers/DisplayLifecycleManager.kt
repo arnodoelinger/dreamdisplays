@@ -5,7 +5,7 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.core.storage.FullDisplayData
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.playback.PlaybackMode
 import com.dreamdisplays.util.FacingUtil

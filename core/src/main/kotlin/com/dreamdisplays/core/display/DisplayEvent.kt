@@ -1,6 +1,6 @@
 package com.dreamdisplays.core.display
 
-import com.dreamdisplays.core.media.DreamMediaException
+import com.dreamdisplays.media.DreamMediaException
 
 /**
  * Represents an event that occurred on a display.

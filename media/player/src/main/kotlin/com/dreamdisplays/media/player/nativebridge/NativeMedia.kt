@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.nativebridge
 
-import com.dreamdisplays.core.platform.OsInfo
+import com.dreamdisplays.media.runtime.OsInfo
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.lang.foreign.Arena

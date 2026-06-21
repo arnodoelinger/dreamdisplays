@@ -2,7 +2,7 @@ package com.dreamdisplays.core.display
 
 import com.dreamdisplays.core.display.DisplayRuntimeState
 import com.dreamdisplays.core.display.WatchPartySession
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList

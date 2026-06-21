@@ -1,7 +1,7 @@
 package com.dreamdisplays.media.player.process
 
-import com.dreamdisplays.core.platform.OsInfo
-import com.dreamdisplays.core.platform.Processes
+import com.dreamdisplays.media.runtime.OsInfo
+import com.dreamdisplays.media.runtime.Processes
 import com.dreamdisplays.media.player.util.daemon
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream

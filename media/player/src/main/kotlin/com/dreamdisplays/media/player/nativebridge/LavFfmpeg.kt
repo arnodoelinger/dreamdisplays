@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.nativebridge
 
-import com.dreamdisplays.core.platform.OsInfo
+import com.dreamdisplays.media.runtime.OsInfo
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory

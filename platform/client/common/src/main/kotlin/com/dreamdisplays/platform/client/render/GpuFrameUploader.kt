@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.core.media.FramePixelFormat
+import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.api.FrameUploader
 import com.dreamdisplays.media.player.api.GpuTextureRef
 import com.mojang.blaze3d.textures.GpuTexture

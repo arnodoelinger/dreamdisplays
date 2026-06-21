@@ -13,11 +13,11 @@ repositories {
 dependencies {
     api(project(":core"))
     api(project(":api"))
-    api(project(":core:storage"))
+    api(project(":media"))
+    api(project(":media:runtime"))
     api(project(":media:player"))
     api(project(":media:source"))
     api(project(":util"))
-    api(project(":core:protocol"))
     api(libs.jspecify)
     api(libs.commonsCompress)
     api(libs.tukaaniXz)

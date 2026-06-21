@@ -37,12 +37,12 @@ import com.dreamdisplays.platform.client.ui.PipOverlayManager
 import com.dreamdisplays.platform.client.displays.MinecraftDisplayCommands
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.source.DefaultMediaResolverChain
-import com.dreamdisplays.core.media.DefaultMediaSessionManager
+import com.dreamdisplays.media.runtime.DefaultMediaSessionManager
 import com.dreamdisplays.media.source.DefaultStreamSelector
 import com.dreamdisplays.media.source.YtDlpSearchService
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSearchService
-import com.dreamdisplays.core.media.MediaSessionManager
+import com.dreamdisplays.media.runtime.MediaSessionManager
 import com.dreamdisplays.media.api.StreamSelector
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.DefaultDisplayRenderer

@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.util.DreamCoroutines
-import com.dreamdisplays.core.platform.OsInfo
-import com.dreamdisplays.core.platform.Processes
+import com.dreamdisplays.media.runtime.OsInfo
+import com.dreamdisplays.media.runtime.Processes
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.File

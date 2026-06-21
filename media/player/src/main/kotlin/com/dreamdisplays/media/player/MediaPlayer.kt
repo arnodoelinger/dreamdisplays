@@ -16,11 +16,11 @@ import com.dreamdisplays.media.player.stream.MediaStreamSelector
 import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.player.util.daemon
-import com.dreamdisplays.core.media.DreamMediaException
+import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.media.api.MediaStream
-import com.dreamdisplays.core.media.VideoQuality
+import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode
-import com.dreamdisplays.core.media.FramePixelFormat
+import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.api.GpuTextureRef
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer

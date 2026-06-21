@@ -56,10 +56,9 @@ dependencyResolutionManagement {
 rootProject.name = "dreamdisplays"
 include(":native")
 include(":core")
-include(":core:protocol")
-include(":core:storage")
 include(":api")
 include(":media")
+include(":media:runtime")
 include(":media:player")
 include(":media:source")
 include(":util")

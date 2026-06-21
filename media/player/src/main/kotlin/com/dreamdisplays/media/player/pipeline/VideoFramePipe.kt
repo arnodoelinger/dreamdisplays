@@ -3,7 +3,7 @@ package com.dreamdisplays.media.player.pipeline
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.player.util.daemon
-import com.dreamdisplays.core.media.FramePixelFormat
+import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.api.FrameUploaderFactory
 import com.dreamdisplays.media.player.api.GpuTextureRef
 import org.slf4j.LoggerFactory
