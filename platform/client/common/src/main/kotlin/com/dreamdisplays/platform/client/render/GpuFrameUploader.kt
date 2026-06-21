@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.core.media.FramePixelFormat
-import com.dreamdisplays.player.api.FrameUploader
-import com.dreamdisplays.player.api.GpuTextureRef
+import com.dreamdisplays.media.player.api.FrameUploader
+import com.dreamdisplays.media.player.api.GpuTextureRef
 import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
 import java.nio.ByteBuffer
@@ -10,7 +10,7 @@ import java.nio.ByteBuffer
 /**
  * Minecraft GPU upload sink for one decode channel. Holds the persistent [AsyncTextureUploader]
  * PBO ring(s) and performs the actual texture uploads via [TextureUploadUtil], keeping all
- * rendering-API code out of the platform-agnostic media-player module.
+ * rendering-API code out of the platform-agnostic media/player module.
  */
 class GpuFrameUploader : FrameUploader {
     private var uploader: AsyncTextureUploader? = null

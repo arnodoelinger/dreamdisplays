@@ -33,8 +33,8 @@ import com.dreamdisplays.core.playback.PlaybackMode
 import com.dreamdisplays.protocol.ReportDisplay
 import com.dreamdisplays.protocol.SetLocked
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
-import com.dreamdisplays.ytdlp.VideoMetadataCache
-import com.dreamdisplays.ytdlp.VideoTitleCache
+import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
+import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
 import net.minecraft.client.input.MouseButtonEvent

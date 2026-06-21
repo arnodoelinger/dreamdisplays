@@ -36,10 +36,10 @@ import com.dreamdisplays.platform.client.render.RenderHook
 import com.dreamdisplays.platform.client.ui.PipOverlayManager
 import com.dreamdisplays.platform.client.displays.MinecraftDisplayCommands
 import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.media.DefaultMediaResolverChain
+import com.dreamdisplays.media.source.DefaultMediaResolverChain
 import com.dreamdisplays.application.media.DefaultMediaSessionManager
-import com.dreamdisplays.media.DefaultStreamSelector
-import com.dreamdisplays.media.YtDlpSearchService
+import com.dreamdisplays.media.source.DefaultStreamSelector
+import com.dreamdisplays.media.source.YtDlpSearchService
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.media.api.MediaSessionManager
@@ -49,9 +49,9 @@ import com.dreamdisplays.platform.client.render.DefaultDisplayRenderer
 import com.dreamdisplays.platform.client.render.ScreenRenderer
 import com.dreamdisplays.render.api.DisplayRenderer
 import com.dreamdisplays.render.api.TextureUploaderFactory
-import com.dreamdisplays.ytdlp.NewPipeResolver
-import com.dreamdisplays.ytdlp.ResolverConfig
-import com.dreamdisplays.ytdlp.YtDlpResolver
+import com.dreamdisplays.media.source.ytdlp.NewPipeResolver
+import com.dreamdisplays.media.source.ytdlp.ResolverConfig
+import com.dreamdisplays.media.source.ytdlp.YtDlpResolver
 
 /**
  * Process-wide [ServiceRegistry] holder and bootstrap entry point.

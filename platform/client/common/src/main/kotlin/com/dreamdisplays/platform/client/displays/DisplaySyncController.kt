@@ -1,6 +1,6 @@
 //package com.dreamdisplays.platform.client.displays
 //
-//import com.dreamdisplays.player.util.daemon
+//import com.dreamdisplays.media.player.util.daemon
 //import kotlin.math.abs
 //import kotlin.math.max
 //

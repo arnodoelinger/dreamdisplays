@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.player.nativebridge.NativeMedia
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import org.lwjgl.opengl.GL11
 
 /**

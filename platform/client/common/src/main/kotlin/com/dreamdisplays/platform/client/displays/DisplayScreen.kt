@@ -8,7 +8,7 @@ import com.dreamdisplays.platform.client.ui.PipCorner
 import com.dreamdisplays.platform.client.managers.ClientPacketManager
 import com.dreamdisplays.platform.client.managers.DisplayPopoutManager
 import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.render.DisplayGeometry
 import com.dreamdisplays.platform.client.render.DisplayTextureResource
 import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
@@ -455,7 +455,7 @@ class DisplayScreen(
     /** True if the media player's playback clock is currently advancing. */
     internal fun isClockRunning(): Boolean = mediaPlayer?.isClockRunning() == true
 
-    /** The current media-player generation, used by the sync controller to detect stale video swaps. */
+    /** The current media/player generation, used by the sync controller to detect stale video swaps. */
     internal val mediaGeneration: Long get() = media.generationNow
 
     /** Recreates the GPU texture (e.g. after a resolution change). */

@@ -16,8 +16,8 @@ import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.media.api.MediaSearchService
 import com.dreamdisplays.platform.client.render.Thumbnails
-import com.dreamdisplays.ytdlp.VideoMetadataCache
-import com.dreamdisplays.ytdlp.VideoTitleCache
+import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
+import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.RenderPipelines

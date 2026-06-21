@@ -2,8 +2,8 @@ package com.dreamdisplays.platform.client.capabilities
 
 import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
 import com.dreamdisplays.platform.client.managers.WarmParkPolicy
-import com.dreamdisplays.player.nativebridge.NativeMedia
-import com.dreamdisplays.player.process.HwAccelBackend
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
+import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.protocol.ClientHello
 import com.dreamdisplays.platform.client.render.RenderBackendCompat
 import com.dreamdisplays.platform.client.render.ShaderPackCompat

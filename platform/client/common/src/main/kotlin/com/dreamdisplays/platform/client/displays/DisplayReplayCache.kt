@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.player.MediaPlayer
-import com.dreamdisplays.player.preparation.PreparedMedia
+import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.media.player.preparation.PreparedMedia
 import com.dreamdisplays.platform.client.managers.WarmParkPolicy
 import java.util.UUID
 import kotlin.math.abs

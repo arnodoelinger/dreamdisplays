@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.player.nativebridge.NativeMedia
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft

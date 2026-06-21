@@ -4,14 +4,14 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSource
-import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment
 import net.minecraft.client.Minecraft
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Owns the media-player lifecycle for a single [DisplayScreen]: swapping in a fresh [MediaPlayer] on
+ * Owns the media/player lifecycle for a single [DisplayScreen]: swapping in a fresh [MediaPlayer] on
  * URL change, generation-guarding async init callbacks against stale players, applying the screen's
  * saved state on start, and teardown.
  *

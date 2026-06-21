@@ -9,7 +9,7 @@ import com.dreamdisplays.platform.client.ui.PipOverlay
 import com.dreamdisplays.platform.client.ui.PipOverlayManager
 import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.render.toUploadFormat
 import org.slf4j.LoggerFactory
 

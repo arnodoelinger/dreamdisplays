@@ -4,7 +4,7 @@ import com.dreamdisplays.core.media.DreamMediaException
 import com.dreamdisplays.core.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.player.api.PlaybackHost
+import com.dreamdisplays.media.player.api.PlaybackHost
 import java.util.UUID
 
 /**

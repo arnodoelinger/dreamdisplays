@@ -5,21 +5,21 @@ import com.dreamdisplays.platform.client.core.get
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.StreamSelector
-import com.dreamdisplays.player.api.CacheInvalidator
-import com.dreamdisplays.player.api.FrameUploader
-import com.dreamdisplays.player.api.FrameUploaderFactory
-import com.dreamdisplays.player.api.PlaybackConfig
-import com.dreamdisplays.player.api.PlaybackEnvironment
-import com.dreamdisplays.player.api.RenderThreadExecutor
+import com.dreamdisplays.media.player.api.CacheInvalidator
+import com.dreamdisplays.media.player.api.FrameUploader
+import com.dreamdisplays.media.player.api.FrameUploaderFactory
+import com.dreamdisplays.media.player.api.PlaybackConfig
+import com.dreamdisplays.media.player.api.PlaybackEnvironment
+import com.dreamdisplays.media.player.api.RenderThreadExecutor
 import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
 import com.dreamdisplays.platform.client.render.GpuFrameUploader
-import com.dreamdisplays.ytdlp.YtDlp
+import com.dreamdisplays.media.source.ytdlp.YtDlp
 import net.minecraft.client.Minecraft
 
 /**
  * Minecraft-client implementation of [PlaybackEnvironment]: bridges the platform-agnostic media
  * player to the live client configuration, the render thread, the GPU uploader, the URL cache, and
- * the service registry. One shared instance is passed to every [com.dreamdisplays.player.MediaPlayer].
+ * the service registry. One shared instance is passed to every [com.dreamdisplays.media.player.MediaPlayer].
  */
 object DreamPlaybackEnvironment : PlaybackEnvironment {
 

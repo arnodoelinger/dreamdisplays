@@ -13,10 +13,10 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.api.Platform
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.storage.DisplayStorage
-import com.dreamdisplays.player.nativebridge.NativeMedia
-import com.dreamdisplays.player.process.FFmpegBinary
-import com.dreamdisplays.ytdlp.FormatDiskCache
-import com.dreamdisplays.ytdlp.YtDlp
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
+import com.dreamdisplays.media.player.process.FFmpegBinary
+import com.dreamdisplays.media.source.ytdlp.FormatDiskCache
+import com.dreamdisplays.media.source.ytdlp.YtDlp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
