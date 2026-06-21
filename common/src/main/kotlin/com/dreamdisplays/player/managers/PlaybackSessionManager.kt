@@ -100,11 +100,11 @@ internal class PlaybackSessionManager(
             getAudioClock: () -> Long = ::pacingClockNanos, parkFlag: AtomicBoolean? = null,
         ) {
             // SSRF guard for the in-process libav path, which bypasses MediaProcess.baseCommand
-            MediaHostGuard.requireAllowed(streamSet.currentVideo.url)
+            val safeUrl = MediaHostGuard.resolveSafeUrl(streamSet.currentVideo.url)
             val fps = streamSet.currentVideo.fps ?: 30.0
             val lavThread = if (nativePipe != null && NativeMedia.lavInProcessEnabled) {
                 nativePipe.startInProcess(
-                    url = streamSet.currentVideo.url, w = w, h = h, seekOffsetNanos = offsetNanos,
+                    url = safeUrl, w = w, h = h, seekOffsetNanos = offsetNanos,
                     sourceFps = fps, hwAccel = hwAccel, stopFlag = stop, terminated = terminated,
                     getAudioClock = getAudioClock, onFirstFrame = onFirstFrame,
                     getBrightness = getBrightness, onEos = onEos, parkFlag = parkFlag,
@@ -116,7 +116,7 @@ internal class PlaybackSessionManager(
             if (nativePipe != null) {
                 val nv12 = NativeMedia.nv12Enabled
                 val transport = if (nv12) MediaProcess.VideoTransport.RAW_NV12 else MediaProcess.VideoTransport.RAW_RGB24
-                val args = MediaProcess.videoArgs(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel, transport)
+                val args = MediaProcess.videoArgs(ffmpeg, safeUrl, w, h, offsetNanos, hwAccel, transport)
                 val vt = nativePipe.start(
                     args = args, w = w, h = h, nv12 = nv12, seekOffsetNanos = offsetNanos, sourceFps = fps,
                     stopFlag = stop, terminated = terminated, getAudioClock = getAudioClock,
@@ -124,7 +124,7 @@ internal class PlaybackSessionManager(
                 ) ?: throw IOException("Native FFmpeg session failed to start")
                 process = null; thread = vt; return
             }
-            val vp = MediaProcess.buildVideo(ffmpeg, streamSet.currentVideo.url, w, h, offsetNanos, hwAccel)
+            val vp = MediaProcess.buildVideo(ffmpeg, safeUrl, w, h, offsetNanos, hwAccel)
             val vt = jvmPipe!!.start(
                 proc = vp, w = w, h = h, seekOffsetNanos = offsetNanos, sourceFps = fps,
                 stopFlag = stop, terminated = terminated, getAudioClock = getAudioClock,

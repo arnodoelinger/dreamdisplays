@@ -111,7 +111,7 @@ object MediaProcess {
     /** Builds the common part of the `FFmpeg` command line for both video and audio processes. */
     @Throws(IOException::class)
     private fun baseCommand(ffmpeg: String, url: String, offsetNanos: Long, hwAccel: HwAccelBackend): MutableList<String> {
-        MediaHostGuard.requireAllowed(url)
+        val safeUrl = MediaHostGuard.resolveSafeUrl(url)
         return mutableListOf<String>().apply {
             add(ffmpeg)
             addAll(listOf("-hide_banner", "-loglevel", "error", "-nostats"))
@@ -136,7 +136,7 @@ object MediaProcess {
             if (offsetNanos > 0) {
                 addAll(listOf("-ss", String.format(Locale.US, "%.6f", offsetNanos / 1e9)))
             }
-            addAll(listOf("-i", url))
+            addAll(listOf("-i", safeUrl))
         }
     }
 }
