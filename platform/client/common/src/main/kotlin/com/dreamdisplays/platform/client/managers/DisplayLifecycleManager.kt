@@ -1,13 +1,13 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.api.DisplayFacing
+import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.core.storage.FullDisplayData
 import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull

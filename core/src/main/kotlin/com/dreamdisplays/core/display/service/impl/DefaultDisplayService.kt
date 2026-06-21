@@ -1,6 +1,12 @@
-package com.dreamdisplays.core.display
+package com.dreamdisplays.core.display.service.impl
 
-import com.dreamdisplays.api.*
+import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.model.Display
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplaySettings
+import com.dreamdisplays.api.display.service.DisplayService
+import com.dreamdisplays.core.display.service.DisplayLookup
+import com.dreamdisplays.core.display.service.DisplayMutationPort
 
 /**
  * Default core implementation of [DisplayService].

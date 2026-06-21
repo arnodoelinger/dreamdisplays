@@ -1,4 +1,4 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.model
 
 import com.dreamdisplays.media.VideoQuality
 

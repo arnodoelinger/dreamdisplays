@@ -1,4 +1,4 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.model
 
 import java.util.UUID
 

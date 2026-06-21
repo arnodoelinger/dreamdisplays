@@ -1,5 +1,9 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.event
 
+import com.dreamdisplays.api.display.model.Display
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplayRuntimeState
+import com.dreamdisplays.api.display.model.DisplaySettings
 import com.dreamdisplays.media.DreamMediaException
 
 /**

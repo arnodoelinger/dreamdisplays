@@ -1,7 +1,7 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.playback
 
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.DisplayRuntimeState
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplayRuntimeState
 import com.dreamdisplays.media.VideoQuality
 import kotlin.time.Duration
 

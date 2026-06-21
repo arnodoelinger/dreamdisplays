@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.playback
 
 import com.dreamdisplays.core.playback.PlaybackContext
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.platform.server.datatypes.DisplayData
 import java.util.UUID
 

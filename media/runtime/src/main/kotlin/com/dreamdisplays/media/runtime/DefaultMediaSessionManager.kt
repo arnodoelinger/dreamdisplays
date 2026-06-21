@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.runtime
 
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.api.PlaybackService
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.service.DisplayService
+import com.dreamdisplays.api.playback.PlaybackService
 
 /**
  * Default [MediaSessionManager] backed by the core [DisplayService] (display snapshots) and

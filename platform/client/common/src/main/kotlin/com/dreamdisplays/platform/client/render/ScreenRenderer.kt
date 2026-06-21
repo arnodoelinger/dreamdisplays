@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.DisplayFacing
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.model.DisplayFacing
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
 import com.dreamdisplays.platform.client.render.ClientRenderService

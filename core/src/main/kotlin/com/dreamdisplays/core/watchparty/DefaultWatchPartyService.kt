@@ -1,9 +1,8 @@
-package com.dreamdisplays.core.display
+package com.dreamdisplays.core.watchparty
 
-import com.dreamdisplays.api.*
-
-import com.dreamdisplays.api.WatchPartyService
-import com.dreamdisplays.api.WatchPartySession
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.watchparty.WatchPartyService
+import com.dreamdisplays.api.watchparty.WatchPartySession
 
 /**
  * Default core implementation of [WatchPartyService].

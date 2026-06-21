@@ -19,7 +19,7 @@ import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.media.api.MediaStream
 import com.dreamdisplays.media.VideoQuality
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.media.FramePixelFormat
 import com.dreamdisplays.media.player.api.GpuTextureRef
 import org.slf4j.LoggerFactory

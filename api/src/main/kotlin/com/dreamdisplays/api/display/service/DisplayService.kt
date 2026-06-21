@@ -1,9 +1,9 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.service
 
-import com.dreamdisplays.api.Display
-import com.dreamdisplays.api.DisplayEvent
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.DisplaySettings
+import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.model.Display
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplaySettings
 
 /**
  * Represents a display in the system.

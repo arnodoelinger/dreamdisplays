@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.platform.client.Mod
-import com.dreamdisplays.core.display.DisplaySystem
+import com.dreamdisplays.core.display.service.DisplaySystem
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.core.protocol.ClearCache

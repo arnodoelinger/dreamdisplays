@@ -1,8 +1,6 @@
 package com.dreamdisplays.core.protocol
 
-import com.dreamdisplays.api.*
-
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.playback.Timeline
 import kotlinx.serialization.Serializable
 import java.util.UUID

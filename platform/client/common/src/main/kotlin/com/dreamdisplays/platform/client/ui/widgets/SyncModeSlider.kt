@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.input.MouseButtonEvent

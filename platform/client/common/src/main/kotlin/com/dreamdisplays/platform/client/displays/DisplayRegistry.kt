@@ -1,10 +1,10 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.core.display.DisplaySystem
+import com.dreamdisplays.core.display.service.DisplaySystem
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.api.DisplayEvent
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.core.storage.FullDisplayData
 import com.dreamdisplays.core.storage.DisplayStorage

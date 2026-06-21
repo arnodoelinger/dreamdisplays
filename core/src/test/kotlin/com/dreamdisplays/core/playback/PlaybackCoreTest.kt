@@ -1,7 +1,6 @@
 package com.dreamdisplays.core.playback
 
-import com.dreamdisplays.api.*
-
+import com.dreamdisplays.api.playback.PlaybackMode
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

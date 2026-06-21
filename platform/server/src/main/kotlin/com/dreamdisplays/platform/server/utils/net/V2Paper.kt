@@ -4,9 +4,9 @@ import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.core.protocol.PacketRegistry
-import com.dreamdisplays.api.PlaybackAction
+import com.dreamdisplays.api.playback.PlaybackAction
 import com.dreamdisplays.core.protocol.PlaybackCommand
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.ReportDisplay
 import com.dreamdisplays.core.protocol.RequestSync
 import com.dreamdisplays.core.protocol.ServerHello
@@ -14,7 +14,7 @@ import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.core.protocol.SetLocked
 import com.dreamdisplays.core.protocol.SetMode
 import com.dreamdisplays.core.protocol.SetVideo
-import com.dreamdisplays.api.WatchPartyAction
+import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.core.protocol.WatchPartyStart
 import com.dreamdisplays.platform.server.Main

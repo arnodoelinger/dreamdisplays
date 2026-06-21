@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.input
 
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.model.DisplayId
 
 /**
  * Represents an interaction with a display, such as right-clicking or looking at it. Used for input handling and

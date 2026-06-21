@@ -1,5 +1,7 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.api.watchparty.WatchPartySession
 
 /**
  * Represents a display that can be rendered on the client.

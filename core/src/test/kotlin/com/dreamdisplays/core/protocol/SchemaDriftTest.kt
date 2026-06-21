@@ -1,7 +1,5 @@
 package com.dreamdisplays.core.protocol
 
-import com.dreamdisplays.api.*
-
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals

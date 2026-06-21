@@ -1,6 +1,5 @@
 package com.dreamdisplays.core.protocol
 
-import com.dreamdisplays.api.*
 
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer

@@ -2,8 +2,6 @@
 
 package com.dreamdisplays.core.protocol
 
-import com.dreamdisplays.api.*
-
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.protobuf.schema.ProtoBufSchemaGenerator
 import java.io.File

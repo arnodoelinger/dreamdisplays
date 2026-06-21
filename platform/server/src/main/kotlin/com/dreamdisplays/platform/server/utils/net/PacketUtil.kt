@@ -7,7 +7,7 @@ import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.core.protocol.ClearCache
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.datatypes.FabricDisplayData

@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.overlay.Overlay
 import com.dreamdisplays.platform.client.overlay.OverlayEvent
 import com.dreamdisplays.platform.client.overlay.OverlayManager

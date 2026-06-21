@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.displays
 
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.DisplayFacing
+import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.ui.PipCorner
@@ -15,20 +15,20 @@ import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
 import com.dreamdisplays.platform.client.render.GpuTextureHandle
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.render.toUploadFormat
-import com.dreamdisplays.api.WatchPartySession
+import com.dreamdisplays.api.watchparty.WatchPartySession
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.DisplaySync
-import com.dreamdisplays.api.PlaybackAction
+import com.dreamdisplays.api.playback.PlaybackAction
 import com.dreamdisplays.core.protocol.PlaybackCommand
 import com.dreamdisplays.core.playback.PlaybackContext
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.playback.PlaybackPermissions
 import com.dreamdisplays.core.protocol.RequestSync
 import com.dreamdisplays.core.protocol.SetMode
 import com.dreamdisplays.core.protocol.SetVideo
-import com.dreamdisplays.api.WatchPartyAction
+import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
-import com.dreamdisplays.api.WatchPartySessionState
+import com.dreamdisplays.api.playback.WatchPartySessionState
 import com.dreamdisplays.core.protocol.WatchPartyStart
 import com.dreamdisplays.core.protocol.WatchPartyState
 import com.dreamdisplays.util.FacingUtil

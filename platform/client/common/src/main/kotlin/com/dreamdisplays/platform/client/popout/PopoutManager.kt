@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.popout
 
-import com.dreamdisplays.api.DisplayId
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.media.api.VideoFrameSink
 
 /**

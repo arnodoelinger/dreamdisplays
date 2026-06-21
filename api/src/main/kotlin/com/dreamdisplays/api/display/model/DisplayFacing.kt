@@ -1,4 +1,4 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.display.model
 
 /**
  * The facing direction of a display. [byte] is the stable wire encoding (see [fromByte]); it is

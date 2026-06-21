@@ -1,10 +1,10 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.api.Display
-import com.dreamdisplays.api.DisplayBounds
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.DisplayRuntimeState
-import com.dreamdisplays.api.DisplaySettings as ApiDisplaySettings
+import com.dreamdisplays.api.display.model.Display
+import com.dreamdisplays.api.display.model.DisplayBounds
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplayRuntimeState
+import com.dreamdisplays.api.display.model.DisplaySettings as ApiDisplaySettings
 import com.dreamdisplays.core.storage.FullDisplayData
 
 /**

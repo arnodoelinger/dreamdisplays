@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.playback
 
-import com.dreamdisplays.api.PlaybackAction
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackAction
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.playback.PlaybackPermissions
 import com.dreamdisplays.core.playback.Timeline
 import com.dreamdisplays.core.protocol.toSync

@@ -2,7 +2,7 @@ package com.dreamdisplays.media.player.api
 
 import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.media.VideoQuality
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackMode
 import java.util.UUID
 
 /**

@@ -1,9 +1,7 @@
 package com.dreamdisplays.core.storage
 
-import com.dreamdisplays.api.*
-
-import com.dreamdisplays.api.DisplayFacing
-import com.dreamdisplays.api.PlaybackMode
+import com.dreamdisplays.api.display.model.DisplayFacing
+import com.dreamdisplays.api.playback.PlaybackMode
 import java.util.UUID
 
 /**

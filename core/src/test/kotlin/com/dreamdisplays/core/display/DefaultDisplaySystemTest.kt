@@ -1,14 +1,14 @@
 package com.dreamdisplays.core.display
 
-import com.dreamdisplays.api.*
-
-import com.dreamdisplays.api.Display
-import com.dreamdisplays.api.DisplayBounds
-import com.dreamdisplays.api.DisplayEvent
-import com.dreamdisplays.api.DisplayFacing
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.DisplayRuntimeState
-import com.dreamdisplays.api.DisplaySettings
+import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.model.Display
+import com.dreamdisplays.api.display.model.DisplayBounds
+import com.dreamdisplays.api.display.model.DisplayFacing
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplayRuntimeState
+import com.dreamdisplays.api.display.model.DisplaySettings
+import com.dreamdisplays.core.display.DisplayCommandExecutor
+import com.dreamdisplays.core.display.service.impl.DefaultDisplaySystem
 import java.util.UUID
 import kotlin.test.Test
 import kotlin.test.assertEquals

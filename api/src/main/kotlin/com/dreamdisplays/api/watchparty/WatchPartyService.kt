@@ -1,7 +1,6 @@
-package com.dreamdisplays.api
+package com.dreamdisplays.api.watchparty
 
-import com.dreamdisplays.api.DisplayId
-import com.dreamdisplays.api.WatchPartySession
+import com.dreamdisplays.api.display.model.DisplayId
 
 /**
  * Controls ephemeral watch-party sessions on displays. Starting one is open to any nearby player

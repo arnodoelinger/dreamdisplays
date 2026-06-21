@@ -4,18 +4,18 @@ package com.dreamdisplays.platform.client.core
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.api.PlaybackService
-import com.dreamdisplays.api.WatchPartyService
-import com.dreamdisplays.core.display.DefaultDisplayService
-import com.dreamdisplays.core.display.DefaultDisplaySystem
-import com.dreamdisplays.core.display.DefaultPlaybackService
-import com.dreamdisplays.core.display.DefaultWatchPartyService
-import com.dreamdisplays.core.display.DisplayLookup
-import com.dreamdisplays.core.display.DisplayMutationPort
-import com.dreamdisplays.core.display.DisplaySystem
-import com.dreamdisplays.core.display.PlaybackPort
-import com.dreamdisplays.core.display.WatchPartyPort
+import com.dreamdisplays.api.display.service.DisplayService
+import com.dreamdisplays.api.playback.PlaybackService
+import com.dreamdisplays.api.watchparty.WatchPartyService
+import com.dreamdisplays.core.display.service.impl.DefaultDisplayService
+import com.dreamdisplays.core.display.service.impl.DefaultDisplaySystem
+import com.dreamdisplays.core.playback.DefaultPlaybackService
+import com.dreamdisplays.core.watchparty.DefaultWatchPartyService
+import com.dreamdisplays.core.display.service.DisplayLookup
+import com.dreamdisplays.core.display.service.DisplayMutationPort
+import com.dreamdisplays.core.display.service.DisplaySystem
+import com.dreamdisplays.core.playback.PlaybackPort
+import com.dreamdisplays.core.watchparty.WatchPartyPort
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.capabilities.ClientCapabilityDetector
 import com.dreamdisplays.platform.client.capabilities.DefaultCapabilityNegotiationService

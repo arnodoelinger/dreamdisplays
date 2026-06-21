@@ -1,10 +1,9 @@
-package com.dreamdisplays.core.display
+package com.dreamdisplays.core.playback
 
-import com.dreamdisplays.api.*
-
-import com.dreamdisplays.api.DisplayRuntimeState
+import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.DisplayRuntimeState
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.media.VideoQuality
-import com.dreamdisplays.api.PlaybackMode
 import kotlin.time.Duration
 
 interface PlaybackPort {
