@@ -38,6 +38,7 @@ object DisplayLifecycleManager {
 
         DisplayRegistry.screens[packet.id]?.let {
             it.updateData(packet)
+            DisplayRegistry.recordScreen(it)
             return
         }
 
@@ -112,6 +113,7 @@ object DisplayLifecycleManager {
 
         displayScreen.createTexture()
         DisplayRegistry.screens[displayScreen.uuid] = displayScreen
+        DisplayRegistry.recordScreen(displayScreen)
 
         if (data.videoUrl.isNotEmpty()) {
             displayScreen.loadVideo(data.videoUrl, data.lang)

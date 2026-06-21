@@ -1,9 +1,11 @@
 package com.dreamdisplays.managers
 
 import com.dreamdisplays.Mod
+import com.dreamdisplays.application.display.DisplaySystem
 import com.dreamdisplays.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
+import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.displays.store.DisplayStorage
 import com.dreamdisplays.protocol.ClearCache
@@ -46,8 +48,14 @@ object ClientPacketManager {
             is ServerHello -> applyServerHello(packet)
             is SetDisplaysEnabled -> applyDisplaysEnabled(packet.enabled)
             is DisplayInfo -> DisplayLifecycleManager.handleInfoPacket(packet)
-            is DisplaySync -> DisplayRegistry.screens[packet.id]?.updateData(packet)
-            is WatchPartyState -> DisplayRegistry.screens[packet.id]?.updateWatchParty(packet)
+            is DisplaySync -> DisplayRegistry.screens[packet.id]?.let {
+                it.updateData(packet)
+                DisplayRegistry.recordScreen(it)
+            }
+            is WatchPartyState -> DisplayRegistry.screens[packet.id]?.let {
+                it.updateWatchParty(packet)
+                DisplayRegistry.recordScreen(it)
+            }
             is DisplayDelete -> handleDelete(packet)
             is ClearCache -> handleClearCache(packet)
             else -> logger.debug("Ignoring non-clientbound packet {}.", packet::class.simpleName)
@@ -81,6 +89,7 @@ object ClientPacketManager {
     private fun handleClearCache(packet: ClearCache) {
         packet.ids.forEach { uuid ->
             DisplayRegistry.screens.remove(uuid)?.unregister()
+            DreamServices.registry.getOrNull<DisplaySystem>()?.removeDisplay(DisplayId(uuid))
             DisplayStorage.removeDisplay(uuid)
         }
     }

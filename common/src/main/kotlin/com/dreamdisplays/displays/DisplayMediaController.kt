@@ -1,7 +1,5 @@
 package com.dreamdisplays.displays
 
-import com.dreamdisplays.core.display.DisplayEvent
-import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaResolverChain
@@ -52,7 +50,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         oldPlayer?.stop()
 
         screen.onVideoSwapped(videoUrl, lang)
-        DisplayRegistry.emit(DisplayEvent.UrlChanged(DisplayId(screen.uuid), videoUrl))
+        DisplayRegistry.recordScreen(screen)
         val shouldBePaused = preservePausedState && screen.paused
         val newPlayer = MediaPlayer(videoUrl, lang, screen, screen.takeReplayBootstrap(videoUrl))
         player = newPlayer
@@ -89,6 +87,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         // corrective seek would cold-restart the session and destroy the seamless replay -> live bridge.
         if (!mp.isResumingFromReplay()) screen.restoreSavedTime()
         // No bootstrap needed for sync since 1.8.0.
+        DisplayRegistry.recordScreen(screen)
     }
 
     /** Runs [action] once the current player is initialized; guards against stale generations. */

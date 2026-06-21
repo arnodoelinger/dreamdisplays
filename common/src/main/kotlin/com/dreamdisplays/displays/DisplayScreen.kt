@@ -147,18 +147,21 @@ class DisplayScreen(
             field = value
             applyEffectiveVolume()
             ClientSettingsStore.updateSettings(uuid, value, quality, brightness, muted, paused)
+            DisplayRegistry.recordScreen(this)
         }
     var brightness: Float = savedSettings.brightness
         set(value) {
             field = value.coerceIn(0f, 2f)
             mediaPlayer?.setBrightness(field)
             ClientSettingsStore.updateSettings(uuid, volume, quality, field, muted, paused)
+            DisplayRegistry.recordScreen(this)
         }
     var quality: VideoQuality = VideoQuality.parse(savedSettings.quality)
         set(value) {
             field = value
             mediaPlayer?.setQuality(effectiveQuality(value))
             ClientSettingsStore.updateSettings(uuid, volume, value, brightness, muted, paused)
+            DisplayRegistry.recordScreen(this)
         }
 
     /**
@@ -174,6 +177,10 @@ class DisplayScreen(
     internal var paused: Boolean = savedSettings.paused
     private var focusMuted: Boolean = false
     var renderDistance: Int = 96
+        set(value) {
+            field = value
+            DisplayRegistry.recordScreen(this)
+        }
     var savedTimeNanos: Long = 0
     internal val timelineFollower = TimelineFollower(this)
     private val media = DisplayMediaController(this)
@@ -586,6 +593,7 @@ class DisplayScreen(
     private fun applyPausedLocal(paused: Boolean) {
         if (!videoStarted) {
             this.paused = paused
+            DisplayRegistry.recordScreen(this)
             waitForMFInit { startVideo() }
             return
         }
@@ -593,6 +601,7 @@ class DisplayScreen(
         this.paused = paused
         if (paused) mediaPlayer?.pause() else mediaPlayer?.play()
         ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
+        DisplayRegistry.recordScreen(this)
     }
 
     /** Marks a local VOD as finished without emitting playback commands upstream. */
@@ -602,6 +611,7 @@ class DisplayScreen(
         if (paused) return
         paused = true
         ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
+        DisplayRegistry.recordScreen(this)
     }
 
     /** Emits the upstream intent for the current mode (no-op for Local / Broadcast / non-host). */
@@ -688,6 +698,7 @@ class DisplayScreen(
         muted = status
         applyEffectiveVolume()
         ClientSettingsStore.updateSettings(uuid, volume, quality, brightness, muted, paused)
+        DisplayRegistry.recordScreen(this)
     }
 
     /** Applies temporary focus mute without changing the user's persisted mute setting. */

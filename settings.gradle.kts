@@ -57,6 +57,7 @@ rootProject.name = "dreamdisplays"
 include(":native")
 include(":core")
 include(":api")
+include(":application")
 include(":protocol")
 include(":common")
 include(":client")

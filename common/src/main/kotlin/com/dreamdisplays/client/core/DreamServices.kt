@@ -4,12 +4,18 @@ package com.dreamdisplays.client.core
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
-import com.dreamdisplays.api.DefaultDisplayService
-import com.dreamdisplays.api.DefaultPlaybackService
-import com.dreamdisplays.api.DefaultWatchPartyService
 import com.dreamdisplays.api.DisplayService
 import com.dreamdisplays.api.PlaybackService
 import com.dreamdisplays.api.WatchPartyService
+import com.dreamdisplays.application.display.DefaultDisplayService
+import com.dreamdisplays.application.display.DefaultDisplaySystem
+import com.dreamdisplays.application.display.DefaultPlaybackService
+import com.dreamdisplays.application.display.DefaultWatchPartyService
+import com.dreamdisplays.application.display.DisplayLookup
+import com.dreamdisplays.application.display.DisplayMutationPort
+import com.dreamdisplays.application.display.DisplaySystem
+import com.dreamdisplays.application.display.PlaybackPort
+import com.dreamdisplays.application.display.WatchPartyPort
 import com.dreamdisplays.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.client.capabilities.ClientCapabilityDetector
 import com.dreamdisplays.client.capabilities.DefaultCapabilityNegotiationService
@@ -28,6 +34,7 @@ import com.dreamdisplays.client.popout.PopoutManager
 import com.dreamdisplays.client.render.ClientRenderService
 import com.dreamdisplays.client.render.RenderHook
 import com.dreamdisplays.client.ui.PipOverlayManager
+import com.dreamdisplays.displays.MinecraftDisplayCommands
 import com.dreamdisplays.managers.ClientStateManager
 import com.dreamdisplays.media.DefaultMediaResolverChain
 import com.dreamdisplays.media.DefaultMediaSessionManager
@@ -93,7 +100,13 @@ object DreamServices {
             register(NewPipeResolver)
             register(YtDlpResolver)
         }
+        val displaySystem = DefaultDisplaySystem(MinecraftDisplayCommands())
 
+        registry.register<DisplaySystem>(displaySystem)
+        registry.register<DisplayLookup>(displaySystem)
+        registry.register<DisplayMutationPort>(displaySystem)
+        registry.register<PlaybackPort>(displaySystem)
+        registry.register<WatchPartyPort>(displaySystem)
         registry.register<MediaResolverChain>(resolverChain)
         registry.register<MediaSearchService>(YtDlpSearchService())
         registry.register<MediaSessionManager>(DefaultMediaSessionManager())
@@ -105,9 +118,9 @@ object DreamServices {
         registry.register<InputHandler>(CompositeInputHandler().apply { register(DisplayMenuInputHandler()) })
         registry.register<ClientRenderService>(ScreenRenderer)
         registry.register<PopoutManager>(DefaultPopoutManager())
-        registry.register<DisplayService>(DefaultDisplayService())
-        registry.register<PlaybackService>(DefaultPlaybackService())
-        registry.register<WatchPartyService>(DefaultWatchPartyService())
+        registry.register<DisplayService>(DefaultDisplayService(displaySystem, displaySystem))
+        registry.register<PlaybackService>(DefaultPlaybackService(displaySystem))
+        registry.register<WatchPartyService>(DefaultWatchPartyService(displaySystem))
         registry.register<ClientCapabilityDetector>(MinecraftClientCapabilityDetector)
         registry.register<CapabilityNegotiationService>(DefaultCapabilityNegotiationService(MinecraftClientCapabilityDetector))
         registry.register<DisplayRenderer>(DefaultDisplayRenderer())

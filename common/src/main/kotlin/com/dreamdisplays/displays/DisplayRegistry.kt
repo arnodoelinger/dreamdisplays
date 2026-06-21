@@ -1,5 +1,8 @@
 package com.dreamdisplays.displays
 
+import com.dreamdisplays.application.display.DisplaySystem
+import com.dreamdisplays.client.core.DreamServices
+import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.core.display.DisplayEvent
 import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.displays.store.ClientSettingsStore
@@ -16,6 +19,8 @@ object DisplayRegistry {
     val unloadedScreens = ConcurrentHashMap<UUID, FullDisplayData>()
 
     private val eventListeners = CopyOnWriteArrayList<(DisplayEvent) -> Unit>()
+    private val displaySystem: DisplaySystem?
+        get() = DreamServices.registry.getOrNull<DisplaySystem>()
 
     /** Returns a snapshot of all currently registered screens. */
     fun getScreens(): Collection<DisplayScreen> = screens.values
@@ -28,13 +33,20 @@ object DisplayRegistry {
 
     /** Subscribes [listener] to display lifecycle events; returns an [AutoCloseable] to unsubscribe. */
     fun addListener(listener: (DisplayEvent) -> Unit): AutoCloseable {
+        displaySystem?.let { return it.onDisplayEvent(listener) }
         eventListeners.add(listener)
         return AutoCloseable { eventListeners.remove(listener) }
     }
 
     /** Dispatches [event] to all registered listeners. */
     fun emit(event: DisplayEvent) {
-        eventListeners.forEach { it(event) }
+        displaySystem?.publish(event) ?: eventListeners.forEach { it(event) }
+    }
+
+    /** Publishes the current screen snapshot into the application display system. */
+    fun recordScreen(displayScreen: DisplayScreen) {
+        if (!screens.containsKey(displayScreen.uuid)) return
+        displaySystem?.recordDisplay(displayScreen.toDisplay())
     }
 
     /** Registers a new display screen. */
@@ -52,7 +64,7 @@ object DisplayRegistry {
         }
 
         screens[displayScreen.uuid] = displayScreen
-        emit(DisplayEvent.Created(DisplayId(displayScreen.uuid), displayScreen.toDisplay()))
+        recordScreen(displayScreen)
     }
 
     /** Unregisters a display screen, saving its data for later re-registration. */
@@ -60,7 +72,7 @@ object DisplayRegistry {
         unloadedScreens[displayScreen.uuid] = displayScreen.toFullDisplayData()
         screens.remove(displayScreen.uuid)
         displayScreen.unregister()
-        emit(DisplayEvent.Removed(DisplayId(displayScreen.uuid)))
+        displaySystem?.removeDisplay(DisplayId(displayScreen.uuid))
     }
 
     /** Unregisters all display screens. */
@@ -68,6 +80,7 @@ object DisplayRegistry {
         screens.values.forEach { it.unregister() }
         screens.clear()
         unloadedScreens.clear()
+        displaySystem?.clearDisplays()
     }
 
     /** Saves the display screen data to disk. */
