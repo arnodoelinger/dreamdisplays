@@ -51,6 +51,8 @@ import java.util.function.Consumer
     private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
     private val reportTime: MutableMap<UUID, Long> = ConcurrentHashMap()
     private val reporterTime: MutableMap<UUID, Long> = ConcurrentHashMap()
+    /** Serializes [isReportThrottled]'s check-then-update across both maps; reports are low-frequency, so a single lock is fine. */
+    private val reportLock = Any()
     private val nearbyPlayersByDisplay: MutableMap<UUID, MutableSet<UUID>> = ConcurrentHashMap()
     private val nearbyDisplaysByPlayer: MutableMap<UUID, Set<UUID>> = ConcurrentHashMap()
 
@@ -93,14 +95,14 @@ import java.util.function.Consumer
      * per-reporter limit stops an attacker from amplifying the webhook by spreading reports across
      * many displays. Records both timestamps and returns false only when the report may proceed.
      */
-    private fun isReportThrottled(id: UUID, reporterId: UUID, cooldownMs: Long): Boolean {
+    private fun isReportThrottled(id: UUID, reporterId: UUID, cooldownMs: Long): Boolean = synchronized(reportLock) {
         val now = System.currentTimeMillis()
-        val lastReport = reportTime.getOrPut(id) { 0L }
-        val lastReporter = reporterTime.getOrPut(reporterId) { 0L }
-        if (now - lastReport < cooldownMs || now - lastReporter < cooldownMs) return true
+        val lastReport = reportTime.getOrDefault(id, 0L)
+        val lastReporter = reporterTime.getOrDefault(reporterId, 0L)
+        if (now - lastReport < cooldownMs || now - lastReporter < cooldownMs) return@synchronized true
         reportTime[id] = now
         reporterTime[reporterId] = now
-        return false
+        false
     }
 
     /**
