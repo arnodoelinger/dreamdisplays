@@ -31,7 +31,7 @@ import com.dreamdisplays.protocol.WatchPartyControl
 import com.dreamdisplays.core.playback.WatchPartySessionState
 import com.dreamdisplays.protocol.WatchPartyStart
 import com.dreamdisplays.protocol.WatchPartyState
-import com.dreamdisplays.utils.FacingUtil
+import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.utils.MinecraftScreenUtil
 import com.dreamdisplays.core.media.DreamMediaException
 import com.dreamdisplays.core.media.VideoQuality

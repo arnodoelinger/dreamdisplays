@@ -50,6 +50,7 @@ import com.dreamdisplays.render.ScreenRenderer
 import com.dreamdisplays.render.api.DisplayRenderer
 import com.dreamdisplays.render.api.TextureUploaderFactory
 import com.dreamdisplays.ytdlp.NewPipeResolver
+import com.dreamdisplays.ytdlp.ResolverConfig
 import com.dreamdisplays.ytdlp.YtDlpResolver
 
 /**
@@ -95,6 +96,12 @@ object DreamServices {
     @Synchronized fun bootstrap() {
         if (bootstrapped) return
         bootstrapped = true
+
+        // Bridge the platform-agnostic media resolvers to the live client config (proxy / browser cookies).
+        ResolverConfig.provider = object : ResolverConfig.Provider {
+            override val ytdlpProxy: String get() = ClientStateManager.config.ytdlpProxy
+            override val ytdlpCookiesFromBrowser: String get() = ClientStateManager.config.ytdlpCookiesFromBrowser
+        }
 
         val resolverChain = DefaultMediaResolverChain().apply {
             register(NewPipeResolver)

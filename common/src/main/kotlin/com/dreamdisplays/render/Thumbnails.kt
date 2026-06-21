@@ -1,7 +1,7 @@
-package com.dreamdisplays.ytdlp
+package com.dreamdisplays.render
 
 import com.dreamdisplays.Initializer
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture

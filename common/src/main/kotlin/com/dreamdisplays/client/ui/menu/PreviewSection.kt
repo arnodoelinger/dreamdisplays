@@ -15,7 +15,7 @@ import com.dreamdisplays.render.TextureUploadUtil
 import com.dreamdisplays.render.UploadPixelFormat
 import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.media.api.MediaSearchService
-import com.dreamdisplays.ytdlp.Thumbnails
+import com.dreamdisplays.render.Thumbnails
 import com.dreamdisplays.ytdlp.VideoMetadataCache
 import com.dreamdisplays.ytdlp.VideoTitleCache
 import com.mojang.blaze3d.platform.NativeImage

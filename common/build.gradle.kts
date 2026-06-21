@@ -16,6 +16,8 @@ dependencies {
     implementation(project(":application"))
     api(project(":storage"))
     api(project(":media-player"))
+    api(project(":media-source"))
+    api(project(":util"))
     api(project(":protocol"))
     api(libs.jspecify)
     api(libs.commonsCompress)

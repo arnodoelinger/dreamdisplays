@@ -1,10 +1,7 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.client.core.DreamServices
-import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaSearchResult
-import com.dreamdisplays.media.api.MediaSearchService
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
@@ -33,10 +30,10 @@ object VideoMetadataCache {
         DreamCoroutines.clientIo.launch { fetchAndStore(videoId) }
     }
 
-    /** Uses the registry [MediaSearchService] to fetch metadata for [videoId] and stores the result. */
+    /** Fetches metadata for [videoId] via [YouTubeInnerTube] and stores the result. */
     private fun fetchAndStore(videoId: String) {
         try {
-            DreamServices.registry.getOrNull<MediaSearchService>()?.metadata(videoId)?.let { put(videoId, it) }
+            YouTubeInnerTube.metadata(videoId)?.let { put(videoId, it) }
         } catch (e: Exception) {
             logger.warn("Metadata fetch failed for $videoId: ${e.message}")
         } finally {

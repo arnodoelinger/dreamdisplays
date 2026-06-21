@@ -3,8 +3,8 @@ package com.dreamdisplays.ytdlp
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.YouTubeUrls
 import com.dreamdisplays.protocol.MediaUrlPolicy
-import com.dreamdisplays.utils.AsyncMemo
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.AsyncMemo
+import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.core.platform.Processes
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async

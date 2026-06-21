@@ -13,7 +13,7 @@ import com.dreamdisplays.server.Main
 import com.dreamdisplays.server.datatypes.FabricDisplayData
 import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.server.managers.PlayerManager
-import com.dreamdisplays.utils.FacingUtil
+import com.dreamdisplays.util.FacingUtil
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer

@@ -3,7 +3,7 @@ package com.dreamdisplays.client.capabilities
 import com.dreamdisplays.net.ProtocolRouter
 import com.dreamdisplays.protocol.ClientHello
 import com.dreamdisplays.protocol.ServerHello
-import com.dreamdisplays.utils.GeneralUtil
+import com.dreamdisplays.util.GeneralUtil
 import org.slf4j.LoggerFactory
 
 /**

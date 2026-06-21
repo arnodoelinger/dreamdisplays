@@ -1,4 +1,4 @@
-package com.dreamdisplays.utils
+package com.dreamdisplays.util
 
 import com.google.gson.JsonObject
 

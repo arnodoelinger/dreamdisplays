@@ -1,6 +1,5 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.managers.ClientStateManager
 import org.slf4j.LoggerFactory
 import java.net.HttpURLConnection
 import java.net.InetSocketAddress
@@ -21,7 +20,7 @@ object ProxyConnections {
     fun open(urlStr: String): HttpURLConnection {
         val uri = URI.create(urlStr)
         val proxyStr = try {
-            ClientStateManager.config.ytdlpProxy.trim()
+            ResolverConfig.ytdlpProxy.trim()
         } catch (_: Exception) {
             ""
         }

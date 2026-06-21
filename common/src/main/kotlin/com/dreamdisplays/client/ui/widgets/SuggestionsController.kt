@@ -4,7 +4,7 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.get
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.MediaSearchService
-import com.dreamdisplays.ytdlp.Thumbnails
+import com.dreamdisplays.render.Thumbnails
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import java.util.concurrent.Executors

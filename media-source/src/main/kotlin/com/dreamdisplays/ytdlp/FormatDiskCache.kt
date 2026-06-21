@@ -1,6 +1,6 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonObject

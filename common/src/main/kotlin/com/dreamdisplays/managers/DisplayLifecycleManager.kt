@@ -9,7 +9,7 @@ import com.dreamdisplays.storage.ServerDisplayStore
 import com.dreamdisplays.core.media.VideoQuality
 import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.core.playback.PlaybackMode
-import com.dreamdisplays.utils.FacingUtil
+import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaResolverChain

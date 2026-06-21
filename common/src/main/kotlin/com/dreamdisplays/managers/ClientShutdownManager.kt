@@ -5,7 +5,7 @@ import com.dreamdisplays.client.core.ClientApplication
 import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.displays.DisplayRegistry
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 
 /**
  * Handles client shutdown cleanup.

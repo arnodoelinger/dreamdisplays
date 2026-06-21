@@ -6,7 +6,7 @@ import com.dreamdisplays.platform.api.PlatformLogger
 import com.dreamdisplays.platform.api.PlatformPaths
 import com.dreamdisplays.platform.api.PlatformScheduler
 import com.dreamdisplays.platform.api.PlatformSide
-import com.dreamdisplays.utils.GeneralUtil
+import com.dreamdisplays.util.GeneralUtil
 import net.neoforged.fml.ModList
 import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.fml.loading.FMLPaths

@@ -1,9 +1,9 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.utils.optBoolean
-import com.dreamdisplays.utils.optDouble
-import com.dreamdisplays.utils.optInt
-import com.dreamdisplays.utils.optString
+import com.dreamdisplays.util.optBoolean
+import com.dreamdisplays.util.optDouble
+import com.dreamdisplays.util.optInt
+import com.dreamdisplays.util.optString
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser

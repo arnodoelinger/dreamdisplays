@@ -1,6 +1,6 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.core.platform.OsInfo
 import com.dreamdisplays.core.platform.Processes
 import kotlinx.coroutines.launch

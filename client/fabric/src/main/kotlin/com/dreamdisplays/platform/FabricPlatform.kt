@@ -6,7 +6,7 @@ import com.dreamdisplays.platform.api.PlatformLogger
 import com.dreamdisplays.platform.api.PlatformPaths
 import com.dreamdisplays.platform.api.PlatformScheduler
 import com.dreamdisplays.platform.api.PlatformSide
-import com.dreamdisplays.utils.GeneralUtil
+import com.dreamdisplays.util.GeneralUtil
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Path
 

@@ -3,8 +3,8 @@ package com.dreamdisplays.client.ui.menu
 import com.dreamdisplays.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.client.ui.drawText
 import com.dreamdisplays.client.ui.kit.UiRect
-import com.dreamdisplays.utils.GeneralUtil
-import com.dreamdisplays.utils.UpdateCheck
+import com.dreamdisplays.util.GeneralUtil
+import com.dreamdisplays.util.UpdateCheck
 import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.Style

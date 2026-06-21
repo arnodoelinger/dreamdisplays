@@ -1,7 +1,6 @@
 package com.dreamdisplays.ytdlp
 
-import com.dreamdisplays.managers.ClientStateManager
-import com.dreamdisplays.utils.DreamCoroutines
+import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.core.platform.Processes
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
@@ -39,7 +38,7 @@ class YtCookieManager {
 
     /** True when the user explicitly disabled browser cookies in the config. */
     fun disabledByConfig(): Boolean =
-        CookieSource.fromConfig(ClientStateManager.config.ytdlpCookiesFromBrowser)?.isDisabled ?: false
+        CookieSource.fromConfig(ResolverConfig.ytdlpCookiesFromBrowser)?.isDisabled ?: false
 
     /** Resolves the browser and exports the header in the background to cut first-fetch latency. */
     fun prewarm() {
@@ -53,7 +52,7 @@ class YtCookieManager {
      * back to `--cookies-from-browser`. Returns the temp copy to delete after the process exits.
      */
     fun appendArgs(args: MutableList<String>): Path? {
-        val proxy = ClientStateManager.config.ytdlpProxy.trim()
+        val proxy = ResolverConfig.ytdlpProxy.trim()
         if (proxy.isNotEmpty()) {
             args.add("--proxy")
             args.add(proxy)
@@ -218,7 +217,7 @@ class YtCookieManager {
         synchronized(this) {
             if (browserResolved && resolvedBrowser != null) return resolvedBrowser
             if (browserResolved && (now - browserResolvedAt) < BROWSER_RETRY_MS) return null
-            val configured = ClientStateManager.config.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
+            val configured = ResolverConfig.ytdlpCookiesFromBrowser.trim().lowercase(Locale.ENGLISH)
 
             if (disabledByConfig()) {
                 browserResolved = true

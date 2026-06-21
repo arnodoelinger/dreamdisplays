@@ -1,4 +1,4 @@
-package com.dreamdisplays.utils
+package com.dreamdisplays.util
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
