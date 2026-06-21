@@ -1,5 +1,6 @@
 package com.dreamdisplays.render
 
+import com.dreamdisplays.core.media.FramePixelFormat
 import com.mojang.blaze3d.platform.NativeImage
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30
@@ -16,4 +17,11 @@ enum class UploadPixelFormat(
 
     /** Single-channel plane of an I420 frame (Y, U, or V), uploaded into a RED8 texture. */
     R8(1, GL30.GL_RED, NativeImage.Format.LUMINANCE, 1),
+}
+
+/** Maps the platform-free [FramePixelFormat] produced by the media player to its GL counterpart. */
+fun FramePixelFormat.toUploadFormat(): UploadPixelFormat = when (this) {
+    FramePixelFormat.RGB24 -> UploadPixelFormat.RGB24
+    FramePixelFormat.RGBA32 -> UploadPixelFormat.RGBA32
+    FramePixelFormat.R8 -> UploadPixelFormat.R8
 }

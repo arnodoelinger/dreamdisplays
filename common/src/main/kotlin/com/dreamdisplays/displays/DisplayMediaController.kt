@@ -5,6 +5,8 @@ import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSource
 import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.player.platform.DisplayPlaybackHost
+import com.dreamdisplays.player.platform.DreamPlaybackEnvironment
 import net.minecraft.client.Minecraft
 import java.util.concurrent.atomic.AtomicLong
 
@@ -52,7 +54,10 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         screen.onVideoSwapped(videoUrl, lang)
         DisplayRegistry.recordScreen(screen)
         val shouldBePaused = preservePausedState && screen.paused
-        val newPlayer = MediaPlayer(videoUrl, lang, screen, screen.takeReplayBootstrap(videoUrl))
+        val newPlayer = MediaPlayer(
+            videoUrl, lang, DisplayPlaybackHost(screen), DreamPlaybackEnvironment,
+            screen.takeReplayBootstrap(videoUrl),
+        )
         player = newPlayer
         screen.timelineFollower.onPlayerCreated()
         // Set the effective volume (incl. distance) now, before the bridge prelude (which starts at

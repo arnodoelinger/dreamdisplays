@@ -10,6 +10,7 @@ import com.dreamdisplays.client.ui.PipOverlayManager
 import com.dreamdisplays.client.ui.VideoPopoutWindow
 import com.dreamdisplays.displays.DisplayScreen
 import com.dreamdisplays.player.MediaPlayer
+import com.dreamdisplays.render.toUploadFormat
 import org.slf4j.LoggerFactory
 
 /**
@@ -30,11 +31,11 @@ class DisplayPopoutManager(
     fun attachTo(player: MediaPlayer, contentAspect: () -> Double) {
         popoutWindow?.let { win ->
             if (win.isOpen) {
-                player.setPopoutSink { buf, fw, fh, format -> win.updateFrame(buf, fw, fh, contentAspect(), format) }
+                player.setPopoutSink { buf, fw, fh, format -> win.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
             }
         }
         pipOverlay?.let { overlay ->
-            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format) }
+            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
         }
     }
 
@@ -60,7 +61,7 @@ class DisplayPopoutManager(
                 popoutWindow = created
                 created.on { event -> emit(event) }
             }
-            player.setPopoutSink { buf, fw, fh, format -> newWin.updateFrame(buf, fw, fh, contentAspect(), format) }
+            player.setPopoutSink { buf, fw, fh, format -> newWin.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
             newWin.open(w, h)
         } catch (e: Exception) {
             logger.warn("Could not open window: ${e.message}.")
@@ -74,7 +75,7 @@ class DisplayPopoutManager(
         val overlay = PipOverlay(displayScreen, corner)
         if (PipOverlayManager.add(overlay)) {
             pipOverlay = overlay
-            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format) }
+            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
             emit(PopoutEvent.Opened(displayScreen.uuid.toString()))
         } else {
             logger.warn("No PiP corners available (max 4).")

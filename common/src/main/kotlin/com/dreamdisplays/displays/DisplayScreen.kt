@@ -12,7 +12,9 @@ import com.dreamdisplays.player.MediaPlayer
 import com.dreamdisplays.render.DisplayGeometry
 import com.dreamdisplays.render.DisplayTextureResource
 import com.dreamdisplays.render.DisplayYuvRenderTypes
+import com.dreamdisplays.render.GpuTextureHandle
 import com.dreamdisplays.render.UploadPixelFormat
+import com.dreamdisplays.render.toUploadFormat
 import com.dreamdisplays.core.display.WatchPartySession
 import com.dreamdisplays.protocol.DisplayInfo
 import com.dreamdisplays.protocol.DisplaySync
@@ -334,7 +336,9 @@ class DisplayScreen(
 
     /** Attaches or clears the menu preview raw-frame sink on the current player. */
     fun setPreviewFrameSink(sink: ((ByteBuffer, Int, Int, UploadPixelFormat) -> Unit)?) {
-        mediaPlayer?.setPreviewSink(sink)
+        mediaPlayer?.setPreviewSink(
+            if (sink == null) null else { buf, w, h, fmt -> sink(buf, w, h, fmt.toUploadFormat()) },
+        )
     }
 
     /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
@@ -511,10 +515,10 @@ class DisplayScreen(
             val y = textureResource.yPlane ?: return false
             val u = textureResource.uPlane ?: return false
             val v = textureResource.vPlane ?: return false
-            mp.updateFramePlanar(y.getTexture(), u.getTexture(), v.getTexture(), w, h)
+            mp.updateFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
         } else {
             val tex = textureResource.texture ?: return false
-            mp.updateFrame(tex.getTexture(), w, h)
+            mp.updateFrame(GpuTextureHandle(tex.getTexture()), w, h)
         }
     }
 
@@ -526,10 +530,10 @@ class DisplayScreen(
             val y = textureResource.pendingYPlane ?: return false
             val u = textureResource.pendingUPlane ?: return false
             val v = textureResource.pendingVPlane ?: return false
-            mp.updateIncomingFramePlanar(y.getTexture(), u.getTexture(), v.getTexture(), w, h)
+            mp.updateIncomingFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
         } else {
             val tex = textureResource.pendingTexture ?: return false
-            mp.updateIncomingFrame(tex.getTexture(), w, h)
+            mp.updateIncomingFrame(GpuTextureHandle(tex.getTexture()), w, h)
         }
     }
 
@@ -850,7 +854,7 @@ class DisplayScreen(
     /** Called every game tick to update distance-based volume attenuation from [pos]. */
     fun tick(pos: BlockPos) {
         val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
-        mediaPlayer?.tick(pos, maxRadius)
+        mediaPlayer?.tick(getDistanceToScreen(pos), maxRadius)
     }
 
     /** Called after a user-initiated seek completes; emits the seek intent upstream per mode. */
