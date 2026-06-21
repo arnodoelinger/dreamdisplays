@@ -1,13 +1,7 @@
-package com.dreamdisplays.application.display
-
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.core.display.Display
-import com.dreamdisplays.core.display.DisplayEvent
-import com.dreamdisplays.core.display.DisplayId
-import com.dreamdisplays.core.display.DisplaySettings
+package com.dreamdisplays.core.display
 
 /**
- * Default application implementation of [DisplayService].
+ * Default core implementation of [DisplayService].
  */
 class DefaultDisplayService(
     private val lookup: DisplayLookup,

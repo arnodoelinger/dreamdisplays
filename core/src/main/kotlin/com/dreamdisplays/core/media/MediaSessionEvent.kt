@@ -1,9 +1,7 @@
-@file:OptIn(DreamDisplaysUnstableApi::class)
+package com.dreamdisplays.core.media
 
-package com.dreamdisplays.media.api
-
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.core.media.DreamMediaException
+
 import kotlin.time.Duration
 
 sealed interface MediaSessionEvent {

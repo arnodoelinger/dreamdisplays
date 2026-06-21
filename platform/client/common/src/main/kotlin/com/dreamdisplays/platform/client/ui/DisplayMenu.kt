@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.ui
 
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.PlaybackService
+import com.dreamdisplays.core.display.DisplayId
+import com.dreamdisplays.core.display.PlaybackService
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.get
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
@@ -78,7 +78,7 @@ class DisplayMenu private constructor(
     override fun init() {
         super.init()
         val ds = displayScreen
-        // Playback controls drive the display through the application PlaybackService instead of mutating
+        // Playback controls drive the display through the core PlaybackService instead of mutating
         // the DisplayScreen directly, so the UI no longer reaches into the live screen for these actions.
         val displayId = DisplayId(ds.uuid)
         val playback = DreamServices.registry.get<PlaybackService>()

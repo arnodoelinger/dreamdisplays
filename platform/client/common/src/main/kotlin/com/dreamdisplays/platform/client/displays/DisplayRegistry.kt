@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.application.display.DisplaySystem
+import com.dreamdisplays.core.display.DisplaySystem
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
 import com.dreamdisplays.core.display.DisplayEvent

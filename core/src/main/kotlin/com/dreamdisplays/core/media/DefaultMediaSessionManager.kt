@@ -1,13 +1,11 @@
-package com.dreamdisplays.application.media
+package com.dreamdisplays.core.media
 
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.api.PlaybackService
 import com.dreamdisplays.core.display.DisplayId
-import com.dreamdisplays.media.api.MediaSession
-import com.dreamdisplays.media.api.MediaSessionManager
+import com.dreamdisplays.core.display.DisplayService
+import com.dreamdisplays.core.display.PlaybackService
 
 /**
- * Default [MediaSessionManager] backed by the application [DisplayService] (display snapshots) and
+ * Default [MediaSessionManager] backed by the core [DisplayService] (display snapshots) and
  * [PlaybackService] (transport). Platform-agnostic: it never touches the Minecraft display objects.
  */
 class DefaultMediaSessionManager(

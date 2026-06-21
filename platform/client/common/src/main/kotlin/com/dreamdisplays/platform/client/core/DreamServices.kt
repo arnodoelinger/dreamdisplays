@@ -4,18 +4,18 @@ package com.dreamdisplays.platform.client.core
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.api.PlaybackService
-import com.dreamdisplays.api.WatchPartyService
-import com.dreamdisplays.application.display.DefaultDisplayService
-import com.dreamdisplays.application.display.DefaultDisplaySystem
-import com.dreamdisplays.application.display.DefaultPlaybackService
-import com.dreamdisplays.application.display.DefaultWatchPartyService
-import com.dreamdisplays.application.display.DisplayLookup
-import com.dreamdisplays.application.display.DisplayMutationPort
-import com.dreamdisplays.application.display.DisplaySystem
-import com.dreamdisplays.application.display.PlaybackPort
-import com.dreamdisplays.application.display.WatchPartyPort
+import com.dreamdisplays.core.display.DisplayService
+import com.dreamdisplays.core.display.PlaybackService
+import com.dreamdisplays.core.display.WatchPartyService
+import com.dreamdisplays.core.display.DefaultDisplayService
+import com.dreamdisplays.core.display.DefaultDisplaySystem
+import com.dreamdisplays.core.display.DefaultPlaybackService
+import com.dreamdisplays.core.display.DefaultWatchPartyService
+import com.dreamdisplays.core.display.DisplayLookup
+import com.dreamdisplays.core.display.DisplayMutationPort
+import com.dreamdisplays.core.display.DisplaySystem
+import com.dreamdisplays.core.display.PlaybackPort
+import com.dreamdisplays.core.display.WatchPartyPort
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.capabilities.ClientCapabilityDetector
 import com.dreamdisplays.platform.client.capabilities.DefaultCapabilityNegotiationService
@@ -37,12 +37,12 @@ import com.dreamdisplays.platform.client.ui.PipOverlayManager
 import com.dreamdisplays.platform.client.displays.MinecraftDisplayCommands
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.source.DefaultMediaResolverChain
-import com.dreamdisplays.application.media.DefaultMediaSessionManager
+import com.dreamdisplays.core.media.DefaultMediaSessionManager
 import com.dreamdisplays.media.source.DefaultStreamSelector
 import com.dreamdisplays.media.source.YtDlpSearchService
 import com.dreamdisplays.media.api.MediaResolverChain
 import com.dreamdisplays.media.api.MediaSearchService
-import com.dreamdisplays.media.api.MediaSessionManager
+import com.dreamdisplays.core.media.MediaSessionManager
 import com.dreamdisplays.media.api.StreamSelector
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.DefaultDisplayRenderer

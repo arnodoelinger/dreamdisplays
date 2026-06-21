@@ -1,11 +1,10 @@
-package com.dreamdisplays.application.display
+package com.dreamdisplays.core.display
 
-import com.dreamdisplays.api.WatchPartyService
-import com.dreamdisplays.core.display.DisplayId
+import com.dreamdisplays.core.display.WatchPartyService
 import com.dreamdisplays.core.display.WatchPartySession
 
 /**
- * Default application implementation of [WatchPartyService].
+ * Default core implementation of [WatchPartyService].
  */
 class DefaultWatchPartyService(
     private val watchParty: WatchPartyPort,

@@ -1,4 +1,4 @@
-package com.dreamdisplays.application.display
+package com.dreamdisplays.core.display
 
 import com.dreamdisplays.core.display.Display
 import com.dreamdisplays.core.display.DisplayBounds

@@ -1,8 +1,4 @@
-package com.dreamdisplays.application.display
-
-import com.dreamdisplays.core.display.Display
-import com.dreamdisplays.core.display.DisplayEvent
-import com.dreamdisplays.core.display.DisplayId
+package com.dreamdisplays.core.display
 
 interface DisplaySystem :
     DisplayLookup,

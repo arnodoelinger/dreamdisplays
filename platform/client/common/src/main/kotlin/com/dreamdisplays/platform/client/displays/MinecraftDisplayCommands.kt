@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.application.display.DisplayCommandExecutor
+import com.dreamdisplays.core.display.DisplayCommandExecutor
 import com.dreamdisplays.core.display.Display
 import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.core.display.DisplaySettings

@@ -1,10 +1,6 @@
-package com.dreamdisplays.application.display
+package com.dreamdisplays.core.display
 
-import com.dreamdisplays.core.display.Display
-import com.dreamdisplays.core.display.DisplayEvent
-import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.core.display.DisplayRuntimeState
-import com.dreamdisplays.core.display.DisplaySettings
 import com.dreamdisplays.core.display.WatchPartySession
 import com.dreamdisplays.core.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode

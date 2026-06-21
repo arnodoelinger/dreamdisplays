@@ -1,6 +1,5 @@
-package com.dreamdisplays.application.display
+package com.dreamdisplays.core.display
 
-import com.dreamdisplays.core.display.DisplayId
 import com.dreamdisplays.core.display.WatchPartySession
 
 interface WatchPartyPort {

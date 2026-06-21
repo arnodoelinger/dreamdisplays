@@ -1,14 +1,13 @@
-package com.dreamdisplays.application.display
+package com.dreamdisplays.core.display
 
-import com.dreamdisplays.api.PlaybackService
-import com.dreamdisplays.core.display.DisplayId
+import com.dreamdisplays.core.display.PlaybackService
 import com.dreamdisplays.core.display.DisplayRuntimeState
 import com.dreamdisplays.core.media.VideoQuality
 import com.dreamdisplays.core.playback.PlaybackMode
 import kotlin.time.Duration
 
 /**
- * Default application implementation of [PlaybackService].
+ * Default core implementation of [PlaybackService].
  */
 class DefaultPlaybackService(
     private val playback: PlaybackPort,

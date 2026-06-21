@@ -1,20 +1,16 @@
-package com.dreamdisplays.application.media
+package com.dreamdisplays.core.media
 
-import com.dreamdisplays.api.DisplayService
-import com.dreamdisplays.api.PlaybackService
 import com.dreamdisplays.core.display.DisplayEvent
 import com.dreamdisplays.core.display.DisplayId
+import com.dreamdisplays.core.display.PlaybackService
+import com.dreamdisplays.core.display.DisplayService
 import com.dreamdisplays.core.display.DisplayRuntimeState
-import com.dreamdisplays.media.api.MediaMetadata
-import com.dreamdisplays.media.api.MediaSession
-import com.dreamdisplays.media.api.MediaSessionEvent
-import com.dreamdisplays.media.api.MediaSessionState
 import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * [MediaSession] view onto a display, expressed purely over the application services: transport calls
+ * [MediaSession] view onto a display, expressed purely over the core services: transport calls
  * delegate to [PlaybackService], state and events come from [DisplayService] (snapshots + event bus),
  * filtered to this display. No Minecraft view object is referenced, so the session is platform-agnostic.
  * Closing the session only detaches listeners; playback is unaffected.

@@ -57,7 +57,6 @@ rootProject.name = "dreamdisplays"
 include(":native")
 include(":core")
 include(":api")
-include(":application")
 include(":storage")
 include(":media")
 include(":media:player")

@@ -13,7 +13,6 @@ repositories {
 dependencies {
     api(project(":core"))
     api(project(":api"))
-    implementation(project(":application"))
     api(project(":storage"))
     api(project(":media:player"))
     api(project(":media:source"))
