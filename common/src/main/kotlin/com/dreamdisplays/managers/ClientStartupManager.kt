@@ -17,26 +17,33 @@ import com.dreamdisplays.player.nativebridge.NativeMedia
 import com.dreamdisplays.player.process.FFmpegBinary
 import com.dreamdisplays.ytdlp.FormatDiskCache
 import com.dreamdisplays.ytdlp.YtDlp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Handles client bootstrapping and background maintenance threads.
+ * Handles client bootstrapping and background maintenance coroutines.
  */
 object ClientStartupManager {
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientStartupManager")
     val config: Config = Config(File("./config/${Initializer.MOD_ID}"))
 
-    /** Daemon so a hung refresh / sweep can never block JVM shutdown; [stop] still cancels it cleanly on a normal exit. */
-    private val qualityRefreshExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "dreamdisplays-quality-refresh").apply { isDaemon = true }
-    }
-    private val cacheSweepExecutor: ScheduledExecutorService = Executors.newSingleThreadScheduledExecutor { r ->
-        Thread(r, "dreamdisplays-cache-sweep").apply { isDaemon = true }
-    }
+    private val qualityRefreshInterval = 2500.milliseconds
+
+    /**
+     * Owns every background maintenance coroutine. Runs on [Dispatchers.IO] (a pool of daemon
+     * threads), so a hung refresh / sweep can never block JVM shutdown; [stop] still cancels it
+     * cleanly on a normal exit. [SupervisorJob] keeps the quality-refresh loop and the cache sweep
+     * independent, so one failing doesn't cancel the other.
+     */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     fun start() {
         config.reload()
@@ -57,20 +64,22 @@ object ClientStartupManager {
         FFmpegBinary.prewarmAsync()
         NativeMedia.prewarmAsync()
 
-        cacheSweepExecutor.execute {
+        scope.launch {
             runCatching { FormatDiskCache.sweepExpired() }
                 .onFailure { e -> logger.warn("Cache sweep failed.", e) }
         }
         Focuser().start()
-        qualityRefreshExecutor.scheduleWithFixedDelay({
-            runCatching { DisplayRegistry.getScreens().forEach(DisplayScreen::reloadQuality) }
-                .onFailure { e -> logger.warn("Quality refresh failed.", e) }
-        }, 2500, 2500, TimeUnit.MILLISECONDS)
+        scope.launch {
+            while (isActive) {
+                runCatching { DisplayRegistry.getScreens().forEach(DisplayScreen::reloadQuality) }
+                    .onFailure { e -> logger.warn("Quality refresh failed.", e) }
+                delay(qualityRefreshInterval)
+            }
+        }
     }
 
-    /** Cancels the background refresh / sweep tasks. Safe to call multiple times. */
+    /** Cancels the background refresh / sweep coroutines. Safe to call multiple times. */
     fun stop() {
-        qualityRefreshExecutor.shutdownNow()
-        cacheSweepExecutor.shutdownNow()
+        scope.cancel()
     }
 }
