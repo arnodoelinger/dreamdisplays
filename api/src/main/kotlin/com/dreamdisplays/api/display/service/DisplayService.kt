@@ -1,16 +1,24 @@
 package com.dreamdisplays.api.display.service
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.Display
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.display.model.DisplaySettings
 
 /**
- * Represents a display in the system.
+ * Public display registry and command surface. Implementations expose immutable [Display] snapshots
+ * and forward mutations to the authoritative side, which validates ownership / permissions and
+ * emits [DisplayEvent] updates.
  */
-interface DisplayService {
+@DreamDisplaysUnstableApi interface DisplayService {
+    /** Returns the latest known display snapshot for [id], or null when absent. */
     fun getDisplay(id: DisplayId): Display?
+
+    /** Returns all displays currently visible to this service. */
     fun listDisplays(): List<Display>
+
+    /** Replaces client-local or server-authoritative settings for [id], depending on implementation side. */
     fun updateSettings(id: DisplayId, settings: DisplaySettings)
 
     /** Requests a server-authoritative video change for [id], optionally with the audio-track [lang]. */
@@ -25,5 +33,6 @@ interface DisplayService {
     /** Reports [id] for moderation review. */
     fun report(id: DisplayId)
 
+    /** Subscribes [listener] to display lifecycle events; close the returned handle to unsubscribe. */
     fun on(listener: (DisplayEvent) -> Unit): AutoCloseable
 }

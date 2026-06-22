@@ -9,7 +9,7 @@ package com.dreamdisplays.api
  * @since 1.8.0
  */
 @RequiresOptIn(
-    message = "This API is unstable and may change or be removed.",
+    message = "Dream Displays API is unstable. Please use with caution and aware of potential breaking changes.",
     level = RequiresOptIn.Level.WARNING,
 )
 @Retention(AnnotationRetention.BINARY)
@@ -20,4 +20,5 @@ package com.dreamdisplays.api
     AnnotationTarget.FIELD,
     AnnotationTarget.TYPEALIAS,
 )
+
 annotation class DreamDisplaysUnstableApi

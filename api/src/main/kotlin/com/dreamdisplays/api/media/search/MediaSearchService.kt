@@ -1,8 +1,9 @@
 package com.dreamdisplays.api.media.search
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Contract for YouTube search, related-video lookup, and video-ID extraction. */
-interface MediaSearchService {
+@DreamDisplaysUnstableApi interface MediaSearchService {
     /** Returns up to [limit] videos matching [query]. */
     fun search(query: String, limit: Int): List<MediaSearchResult>
 

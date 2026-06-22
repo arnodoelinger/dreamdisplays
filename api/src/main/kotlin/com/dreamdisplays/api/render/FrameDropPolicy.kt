@@ -1,5 +1,7 @@
 package com.dreamdisplays.api.render
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
+
 
 /**
  * Strategy for handling decoded frames that arrive faster than they can be uploaded, i.e. how a
@@ -7,7 +9,7 @@ package com.dreamdisplays.api.render
  *
  * @since 1.8.0
  */
-enum class FrameDropPolicy {
+@DreamDisplaysUnstableApi enum class FrameDropPolicy {
     /** Never drop; every decoded frame is uploaded even if it adds latency. */
     NEVER,
 

@@ -1,5 +1,6 @@
 package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.watchparty.WatchPartySession
 
@@ -8,7 +9,7 @@ import com.dreamdisplays.api.watchparty.WatchPartySession
  *
  * @since 1.0.0
  */
-data class Display(
+@DreamDisplaysUnstableApi data class Display(
     /** The unique identifier of the display. */
     val id: DisplayId,
 

@@ -1,11 +1,13 @@
 package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
+
 /**
  * The bounds of a display.
  *
  * @since 1.8.0
  */
-data class DisplayBounds(
+@DreamDisplaysUnstableApi data class DisplayBounds(
     /** The [x] coordinate of the display's center, in world units. */
     val x: Double,
 

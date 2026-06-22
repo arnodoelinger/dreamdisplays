@@ -1,5 +1,6 @@
 package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.media.DreamMediaException
 
 /**
@@ -7,7 +8,7 @@ import com.dreamdisplays.media.DreamMediaException
  *
  * @since 1.8.0
  */
-sealed interface DisplayRuntimeState {
+@DreamDisplaysUnstableApi sealed interface DisplayRuntimeState {
     /** The display is currently idle. */
     data object Idle : DisplayRuntimeState
 
@@ -42,7 +43,7 @@ sealed interface DisplayRuntimeState {
     /** The display has been stopped. */
     data object Stopped : DisplayRuntimeState
 
-    /** The display has been removed. */
+    /** True while the display owns an active media session. */
     val isActive: Boolean
         get() = this is Playing || this is Paused || this is Buffering
 

@@ -1,5 +1,6 @@
 package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.media.VideoQuality
 
 /**
@@ -7,7 +8,7 @@ import com.dreamdisplays.media.VideoQuality
  *
  * @since 1.0.0
  */
-data class DisplaySettings(
+@DreamDisplaysUnstableApi data class DisplaySettings(
     /** The display's volume. */
     val volume: Float = 1.0f,
 

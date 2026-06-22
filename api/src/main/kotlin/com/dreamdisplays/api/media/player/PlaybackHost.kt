@@ -1,5 +1,6 @@
 package com.dreamdisplays.api.media.player
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.media.DreamMediaException
 import com.dreamdisplays.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
@@ -10,7 +11,7 @@ import java.util.UUID
  * `DisplayScreen`. The platform layer implements this; the player reads playback-relevant state and
  * signals render-side transitions through it.
  */
-interface PlaybackHost {
+@DreamDisplaysUnstableApi interface PlaybackHost {
     /** Stable identifier of this display, used for log labels. */
     val uuid: UUID
 

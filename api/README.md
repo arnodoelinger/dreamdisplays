@@ -1,7 +1,8 @@
 # API
 
-Public, experimental Dream Displays API. This module is the boundary external code, platform integrations, and sibling
-modules can use without depending on `core` internals. Everything here is annotated as unstable via `DreamDisplaysUnstableApi`.
+Public, experimental Dream Displays API. This module is the boundary external code, platform integrations,
+and sibling modules can use without depending on `core` internals. Unstable contracts are marked with
+`DreamDisplaysUnstableApi`.
 
 ## Contents
 
@@ -25,6 +26,7 @@ modules can use without depending on `core` internals. Everything here is annota
 - `api` must not depend on `core` or import `com.dreamdisplays.core.*`
 - Do not put implementations, caches, file IO, network IO, Minecraft / `Paper` / `Fabric` / `NeoForge` classes here
 - If a type is meant for public consumers, it belongs here or in a small independent module such as `media`, not in `core`
+- Keep contracts loader-neutral: expose value objects, service interfaces, sinks, and handles instead of runtime classes
 
 ## Dependents
 

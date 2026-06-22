@@ -1,5 +1,7 @@
 package com.dreamdisplays.api.display.model
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
+
 /**
  * The facing direction of a display. [byte] is the stable wire encoding (see [fromByte]); it is
  * fixed per constant rather than derived from the ordinal, so constants may be reordered safely.
@@ -8,7 +10,7 @@ package com.dreamdisplays.api.display.model
  *
  * @since 1.0.0
  */
-enum class DisplayFacing(val byte: Byte) {
+@DreamDisplaysUnstableApi enum class DisplayFacing(val byte: Byte) {
     /** Facing north (−Z). */
     NORTH(0),
 
