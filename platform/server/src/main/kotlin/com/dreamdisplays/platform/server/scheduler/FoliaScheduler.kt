@@ -10,7 +10,9 @@ import java.util.concurrent.TimeUnit
  * `Folia` scheduler adapter. The sync task runs on the global scheduler and must only coordinate
  * region / entity work; player / world access belongs in per-player or per-region tasks.
  */
-@PaperOnly @NullMarked object FoliaScheduler : AdapterScheduler {
+@PaperOnly
+@NullMarked
+object FoliaScheduler : AdapterScheduler {
     /** The number of milliseconds in a tick. */
     private const val TICK_MILLIS = 50L
 

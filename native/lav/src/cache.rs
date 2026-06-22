@@ -337,7 +337,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
     (ts != NO_PTS).then_some(ts)
 }
 
-#[cfg(test)] mod tests {
+#[cfg(test)]
+mod tests {
     use super::*;
 
     const MS: i64 = 1_000_000;
@@ -358,7 +359,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
         }
     }
 
-    #[test] fn retains_window_and_stays_keyframe_aligned() {
+    #[test]
+    fn retains_window_and_stays_keyframe_aligned() {
         // 1 s window; feed 10 s at 30 fps
         let mut ring = PacketRing::new(1_000 * MS, usize::MAX);
         fill(&mut ring, 300, 100);
@@ -376,7 +378,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
         assert!(ring.len() < 300, "Old GOPs must be evicted.");
     }
 
-    #[test] fn enforces_byte_budget_by_dropping_gops() {
+    #[test]
+    fn enforces_byte_budget_by_dropping_gops() {
         // Window huge, but cap bytes so the budget is the binding constraint
         let mut ring = PacketRing::new(i64::MAX / 4, 1_000);
         fill(&mut ring, 300, 100);
@@ -388,7 +391,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
         assert!(!ring.is_empty(), "Keeps at least one decodable GOP.");
     }
 
-    #[test] fn never_drops_below_one_gop() {
+    #[test]
+    fn never_drops_below_one_gop() {
         // Absurdly tight budget; a single GOP (5 frames) still exceeds it but must be retained
         let mut ring = PacketRing::new(0, 1);
         fill(&mut ring, 7, 100);
@@ -398,11 +402,12 @@ fn ts_opt(ts: i64) -> Option<i64> {
         assert!(ring.len() <= 7);
     }
 
-    #[test] fn drain_from_backs_up_one_keyframe_for_decoder_context() {
+    #[test]
+    fn drain_from_backs_up_one_keyframe_for_decoder_context() {
         let mut ring = PacketRing::new(i64::MAX / 4, usize::MAX);
         fill(&mut ring, 30, 100); // keyframes at frame 0,5,10,15,20,25 ⇒ 0,165,330,495,660,825 ms
-                                  // Resume at 500 ms -> last keyframe <= 500 ms is frame 15 (495 ms), but replay backs up
-                                  // one GOP for H.264/open-GOP decoder references.
+        // Resume at 500 ms -> last keyframe <= 500 ms is frame 15 (495 ms), but replay backs up
+        // one GOP for H.264/open-GOP decoder references.
         let out = ring.drain_from(500 * MS);
         assert!(!out.is_empty());
         assert!(out[0].keyframe, "Replay must begin on a keyframe.");
@@ -414,7 +419,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
         assert!(out.iter().all(|p| p.pts_nanos >= 330 * MS));
     }
 
-    #[test] fn packets_from_position_matches_ring_drain() {
+    #[test]
+    fn packets_from_position_matches_ring_drain() {
         let mut ring = PacketRing::new(i64::MAX / 4, usize::MAX);
         fill(&mut ring, 30, 100);
         let all = ring.drain_from(i64::MIN + 1);
@@ -423,7 +429,8 @@ fn ts_opt(ts: i64) -> Option<i64> {
         assert_eq!(sliced.len(), ring.drain_from(500 * MS).len());
     }
 
-    #[test] fn drain_from_before_ring_starts_at_first_keyframe() {
+    #[test]
+    fn drain_from_before_ring_starts_at_first_keyframe() {
         let mut ring = PacketRing::new(i64::MAX / 4, usize::MAX);
         fill(&mut ring, 30, 100);
         let first_kf = ring.packets.front().unwrap().pts_nanos;
@@ -434,13 +441,15 @@ fn ts_opt(ts: i64) -> Option<i64> {
         );
     }
 
-    #[test] fn empty_ring_drains_nothing() {
+    #[test]
+    fn empty_ring_drains_nothing() {
         let ring = PacketRing::new(1_000 * MS, usize::MAX);
         assert!(ring.drain_from(0).is_empty());
         assert_eq!(ring.span_nanos(), 0);
     }
 
-    #[test] fn snapshot_round_trips() {
+    #[test]
+    fn snapshot_round_trips() {
         let params = CodecParams {
             codec_id: 27, // AV_CODEC_ID_H264
             width: 1920,
@@ -471,12 +480,13 @@ fn ts_opt(ts: i64) -> Option<i64> {
         }
     }
 
-    #[test] fn deserialize_rejects_garbage() {
+    #[test]
+    fn deserialize_rejects_garbage() {
         assert!(deserialize_snapshot(&[]).is_none());
         assert!(deserialize_snapshot(&[0, 1, 2, 3]).is_none()); // Magic
         let mut blob = serialize_snapshot(&CodecParams::default(), &[]);
         blob.truncate(blob.len() - 1); // Truncated tail; empty packet list survives truncation only
-                                       // if nothing was after the count; force a packet.
+        // if nothing was after the count; force a packet.
         let with_pkt = serialize_snapshot(
             &CodecParams::default(),
             &[CachedPacket {

@@ -8,7 +8,8 @@ import com.dreamdisplays.media.DreamMediaException
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi sealed interface DisplayRuntimeState {
+@DreamDisplaysUnstableApi
+sealed interface DisplayRuntimeState {
     /** The display is currently idle. */
     data object Idle : DisplayRuntimeState
 

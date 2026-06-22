@@ -26,14 +26,20 @@ open class ScreenOverlay {
         method = ["extractRenderStateWithTooltipAndSubtitles"],
         at = [At("RETURN")]
     )
-    open fun onRenderReturn(graphics: GuiGraphicsExtractor, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {
-    //?} else
-    /*@Inject(
-        method = ["renderWithTooltipAndSubtitles"],
-        at = [At("RETURN")],
-        require = 0
-    )
-    open fun onRenderReturn(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {*/
+    open fun onRenderReturn(
+        graphics: GuiGraphicsExtractor,
+        mouseX: Int,
+        mouseY: Int,
+        partialTick: Float,
+        ci: CallbackInfo
+    ) {
+        //?} else
+        /*@Inject(
+            method = ["renderWithTooltipAndSubtitles"],
+            at = [At("RETURN")],
+            require = 0
+        )
+        open fun onRenderReturn(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {*/
         val overlays = DreamServices.registry.getOrNull<OverlayManager>() ?: return
         if (overlays.isEmpty) return
         val mc = Minecraft.getInstance()

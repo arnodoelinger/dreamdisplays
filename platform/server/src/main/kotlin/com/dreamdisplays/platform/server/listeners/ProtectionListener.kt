@@ -25,11 +25,13 @@ import org.bukkit.event.entity.EntityExplodeEvent
  * Handles block breaking, explosions, and piston movements.
  */
 @Suppress("UNUSED")
-@PaperOnly class ProtectionListener : Listener {
+@PaperOnly
+class ProtectionListener : Listener {
     /**
      * Handles block breaking events, checking if the block is protected and canceling if necessary.
      */
-    @EventHandler fun onBlockBreak(event: BlockBreakEvent) {
+    @EventHandler
+    fun onBlockBreak(event: BlockBreakEvent) {
         val loc = event.block.location
         if (DisplayManager.isContains(loc) != null && PlayerManager.getVersion(event.player) == null) {
             MessageUtil.sendMessage(event.player, "displayBlockBreak")
@@ -40,19 +42,22 @@ import org.bukkit.event.entity.EntityExplodeEvent
     /**
      * Handles explosion events, removing protected blocks from the list of blocks to be destroyed.
      */
-    @EventHandler fun onExplosion(event: EntityExplodeEvent) {
+    @EventHandler
+    fun onExplosion(event: EntityExplodeEvent) {
         event.blockList().removeIf { isLocationProtected(it.location) }
     }
 
     /**
      * Handles piston movements, checking if the piston is moving blocks protected by displays.
      */
-    @EventHandler fun onPistonExtend(event: BlockPistonExtendEvent) = handlePiston(event.blocks, event)
+    @EventHandler
+    fun onPistonExtend(event: BlockPistonExtendEvent) = handlePiston(event.blocks, event)
 
     /**
      * Handles piston retraction, checking if the piston is moving blocks protected by displays.
      */
-    @EventHandler fun onPistonRetract(event: BlockPistonRetractEvent) = handlePiston(event.blocks, event)
+    @EventHandler
+    fun onPistonRetract(event: BlockPistonRetractEvent) = handlePiston(event.blocks, event)
 
     /**
      * Handles piston movements, checking if the piston is moving blocks protected by displays.
@@ -77,7 +82,8 @@ import org.bukkit.event.entity.EntityExplodeEvent
 }
 
 /** Fabric-specific implementation of [ProtectionListener]. */
-@FabricOnly object FabricProtectionListener {
+@FabricOnly
+object FabricProtectionListener {
     /**
      * Registers the protection listener. In `Fabric`, this is done automatically by the `Fabric API`, so we don't need to
      * register it, yey.

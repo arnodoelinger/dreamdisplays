@@ -65,7 +65,8 @@ object DreamServices {
      * Whether [bootstrap] has been called already. Guards against double registration of services, which can cause
      * issues if services have internal state or are expected to be singletons.
      */
-    @Volatile private var bootstrapped = false
+    @Volatile
+    private var bootstrapped = false
 
     /**
      * Registers the default service graph exactly once.
@@ -87,7 +88,8 @@ object DreamServices {
      * when present, [com.dreamdisplays.platform.client.managers.ClientStartupManager] hosts a
      * [ClientApplication] on top of it.
      */
-    @Synchronized fun bootstrap() {
+    @Synchronized
+    fun bootstrap() {
         if (bootstrapped) return
         bootstrapped = true
 
@@ -126,10 +128,15 @@ object DreamServices {
         registry.register<MediaSessionManager>(DefaultMediaSessionManager(playbackService, displayService))
         registry.register<WatchPartyService>(DefaultWatchPartyService(displaySystem))
         registry.register<ClientCapabilityDetector>(MinecraftClientCapabilityDetector)
-        registry.register<CapabilityNegotiationService>(DefaultCapabilityNegotiationService(MinecraftClientCapabilityDetector))
+        registry.register<CapabilityNegotiationService>(
+            DefaultCapabilityNegotiationService(
+                MinecraftClientCapabilityDetector
+            )
+        )
         registry.register<DisplayRenderer>(DefaultDisplayRenderer())
         registry.register<TextureUploaderFactory>(TextureUploaderFactory { AsyncTextureUploader(stateCache = it) })
-        registry.register<RenderHook>(RenderHook { context -> registry.getOrNull<DisplayRenderer>()?.takeIf { it.registeredCount > 0 }?.renderAll(context)
+        registry.register<RenderHook>(RenderHook { context ->
+            registry.getOrNull<DisplayRenderer>()?.takeIf { it.registeredCount > 0 }?.renderAll(context)
         })
     }
 }

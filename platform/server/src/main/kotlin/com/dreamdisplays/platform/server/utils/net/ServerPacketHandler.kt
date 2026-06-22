@@ -33,7 +33,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * Fabric-specific packet actions, shared between the frozen v1 receivers registered here and the
  * protocol-v2 dispatch in [FabricV2Networking].
  */
-@FabricOnly object ServerPacketHandler {
+@FabricOnly
+object ServerPacketHandler {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
 
@@ -147,7 +148,13 @@ import kotlin.time.Duration.Companion.milliseconds
     }
 
     /** Switches a display's persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`) and re-anchors its clock. */
-    fun setMode(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, mode: PlaybackMode, positionMs: Long) {
+    fun setMode(
+        player: ServerPlayer,
+        server: MinecraftServer,
+        displayId: java.util.UUID,
+        mode: PlaybackMode,
+        positionMs: Long
+    ) {
         if (!PlaybackMode.isBaseMode(mode)) return
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData ?: return
         if (!PlaybackPermissions.canSetMode(context(displayData, player))) return
@@ -285,7 +292,8 @@ import kotlin.time.Duration.Companion.milliseconds
 }
 
 /** Simple scheduler helper for server-side delayed tasks. */
-@FabricOnly object ServerScheduler {
+@FabricOnly
+object ServerScheduler {
     fun runLater(server: MinecraftServer, delayTicks: Long, task: Runnable) {
         if (delayTicks <= 0L) {
             server.execute(task)

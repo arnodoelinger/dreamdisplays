@@ -14,7 +14,9 @@ import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 
 /** Registers bStats charts for protocol, client render / media capabilities, and server display usage. */
-@PaperOnly @NullMarked object TelemetryMetrics {
+@PaperOnly
+@NullMarked
+object TelemetryMetrics {
     /** Registers all bStats charts. */
     fun register(plugin: Main, metrics: Metrics) {
         metrics.addCustomChart(SimplePie("server_protocol_current") { ProtocolVersion.CURRENT.toString() })

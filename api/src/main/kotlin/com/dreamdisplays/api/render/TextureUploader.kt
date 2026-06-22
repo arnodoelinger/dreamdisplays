@@ -4,7 +4,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.media.sink.DecodedVideoFrame
 
 /** Uploads decoded video frames into platform-owned textures. */
-@DreamDisplaysUnstableApi interface TextureUploader : AutoCloseable {
+@DreamDisplaysUnstableApi
+interface TextureUploader : AutoCloseable {
     /** True when the implementation can perform upload work asynchronously. */
     val supportsAsync: Boolean
 

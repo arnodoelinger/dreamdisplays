@@ -3,7 +3,8 @@ package com.dreamdisplays.api.media.source
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Ordered registry of media resolvers used by playback and search integrations. */
-@DreamDisplaysUnstableApi interface MediaResolverRegistry {
+@DreamDisplaysUnstableApi
+interface MediaResolverRegistry {
     /** Adds [resolver] to the registry. */
     fun register(resolver: MediaResolver)
 

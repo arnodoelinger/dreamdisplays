@@ -37,7 +37,8 @@ internal object DisplayReplayCache {
     private var totalBytes = 0L
 
     /** Snapshot time-to-live in milliseconds. */
-    private val ttlMs: Long = System.getProperty("dreamdisplays.cache.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: DEFAULT_TTL_MS
+    private val ttlMs: Long =
+        System.getProperty("dreamdisplays.cache.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: DEFAULT_TTL_MS
 
     /** Total JVM-side memory cap for retained replay snapshots. */
     private val maxBytes: Long =
@@ -45,7 +46,14 @@ internal object DisplayReplayCache {
             ?: WarmParkPolicy.replayCacheBudgetBytes.coerceAtMost(DEFAULT_MAX_BYTES)
 
     /** Stores [snapshot] (plus optional cached [audioPcm] / resolved [prepared] streams) for [uuid]. */
-    fun put(uuid: UUID, url: String, positionNanos: Long, snapshot: ByteArray, audioPcm: ByteArray?, prepared: PreparedMedia?) {
+    fun put(
+        uuid: UUID,
+        url: String,
+        positionNanos: Long,
+        snapshot: ByteArray,
+        audioPcm: ByteArray?,
+        prepared: PreparedMedia?
+    ) {
         if (snapshot.isEmpty() || ttlMs == 0L || maxBytes == 0L) return
         synchronized(lock) {
             entries.remove(uuid)?.let { totalBytes -= entryBytes(it) }

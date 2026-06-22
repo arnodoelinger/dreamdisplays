@@ -24,7 +24,8 @@ class DefaultCapabilityNegotiationService(
     }
 
     /** Updated as handshake packets arrive; null until the first arrives. */
-    @Volatile override var serverCapabilities: ServerHello? = null
+    @Volatile
+    override var serverCapabilities: ServerHello? = null
         private set
 
     /** True, once any server capability information has arrived. */

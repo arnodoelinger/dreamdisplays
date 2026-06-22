@@ -17,7 +17,8 @@ import org.bukkit.entity.Player
  * Handles the `/display stats` command. Prints a per-mod-version breakdown of currently
  * connected players that have reported their client version.
  */
-@PaperOnly class StatsCommand : SubCommand {
+@PaperOnly
+class StatsCommand : SubCommand {
     override val name = "stats"
     override val permission = Main.config.permissions.stats
 
@@ -50,7 +51,8 @@ import org.bukkit.entity.Player
 /**
  * `Fabric`-specific implementation of the `/display stats` command.
  */
-@FabricOnly object FabricStatsCommand {
+@FabricOnly
+object FabricStatsCommand {
     /** Prints a per-mod-version breakdown of currently connected players that have reported their client version. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer

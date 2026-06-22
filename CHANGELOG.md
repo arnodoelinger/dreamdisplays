@@ -6,12 +6,16 @@
 
 - Improved experimental API
 - Hardened background maintenance tasks against hanging the game on exit
-- Reworked background networking, thumbnail, and cache work onto a unified coroutine scheduler for cleaner shutdown and fewer idle threads
+- Reworked background networking, thumbnail, and cache work onto a unified coroutine scheduler for cleaner shutdown and
+  fewer idle threads
+- Enhanced documentation in codebase
 - Improved Dream Displays security
 
 ### Fixes
 
 - Fixed 360p quality lock in some cases
+- Fixed the display menu preview blitting a just-released texture during a quality switch, causing repeated "Missing
+  resource" warnings and a GL error
 
 ## Server
 
@@ -21,19 +25,21 @@
 - Improved display data saving
 - Improved version parsing
 - Moved webhook reports and `Fabric` database saves off the main server thread
+- Enhanced documentation in codebase
 - Improved Dream Displays security
 
 ### Fixes
 
 - Fixed periodic display / player update ticks running on an async scheduler on `Paper` servers
 - Fixed unsafe async `Bukkit` / `Paper` API usage
-- Fixed displays not being saved until the server shuts down cleanly, so a crash could lose newly created or edited displays
+- Fixed displays not being saved until the server shuts down cleanly, so a crash could lose newly created or edited
+  displays
 - Fixed display owners on `Paper` servers needing extra permission to delete their own display, unlike `Fabric`
 - Fixed a malformed legacy network packet being able to crash decoding instead of being safely rejected
 - Fixed broadcast displays briefly losing their quality clamp right after reconnecting until the server resent it
 - Fixed the display cache file being able to get corrupted if the game / server crashed mid-save
 - Fixed a race that let concurrent reports slip past the report cooldown
-- Fixed default permissions; (local), synced and broadcast are for all players, no only for OPs 
+- Fixed default permissions; (local), synced and broadcast are for all players, no only for OPs
 
 # Version 1.8.2
 
@@ -96,6 +102,7 @@
 ## Client
 
 ### Features
+
 - Added support for Minecraft 26.2
 - Brought back Minecraft 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
 - Added a new packet protocol v2
@@ -203,7 +210,8 @@
 - Added Java 21 support for Minecraft 1.21.11 servers
 - Added a new packet protocol v2
 - Added fallback support for protocol v1, but v1 is now deprecated and will be removed in the future
-- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`, `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
+- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`,
+  `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
 - Added more anonymous telemetry data to improve development, compatibility, and stability
 
 ### Improvements
@@ -291,7 +299,8 @@
 
 - Support 26.2-pre4 `Fabric` servers
 - Implement 1.21.11 support for `Fabric` servers
-- Back Java 21 support (if you're running on 1.21.11, you can still use Java 21 with this version instead of being forced to update to Java 25, as it was in previous versions)
+- Back Java 21 support (if you're running on 1.21.11, you can still use Java 21 with this version instead of being
+  forced to update to Java 25, as it was in previous versions)
 
 ### Improvements
 
@@ -338,6 +347,7 @@
 ## Client
 
 ### Features
+
 - Support 26.1.2 version and Java 25
 - Support `Fabric` servers
 - Support YouTube shorts
@@ -346,6 +356,7 @@
 - Show max 72 recommended videos based on the current video instead of 24
 
 ### Improvements
+
 - Switch from RGBA to RGB24 for improved rendering performance
 - Videos now stop rendering (but still play) when Minecraft is minimized
 - Enhance watchdog logic for low-connection networks and stability
@@ -358,10 +369,12 @@
 - Update dependencies and replace some of them with better alternatives
 
 ### Fixes
+
 - Fix cropping at display edges
 - Fix mute logic and allow players to mute displays in sync mode
 - Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
+- Fix the "You have to look at the display block" error when there is actually
+  display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
 - Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
 - Fix version semantic versioning parsing for mod updates
 - Fix tiled thumbnail rendering in the menu
@@ -373,11 +386,13 @@
 ## Server
 
 ### Features
+
 - Support `Fabric` servers
 - Follow client's feature of lock / unlock displays
 - Deprecate `/display` command (will be replaced by direct interaction with displays in future versions)
 
 ### Improvements
+
 - Preserve sync mode when switching videos
 - Broadcast synced display state every 2 seconds
 - Add dynamic material messages
@@ -387,7 +402,8 @@
 
 ## Mod
 
-- Now you can decide whether to lock or unlock a display from modifying by other players in the menu (works only on servers with the new plugin version)
+- Now you can decide whether to lock or unlock a display from modifying by other players in the menu (works only on
+  servers with the new plugin version)
 - New async texture uploader with a triple-buffered PBO ring
 - Hardware-accelerated `FFmpeg` video decoding
 - Reimplement fix of OpenGL `GL_INVALID_VALUE` error in all modes
@@ -396,7 +412,8 @@
 - Fix tiled thumbnail rendering in the menu
 - Fix mute logic and allow players to mute displays in sync mode
 - Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
+- Fix the "You have to look at the display block" error when there is actually
+  display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
 - Fix a locked quality bug ([#80](https://github.com/arsmotorin/dreamdisplays/issues/80))
 - Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
 - Fix texture race crash in some rare cases
@@ -503,7 +520,9 @@
 ## Mod
 
 - Correct suggestion translations
-- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as errored
+- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically
+  invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as
+  errored
 - Reduce format URL cache TTL from 5 hours to 2 hours to avoid serving near-expired YouTube CDN links
 - Improve error handling and timeout management in `yt-dlp` process execution
 

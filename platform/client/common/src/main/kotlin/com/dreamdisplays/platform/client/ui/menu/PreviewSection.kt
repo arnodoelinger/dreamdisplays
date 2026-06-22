@@ -211,12 +211,23 @@ class PreviewSection(
     }
 
     private class PreviewFrameTexture(private val ds: DisplayScreen) {
-        @Volatile private var frontBuf: ByteBuffer = EMPTY_DIRECT
+        @Volatile
+        private var frontBuf: ByteBuffer = EMPTY_DIRECT
+
         private var backBuf: ByteBuffer = EMPTY_DIRECT
-        @Volatile private var frameW = 0
-        @Volatile private var frameH = 0
-        @Volatile private var frameFormat = UploadPixelFormat.RGB24
-        @Volatile private var frameVersion = 0L
+
+        @Volatile
+        private var frameW = 0
+
+        @Volatile
+        private var frameH = 0
+
+        @Volatile
+        private var frameFormat = UploadPixelFormat.RGB24
+
+        @Volatile
+        private var frameVersion = 0L
+
         private var uploadedVersion = 0L
 
         private var dynamicTexture: DynamicTexture? = null
@@ -257,7 +268,8 @@ class PreviewSection(
 
             val prev = frontBuf
             frontBuf = back
-            backBuf = if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+            backBuf =
+                if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
             frameW = w
             frameH = h
             frameFormat = format

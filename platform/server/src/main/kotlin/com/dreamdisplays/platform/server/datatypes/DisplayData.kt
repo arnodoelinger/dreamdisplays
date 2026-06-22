@@ -61,7 +61,9 @@ interface DisplayData {
  * @property duration optional duration for which the content should be displayed.
  * @property box bounding box of the display area.
  */
-@PaperOnly @NullMarked class PaperDisplayData(
+@PaperOnly
+@NullMarked
+class PaperDisplayData(
     override val id: UUID,
     override val ownerId: UUID,
     val pos1: Location,
@@ -90,7 +92,8 @@ interface DisplayData {
 /**
  * `Fabric`-specific implementation of [DisplayData].
  */
-@FabricOnly class FabricDisplayData(
+@FabricOnly
+class FabricDisplayData(
     override val id: UUID,
     override val ownerId: UUID,
     val worldKey: String,

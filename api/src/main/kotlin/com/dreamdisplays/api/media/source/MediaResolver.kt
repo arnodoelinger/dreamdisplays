@@ -3,7 +3,8 @@ package com.dreamdisplays.api.media.source
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Resolves a [MediaSource] into playable streams and metadata. */
-@DreamDisplaysUnstableApi interface MediaResolver {
+@DreamDisplaysUnstableApi
+interface MediaResolver {
     /** Higher-priority resolvers are preferred when several can resolve the same source. */
     val priority: Int get() = 0
 

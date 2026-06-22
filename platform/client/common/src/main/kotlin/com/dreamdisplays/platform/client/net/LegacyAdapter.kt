@@ -28,7 +28,14 @@ object LegacyAdapter {
      */
     fun toLegacy(packet: DreamPacket): CustomPacketPayload? = when (packet) {
         is ClientHello -> Packets.Version(packet.modVersion)
-        is DisplaySync -> Packets.Sync(packet.id, packet.isSync, packet.isPaused, packet.currentTimeMs, packet.durationMs)
+        is DisplaySync -> Packets.Sync(
+            packet.id,
+            packet.isSync,
+            packet.isPaused,
+            packet.currentTimeMs,
+            packet.durationMs
+        )
+
         is RequestSync -> Packets.RequestSync(packet.id)
         is SetVideo -> Packets.SetVideo(packet.id, packet.url, packet.lang)
         is SetLocked -> Packets.SetLocked(packet.id, packet.locked)
@@ -54,7 +61,15 @@ object LegacyAdapter {
             lang = payload.lang,
             isLocked = payload.isLocked ?: true,
         )
-        is Packets.Sync -> DisplaySync(payload.uuid, payload.isSync, payload.currentState, payload.currentTime, payload.limitTime)
+
+        is Packets.Sync -> DisplaySync(
+            payload.uuid,
+            payload.isSync,
+            payload.currentState,
+            payload.currentTime,
+            payload.limitTime
+        )
+
         is Packets.Delete -> DisplayDelete(payload.uuid)
         is Packets.ClearCache -> ClearCache(payload.displayUuids)
         is Packets.Premium -> ClientPacketManager.serverSnapshot.copy(isPremium = payload.premium)

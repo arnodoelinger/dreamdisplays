@@ -17,10 +17,12 @@ object UpdateCheck {
     private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
 
     /** Check state. */
-    @Volatile private var checked = false
+    @Volatile
+    private var checked = false
 
     /** Latest release version of the mod, or null if the check failed or the version is unknown. */
-    @Volatile private var latestVersion: String? = null
+    @Volatile
+    private var latestVersion: String? = null
 
     /**
      * Returns true if the UI update arrow should be shown.
@@ -38,7 +40,8 @@ object UpdateCheck {
         version.contains("-DEV", ignoreCase = true) || version.contains("-SNAPSHOT", ignoreCase = true)
 
     /** Start the background update check exactly once; subsequent calls are no-ops. */
-    @Synchronized private fun startCheck() {
+    @Synchronized
+    private fun startCheck() {
         if (checked) return
         checked = true
         DreamCoroutines.clientIo.launch { doCheck() }
@@ -65,10 +68,12 @@ object UpdateCheck {
                     val obj = root.asJsonObject
                     obj.optString("tag_name") ?: obj.optString("name")
                 }
+
                 root.isJsonArray -> {
                     val arr = root.asJsonArray
                     if (!arr.isEmpty && arr[0].isJsonObject) arr[0].asJsonObject.optString("tag_name") else null
                 }
+
                 else -> null
             } ?: return
             latestVersion = rawTag.trimStart('v', 'V')

@@ -33,7 +33,8 @@ object ClientTickManager {
     private var wasInMultiplayer = false
 
     /** The level seen last tick, used to detect level changes. */
-    @Volatile private var lastLevel: ClientLevel? = null
+    @Volatile
+    private var lastLevel: ClientLevel? = null
 
     /** Whether focus-mode blindness was applied last tick. */
     private var wasFocused = false

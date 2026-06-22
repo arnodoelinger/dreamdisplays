@@ -99,7 +99,7 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
             // driftMs > 0 => player is behind the server; < 0 => player is ahead
 
             val sinceSeekMs = if (lastSeekNanos == 0L) Long.MAX_VALUE
-                else (System.nanoTime() - lastSeekNanos) / 1_000_000L
+            else (System.nanoTime() - lastSeekNanos) / 1_000_000L
             // Always honor the cooldown: re-seeking while a previous correction is still warming up is
             // exactly what makes a cold rejoin thrash. The first correction after a load is exempt
             // (lastSeekNanos == 0), so joining still snaps to live immediately.
@@ -116,7 +116,11 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
             // on the live point. Clamp shy of the end so we never seek past EOS (which would loop to 0).
             val seekMs = if (driftMs > 0 && !packet.paused) {
                 val lead = target + SEEK_LEAD_MS
-                wrap(if (!packet.loop && durationMs > 0) lead.coerceAtMost(durationMs - END_MARGIN_MS) else lead, packet.loop, durationMs)
+                wrap(
+                    if (!packet.loop && durationMs > 0) lead.coerceAtMost(durationMs - END_MARGIN_MS) else lead,
+                    packet.loop,
+                    durationMs
+                )
             } else target
 
             screen.clearRenderedFrameForTimeline()

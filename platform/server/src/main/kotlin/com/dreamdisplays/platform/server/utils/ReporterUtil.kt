@@ -33,7 +33,8 @@ object ReporterUtil {
      * Sends a report to Discord. `Fabric` overload. Accepts a pre-formatted [locationStr]
      * because `Fabric` server code already converts [BlockPos] and world key to a readable string.
      */
-    @FabricOnly fun sendReport(
+    @FabricOnly
+    fun sendReport(
         locationStr: String,
         videoLink: String?,
         displayId: UUID,
@@ -49,7 +50,8 @@ object ReporterUtil {
      * Sends a report to Discord. `Paper` overload. Converts a `Bukkit` [Location] and
      * [Player] to their string representations, then delegates to the shared logic.
      */
-    @PaperOnly fun sendReport(
+    @PaperOnly
+    fun sendReport(
         location: Location,
         videoLink: String?,
         displayId: UUID,

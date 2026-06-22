@@ -3,7 +3,8 @@ package com.dreamdisplays.api.render
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Per-frame limits used by render upload queues to avoid starving the game renderer. */
-@DreamDisplaysUnstableApi data class UploadBudget(
+@DreamDisplaysUnstableApi
+data class UploadBudget(
     /** Maximum number of frames to upload during one render frame. */
     val maxUploadsPerFrame: Int,
 

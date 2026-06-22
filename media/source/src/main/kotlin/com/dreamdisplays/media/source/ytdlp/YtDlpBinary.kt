@@ -52,14 +52,19 @@ object YtDlpBinary {
      *  cause of "not a bot" / extraction failures since it never self-updates otherwise. */
     private const val BINARY_REFRESH_MS: Long = 7L * 24L * 60L * 60L * 1_000L
 
-    @Volatile private var resolved: String? = null
+    @Volatile
+    private var resolved: String? = null
+
     private val updateChecked = AtomicBoolean(false)
 
     /** Cached full launch prefix (e.g. `[python3, …/yt-dlp.pyz]` or `[binaryPath]`); see [resolveCommand]. */
-    @Volatile private var resolvedCommand: List<String>? = null
+    @Volatile
+    private var resolvedCommand: List<String>? = null
 
     /** Probed interpreter for the zipapp path: `null` = not yet probed, `""` = none usable. */
-    @Volatile private var pythonProbe: String? = null
+    @Volatile
+    private var pythonProbe: String? = null
+
     private val zipappUpdateChecked = AtomicBoolean(false)
 
     /**

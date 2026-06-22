@@ -34,7 +34,9 @@ const val V2_CHANNEL: String = "dreamdisplays:v2"
  * the [ClientHello] handshake, and sends v2 packets to negotiated players. Business logic is
  * shared with the frozen-v1 path through [DisplayActions].
  */
-@PaperOnly @NullMarked object PaperV2Networking : PluginMessageListener {
+@PaperOnly
+@NullMarked
+object PaperV2Networking : PluginMessageListener {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PaperV2Networking")
     private val plugin: Main by lazy { Main.getInstance() }
 
@@ -71,14 +73,22 @@ const val V2_CHANNEL: String = "dreamdisplays:v2"
             is ReportDisplay -> DisplayManager.report(packet.id, player)
             is SetVideo -> DisplayActions.setVideo(player, packet.id, packet.url, packet.lang)
             is SetLocked -> DisplayActions.setLocked(player, packet.id, packet.locked)
-            is SetMode -> DisplayActions.setMode(player, packet.id, PlaybackMode.fromWire(packet.mode), packet.positionMs)
+            is SetMode -> DisplayActions.setMode(
+                player,
+                packet.id,
+                PlaybackMode.fromWire(packet.mode),
+                packet.positionMs
+            )
+
             is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
                 DisplayActions.playbackCommand(player, packet.id, it, packet.positionMs)
             }
+
             is WatchPartyStart -> DisplayActions.watchPartyStart(player, packet.id, packet.url, packet.lang)
             is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
                 DisplayActions.watchPartyControl(player, packet.id, it, packet.positionMs)
             }
+
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }

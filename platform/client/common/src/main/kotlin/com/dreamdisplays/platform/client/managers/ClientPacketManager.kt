@@ -55,10 +55,12 @@ object ClientPacketManager {
                 it.updateData(packet)
                 DisplayRegistry.recordScreen(it)
             }
+
             is WatchPartyState -> DisplayRegistry.screens[packet.id]?.let {
                 it.updateWatchParty(packet)
                 DisplayRegistry.recordScreen(it)
             }
+
             is DisplayDelete -> handleDelete(packet)
             is ClearCache -> handleClearCache(packet)
             else -> logger.debug("Ignoring non-clientbound packet {}.", packet::class.simpleName)

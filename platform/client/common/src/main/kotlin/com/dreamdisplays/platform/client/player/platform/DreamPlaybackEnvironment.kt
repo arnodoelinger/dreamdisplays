@@ -38,7 +38,8 @@ object DreamPlaybackEnvironment : PlaybackEnvironment {
     }
 
     /** Runs tasks on Minecraft's render/main thread. */
-    override val renderExecutor: RenderThreadExecutor = RenderThreadExecutor { task -> Minecraft.getInstance().execute(task) }
+    override val renderExecutor: RenderThreadExecutor =
+        RenderThreadExecutor { task -> Minecraft.getInstance().execute(task) }
 
     /** Creates per-player GPU frame uploaders. */
     override val uploaderFactory: FrameUploaderFactory = FrameUploaderFactory { GpuFrameUploader() as FrameUploader }

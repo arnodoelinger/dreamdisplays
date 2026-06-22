@@ -18,7 +18,11 @@ object MinecraftScreenUtil {
 
     /** Initialize the screen getter and setter. */
     init {
-        val screenField = try { Minecraft::class.java.getField("screen") } catch (_: NoSuchFieldException) { null }
+        val screenField = try {
+            Minecraft::class.java.getField("screen")
+        } catch (_: NoSuchFieldException) {
+            null
+        }
         if (screenField != null) {
             val setScreenMethod = Minecraft::class.java.getMethod("setScreen", Screen::class.java)
             getScreen = { mc -> screenField.get(mc) as? Screen }

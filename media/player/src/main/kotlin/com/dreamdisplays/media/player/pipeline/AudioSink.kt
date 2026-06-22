@@ -15,6 +15,7 @@ import javax.sound.sampled.*
 /** Manages the `javax.sound` PCM pipeline for one `FFmpeg` audio process. */
 internal class AudioSink(private val debugLabel: String) {
     private val logger = LoggerFactory.getLogger("DreamDisplays/AudioSink")
+
     companion object {
         const val SAMPLE_RATE = 44100
 
@@ -30,7 +31,8 @@ internal class AudioSink(private val debugLabel: String) {
     }
 
     /** Current volume multiplier applied to each audio chunk. */
-    @Volatile var currentVolume: Double = 1.0
+    @Volatile
+    var currentVolume: Double = 1.0
 
     /**
      * Live-relative frame position of the open audio line, or -1 when no line is active (or the line is
@@ -47,26 +49,32 @@ internal class AudioSink(private val debugLabel: String) {
             return if (live < 0L) -1L else live
         }
 
-    @Volatile private var line: SourceDataLine? = null
+    @Volatile
+    private var line: SourceDataLine? = null
 
     /** Frames of cached prelude played ahead of the live PCM on a bridge line (0 for a normal session). */
-    @Volatile private var preludeFrames = 0L
+    @Volatile
+    private var preludeFrames = 0L
 
     /**
      * Whether [framePosition] reports the line clock. False during a bridge's cached-prelude phase, so the
      * audio clock is hidden (it would still read the pre-handoff seek offset, stalling video pacing) until
      * [onBridgeHandoff] re-anchors the playback clock to the live edge. Always true for a normal session.
      */
-    @Volatile private var exposeLiveClock = true
+    @Volatile
+    private var exposeLiveClock = true
 
     /** Gate a bridge session waits on for its live `FFmpeg` process; null outside a bridge. */
-    @Volatile private var liveGate: CountDownLatch? = null
-    @Volatile private var liveProc: Process? = null
+    @Volatile
+    private var liveGate: CountDownLatch? = null
+    @Volatile
+    private var liveProc: Process? = null
 
     /** When set and true, the reader pauses the line (keeping it open) and idles — used to keep the audio
      *  process warm while a display is parked out of render distance. Set once per session; persists across
      *  every audio path (normal start and the reappearance bridge) so any live audio thread observes it. */
-    @Volatile private var parked: AtomicBoolean? = null
+    @Volatile
+    private var parked: AtomicBoolean? = null
 
     /** Installs the session park flag (see [parked]); set once by the owning session manager. */
     fun setParkFlag(flag: AtomicBoolean?) {
@@ -277,7 +285,12 @@ internal class AudioSink(private val debugLabel: String) {
     )
 
     /** Writes the cached bridge prelude to [ln] (volume applied), without ring-caching it. */
-    private fun writePrelude(ln: SourceDataLine, prelude: ByteArray, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
+    private fun writePrelude(
+        ln: SourceDataLine,
+        prelude: ByteArray,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean
+    ) {
         val chunk = ByteArray(CHUNK_BYTES)
         var off = 0
         while (off < prelude.size && !terminated.get() && !stopFlag.get()) {
@@ -320,7 +333,9 @@ internal class AudioSink(private val debugLabel: String) {
                 break
             }
             totalBytes += n
-            if (firstChunk) { logger.debug("$debugLabel [audio] first PCM chunk received ($n bytes)."); firstChunk = false }
+            if (firstChunk) {
+                logger.debug("$debugLabel [audio] first PCM chunk received ($n bytes)."); firstChunk = false
+            }
             ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
             MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
             writeFully(ln, chunk, n, terminated, stopFlag)
@@ -337,7 +352,11 @@ internal class AudioSink(private val debugLabel: String) {
         if (!pk.get()) return false
         runCatching { ln.stop() } // pause playback, keep the buffered tail and the line open
         while (pk.get() && !terminated.get() && !stopFlag.get()) {
-            try { Thread.sleep(20) } catch (_: InterruptedException) { Thread.currentThread().interrupt(); return true }
+            try {
+                Thread.sleep(20)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt(); return true
+            }
         }
         if (terminated.get() || stopFlag.get()) return true
         runCatching { ln.start() } // resume from exactly where it paused (frame position is continuous)
@@ -345,7 +364,13 @@ internal class AudioSink(private val debugLabel: String) {
     }
 
     /** Writes the first [n] bytes of [chunk] to [ln], retrying short writes until stop/terminate. */
-    private fun writeFully(ln: SourceDataLine, chunk: ByteArray, n: Int, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
+    private fun writeFully(
+        ln: SourceDataLine,
+        chunk: ByteArray,
+        n: Int,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean
+    ) {
         var written = 0
         while (written < n && !terminated.get() && !stopFlag.get()) {
             val w = ln.write(chunk, written, n - written)
@@ -400,6 +425,7 @@ internal class AudioSink(private val debugLabel: String) {
             proc.errorStream.bufferedReader().forEachLine { line ->
                 if (line.isNotBlank()) logger.warn("$debugLabel [audio] FFmpeg stderr: ${line.trim()}.")
             }
-        } catch (_: IOException) {}
+        } catch (_: IOException) {
+        }
     }, "MediaPlayer-astderr").start()
 }

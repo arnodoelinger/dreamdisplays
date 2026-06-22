@@ -10,7 +10,8 @@ import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
 /**
  * Manages the registration of plugin channels for incoming and outgoing messages.
  */
-@PaperOnly object ChannelRegistrar {
+@PaperOnly
+object ChannelRegistrar {
     /** Incoming plugin channels. */
     private val incomingChannels = listOf(
         "dreamdisplays:sync",

@@ -34,18 +34,32 @@ class PipOverlay(
     val displayScreen: DisplayScreen,
     initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
 ) : Overlay {
-    @Volatile private var frontBuf: ByteBuffer = EMPTY_DIRECT
+    @Volatile
+    private var frontBuf: ByteBuffer = EMPTY_DIRECT
+
     private var backBuf: ByteBuffer = EMPTY_DIRECT
-    @Volatile var frameW = 0
-    @Volatile var frameH = 0
-    @Volatile private var frameVersion = 0L
-    @Volatile private var contentAspect = 0.0
-    @Volatile private var frameFormat = UploadPixelFormat.RGB24
+
+    @Volatile
+    var frameW = 0
+
+    @Volatile
+    var frameH = 0
+
+    @Volatile
+    private var frameVersion = 0L
+
+    @Volatile
+    private var contentAspect = 0.0
+
+    @Volatile
+    private var frameFormat = UploadPixelFormat.RGB24
+
     private var uploadedVersion = 0L
 
     private var dynamicTexture: DynamicTexture? = null
     private var textureId: Identifier? = null
-    private var texW = 0; private var texH = 0
+    private var texW = 0;
+    private var texH = 0
     private var uploader: AsyncTextureUploader? = null
     private var rgbaUploadBuffer: ByteBuffer? = null
 
@@ -116,11 +130,20 @@ class PipOverlay(
      * @return true if the event was consumed.
      */
     override fun onEvent(event: OverlayEvent): Boolean = when (event) {
-        is OverlayEvent.CloseRequested -> { startClose(); true }
+        is OverlayEvent.CloseRequested -> {
+            startClose(); true
+        }
+
         else -> false
     }
 
-    fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat = UploadPixelFormat.RGB24) {
+    fun updateFrame(
+        buf: ByteBuffer,
+        w: Int,
+        h: Int,
+        aspect: Double,
+        format: UploadPixelFormat = UploadPixelFormat.RGB24
+    ) {
         val size = w * h * format.bytesPerPixel
         if (size <= 0 || buf.remaining() < size) return
         var back = backBuf
@@ -146,7 +169,8 @@ class PipOverlay(
     }
 
     fun uploadFrame() {
-        val fw = frameW; val fh = frameH
+        val fw = frameW;
+        val fh = frameH
         val v = frameVersion
         if (v == uploadedVersion) return
         val buf = frontBuf
@@ -162,7 +186,8 @@ class PipOverlay(
             val img = NativeImage(NativeImage.Format.RGBA, fw, fh, false)
             tex = DynamicTexture({ "dreamdisplays:pip" }, img)
             textureId = Identifier.fromNamespaceAndPath(
-                Initializer.MOD_ID, "pip/${displayScreen.uuid}-${UUID.randomUUID()}")
+                Initializer.MOD_ID, "pip/${displayScreen.uuid}-${UUID.randomUUID()}"
+            )
             mc.textureManager.register(textureId!!, tex)
             dynamicTexture = tex; texW = fw; texH = fh
         }
@@ -193,18 +218,21 @@ class PipOverlay(
     ): Boolean {
         val now = System.nanoTime()
         val dt = if (lastRenderNanos == 0L) 0.016f
-                 else ((now - lastRenderNanos) / 1e9f).coerceIn(0f, 0.1f)
+        else ((now - lastRenderNanos) / 1e9f).coerceIn(0f, 0.1f)
         lastRenderNanos = now
 
         val target = if (closing) 0f else 1f
         animProgress += (target - animProgress) * minOf(1f, dt * 10f)
 
-        if (isFinished) { cleanup(mc); return false }
+        if (isFinished) {
+            cleanup(mc); return false
+        }
         val id = textureId ?: return true
 
         val sw = mc.window.guiScaledWidth
         val sh = mc.window.guiScaledHeight
-        val fw = texW; val fh = texH
+        val fw = texW;
+        val fh = texH
         val content = contentRect(fw, fh, contentAspect)
         val contentAspect = if (content.w > 0 && content.h > 0) content.w / content.h.toDouble() else 16.0 / 9.0
         val pipW = (sw * sizeFraction).toInt().coerceAtLeast(80)
@@ -229,15 +257,16 @@ class PipOverlay(
             targetX = posX; targetY = posY
         }
 
-        val cx = posX.toInt(); val cy = posY.toInt()
+        val cx = posX.toInt();
+        val cy = posY.toInt()
         lastPipX = cx; lastPipY = cy; lastPipW = pipW; lastPipH = pipH
 
         val (handleX, handleY) = handlePixelPos(pipW, pipH)
 
         hovering = mouseX in cx..(cx + pipW) && mouseY in cy..(cy + pipH) && animProgress > 0.6f
         hoveringResize = hovering &&
-            mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
-            mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
+                mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
+                mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
 
         val scale = 0.94f + 0.06f * animProgress
         val alpha = animProgress
@@ -282,7 +311,8 @@ class PipOverlay(
         mx: Int, my: Int, leftPressed: Boolean,
         sw: Int, sh: Int, pipW: Int, pipH: Int,
     ) {
-        val cx = posX.toInt(); val cy = posY.toInt()
+        val cx = posX.toInt();
+        val cy = posY.toInt()
         val pressJustDown = leftPressed && !wasLeftPressed
         val pressJustUp = !leftPressed && wasLeftPressed
 
@@ -293,7 +323,7 @@ class PipOverlay(
                 pressMouseX = mx; pressMouseY = my
                 val (hx, hy) = handlePixelPos(pipW, pipH)
                 pressedInResize = mx in (cx + hx)..(cx + hx + RESIZE_SZ) &&
-                                  my in (cy + hy)..(cy + hy + RESIZE_SZ)
+                        my in (cy + hy)..(cy + hy + RESIZE_SZ)
                 pressedInBody = !pressedInResize
                 dragOffsetX = mx - cx
                 dragOffsetY = my - cy
@@ -334,6 +364,7 @@ class PipOverlay(
                     targetX = ax.toFloat(); targetY = ay.toFloat()
                     dragging = false
                 }
+
                 resizing -> resizing = false
                 pressedInBody -> DisplayMenu.open(displayScreen)
             }
@@ -356,7 +387,9 @@ class PipOverlay(
             val ddx = anchorCx - cx
             val ddy = anchorCy - cy
             val d2 = ddx * ddx + ddy * ddy
-            if (d2 < bestDist) { bestDist = d2; best = a }
+            if (d2 < bestDist) {
+                bestDist = d2; best = a
+            }
         }
         return best
     }
@@ -381,12 +414,12 @@ class PipOverlay(
         val x = when {
             sx > 0 -> pipW - RESIZE_SZ - RESIZE_INSET
             sx < 0 -> RESIZE_INSET
-            else   -> (pipW - RESIZE_SZ) / 2
+            else -> (pipW - RESIZE_SZ) / 2
         }
         val y = when {
             sy > 0 -> pipH - RESIZE_SZ - RESIZE_INSET
             sy < 0 -> RESIZE_INSET
-            else   -> (pipH - RESIZE_SZ) / 2
+            else -> (pipH - RESIZE_SZ) / 2
         }
         return x to y
     }
@@ -429,15 +462,23 @@ class PipOverlay(
         }
     }
 
-    fun startClose() { closing = true }
+    fun startClose() {
+        closing = true
+    }
 
     fun cleanup(mc: Minecraft) {
-        try { uploader?.cleanup() } catch (_: Exception) {}
+        try {
+            uploader?.cleanup()
+        } catch (_: Exception) {
+        }
         uploader = null
         rgbaUploadBuffer = null
         val id = textureId ?: return
         textureId = null
-        try { mc.textureManager.release(id) } catch (_: Exception) {}
+        try {
+            mc.textureManager.release(id)
+        } catch (_: Exception) {
+        }
         dynamicTexture = null
     }
 

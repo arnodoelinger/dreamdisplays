@@ -17,7 +17,9 @@ import java.time.Duration
 /**
  * GitHub version fetcher. Uses the GitHub API to fetch the latest release of the mod and plugin.
  */
-@PaperOnly @NullMarked object GitHubFetcherUtil {
+@PaperOnly
+@NullMarked
+object GitHubFetcherUtil {
     private val logger = LoggerFactory.getLogger("DreamDisplays/GitHubFetcher")
     private val gson = Gson()
     private val client: HttpClient = newHttpClient()

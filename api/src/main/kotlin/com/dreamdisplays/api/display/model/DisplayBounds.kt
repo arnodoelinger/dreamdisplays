@@ -7,7 +7,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi data class DisplayBounds(
+@DreamDisplaysUnstableApi
+data class DisplayBounds(
     /** The [x] coordinate of the display's center, in world units. */
     val x: Double,
 

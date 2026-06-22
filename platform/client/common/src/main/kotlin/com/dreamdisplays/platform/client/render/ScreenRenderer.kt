@@ -93,7 +93,15 @@ object ScreenRenderer : ClientRenderService {
             renderGpuTexture(drawQuad, displayScreen)
             stack.popPose()
         } else {
-            renderPlaceholder(stack, drawQuad, DisplayYuvRenderTypes.solidColorType(), facing, w, h, displayScreen.errored)
+            renderPlaceholder(
+                stack,
+                drawQuad,
+                DisplayYuvRenderTypes.solidColorType(),
+                facing,
+                w,
+                h,
+                displayScreen.errored
+            )
         }
     }
 

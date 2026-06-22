@@ -45,6 +45,7 @@ internal object RenderPipelineCompat {
         val depthTestFunctionClass = runCatching {
             Class.forName("com.mojang.blaze3d.platform.DepthTestFunction")
         }.getOrNull() ?: return
+
         @Suppress("UNCHECKED_CAST")
         val lequalDepth = java.lang.Enum.valueOf(depthTestFunctionClass as Class<out Enum<*>>, "LEQUAL_DEPTH_TEST")
         builderClass.getMethod("withDepthTestFunction", depthTestFunctionClass).invoke(builder, lequalDepth)
@@ -72,6 +73,7 @@ internal object RenderPipelineCompat {
 
         //? if >=26 {
         val modeClass = Class.forName("com.mojang.blaze3d.vertex.VertexFormat\$Mode")
+
         @Suppress("UNCHECKED_CAST")
         val quads = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, "QUADS")
         builderClass.getMethod("withVertexFormat", VertexFormat::class.java, modeClass)
@@ -101,6 +103,7 @@ internal object RenderPipelineCompat {
             .invoke(builder, 0, DefaultVertexFormat.POSITION_TEX_COLOR)
 
         val topologyClass = Class.forName("com.mojang.blaze3d.PrimitiveTopology")
+
         @Suppress("UNCHECKED_CAST")
         val quads = java.lang.Enum.valueOf(topologyClass as Class<out Enum<*>>, "QUADS")
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)

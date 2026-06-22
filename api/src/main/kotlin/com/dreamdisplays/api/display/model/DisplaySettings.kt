@@ -8,7 +8,8 @@ import com.dreamdisplays.media.VideoQuality
  *
  * @since 1.0.0
  */
-@DreamDisplaysUnstableApi data class DisplaySettings(
+@DreamDisplaysUnstableApi
+data class DisplaySettings(
     /** The display's volume. */
     val volume: Float = 1.0f,
 

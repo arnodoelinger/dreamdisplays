@@ -17,7 +17,9 @@ import kotlin.math.min
  */
 object RegionUtil {
     /** Computes the [RegionData] describing the axis-aligned box between [pos1] and [pos2]. */
-    @PaperOnly @NullMarked fun calculateRegion(pos1: Location, pos2: Location): RegionData {
+    @PaperOnly
+    @NullMarked
+    fun calculateRegion(pos1: Location, pos2: Location): RegionData {
         val minX = min(pos1.blockX, pos2.blockX)
         val minY = min(pos1.blockY, pos2.blockY)
         val minZ = min(pos1.blockZ, pos2.blockZ)
@@ -40,26 +42,34 @@ object RegionUtil {
     }
 
     /** Is [location] within the boundaries of [pos1] and [pos2]? */
-    @PaperOnly @NullMarked fun isInBoundaries(pos1: Location, pos2: Location, location: Location): Boolean {
+    @PaperOnly
+    @NullMarked
+    fun isInBoundaries(pos1: Location, pos2: Location, location: Location): Boolean {
         return location.world == pos1.world && location.blockX in getRange(pos1.blockX, pos2.blockX) &&
                 location.blockY in getRange(pos1.blockY, pos2.blockY) &&
                 location.blockZ in getRange(pos1.blockZ, pos2.blockZ)
     }
+
     /** Returns the inclusive integer range covering [a] and [b] regardless of order. */
-    @PaperOnly private fun getRange(a: Int, b: Int): IntRange = min(a, b)..max(a, b)
+    @PaperOnly
+    private fun getRange(a: Int, b: Int): IntRange = min(a, b)..max(a, b)
 
     /** Resolves a [ServerLevel] from a dimension key string like `"minecraft:overworld"`. */
-    @FabricOnly fun getLevelByKey(server: MinecraftServer, worldKey: String): ServerLevel? {
+    @FabricOnly
+    fun getLevelByKey(server: MinecraftServer, worldKey: String): ServerLevel? {
         val rl = runCatching { net.minecraft.resources.Identifier.parse(worldKey) }.getOrNull() ?: return null
         val key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, rl)
         return server.getLevel(key)
     }
 
     /** Returns the dimension key string (e.g. `"minecraft:overworld"`) for a given [ServerLevel]. */
-    @FabricOnly fun getLevelKey(level: ServerLevel): String = level.dimension().identifier().toString()
+    @FabricOnly
+    fun getLevelKey(level: ServerLevel): String = level.dimension().identifier().toString()
 
     /** Data class describing a region in 3D space. */
-    @PaperOnly @NullMarked data class RegionData(
+    @PaperOnly
+    @NullMarked
+    data class RegionData(
         val minX: Int,
         val minY: Int,
         val minZ: Int,

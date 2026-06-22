@@ -19,7 +19,8 @@ internal class StreamWatchdog(
 ) {
     private val logger = LoggerFactory.getLogger("DreamDisplays/StreamWatchdog")
 
-    @Volatile private var executor: ScheduledExecutorService? = null
+    @Volatile
+    private var executor: ScheduledExecutorService? = null
 
     /** Start watchdog. */
     fun start() {
@@ -38,12 +39,14 @@ internal class StreamWatchdog(
     }
 
     /** Main checker for [stallThresholdMs]. */
-    private fun check() { runCatching {
-        if (!isActive()) return
-        val silenceMs = (System.nanoTime() - getLastFrameNanos()) / 1_000_000L
-        if (silenceMs >= stallThresholdMs) {
-            logger.warn("$debugLabel No frames for ${silenceMs} ms. Restarting...")
-            onStall()
+    private fun check() {
+        runCatching {
+            if (!isActive()) return
+            val silenceMs = (System.nanoTime() - getLastFrameNanos()) / 1_000_000L
+            if (silenceMs >= stallThresholdMs) {
+                logger.warn("$debugLabel No frames for ${silenceMs} ms. Restarting...")
+                onStall()
+            }
         }
-    } }
+    }
 }

@@ -7,7 +7,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * PiP overlay, and frame pipe owns its own), so the registry exposes this factory rather than a
  * single shared uploader instance.
  */
-@DreamDisplaysUnstableApi fun interface TextureUploaderFactory {
+@DreamDisplaysUnstableApi
+fun interface TextureUploaderFactory {
     /** @param stateCache true to route GL calls through Minecraft's cached `GlStateManager`. */
     fun create(stateCache: Boolean): TextureUploader
 }

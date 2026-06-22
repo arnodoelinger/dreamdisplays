@@ -11,7 +11,8 @@ import org.bukkit.Bukkit
 /**
  * Registers event listeners.
  */
-@PaperOnly object ListenerRegistrar {
+@PaperOnly
+object ListenerRegistrar {
     /** Registers selection, protection, and player listeners with `Bukkit`. */
     fun registerListeners(plugin: Main) {
         val pm = Bukkit.getPluginManager()

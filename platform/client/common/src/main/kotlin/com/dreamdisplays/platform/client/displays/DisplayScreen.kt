@@ -92,7 +92,8 @@ class DisplayScreen(
     var isLocked: Boolean? = null
 
     /** The last media failure on this display, or `null` when healthy. */
-    @Volatile var mediaError: DreamMediaException? = null
+    @Volatile
+    var mediaError: DreamMediaException? = null
 
     /** True while a media error is active. */
     val errored: Boolean get() = mediaError != null
@@ -107,10 +108,12 @@ class DisplayScreen(
     val isSync: Boolean get() = mode == PlaybackMode.SYNCED
 
     /** Live watch-party session over this display, or null when none is running. */
-    @Volatile var watchParty: WatchPartySession? = null; internal set
+    @Volatile
+    var watchParty: WatchPartySession? = null; internal set
 
     /** Whether the local player has marked themselves ready in the current session (UI toggle state). */
-    @Volatile var localWatchPartyReady: Boolean = false; internal set
+    @Volatile
+    var localWatchPartyReady: Boolean = false; internal set
 
     /** The effective mode the player experiences — `WATCH_PARTY` while a session is live. */
     val effectiveMode: PlaybackMode get() = if (watchParty != null) PlaybackMode.WATCH_PARTY else mode
@@ -175,13 +178,15 @@ class DisplayScreen(
 
     /** [RenderType] for the loading / error color quads (differs from [renderType] in YUV mode). */
     val fallbackRenderType: RenderType? get() = textureResource.fallbackRenderType
+
     // During a quality handoff the new decoder must target the pending (new-resolution) texture,
     // not the live one — otherwise its frames never match the staged texture and the display freezes.
     val textureWidth: Int get() = if (textureResource.hasPending) textureResource.pendingWidth else textureResource.width
     val textureHeight: Int get() = if (textureResource.hasPending) textureResource.pendingHeight else textureResource.height
 
     /** Aspect ratio of the decoded video content (width / height); `0.0` until the first frame. */
-    @Volatile var videoContentAspect: Double = 0.0
+    @Volatile
+    var videoContentAspect: Double = 0.0
 
     /** User-set volume (`0.0`..`1.0`); writes apply the effective volume and persist the setting. */
     var volume: Float = savedSettings.volume
@@ -260,7 +265,8 @@ class DisplayScreen(
      *  @see [goDormant]
      *  @see [wake]
      */
-    @Volatile var isDormant: Boolean = false; private set
+    @Volatile
+    var isDormant: Boolean = false; private set
 
     /** [System.nanoTime] when the display entered warm park; used for TTL eviction. */
     private var dormantSinceNanos = 0L
@@ -277,7 +283,8 @@ class DisplayScreen(
     private var clientUrlOverride: Boolean = false
 
     /** Cached [BlockPos] for the anchor, lazily rebuilt when [x]/[y]/[z] change. */
-    @Transient private var blockPos: BlockPos? = null
+    @Transient
+    private var blockPos: BlockPos? = null
 
     /**
      * True once at least one decoded frame has been uploaded to the live texture. Keeps the screen
@@ -285,13 +292,19 @@ class DisplayScreen(
      * frame — most importantly during a quality handoff, while the new-resolution pipe spins up.
      * Reset by [createTexture] (full reallocation: new video, resize, backend restart).
      */
-    @Transient @Volatile private var hasEverRendered = false
+    @Transient
+    @Volatile
+    private var hasEverRendered = false
 
     /** [System.nanoTime] of the first uploaded frame, driving the appear fade-in. `0` = none yet. */
-    @Transient @Volatile private var firstFrameNanos = 0L
+    @Transient
+    @Volatile
+    private var firstFrameNanos = 0L
 
     /** True while waiting for the server's first timeline before showing the video (Synced / Broadcast / WP). */
-    @Transient @Volatile private var waitingForInitialTimeline = false
+    @Transient
+    @Volatile
+    private var waitingForInitialTimeline = false
 
     /** Audio track / language of the current video, or `null` when idle. */
     var lang: String? = null; private set
@@ -533,6 +546,7 @@ class DisplayScreen(
         when (state) {
             WatchPartySessionState.PLAYING, WatchPartySessionState.PAUSED ->
                 timelineFollower.apply(packet.positionMs, packet.serverTimeMs, packet.paused, loop = false)
+
             else -> if (!isPaused && videoStarted) applyServerPaused(true)
         }
     }
@@ -659,6 +673,7 @@ class DisplayScreen(
             PlaybackMode.SYNCED -> Initializer.sendPacket(PlaybackCommand(uuid, action.wire, positionMs))
             PlaybackMode.WATCH_PARTY -> if (watchParty?.isHost == true)
                 Initializer.sendPacket(WatchPartyControl(uuid, action.toWatchPartyAction().wire, positionMs))
+
             else -> {}
         }
     }

@@ -82,7 +82,8 @@ object TextureUploadUtil {
                 )
                 .invokeOrThrowTarget(encoder, texture, pixels, format, 0, 0, 0, 0, w, h)
             return
-        } catch (_: NoSuchMethodException) {}
+        } catch (_: NoSuchMethodException) {
+        }
 
         encoderClass
             .getMethod(

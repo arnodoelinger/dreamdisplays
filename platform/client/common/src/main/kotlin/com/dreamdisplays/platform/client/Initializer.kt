@@ -98,8 +98,8 @@ object Initializer {
     /** Renders all active PiP overlays on the HUD when the player is in-world and no screen is open. */
     //? if >=26 {
     fun onRenderHud(mc: Minecraft, graphics: GuiGraphicsExtractor, partialTick: Float) {
-    //?} else
-    /*fun onRenderHud(mc: Minecraft, graphics: GuiGraphics, partialTick: Float) {*/
+        //?} else
+        /*fun onRenderHud(mc: Minecraft, graphics: GuiGraphics, partialTick: Float) {*/
         if (mc.level == null || mc.player == null) return
         if (MinecraftScreenUtil.currentScreen(mc) != null) return
         DreamServices.registry.getOrNull<OverlayManager>()

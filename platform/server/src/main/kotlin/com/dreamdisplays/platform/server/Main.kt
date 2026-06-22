@@ -56,7 +56,9 @@ import kotlin.time.Duration.Companion.milliseconds
  *
  * @see <a href="https://github.com/arsmotorin/OFRAT">OFRAT</a>
  */
-@PaperOnly @NullMarked class Main : JavaPlugin() {
+@PaperOnly
+@NullMarked
+class Main : JavaPlugin() {
     /** Storage manager for persistent data. */
     lateinit var storage: StorageManager
 
@@ -145,7 +147,8 @@ import kotlin.time.Duration.Companion.milliseconds
  * `Fabric`-specific implementation of [Main].
  */
 @Suppress("UNUSED")
-@FabricOnly class Server : ModInitializer {
+@FabricOnly
+class Server : ModInitializer {
     /**
      * Initializes the server-side mod. It registers all necessary event listeners, packet handlers, and commands.
      * Also sets up repeating tasks for display updates and update checking.
@@ -289,10 +292,12 @@ import kotlin.time.Duration.Companion.milliseconds
         }
 
         /** Latest mod version from GitHub (populated by updater). */
-        @Volatile var modLatestVersion: Semver? = null
+        @Volatile
+        var modLatestVersion: Semver? = null
 
         /** Latest plugin version string from GitHub (populated by updater). */
-        @Volatile var pluginLatestVersion: String? = null
+        @Volatile
+        var pluginLatestVersion: String? = null
 
         private lateinit var configInstance: FabricConfig
         private var serverInstance: MinecraftServer? = null
@@ -312,7 +317,7 @@ import kotlin.time.Duration.Companion.milliseconds
                 .onSuccess {
                     logger.info(
                         "Migrated displays from legacy global DB to per-world DB at ${newDb.absolutePath}. " +
-                        "The old file at ${oldDb.absolutePath} can be deleted once all worlds have been started at least once."
+                                "The old file at ${oldDb.absolutePath} can be deleted once all worlds have been started at least once."
                     )
                 }
                 .onFailure { logger.error("Failed to migrate global DB to ${newDb.absolutePath}.", it) }

@@ -55,7 +55,8 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
         }
-        val w = frame.width; val h = frame.height
+        val w = frame.width;
+        val h = frame.height
         val buf = ByteBuffer.wrap(frame.data)
         if (w != managedTexW || h != managedTexH) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)

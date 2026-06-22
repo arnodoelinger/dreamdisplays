@@ -12,7 +12,8 @@ import kotlin.time.Duration
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi interface PlaybackService {
+@DreamDisplaysUnstableApi
+interface PlaybackService {
     /** Plays the video for [displayId]. */
     fun play(displayId: DisplayId)
 

@@ -33,7 +33,8 @@ import java.util.*
  * to the display the player is looking at, after validating ownership.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class VideoCommand : SubCommand {
+@PaperOnly
+class VideoCommand : SubCommand {
     override val name = "video"
     override val permission = Main.config.permissions.video
     override val playerOnly = true
@@ -76,7 +77,7 @@ import java.util.*
         val wasSync = data.isSync
         data.apply {
             url = if ("/shorts/" in (args[1] ?: "")) "https://www.youtube.com/shorts/$code"
-                  else "https://www.youtube.com/watch?v=$code"
+            else "https://www.youtube.com/watch?v=$code"
             lang = normalizeLangCode(args.getOrNull(2).orEmpty())
         }
 
@@ -135,7 +136,8 @@ import java.util.*
  * `Fabric`-specific implementation of the `/display video` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricVideoCommand {
+@FabricOnly
+object FabricVideoCommand {
     /** Assigns a YouTube URL (and optional language) to the targeted display, after validating ownership. */
     fun execute(ctx: CommandContext<CommandSourceStack>, urlAndLang: String): Int {
         val player = ctx.source.entity as? ServerPlayer
@@ -170,7 +172,7 @@ import java.util.*
 
         val wasSync = data.isSync
         data.url = if ("/shorts/" in urlRaw) "https://www.youtube.com/shorts/$code"
-                   else "https://www.youtube.com/watch?v=$code"
+        else "https://www.youtube.com/watch?v=$code"
         data.lang = normalizeLangCode(langRaw)
         ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
 

@@ -21,7 +21,8 @@ import java.util.UUID
  */
 
 /** Client -> server hello; replaces the legacy `version` packet and advertises capabilities. */
-@Serializable data class ClientHello(
+@Serializable
+data class ClientHello(
     @ProtoNumber(1) val protocolVersion: Int = ProtocolVersion.CURRENT,
     @ProtoNumber(2) val modVersion: String = "",
     @ProtoNumber(3) val supportsPopout: Boolean = false,
@@ -53,7 +54,8 @@ import java.util.UUID
  * `report_enabled` flags. Re-sent in full whenever any flag changes — the client replaces its
  * snapshot wholesale. Field number 5 is retired (was `displaysEnabled`, now [SetDisplaysEnabled]).
  */
-@Serializable data class ServerHello(
+@Serializable
+data class ServerHello(
     @ProtoNumber(1) val protocolVersion: Int = ProtocolVersion.CURRENT,
     @ProtoNumber(2) val isPremium: Boolean = false,
     @ProtoNumber(3) val isAdmin: Boolean = false,
@@ -63,7 +65,8 @@ import java.util.UUID
 ) : DreamPacket
 
 /** Full description of a single display. */
-@Serializable data class DisplayInfo(
+@Serializable
+data class DisplayInfo(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val ownerId: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(3) @ProtoType(ProtoIntegerType.SIGNED) val x: Int = 0,
@@ -83,7 +86,8 @@ import java.util.UUID
 ) : DreamPacket
 
 /** Removes a display (server broadcast) or requests its deletion (client action). */
-@Serializable data class DisplayDelete(
+@Serializable
+data class DisplayDelete(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
 ) : DreamPacket
 
@@ -95,7 +99,8 @@ import java.util.UUID
  * Still travels in both directions for frozen-v1 compatibility, but v2 clients no longer report
  * their own clock here — they send intents via [PlaybackCommand] and the server owns the timeline.
  */
-@Serializable data class DisplaySync(
+@Serializable
+data class DisplaySync(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val isSync: Boolean = false,
     @ProtoNumber(3) val isPaused: Boolean = false,
@@ -107,25 +112,29 @@ import java.util.UUID
 ) : DreamPacket
 
 /** Client asks the server for the authoritative playback state of a display. */
-@Serializable data class RequestSync(
+@Serializable
+data class RequestSync(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
 ) : DreamPacket
 
 /** Client applies a new media URL / audio language to a display. */
-@Serializable data class SetVideo(
+@Serializable
+data class SetVideo(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val url: String = "",
     @ProtoNumber(3) val lang: String = "",
 ) : DreamPacket
 
 /** Client toggles the locked flag of a display it owns. */
-@Serializable data class SetLocked(
+@Serializable
+data class SetLocked(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val locked: Boolean = true,
 ) : DreamPacket
 
 /** Client reports a display to the server's configured webhook. */
-@Serializable data class ReportDisplay(
+@Serializable
+data class ReportDisplay(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
 ) : DreamPacket
 
@@ -133,12 +142,14 @@ import java.util.UUID
  * Display rendering toggle: client -> server persists the player's preference; server -> client
  * forces the toggle (admin `/display on|off` commands), mirroring the legacy `display_enabled` channel.
  */
-@Serializable data class SetDisplaysEnabled(
+@Serializable
+data class SetDisplaysEnabled(
     @ProtoNumber(1) val enabled: Boolean = true,
 ) : DreamPacket
 
 /** Server tells the client to evict the listed displays from local caches. */
-@Serializable data class ClearCache(
+@Serializable
+data class ClearCache(
     @ProtoNumber(1) val ids: List<@Serializable(UuidSerializer::class) UUID> = emptyList(),
 ) : DreamPacket
 
@@ -147,21 +158,24 @@ import java.util.UUID
  * edit, or a watch-party host). The server validates permission, updates its clock, and rebroadcasts
  * the new [DisplaySync]. [action] is a [PlaybackAction.wire]; [positionMs] is used by `SEEK`.
  */
-@Serializable data class PlaybackCommand(
+@Serializable
+data class PlaybackCommand(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val action: Int = 0,
     @ProtoNumber(3) val positionMs: Long = 0,
 ) : DreamPacket
 
 /** Client sets a display's persistent base mode; [mode] is a [PlaybackMode.wire] (not `WATCH_PARTY`). */
-@Serializable data class SetMode(
+@Serializable
+data class SetMode(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val mode: Int = 0,
     @ProtoNumber(3) val positionMs: Long = -1,
 ) : DreamPacket
 
 /** Client starts a watch-party session on a display, becoming its host (display must be unlocked, or owner). */
-@Serializable data class WatchPartyStart(
+@Serializable
+data class WatchPartyStart(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val url: String = "",
     @ProtoNumber(3) val lang: String = "",
@@ -171,7 +185,8 @@ import java.util.UUID
  * Participant readiness ([WatchPartyAction.READY]/[WatchPartyAction.UNREADY], any nearby player) or
  * host control (everything else) for an active session. [positionMs] is used by `SEEK`.
  */
-@Serializable data class WatchPartyControl(
+@Serializable
+data class WatchPartyControl(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val action: Int = 0,
     @ProtoNumber(3) val positionMs: Long = 0,
@@ -182,7 +197,8 @@ import java.util.UUID
  * [state] is a [WatchPartySessionState.wire]; [positionMs] is the timeline position as of
  * [serverTimeMs]; [countdownStartEpochMs] is the shared instant `COUNTDOWN` resolves to `PLAYING`.
  */
-@Serializable data class WatchPartyState(
+@Serializable
+data class WatchPartyState(
     @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
     @ProtoNumber(2) val sessionId: String = "",
     @ProtoNumber(3) val state: Int = 0,

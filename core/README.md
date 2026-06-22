@@ -1,13 +1,17 @@
 # Core
 
-Internal domain implementation for Dream Displays. `core` knows product rules, but it does not know Minecraft loader-specific APIs.
+Internal domain implementation for Dream Displays. `core` knows product rules, but it does not know Minecraft
+loader-specific APIs.
 
 ## Contents
 
-- Service implementations of the public `api` contracts: `DefaultDisplayService`, `DefaultPlaybackService`, `DefaultWatchPartyService`
-- Internal display ports: `DisplaySystem` / `DefaultDisplaySystem`, `DisplayLookup`, `DisplayMutationPort`, `DisplayCommandExecutor`
+- Service implementations of the public `api` contracts: `DefaultDisplayService`, `DefaultPlaybackService`,
+  `DefaultWatchPartyService`
+- Internal display ports: `DisplaySystem` / `DefaultDisplaySystem`, `DisplayLookup`, `DisplayMutationPort`,
+  `DisplayCommandExecutor`
 - Playback / watch-party ports and logic: `PlaybackPort`, `WatchPartyPort`, `PlaybackPermissions`, `Timeline`
-- Protocol v2 wire layer: `DreamPacket`, `Packets`, `PacketRegistry`, `ProtocolVersion`, `TimelineWire`, `UuidSerializer`
+- Protocol v2 wire layer: `DreamPacket`, `Packets`, `PacketRegistry`, `ProtocolVersion`, `TimelineWire`,
+  `UuidSerializer`
 - Storage models: `DisplayStorage`, `FullDisplayData`
 - Security policies / guards: `MediaUrlPolicy`, `MediaHostGuard`
 

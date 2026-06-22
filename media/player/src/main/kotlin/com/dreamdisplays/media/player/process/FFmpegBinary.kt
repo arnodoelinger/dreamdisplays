@@ -18,7 +18,8 @@ object FFmpegBinary {
     private const val CACHE_ROOT = "./dreamdisplays/ffmpeg"
     private const val BTBN_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
 
-    @Volatile private var cachedPath: String? = null
+    @Volatile
+    private var cachedPath: String? = null
 
     /** Returns the path to a usable `FFmpeg` binary, resolving and caching it on the first call. */
     fun getPath(): String? {
@@ -193,15 +194,35 @@ object FFmpegBinary {
         val isArm = OsInfo.isArm
         return when {
             OsInfo.isWindows -> if (isArm) null else
-                Platform("windows-x64", "$BTBN_BASE/ffmpeg-master-latest-win64-gpl.zip", "ffmpeg.exe", "/bin/ffmpeg.exe", false)
+                Platform(
+                    "windows-x64",
+                    "$BTBN_BASE/ffmpeg-master-latest-win64-gpl.zip",
+                    "ffmpeg.exe",
+                    "/bin/ffmpeg.exe",
+                    false
+                )
+
             OsInfo.isMac -> if (isArm)
                 Platform("macos-aarch64", "https://www.osxexperts.net/ffmpeg71arm.zip", "ffmpeg", "ffmpeg", false)
             else
                 Platform("macos-x64", "https://evermeet.cx/ffmpeg/getrelease/zip", "ffmpeg", "ffmpeg", false)
+
             else -> if (isArm)
-                Platform("linux-aarch64", "$BTBN_BASE/ffmpeg-master-latest-linuxarm64-gpl.tar.xz", "ffmpeg", "/bin/ffmpeg", true)
+                Platform(
+                    "linux-aarch64",
+                    "$BTBN_BASE/ffmpeg-master-latest-linuxarm64-gpl.tar.xz",
+                    "ffmpeg",
+                    "/bin/ffmpeg",
+                    true
+                )
             else
-                Platform("linux-x64", "$BTBN_BASE/ffmpeg-master-latest-linux64-gpl.tar.xz", "ffmpeg", "/bin/ffmpeg", true)
+                Platform(
+                    "linux-x64",
+                    "$BTBN_BASE/ffmpeg-master-latest-linux64-gpl.tar.xz",
+                    "ffmpeg",
+                    "/bin/ffmpeg",
+                    true
+                )
         }
     }
 

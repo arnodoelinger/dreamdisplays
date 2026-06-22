@@ -10,8 +10,10 @@ val activeStonecutterVersion = rootProject.file("versions/active.txt").readText(
 val stonecutterVersions = Properties().apply {
     rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
 }
+
 fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
     ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+
 val isLegacyObfuscatedMinecraft = scVersion("minecraft.version").startsWith("1.")
 
 if (isLegacyObfuscatedMinecraft) {
@@ -75,7 +77,8 @@ tasks.processResources {
     val projectVersion = version.toString()
     val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
     val stonecutterVersions = Properties().apply {
-        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream()
+            .use { input -> load(input) }
     }
     val props = mapOf(
         "version" to projectVersion,

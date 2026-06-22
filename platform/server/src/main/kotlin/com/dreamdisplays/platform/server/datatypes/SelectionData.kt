@@ -33,7 +33,9 @@ interface SelectionData {
  * @property pos2 Opposite corner of the selected area.
  * @property isReady Boolean indicating if the selection is complete.
  */
-@PaperOnly @NullMarked class PaperSelectionData(player: Player) : SelectionData {
+@PaperOnly
+@NullMarked
+class PaperSelectionData(player: Player) : SelectionData {
     var pos1: Location? = null
     var pos2: Location? = null
     override var isReady: Boolean = false
@@ -99,7 +101,8 @@ interface SelectionData {
 /**
  * `Fabric`-specific implementation of [SelectionData].
  */
-@FabricOnly class FabricSelectionData : SelectionData {
+@FabricOnly
+class FabricSelectionData : SelectionData {
     var pos1: BlockPos? = null
     var pos2: BlockPos? = null
     var worldKey: String? = null

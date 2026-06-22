@@ -12,7 +12,8 @@ import kotlinx.serialization.protobuf.ProtoNumber
 import kotlin.reflect.KClass
 
 /** Wire frame for the `dreamdisplays:v2` channel: a type id plus the encoded packet bytes. */
-@Serializable data class Envelope(
+@Serializable
+data class Envelope(
     @ProtoNumber(1) val type: Int = 0,
     @ProtoNumber(2) val payload: ByteArray = ByteArray(0),
 ) {
@@ -69,6 +70,7 @@ object PacketRegistry {
     /** Encodes [packet] into envelope bytes ready for the `dreamdisplays:v2` channel. */
     fun encode(packet: DreamPacket): ByteArray {
         val entry = entryOf(packet)
+
         @Suppress("UNCHECKED_CAST")
         val payload = proto.encodeToByteArray(entry.serializer as KSerializer<DreamPacket>, packet)
         return proto.encodeToByteArray(Envelope.serializer(), Envelope(entry.id, payload))

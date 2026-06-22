@@ -14,8 +14,10 @@ internal class VolumeController(
     initialVolume: Double,
     private val applyVolume: (Double) -> Unit,
 ) {
-    @Volatile private var userVolume = initialVolume
-    @Volatile private var lastAttenuation = 1.0
+    @Volatile
+    private var userVolume = initialVolume
+    @Volatile
+    private var lastAttenuation = 1.0
 
     /** Sets the user-controlled volume (clamped to 0.0-2.0) and re-applies the effective value. */
     fun setUserVolume(volume: Float) {

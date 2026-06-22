@@ -18,7 +18,9 @@ import java.nio.file.StandardCopyOption
 /**
  * Manages the configuration of the plugin.
  */
-@PaperOnly @NullMarked class Config(private val plugin: Main) {
+@PaperOnly
+@NullMarked
+class Config(private val plugin: Main) {
     /** The plugin's configuration file. */
     private val configFile = File(plugin.dataFolder, "config.toml")
 
@@ -378,7 +380,8 @@ import java.nio.file.StandardCopyOption
  * for materials and does not depend on `Bukkit`.
  */
 @Deprecated("Fabric config will be merged with Paper config in the future.")
-@FabricOnly class FabricConfig { // TODO: merge
+@FabricOnly
+class FabricConfig { // TODO: merge
     private val logger = LoggerFactory.getLogger("DreamDisplays/ServerConfig")
 
     private val configDir: File = FabricLoader.getInstance().configDir.resolve("dreamdisplays").toFile()

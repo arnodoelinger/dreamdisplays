@@ -20,10 +20,12 @@ import java.net.http.HttpClient
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
 import java.time.Duration
+
 /**
  * Checks for updates of the `Paper` plugin and mod from GitHub releases.
  */
-@PaperOnly object Updater {
+@PaperOnly
+object Updater {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
 
@@ -71,7 +73,8 @@ import java.time.Duration
 /**
  * `Fabric`-specific implementation of [Updater].
  */
-@FabricOnly object FabricUpdater {
+@FabricOnly
+object FabricUpdater {
     private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
     private val gson = Gson()
     private val client: HttpClient = HttpClient.newHttpClient()

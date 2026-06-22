@@ -11,7 +11,8 @@ import java.util.UUID
  * `DisplayScreen`. The platform layer implements this; the player reads playback-relevant state and
  * signals render-side transitions through it.
  */
-@DreamDisplaysUnstableApi interface PlaybackHost {
+@DreamDisplaysUnstableApi
+interface PlaybackHost {
     /** Stable identifier of this display, used for log labels. */
     val uuid: UUID
 

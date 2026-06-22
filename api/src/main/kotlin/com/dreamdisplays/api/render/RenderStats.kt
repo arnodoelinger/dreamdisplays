@@ -3,7 +3,8 @@ package com.dreamdisplays.api.render
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Rolling render and texture-upload counters for display diagnostics. */
-@DreamDisplaysUnstableApi data class RenderStats(
+@DreamDisplaysUnstableApi
+data class RenderStats(
     /** Frames decoded per second. */
     val decodedFps: Float,
 

@@ -34,7 +34,8 @@ enum class FacingUtil {
 
     companion object {
         /** Deserializes a facing from [data] byte; throws [IllegalArgumentException] for out-of-range values. */
-        @JvmStatic fun fromPacket(data: Byte): FacingUtil {
+        @JvmStatic
+        fun fromPacket(data: Byte): FacingUtil {
             val values = entries
             require(data in values.indices) { "Invalid facing ID: $data." }
             return values[data.toInt()]

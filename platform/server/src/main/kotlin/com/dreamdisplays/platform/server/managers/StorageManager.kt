@@ -51,7 +51,8 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
  * SQL-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
  * objects and writes updates from managers back to SQLite or MySQL through Exposed / Hikari.
  */
-@NullMarked class StorageManager(
+@NullMarked
+class StorageManager(
     type: String,
     dataDir: File,
     tablePrefix: String = "",
@@ -97,27 +98,32 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     fun disconnect() = dataSource.close()
 
     /** Load all displays from the database, returning a list of [DisplayData] objects. */
-    @PaperOnly fun loadAllPaperDisplays(): List<PaperDisplayData> = transaction(db) {
+    @PaperOnly
+    fun loadAllPaperDisplays(): List<PaperDisplayData> = transaction(db) {
         table.selectAll().mapNotNull(::rowToPaper)
     }
 
     /** Upserts the full row for [data] into the displays table. */
-    @PaperOnly fun saveDisplay(data: PaperDisplayData) {
+    @PaperOnly
+    fun saveDisplay(data: PaperDisplayData) {
         val worldName = data.pos1.world?.name ?: run {
             logger.error("Cannot save display ${data.id}: world is null.")
             return
         }
-        upsert(data, worldName,
+        upsert(
+            data, worldName,
             packPos(data.pos1.blockX, data.pos1.blockY, data.pos1.blockZ),
             packPos(data.pos2.blockX, data.pos2.blockY, data.pos2.blockZ),
-            packFacing(data.facing.ordinal, data.rotation))
+            packFacing(data.facing.ordinal, data.rotation)
+        )
     }
 
     /** Deletes the display with the given [data] from the displays table. */
     fun deleteDisplay(data: DisplayData) = delete(data.id)
 
     /** Converts a row from the displays table into a [PaperDisplayData] object, or null if the row */
-    @PaperOnly private fun rowToPaper(row: ResultRow): PaperDisplayData? {
+    @PaperOnly
+    private fun rowToPaper(row: ResultRow): PaperDisplayData? {
         val id = row[table.id].toUUID()
         val worldName = row[table.world]
         val world = Bukkit.getWorld(worldName)
@@ -141,20 +147,25 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     }
 
     /** Load all displays from the database, returning a list of [FabricDisplayData] objects. */
-    @FabricOnly fun loadAllFabricDisplays(): List<FabricDisplayData> = transaction(db) {
+    @FabricOnly
+    fun loadAllFabricDisplays(): List<FabricDisplayData> = transaction(db) {
         table.selectAll().mapNotNull(::rowToFabric)
     }
 
     /** Upserts the full row for [data] into the displays table. */
-    @FabricOnly fun saveDisplay(data: FabricDisplayData) {
-        upsert(data, data.worldKey,
+    @FabricOnly
+    fun saveDisplay(data: FabricDisplayData) {
+        upsert(
+            data, data.worldKey,
             packPos(data.pos1.x, data.pos1.y, data.pos1.z),
             packPos(data.pos2.x, data.pos2.y, data.pos2.z),
-            packFacing(DIRECTION_TO_ORDINAL.getValue(data.facing), data.rotation))
+            packFacing(DIRECTION_TO_ORDINAL.getValue(data.facing), data.rotation)
+        )
     }
 
     /** Converts a row from the displays table into a [FabricDisplayData] object. */
-    @FabricOnly private fun rowToFabric(row: ResultRow): FabricDisplayData {
+    @FabricOnly
+    private fun rowToFabric(row: ResultRow): FabricDisplayData {
         val (x1, y1, z1) = unpackPos(row[table.pos1])
         val (x2, y2, z2) = unpackPos(row[table.pos2])
         val (w, h) = unpackInts(row[table.size])

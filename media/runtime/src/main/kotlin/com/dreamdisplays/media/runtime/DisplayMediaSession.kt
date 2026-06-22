@@ -89,6 +89,7 @@ internal class DisplayMediaSession(
     private fun DisplayEvent.toSessionEvent(): MediaSessionEvent? = when (this) {
         is DisplayEvent.StateChanged ->
             MediaSessionEvent.StateChanged(previous.toSessionState(), current.toSessionState())
+
         is DisplayEvent.MediaError -> MediaSessionEvent.Error(cause)
         is DisplayEvent.Removed -> MediaSessionEvent.Ended
         else -> null

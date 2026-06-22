@@ -4,7 +4,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.media.DreamMediaException
 
 /** Lifecycle state of a media session, from idle / resolving through active playback and teardown. */
-@DreamDisplaysUnstableApi sealed interface MediaSessionState {
+@DreamDisplaysUnstableApi
+sealed interface MediaSessionState {
     /** No media is currently loaded. */
     data object Idle : MediaSessionState
 

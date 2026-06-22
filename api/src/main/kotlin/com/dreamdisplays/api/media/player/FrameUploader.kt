@@ -11,7 +11,8 @@ import java.nio.ByteBuffer
  *
  * All methods are called on the render thread.
  */
-@DreamDisplaysUnstableApi interface FrameUploader {
+@DreamDisplaysUnstableApi
+interface FrameUploader {
     /** True when uploads should proceed (e.g. the game window is not minimized). */
     fun canUpload(): Boolean
 
@@ -32,6 +33,7 @@ import java.nio.ByteBuffer
 }
 
 /** Creates a fresh [FrameUploader] for one decode channel. */
-@DreamDisplaysUnstableApi fun interface FrameUploaderFactory {
+@DreamDisplaysUnstableApi
+fun interface FrameUploaderFactory {
     fun create(): FrameUploader
 }

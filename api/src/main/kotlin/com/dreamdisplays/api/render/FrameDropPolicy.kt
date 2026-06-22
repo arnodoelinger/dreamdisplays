@@ -9,7 +9,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi enum class FrameDropPolicy {
+@DreamDisplaysUnstableApi
+enum class FrameDropPolicy {
     /** Never drop; every decoded frame is uploaded even if it adds latency. */
     NEVER,
 

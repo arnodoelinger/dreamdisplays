@@ -14,7 +14,8 @@ import com.dreamdisplays.platform.server.utils.PlatformUtil
 /**
  * Manages the registration of scheduled tasks.
  */
-@PaperOnly object SchedulerRegistrar {
+@PaperOnly
+object SchedulerRegistrar {
     /** The interval between display updates in ticks. */
     private const val TICKS_PER_SECOND = 20L
 

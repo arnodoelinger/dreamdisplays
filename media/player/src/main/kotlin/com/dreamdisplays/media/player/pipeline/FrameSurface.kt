@@ -36,10 +36,13 @@ internal class FrameSurface(
     }
 
     /** Pool retention cap; raised by the prebuffer so its in-flight buffers are reused, not churned. */
-    @Volatile private var maxReusableBuffers = MAX_REUSABLE_FRAME_BUFFERS
+    @Volatile
+    private var maxReusableBuffers = MAX_REUSABLE_FRAME_BUFFERS
 
     /** Raises the reusable-buffer pool size (used when a [FramePrebuffer] keeps many frames in flight). */
-    fun setMaxReusableBuffers(n: Int) { maxReusableBuffers = n.coerceAtLeast(MAX_REUSABLE_FRAME_BUFFERS) }
+    fun setMaxReusableBuffers(n: Int) {
+        maxReusableBuffers = n.coerceAtLeast(MAX_REUSABLE_FRAME_BUFFERS)
+    }
 
     private val readyBufferRef = AtomicReference<ByteBuffer?>(null)
     private val textureReady = AtomicBoolean(false)

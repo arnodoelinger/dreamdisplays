@@ -11,7 +11,8 @@ import com.dreamdisplays.api.display.model.DisplaySettings
  * and forward mutations to the authoritative side, which validates ownership / permissions and
  * emits [DisplayEvent] updates.
  */
-@DreamDisplaysUnstableApi interface DisplayService {
+@DreamDisplaysUnstableApi
+interface DisplayService {
     /** Returns the latest known display snapshot for [id], or null when absent. */
     fun getDisplay(id: DisplayId): Display?
 

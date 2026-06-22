@@ -64,8 +64,10 @@ object YtDlp {
     private val cookies = YtCookieManager()
 
     private val formatMemo = AsyncMemo<String, List<YtStream>>(200, CACHE_TTL_MS, DreamCoroutines.clientIo, "fetch")
-    private val searchMemo = AsyncMemo<String, List<MediaSearchResult>>(100, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "search")
-    private val relatedMemo = AsyncMemo<String, List<MediaSearchResult>>(200, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "related")
+    private val searchMemo =
+        AsyncMemo<String, List<MediaSearchResult>>(100, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "search")
+    private val relatedMemo =
+        AsyncMemo<String, List<MediaSearchResult>>(200, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "related")
 
     /**
      * Returns the stream list for [videoUrl], hitting the in-memory cache, then disk cache, then running `yt-dlp`.
@@ -261,7 +263,11 @@ object YtDlp {
      * immediately and the still-running losers are killed; otherwise, once every client finishes,
      * [bestResult] picks the strongest result. Returns null when every client failed.
      */
-    private suspend fun raceParallel(videoUrl: String, clients: List<String?>, onProcess: (Process) -> Unit): List<YtStream>? {
+    private suspend fun raceParallel(
+        videoUrl: String,
+        clients: List<String?>,
+        onProcess: (Process) -> Unit
+    ): List<YtStream>? {
         val processes = CopyOnWriteArrayList<Process>()
         val results = CopyOnWriteArrayList<List<YtStream>>()
         val winner = CompletableDeferred<List<YtStream>>()
@@ -278,7 +284,12 @@ object YtDlp {
                     if (streams.isNotEmpty()) results.add(streams)
                     if (YtStreams.offersQualityLadder(streams)) winner.complete(streams)
                 } catch (e: Exception) {
-                    logger.debug("yt-dlp client {} failed for {}: {}", client ?: "cookies", videoUrl, e.message?.take(200))
+                    logger.debug(
+                        "yt-dlp client {} failed for {}: {}",
+                        client ?: "cookies",
+                        videoUrl,
+                        e.message?.take(200)
+                    )
                 } finally {
                     if (remaining.decrementAndGet() == 0) winner.complete(bestResult(results))
                 }

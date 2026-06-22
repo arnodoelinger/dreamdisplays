@@ -27,14 +27,17 @@ import org.jspecify.annotations.NullMarked
  * vanilla clients.
  */
 @Suppress("UNUSED")
-@PaperOnly @NullMarked class PlayerListener : Listener {
+@PaperOnly
+@NullMarked
+class PlayerListener : Listener {
     private var hasValidatedWorld = false
 
     /**
      * On the first join after startup, validates all stored displays once. Also schedules a delayed
      * `modRequired` message for vanilla clients when mod detection is enabled.
      */
-    @EventHandler fun onPlayerJoin(event: PlayerJoinEvent) {
+    @EventHandler
+    fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
         Scheduler.trackPlayer(player)
 
@@ -61,7 +64,8 @@ import org.jspecify.annotations.NullMarked
     }
 
     /** Drops cached per-player state when a player disconnects. */
-    @EventHandler fun onPlayerLeave(event: PlayerQuitEvent) {
+    @EventHandler
+    fun onPlayerLeave(event: PlayerQuitEvent) {
         PlayerManager.removeVersion(event.player)
         V2PlayerTracker.clear(event.player.uniqueId)
         WatchPartyManager.onPlayerQuit(event.player.uniqueId)
@@ -73,7 +77,8 @@ import org.jspecify.annotations.NullMarked
 /**
  * `Fabric` specific implementation of [PlayerListener].
  */
-@FabricOnly object FabricPlayerListener {
+@FabricOnly
+object FabricPlayerListener {
     private var hasValidatedWorld = false
 
     /**

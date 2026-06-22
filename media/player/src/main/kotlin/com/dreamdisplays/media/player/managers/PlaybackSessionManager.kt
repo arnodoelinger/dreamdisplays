@@ -87,15 +87,20 @@ internal class PlaybackSessionManager(
     private inner class VideoChannel {
         val nativePipe: NativeVideoFramePipe? =
             if (NativeMedia.isAvailable) NativeVideoFramePipe(debugLabel, uploaderFactory, gpuYuvActive) else null
-        private val jvmPipe: VideoFramePipe? = if (nativePipe == null) VideoFramePipe(debugLabel, uploaderFactory) else null
+        private val jvmPipe: VideoFramePipe? =
+            if (nativePipe == null) VideoFramePipe(debugLabel, uploaderFactory) else null
         val pipe: FramePipe = nativePipe ?: jvmPipe!!
 
-        @Volatile var process: Process? = null
-        @Volatile var thread: Thread? = null
+        @Volatile
+        var process: Process? = null
+
+        @Volatile
+        var thread: Thread? = null
 
         /** True when this channel decodes via the in-process libav path — the only path that supports a
          *  warm park (the others use an external `FFmpeg` process / pipe). */
-        @Volatile var inProcess = false
+        @Volatile
+        var inProcess = false
             private set
         val stop = AtomicBoolean()
 
@@ -126,7 +131,8 @@ internal class PlaybackSessionManager(
             }
             if (nativePipe != null) {
                 val nv12 = NativeMedia.nv12Enabled
-                val transport = if (nv12) MediaProcess.VideoTransport.RAW_NV12 else MediaProcess.VideoTransport.RAW_RGB24
+                val transport =
+                    if (nv12) MediaProcess.VideoTransport.RAW_NV12 else MediaProcess.VideoTransport.RAW_RGB24
                 val args = MediaProcess.videoArgs(ffmpeg, safeUrl, w, h, offsetNanos, hwAccel, transport)
                 val vt = nativePipe.start(
                     args = args, w = w, h = h, nv12 = nv12, seekOffsetNanos = offsetNanos, sourceFps = fps,
@@ -161,7 +167,8 @@ internal class PlaybackSessionManager(
 
     /** The single-line reappearance bridge audio session (cached prelude -> live PCM on one line) while it
      *  is still playing its prelude, before the live process is attached and it moves into [audioHalf]. */
-    @Volatile private var bridgeAudio: AudioHalf? = null
+    @Volatile
+    private var bridgeAudio: AudioHalf? = null
 
     /** When true, the live video + audio reader threads idle in place, keeping their decoder / line open
      *  so a returning display resumes instantly ([suspend] / [resume]). Reset false on every fresh start. */
@@ -174,10 +181,14 @@ internal class PlaybackSessionManager(
 
     /** Guards the live/incoming channel transitions across the control, render, and reader threads. */
     private val switchLock = Any()
-    @Volatile private var active: VideoChannel? = null
-    @Volatile private var incoming: VideoChannel? = null
-    @Volatile private var incomingGeneration: Long = 0L
-    @Volatile private var audioHalf: AudioHalf? = null
+    @Volatile
+    private var active: VideoChannel? = null
+    @Volatile
+    private var incoming: VideoChannel? = null
+    @Volatile
+    private var incomingGeneration: Long = 0L
+    @Volatile
+    private var audioHalf: AudioHalf? = null
 
     /** Fallback timestamp source when no channel is live (the watchdog guards against reading it then). */
     private val noFrames = AtomicLong(0)
@@ -189,10 +200,11 @@ internal class PlaybackSessionManager(
      * reaches the edge — the handoff has no forward jump and no drop-storm. On the live channel's first
      * frame the clock is rebased to the edge and this is lifted to [Long.MAX_VALUE]. Default disables it.
      */
-    @Volatile private var bridgeCeilingNanos: Long = Long.MAX_VALUE
+    @Volatile
+    private var bridgeCeilingNanos: Long = Long.MAX_VALUE
 
-    @Volatile var isPlaying = false
-        private set
+    @Volatile
+    var isPlaying = false; private set
 
     /** True once the first decoded frame of the live channel is ready for GPU upload. */
     fun textureFilled(): Boolean = active?.pipe?.textureFilled() == true
@@ -222,13 +234,18 @@ internal class PlaybackSessionManager(
     val audioFramePosition: Long get() = audio.framePosition
 
     /** Sets the effective volume (user volume * distance attenuation). */
-    fun setVolume(volume: Double) { audio.currentVolume = volume }
+    fun setVolume(volume: Double) {
+        audio.currentVolume = volume
+    }
 
     /** Timestamp of the live channel's last decoded video frame; read by [StreamWatchdog]. */
     val lastFrameNanos: AtomicLong get() = active?.pipe?.lastFrameReceivedNanos ?: noFrames
 
-    @Volatile private var popoutSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
-    @Volatile private var previewSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    @Volatile
+    private var popoutSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+
+    @Volatile
+    private var previewSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
 
     /** Routes raw frames to the popout window. Null = no popout active. */
     var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?
@@ -314,7 +331,12 @@ internal class PlaybackSessionManager(
      * the handoff point; [attachLiveAfterReplay] takes over there. Returns false when native replay is
      * unavailable.
      */
-    fun startReplayVideoOnly(snapshot: ByteArray, resumeNanos: Long, liveEdgeNanos: Long, audioPcm: ByteArray?): Boolean {
+    fun startReplayVideoOnly(
+        snapshot: ByteArray,
+        resumeNanos: Long,
+        liveEdgeNanos: Long,
+        audioPcm: ByteArray?
+    ): Boolean {
         stop()
         if (terminated.get()) return false
 
@@ -384,17 +406,37 @@ internal class PlaybackSessionManager(
 
         return try {
             val firstLiveFrame = CountDownLatch(1)
-            channel.launch(ffmpeg, streamSet, w, h, liveOffsetNanos, hwAccel, onFirstFrame = {
-                // Live reached the edge: re-anchor the clock there (matching the audio offset), lift the
-                // bridge clamp, then open the live audio gate. The cached bridge audio is not stopped here
-                // — it streams the live PCM straight on, on its own line, so the audio seam is continuous.
-                clock.rebaseTo(liveOffsetNanos)
-                audio.onBridgeHandoff() // Let the bridge line's (live-relative) clock drive pacing now
-                bridgeCeilingNanos = Long.MAX_VALUE
-                firstLiveFrame.countDown()
-                logger.debug("$debugLabel [reappear] live channel presented first frame; handoff at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)} ms.")
-            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}.") },
-                parkFlag = parkFlag)
+            channel.launch(
+                ffmpeg,
+                streamSet,
+                w,
+                h,
+                liveOffsetNanos,
+                hwAccel,
+                onFirstFrame = {
+                    // Live reached the edge: re-anchor the clock there (matching the audio offset), lift the
+                    // bridge clamp, then open the live audio gate. The cached bridge audio is not stopped here
+                    // — it streams the live PCM straight on, on its own line, so the audio seam is continuous.
+                    clock.rebaseTo(liveOffsetNanos)
+                    audio.onBridgeHandoff() // Let the bridge line's (live-relative) clock drive pacing now
+                    bridgeCeilingNanos = Long.MAX_VALUE
+                    firstLiveFrame.countDown()
+                    logger.debug(
+                        "$debugLabel [reappear] live channel presented first frame; handoff at ${
+                            "%.1f".format(
+                                liveOffsetNanos / 1_000_000.0
+                            )
+                        } ms."
+                    )
+                },
+                onEos = { stderr, normalEos ->
+                    abortIncoming(
+                        generation,
+                        "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}."
+                    )
+                },
+                parkFlag = parkFlag
+            )
 
             val ap = MediaProcess.buildAudio(ffmpeg, streamSet.currentAudio.url, liveOffsetNanos, AudioSink.SAMPLE_RATE)
             val bridge = bridgeAudio
@@ -412,7 +454,9 @@ internal class PlaybackSessionManager(
             }
 
             if (terminated.get()) {
-                synchronized(switchLock) { if (incoming === channel && incomingGeneration == generation) incoming = null }
+                synchronized(switchLock) {
+                    if (incoming === channel && incomingGeneration == generation) incoming = null
+                }
                 discardChannelBlocking(channel)
                 return false
             }
@@ -421,7 +465,9 @@ internal class PlaybackSessionManager(
         } catch (e: IOException) {
             logger.error("$debugLabel [reappear] failed to attach live after replay.", e)
             val wasCurrent = synchronized(switchLock) {
-                if (incoming === channel && incomingGeneration == generation) { incoming = null; true } else false
+                if (incoming === channel && incomingGeneration == generation) {
+                    incoming = null; true
+                } else false
             }
             discardChannelBlocking(channel)
             if (wasCurrent) onQualitySwitchAborted()
@@ -445,8 +491,10 @@ internal class PlaybackSessionManager(
     /** The live edge a replay -> live bridge is currently resuming toward, or null when no bridge is in flight. */
     fun activeBridgeEdgeNanos(): Long? = bridgeCeilingNanos.takeIf { it != Long.MAX_VALUE }
 
-    @Volatile private var parkStartNanos = 0L
-    @Volatile private var frozenPositionNanos = -1L
+    @Volatile
+    private var parkStartNanos = 0L
+    @Volatile
+    private var frozenPositionNanos = -1L
 
     /**
      * Whether this session can be parked warm (steady in-process-libav playback): no external `FFmpeg`
@@ -455,7 +503,7 @@ internal class PlaybackSessionManager(
      */
     fun canPark(): Boolean =
         isPlaying && !terminated.get() && active?.inProcess == true &&
-            bridgeCeilingNanos == Long.MAX_VALUE && incoming == null && audioHalf != null
+                bridgeCeilingNanos == Long.MAX_VALUE && incoming == null && audioHalf != null
 
     /**
      * Parks the live session: the video + audio reader threads idle in place (decoder + audio line stay
@@ -565,11 +613,25 @@ internal class PlaybackSessionManager(
                             "at ${"%.1f".format(offsetNanos / 1_000_000.0)} ms.",
                 )
             }
-            channel.launch(ffmpeg, streamSet, w, h, offsetNanos, hwAccel, onFirstFrame = {
-                clock.markFirstFrame()
-                if (MediaPlayer.DEBUG) logger.debug("$debugLabel Incoming video handoff #$generation presented its first frame.")
-            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}.") },
-                parkFlag = parkFlag)
+            channel.launch(
+                ffmpeg,
+                streamSet,
+                w,
+                h,
+                offsetNanos,
+                hwAccel,
+                onFirstFrame = {
+                    clock.markFirstFrame()
+                    if (MediaPlayer.DEBUG) logger.debug("$debugLabel Incoming video handoff #$generation presented its first frame.")
+                },
+                onEos = { stderr, normalEos ->
+                    abortIncoming(
+                        generation,
+                        "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}."
+                    )
+                },
+                parkFlag = parkFlag
+            )
             val shouldDiscard = synchronized(switchLock) {
                 if (!terminated.get() && active != null && incoming === channel && incomingGeneration == generation) {
                     false

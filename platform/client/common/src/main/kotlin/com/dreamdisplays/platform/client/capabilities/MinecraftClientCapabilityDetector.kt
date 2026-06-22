@@ -63,5 +63,6 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
     private fun safeBool(block: () -> Boolean): Boolean = runCatching(block).getOrDefault(false)
 
     /** Runs [block] and returns the empty string on any exception. */
-    private fun safeString(default: String, block: () -> String): String = runCatching(block).getOrDefault(default).ifBlank { default }
+    private fun safeString(default: String, block: () -> String): String =
+        runCatching(block).getOrDefault(default).ifBlank { default }
 }

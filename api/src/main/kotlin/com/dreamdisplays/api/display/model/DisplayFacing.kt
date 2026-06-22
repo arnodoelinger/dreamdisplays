@@ -10,7 +10,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  *
  * @since 1.0.0
  */
-@DreamDisplaysUnstableApi enum class DisplayFacing(val byte: Byte) {
+@DreamDisplaysUnstableApi
+enum class DisplayFacing(val byte: Byte) {
     /** Facing north (−Z). */
     NORTH(0),
 
@@ -30,14 +31,15 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
     DOWN(5);
 
     /** The facing 180 degrees from this one. */
-    val opposite: DisplayFacing get() = when (this) {
-        NORTH -> SOUTH
-        SOUTH -> NORTH
-        EAST -> WEST
-        WEST -> EAST
-        UP -> DOWN
-        DOWN -> UP
-    }
+    val opposite: DisplayFacing
+        get() = when (this) {
+            NORTH -> SOUTH
+            SOUTH -> NORTH
+            EAST -> WEST
+            WEST -> EAST
+            UP -> DOWN
+            DOWN -> UP
+        }
 
     companion object {
         /** Decodes a [DisplayFacing] from its [byte] wire value; errors on an unknown byte. */

@@ -32,7 +32,8 @@ import kotlin.math.abs
  * registers the resulting display.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class CreateCommand : SubCommand {
+@PaperOnly
+class CreateCommand : SubCommand {
     override val name = "create"
     override val permission = Main.config.permissions.create
     override val playerOnly = true
@@ -47,14 +48,26 @@ import kotlin.math.abs
                 Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial
             )
 
-        validate(sel,
+        validate(
+            sel,
             sendError = { key, args ->
                 if (key == "noDisplayTerritories")
-                    MessageUtil.sendMessageWithMaterials(player, key, Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial)
+                    MessageUtil.sendMessageWithMaterials(
+                        player,
+                        key,
+                        Main.config.settings.selectionMaterial,
+                        Main.config.settings.baseMaterial
+                    )
                 else
                     MessageUtil.sendMessage(player, key, *args)
             },
-            onWrongStructure = { MessageUtil.sendMessageWithMaterials(player, "wrongStructure", Main.config.settings.baseMaterial) }
+            onWrongStructure = {
+                MessageUtil.sendMessageWithMaterials(
+                    player,
+                    "wrongStructure",
+                    Main.config.settings.baseMaterial
+                )
+            }
         ) ?: return
 
         if (DisplayManager.isOverlaps(sel)) {
@@ -140,7 +153,8 @@ import kotlin.math.abs
 
 /** `Fabric`-specific version of the [CreateCommand]. */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricCreateCommand {
+@FabricOnly
+object FabricCreateCommand {
     /** Command execution logic. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
@@ -152,14 +166,26 @@ import kotlin.math.abs
                 Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial
             ).let { 0 }
 
-        validate(sel, ctx.source.server,
+        validate(
+            sel, ctx.source.server,
             sendError = { key, args ->
                 if (key == "noDisplayTerritories")
-                    MessageUtil.sendMessageWithMaterials(player, key, Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial)
+                    MessageUtil.sendMessageWithMaterials(
+                        player,
+                        key,
+                        Server.config.settings.selectionMaterial,
+                        Server.config.settings.baseMaterial
+                    )
                 else
                     MessageUtil.sendMessage(player, key, *args)
             },
-            onWrongStructure = { MessageUtil.sendMessageWithMaterials(player, "wrongStructure", Server.config.settings.baseMaterial) }
+            onWrongStructure = {
+                MessageUtil.sendMessageWithMaterials(
+                    player,
+                    "wrongStructure",
+                    Server.config.settings.baseMaterial
+                )
+            }
         ) ?: return 0
 
         if (DisplayManager.isOverlaps(sel)) {
@@ -274,8 +300,8 @@ private fun validateRegion(
     onWrongStructure: (() -> Unit)? = null,
 ): Unit? {
     val depthOk = (faceModX != 0 && deltaX == faceModX)
-        || (faceModZ != 0 && deltaZ == faceModZ)
-        || (faceModY != 0 && deltaY == faceModY)
+            || (faceModZ != 0 && deltaZ == faceModZ)
+            || (faceModY != 0 && deltaY == faceModY)
     if (!depthOk) {
         sendError("structureWrongDepth", emptyArray())
         return null

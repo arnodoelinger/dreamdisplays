@@ -16,7 +16,9 @@ import java.util.UUID
  * The "current" server is set by [load]; lookups and per-display saves operate against it.
  */
 object ServerDisplayStore {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ServerDisplayStore")
+
     /** Loads the display registry for [serverId] from disk and marks it as the current server. */
     fun load(serverId: String) {
         val type = object : TypeToken<Map<String, FullDisplayData>>() {}.type

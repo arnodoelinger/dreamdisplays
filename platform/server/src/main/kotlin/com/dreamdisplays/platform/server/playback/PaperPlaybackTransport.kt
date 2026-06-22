@@ -14,7 +14,9 @@ import org.jspecify.annotations.NullMarked
 import java.util.UUID
 
 /** `Paper` implementation of [PlaybackTransport]: v2 envelopes via [PaperV2Networking]. */
-@PaperOnly @NullMarked object PaperPlaybackTransport : PlaybackTransport {
+@PaperOnly
+@NullMarked
+object PaperPlaybackTransport : PlaybackTransport {
     /** Returns the current time in milliseconds. */
     override fun nowMs(): Long = System.currentTimeMillis()
 

@@ -12,8 +12,10 @@ import net.minecraft.server.MinecraftServer
 import java.util.UUID
 
 /** `Fabric` implementation of [PlaybackTransport]: v2 envelopes via [FabricV2Networking]. */
-@FabricOnly object FabricPlaybackTransport : PlaybackTransport {
-    @Volatile private var server: MinecraftServer? = null
+@FabricOnly
+object FabricPlaybackTransport : PlaybackTransport {
+    @Volatile
+    private var server: MinecraftServer? = null
 
     /** Binds the running server; called from `SERVER_STARTED`. */
     fun bind(server: MinecraftServer) {

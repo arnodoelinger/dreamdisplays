@@ -73,13 +73,16 @@ class DisplayTextureResource(private val uuid: UUID) {
      * Pending allocation, or null if none is staged. This is the new-resolution allocation that
      * will be swapped in once the first frame has landed.
      */
-    @Volatile private var pending: Allocation? = null
+    @Volatile
+    private var pending: Allocation? = null
 
     /** Width of the current allocation, or 0 if none is allocated. */
-    @Volatile var width: Int = 0; private set
+    @Volatile
+    var width: Int = 0; private set
 
     /** Height of the current allocation, or 0 if none is allocated. */
-    @Volatile var height: Int = 0; private set
+    @Volatile
+    var height: Int = 0; private set
 
     /** Current GPU texture, or null if none is allocated. */
     val texture: DynamicTexture? get() = current?.texture
@@ -223,7 +226,8 @@ class DisplayTextureResource(private val uuid: UUID) {
         var v: AbstractTexture? = null
         val ids = listOf("y" to (w to h), "u" to (cw to ch), "v" to (cw to ch)).map { (plane, dims) ->
             val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "screen-$plane-plane-$suffix.")
-            val tex = DisplayYuvRenderTypes.createPlaneTexture("dreamdisplays $plane plane $uuid.", dims.first, dims.second)
+            val tex =
+                DisplayYuvRenderTypes.createPlaneTexture("dreamdisplays $plane plane $uuid.", dims.first, dims.second)
             manager.register(id, tex)
             when (plane) {
                 "y" -> y = tex

@@ -21,7 +21,8 @@ class RoundTripTest {
         assertEquals(packet, PacketRegistry.decode(PacketRegistry.encode(packet)))
     }
 
-    @Test fun clientHello() = roundTrip(
+    @Test
+    fun clientHello() = roundTrip(
         ClientHello(
             modVersion = "1.8.0",
             supportsPopout = true,
@@ -35,7 +36,8 @@ class RoundTripTest {
         )
     )
 
-    @Test fun serverHello() = roundTrip(
+    @Test
+    fun serverHello() = roundTrip(
         ServerHello(
             isPremium = true,
             isAdmin = true,
@@ -45,7 +47,8 @@ class RoundTripTest {
         )
     )
 
-    @Test fun displayInfoWithNegativeCoordinatesAndUnicode() = roundTrip(
+    @Test
+    fun displayInfoWithNegativeCoordinatesAndUnicode() = roundTrip(
         DisplayInfo(
             id = id,
             ownerId = owner,
@@ -61,13 +64,15 @@ class RoundTripTest {
         )
     )
 
-    @Test fun defaultsRoundTrip() {
+    @Test
+    fun defaultsRoundTrip() {
         roundTrip(DisplayInfo())
         roundTrip(ClientHello())
         roundTrip(ServerHello())
     }
 
-    @Test fun remainingPackets() {
+    @Test
+    fun remainingPackets() {
         roundTrip(DisplayDelete(id))
         roundTrip(DisplaySync(id, isSync = true, isPaused = true, currentTimeMs = -1, durationMs = Long.MAX_VALUE))
         roundTrip(
@@ -85,7 +90,8 @@ class RoundTripTest {
         roundTrip(ClearCache(emptyList()))
     }
 
-    @Test fun playbackModePackets() {
+    @Test
+    fun playbackModePackets() {
         roundTrip(PlaybackCommand(id, action = PlaybackAction.SEEK.wire, positionMs = 42_000))
         roundTrip(SetMode(id, mode = PlaybackMode.SYNCED.wire))
         roundTrip(WatchPartyStart(id, "https://youtu.be/abc", "en"))
@@ -100,13 +106,15 @@ class RoundTripTest {
         )
     }
 
-    @Test fun unknownTypeIdIsIgnored() {
+    @Test
+    fun unknownTypeIdIsIgnored() {
         val proto = ProtoBuf { }
         val bytes = proto.encodeToByteArray(Envelope.serializer(), Envelope(9999, byteArrayOf(1, 2, 3)))
         assertNull(PacketRegistry.decode(bytes))
     }
 
-    @Test fun unknownFieldIsSkipped() {
+    @Test
+    fun unknownFieldIsSkipped() {
         val proto = ProtoBuf { }
         val payload = proto.encodeToByteArray(DisplaySync.serializer(), DisplaySync(id, isPaused = true))
         val extraField = byteArrayOf((15 shl 3 or 0).toByte(), 42) // field 15, varint 42
@@ -114,7 +122,8 @@ class RoundTripTest {
         assertEquals(DisplaySync(id, isPaused = true), PacketRegistry.decode(frame))
     }
 
-    @Test fun directionsMatchRegistry() {
+    @Test
+    fun directionsMatchRegistry() {
         assertEquals(PacketDirection.CLIENT_TO_SERVER, PacketRegistry.directionOf(ClientHello()))
         assertEquals(PacketDirection.SERVER_TO_CLIENT, PacketRegistry.directionOf(ServerHello()))
         assertEquals(PacketDirection.BIDIRECTIONAL, PacketRegistry.directionOf(DisplaySync()))

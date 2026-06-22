@@ -76,7 +76,8 @@ object LavFfmpeg {
 
     /** True once at least the core decode library is present in [dir]. */
     private fun hasFfmpeg(dir: File): Boolean =
-        dir.listFiles()?.any { it.isFile && it.name.lowercase().let { n -> "avcodec" in n && isSharedLibrary(n) } } == true
+        dir.listFiles()
+            ?.any { it.isFile && it.name.lowercase().let { n -> "avcodec" in n && isSharedLibrary(n) } } == true
 
     private fun isSharedLibrary(name: String): Boolean =
         name.endsWith(".dll") || name.endsWith(".dylib") || ".so" in name
@@ -88,6 +89,7 @@ object LavFfmpeg {
             val arch = if (OsInfo.isArm64) "winarm64" else "win64"
             Source(assetRegex(arch, "zip"), isTarXz = false, libDir = "bin")
         }
+
         else -> {
             val arch = if (OsInfo.isArm64) "linuxarm64" else "linux64"
             Source(assetRegex(arch, "tar.xz"), isTarXz = true, libDir = "lib")
@@ -95,7 +97,13 @@ object LavFfmpeg {
     }
 
     private fun assetRegex(arch: String, extension: String): Regex =
-        Regex("""^ffmpeg-n8\..*-${Regex.escape(arch)}-lgpl-shared-${Regex.escape(FFMPEG_BRANCH_SUFFIX)}\.${Regex.escape(extension)}$""")
+        Regex(
+            """^ffmpeg-n8\..*-${Regex.escape(arch)}-lgpl-shared-${Regex.escape(FFMPEG_BRANCH_SUFFIX)}\.${
+                Regex.escape(
+                    extension
+                )
+            }$"""
+        )
 
     @Throws(IOException::class)
     private fun resolveLatestAssetUrl(source: Source): String {

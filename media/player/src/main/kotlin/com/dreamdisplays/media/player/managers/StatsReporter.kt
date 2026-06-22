@@ -24,7 +24,8 @@ internal class StatsReporter(
     /** Raw counter values sampled at one reporting interval. */
     data class Snapshot(val samplesIn: Long, val framesToGpu: Long, val framesDropped: Long)
 
-    @Volatile private var executor: ScheduledExecutorService? = null
+    @Volatile
+    private var executor: ScheduledExecutorService? = null
 
     /** Starts the periodic reporting task. No-op if already running. */
     fun start() {
@@ -35,15 +36,19 @@ internal class StatsReporter(
     }
 
     /** Stops the reporting task. */
-    fun stop() { executor?.shutdownNow(); executor = null }
+    fun stop() {
+        executor?.shutdownNow(); executor = null
+    }
 
     /** Samples the current frame counters, formats a one-line stats string, and logs it. */
     private fun report() {
         runCatching {
             val (inN, outN, dropN) = pollCounters()
             val sec = intervalMs / 1000.0
-            logger.debug("$debugLabel decode=%.1ffps gpu=%.1ffps dropped=%.1f/s pos=%dms live=%s"
-                .format(inN / sec, outN / sec, dropN / sec, getPositionMs(), isLive()))
+            logger.debug(
+                "$debugLabel decode=%.1ffps gpu=%.1ffps dropped=%.1f/s pos=%dms live=%s"
+                    .format(inN / sec, outN / sec, dropN / sec, getPositionMs(), isLive())
+            )
         }
     }
 }

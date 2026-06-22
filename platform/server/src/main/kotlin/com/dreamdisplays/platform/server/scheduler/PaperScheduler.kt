@@ -9,7 +9,9 @@ import java.util.concurrent.TimeUnit
 /**
  * `Paper` scheduler adapter for regular, non-`Folia` servers.
  */
-@PaperOnly @NullMarked object PaperScheduler : AdapterScheduler {
+@PaperOnly
+@NullMarked
+object PaperScheduler : AdapterScheduler {
     /** Tick delay in milliseconds. */
     private const val TICK_MILLIS = 50L
 

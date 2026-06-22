@@ -39,6 +39,7 @@ internal class NativeVideoFramePipe(
         private const val LAV_HW_AUTO = 1
         private const val LAV_PTS_ORIGIN_TOLERANCE_NS = 10_000_000_000L
         private const val LAV_PREROLL_MARGIN_NS = 50_000_000L
+
         // Rolling reappearance cache, enabled by default: ~30 s of recent stream so a returning
         // display can replay locally (network-free) while the live source re-resolves. Capped by bytes.
         private const val DEFAULT_CACHE_WINDOW_MS = 30_000L
@@ -59,36 +60,49 @@ internal class NativeVideoFramePipe(
     override val lastFrameReceivedNanos = AtomicLong(0)
 
     /** Set by the popout window to receive raw frames. Called on the reader thread. */
-    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    @Volatile
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
 
-    @Volatile var expectedW = 0
-        private set
-    @Volatile var expectedH = 0
-        private set
+    @Volatile
+    var expectedW = 0; private set
+
+    @Volatile
+    var expectedH = 0; private set
 
     private val outputFormat: FramePixelFormat =
         if (NativeMedia.rgbaFramesEnabled) FramePixelFormat.RGBA32 else FramePixelFormat.RGB24
     private val surface = FrameSurface(debugLabel, uploaderFactory, outputFormat)
-    @Volatile private var activePrebuffer: FramePrebuffer? = null
+
+    @Volatile
+    private var activePrebuffer: FramePrebuffer? = null
 
     /** Scratch RGBA buffer for the popout window in planar mode (it still wants RGBA frames). */
     private var popoutRgba: ByteBuffer? = null
 
-    @Volatile private var handle = 0L
+    @Volatile
+    private var handle = 0L
 
     /** Handle of the in-process libav session, when [startInProcess] is used instead of FFmpeg. */
-    @Volatile private var lavHandle = 0L
+    @Volatile
+    private var lavHandle = 0L
 
     /** When set and true, the reader idles (no decode) while keeping the native session open — used to keep
      *  the in-process LAV decoder warm while a display is parked out of render distance. Null = not parkable. */
-    @Volatile private var parked: AtomicBoolean? = null
+    @Volatile
+    private var parked: AtomicBoolean? = null
 
     override fun textureFilled(): Boolean = surface.textureFilled()
 
     override fun updateFrame(texture: GpuTextureRef, actualW: Int, actualH: Int): Boolean =
         surface.updateFrame(texture, actualW, actualH, expectedW, expectedH)
 
-    override fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, actualW: Int, actualH: Int): Boolean =
+    override fun updateFramePlanar(
+        y: GpuTextureRef,
+        u: GpuTextureRef,
+        v: GpuTextureRef,
+        actualW: Int,
+        actualH: Int
+    ): Boolean =
         surface.updateFramePlanar(y, u, v, actualW, actualH, expectedW, expectedH)
 
     override fun clear() = surface.clear()
@@ -116,7 +130,8 @@ internal class NativeVideoFramePipe(
      * @param getBrightness   returns current brightness multiplier (read per frame)
      * @param onEos           called when the stream ends with stderr output and EOS flag
      */
-    fun start(args: List<String>, w: Int, h: Int, nv12: Boolean, seekOffsetNanos: Long, sourceFps: Double,
+    fun start(
+        args: List<String>, w: Int, h: Int, nv12: Boolean, seekOffsetNanos: Long, sourceFps: Double,
         stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
         getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit,
     ): Thread? {
@@ -137,7 +152,22 @@ internal class NativeVideoFramePipe(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
         return daemon(
-            { read(hnd, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
+            {
+                read(
+                    hnd,
+                    w,
+                    h,
+                    frameNs,
+                    seekOffsetNanos,
+                    stopFlag,
+                    terminated,
+                    getAudioClock,
+                    onFirstFrame,
+                    getBrightness,
+                    onEos,
+                    prebuffer
+                )
+            },
             "MediaPlayer-video",
         ).also { it.start() }
     }
@@ -147,9 +177,20 @@ internal class NativeVideoFramePipe(
      * reader thread. Requires the planar GPU path. Returns the running thread, or null when
      * the session could not be opened (the caller falls back to the process pipeline).
      */
-    fun startInProcess(url: String, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, hwAccel: HwAccelBackend,
-        stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
-        getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit, parkFlag: AtomicBoolean? = null,
+    fun startInProcess(
+        url: String,
+        w: Int,
+        h: Int,
+        seekOffsetNanos: Long,
+        sourceFps: Double,
+        hwAccel: HwAccelBackend,
+        stopFlag: AtomicBoolean,
+        terminated: AtomicBoolean,
+        getAudioClock: () -> Long,
+        onFirstFrame: () -> Unit,
+        getBrightness: () -> Double,
+        onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        parkFlag: AtomicBoolean? = null,
     ): Thread? {
         if (!planarOutput) return null
         release()
@@ -171,7 +212,22 @@ internal class NativeVideoFramePipe(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
         return daemon(
-            { read(0L, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
+            {
+                read(
+                    0L,
+                    w,
+                    h,
+                    frameNs,
+                    seekOffsetNanos,
+                    stopFlag,
+                    terminated,
+                    getAudioClock,
+                    onFirstFrame,
+                    getBrightness,
+                    onEos,
+                    prebuffer
+                )
+            },
             "MediaPlayer-video",
         ).also { it.start() }
     }
@@ -180,7 +236,8 @@ internal class NativeVideoFramePipe(
      * Opens a local replay session from a packet-ring [snapshot] and starts the reader thread.
      * Returns null when the replay ABI is unavailable or the snapshot cannot be opened.
      */
-    fun startReplay(snapshot: ByteArray, w: Int, h: Int, resumeNanos: Long, sourceFps: Double,
+    fun startReplay(
+        snapshot: ByteArray, w: Int, h: Int, resumeNanos: Long, sourceFps: Double,
         stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
         getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit,
     ): Thread? {
@@ -202,7 +259,22 @@ internal class NativeVideoFramePipe(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
         return daemon(
-            { read(0L, w, h, frameNs, resumeNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
+            {
+                read(
+                    0L,
+                    w,
+                    h,
+                    frameNs,
+                    resumeNanos,
+                    stopFlag,
+                    terminated,
+                    getAudioClock,
+                    onFirstFrame,
+                    getBrightness,
+                    onEos,
+                    prebuffer
+                )
+            },
             "MediaPlayer-video-replay",
         ).also { it.start() }
     }
@@ -219,7 +291,8 @@ internal class NativeVideoFramePipe(
      * Main loop of the reader thread: blocks in the native library until a converted frame lands
      * in the spare buffer, then paces and publishes it exactly like the JVM pipe.
      */
-    private fun read(handle: Long, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
+    private fun read(
+        handle: Long, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
     ) {
@@ -248,7 +321,11 @@ internal class NativeVideoFramePipe(
             val pk = parked
             if (pk != null && pk.get()) {
                 while (pk.get() && !terminated.get() && !stopFlag.get()) {
-                    try { Thread.sleep(20) } catch (_: InterruptedException) { Thread.currentThread().interrupt(); break }
+                    try {
+                        Thread.sleep(20)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt(); break
+                    }
                 }
                 lastFrameReceivedNanos.set(System.nanoTime())
                 continue
@@ -322,7 +399,9 @@ internal class NativeVideoFramePipe(
             if (prebuffer != null) {
                 // Producer path: the jitter buffer's consumer thread paces and presents (and fires onFirstFrame).
                 spare = prebuffer.submit(spare, framePts, frameSize)
-                if (MediaPlayer.DEBUG) { MediaPlayer.samplesIn.incrementAndGet(); metrics.recordPublished(); metrics.maybeLog() }
+                if (MediaPlayer.DEBUG) {
+                    MediaPlayer.samplesIn.incrementAndGet(); metrics.recordPublished(); metrics.maybeLog()
+                }
                 videoPts = framePts + frameNs
                 continue
             }
@@ -544,7 +623,11 @@ internal class NativeVideoFramePipe(
                         "read=${readCount} avgRead=${"%.3f".format(avgReadMs)}ms maxRead=${"%.3f".format(maxReadMs)}ms slowRead=$slowReads " +
                         "published=$published noCapture=$notPublished paced=$paced pacedDrops=$pacedDrops " +
                         "prerollDrops=$prerollDrops prerollMax=${"%.1f".format(prerollMaxNs / 1_000_000.0)}ms " +
-                        "avBehindMax=${"%.1f".format(avBehindMaxNs / 1_000_000.0)}ms avAheadMax=${"%.1f".format(avAheadMaxNs / 1_000_000.0)}ms " +
+                        "avBehindMax=${"%.1f".format(avBehindMaxNs / 1_000_000.0)}ms avAheadMax=${
+                            "%.1f".format(
+                                avAheadMaxNs / 1_000_000.0
+                            )
+                        }ms " +
                         "popoutAvg=${"%.3f".format(popoutAvgMs)}ms heap=${heapUsedMiB}/${heapMaxMiB}MiB rc=$lastRc",
             )
         }

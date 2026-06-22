@@ -15,7 +15,8 @@ import org.bukkit.command.CommandSender
  * Handles the `/display reload` command. Re-reads `config.yml` from disk at runtime
  * and confirms success or failure to the sender.
  */
-@PaperOnly class ReloadCommand : SubCommand {
+@PaperOnly
+class ReloadCommand : SubCommand {
     override val name = "reload"
     override val permission = Main.config.permissions.reload
 
@@ -34,7 +35,8 @@ import org.bukkit.command.CommandSender
 /**
  * `Fabric`-specific implementation of the `/display reload` command.
  */
-@FabricOnly object FabricReloadCommand {
+@FabricOnly
+object FabricReloadCommand {
     /** Reloads the server config from disk; replies with success or failure to the command source. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer

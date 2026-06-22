@@ -120,27 +120,33 @@ object WatchPartyManager {
                 session.state = COUNTDOWN
                 session.countdownStartEpochMs = now + COUNTDOWN_MS
             }
+
             WatchPartyAction.PAUSE -> if (session.state == PLAYING) {
                 session.state = PAUSED
                 session.timeline = session.timeline.withPaused(true, now)
             }
+
             WatchPartyAction.RESUME -> if (session.state == PAUSED) {
                 session.state = PLAYING
                 session.timeline = session.timeline.withPaused(false, now)
             }
+
             WatchPartyAction.SEEK -> if (session.state == PLAYING || session.state == PAUSED) {
                 session.timeline = session.timeline.seekedTo(positionMs, now)
             }
+
             WatchPartyAction.END -> {
                 session.state = ENDED
                 session.timeline = session.timeline.withPaused(true, now)
             }
+
             WatchPartyAction.RESTART -> if (session.state == ENDED) {
                 session.state = PREPARING
                 session.ready.clear()
                 session.countdownStartEpochMs = 0
                 session.timeline = Timeline.start(now, paused = true)
             }
+
             else -> return false
         }
         broadcast(session, now)
@@ -186,15 +192,19 @@ object WatchPartyManager {
         for (session in sessions.values) {
             var changed = false
             when {
-                session.state == CREATED -> { session.state = PREPARING; changed = true }
+                session.state == CREATED -> {
+                    session.state = PREPARING; changed = true
+                }
+
                 session.state == COUNTDOWN && now >= session.countdownStartEpochMs -> {
                     session.state = PLAYING
                     // Anchor at the shared start instant so every client's local countdown lines up
                     session.timeline = Timeline(0, session.countdownStartEpochMs, paused = false)
                     changed = true
                 }
+
                 session.hostDisconnectedAt > 0 && now - session.hostDisconnectedAt > HOST_GRACE_MS
-                    && session.state != ENDED -> {
+                        && session.state != ENDED -> {
                     session.state = ENDED
                     session.timeline = session.timeline.withPaused(true, now)
                     changed = true

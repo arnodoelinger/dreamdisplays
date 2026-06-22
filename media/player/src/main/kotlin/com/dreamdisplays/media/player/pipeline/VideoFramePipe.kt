@@ -28,6 +28,7 @@ internal class VideoFramePipe(
     uploaderFactory: FrameUploaderFactory,
 ) : FramePipe {
     private val logger = LoggerFactory.getLogger("DreamDisplays/VideoFramePipe")
+
     companion object {
         /** Default frame rate when the source doesn't report one or reports an invalid one. */
         private const val DEFAULT_FPS = 30.0
@@ -37,15 +38,19 @@ internal class VideoFramePipe(
     override val lastFrameReceivedNanos = AtomicLong(0)
 
     /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
-    @Volatile override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    @Volatile
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
 
-    @Volatile var expectedW = 0
-        private set
-    @Volatile var expectedH = 0
-        private set
+    @Volatile
+    var expectedW = 0; private set
+
+    @Volatile
+    var expectedH = 0; private set
 
     private val surface = FrameSurface(debugLabel, uploaderFactory)
-    @Volatile private var activePrebuffer: FramePrebuffer? = null
+
+    @Volatile
+    private var activePrebuffer: FramePrebuffer? = null
 
     /**
      * Returns true once a frame is available for upload or has already been uploaded to the GPU texture.
@@ -92,7 +97,8 @@ internal class VideoFramePipe(
      * @param getBrightness   returns current brightness multiplier (read per frame)
      * @param onEos           called when the stream ends with stderr output and EOS flag
      */
-    fun start(proc: Process, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, stopFlag: AtomicBoolean,
+    fun start(
+        proc: Process, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit,
     ): Thread {
@@ -105,7 +111,22 @@ internal class VideoFramePipe(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
         return daemon(
-            { read(proc, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getAudioClock, onFirstFrame, getBrightness, onEos, prebuffer) },
+            {
+                read(
+                    proc,
+                    w,
+                    h,
+                    frameNs,
+                    seekOffsetNanos,
+                    stopFlag,
+                    terminated,
+                    getAudioClock,
+                    onFirstFrame,
+                    getBrightness,
+                    onEos,
+                    prebuffer
+                )
+            },
             "MediaPlayer-video",
         ).also { it.start() }
     }
@@ -113,7 +134,8 @@ internal class VideoFramePipe(
     /**
      * Main loop of the video reader thread. Reads raw RGB frames from [proc], applies brightness, and fills the ready buffer.
      */
-    private fun read(proc: Process, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
+    private fun read(
+        proc: Process, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
     ) {
@@ -135,7 +157,8 @@ internal class VideoFramePipe(
                         }
                     }
                 }
-            } catch (_: IOException) {}
+            } catch (_: IOException) {
+            }
         }, "MediaPlayer-vstderr").also { it.start() }
 
         var normalEos = false
@@ -144,14 +167,18 @@ internal class VideoFramePipe(
             proc.inputStream.use { input ->
                 var rowBuf = ByteArray(w * 3)
                 while (!terminated.get() && !stopFlag.get()) {
-                    if (!skipToP6(input)) { normalEos = true; break }
+                    if (!skipToP6(input)) {
+                        normalEos = true; break
+                    }
                     val pw = readAsciiInt(input)
                     val ph = readAsciiInt(input)
                     val maxVal = readAsciiInt(input)
                     if (pw != w || ph != h || maxVal != 255) {
                         logger.warn("$debugLabel PPM header mismatch: ${pw}x$ph max=$maxVal (expected ${w}x$h max=255).")
                         val skip = pw.toLong() * ph * 3
-                        if (pw <= 0 || ph <= 0 || skip <= 0 || !skipBytes(input, skip)) { normalEos = true; break }
+                        if (pw <= 0 || ph <= 0 || skip <= 0 || !skipBytes(input, skip)) {
+                            normalEos = true; break
+                        }
                         continue
                     }
                     val requiredFrameSize = w * h * 3
@@ -174,7 +201,9 @@ internal class VideoFramePipe(
                         spare = surface.allocateFrameBuffer(requiredFrameSize)
                         spare.clear()
                     }
-                    if (!readFully(input, spare, rowBuf, requiredFrameSize)) { normalEos = true; break }
+                    if (!readFully(input, spare, rowBuf, requiredFrameSize)) {
+                        normalEos = true; break
+                    }
                     applyBrightness(spare, requiredFrameSize, getBrightness())
                     spare.flip()
 
@@ -184,7 +213,9 @@ internal class VideoFramePipe(
                         // Producer path: hand the decoded frame to the jitter buffer; the consumer thread
                         // paces and presents it (and fires onFirstFrame after the prefill).
                         popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
-                        if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
+                        if (!MediaPlayer.captureSamples) {
+                            videoPts += frameNs; continue
+                        }
                         spare = prebuffer.submit(spare, videoPts, requiredFrameSize)
                         if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
                         videoPts += frameNs
@@ -199,7 +230,9 @@ internal class VideoFramePipe(
 
                     popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
 
-                    if (!MediaPlayer.captureSamples) { videoPts += frameNs; continue }
+                    if (!MediaPlayer.captureSamples) {
+                        videoPts += frameNs; continue
+                    }
 
                     spare = surface.publish(spare, requiredFrameSize)
                     if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
@@ -233,11 +266,16 @@ internal class VideoFramePipe(
                 val done = proc.waitFor(500, TimeUnit.MILLISECONDS)
                 exitCode = if (done) proc.exitValue() else -1
                 if (!done) proc.destroyForcibly()
-            } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
 
         if (!terminated.get() && !stopFlag.get()) {
-            try { stderrThread.join(500) } catch (_: InterruptedException) {}
+            try {
+                stderrThread.join(500)
+            } catch (_: InterruptedException) {
+            }
             val stderr = synchronized(stderrBuf) { stderrBuf.toString() }
             onEos(stderr, exitCode == 0)
         }

@@ -16,7 +16,8 @@ import org.bukkit.entity.Player
  * Prints the help message listing every `/display` subcommand.
  * Used for providing a quick reference to players for the available commands and their usage.
  */
-@PaperOnly class HelpCommand : SubCommand {
+@PaperOnly
+class HelpCommand : SubCommand {
     override val name = "help"
     override val permission = Main.config.permissions.help
     override val playerOnly = true
@@ -52,7 +53,8 @@ import org.bukkit.entity.Player
 /**
  * `Fabric`-specific implementation of the `/display help` command.
  */
-@FabricOnly object FabricHelpCommand {
+@FabricOnly
+object FabricHelpCommand {
     /** Prints the help message listing every `/display` subcommand. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer

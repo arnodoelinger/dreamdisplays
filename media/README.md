@@ -1,6 +1,7 @@
 # Media
 
-Base media types without runtime implementation. This is a neutral layer used by `api`, `core`, and the media player / runtime / source modules.
+Base media types without runtime implementation. This is a neutral layer used by `api`, `core`, and the media player /
+runtime / source modules.
 
 ## Contents
 

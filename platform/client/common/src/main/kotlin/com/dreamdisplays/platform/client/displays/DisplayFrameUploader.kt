@@ -67,7 +67,13 @@ internal class DisplayFrameUploader(private val uuid: UUID) {
             val y = tex.yPlane ?: return false
             val u = tex.uPlane ?: return false
             val v = tex.vPlane ?: return false
-            mp.updateFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
+            mp.updateFramePlanar(
+                GpuTextureHandle(y.getTexture()),
+                GpuTextureHandle(u.getTexture()),
+                GpuTextureHandle(v.getTexture()),
+                w,
+                h
+            )
         } else {
             val texture = tex.texture ?: return false
             mp.updateFrame(GpuTextureHandle(texture.getTexture()), w, h)
@@ -82,7 +88,13 @@ internal class DisplayFrameUploader(private val uuid: UUID) {
             val y = tex.pendingYPlane ?: return false
             val u = tex.pendingUPlane ?: return false
             val v = tex.pendingVPlane ?: return false
-            mp.updateIncomingFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
+            mp.updateIncomingFramePlanar(
+                GpuTextureHandle(y.getTexture()),
+                GpuTextureHandle(u.getTexture()),
+                GpuTextureHandle(v.getTexture()),
+                w,
+                h
+            )
         } else {
             val texture = tex.pendingTexture ?: return false
             mp.updateIncomingFrame(GpuTextureHandle(texture.getTexture()), w, h)

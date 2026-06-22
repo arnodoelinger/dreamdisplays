@@ -8,7 +8,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  *
  * @since 1.6.0
  */
-@DreamDisplaysUnstableApi enum class MediaStreamType {
+@DreamDisplaysUnstableApi
+enum class MediaStreamType {
     /** Video track only (no audio). */
     VIDEO,
 

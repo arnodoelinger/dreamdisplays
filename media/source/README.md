@@ -1,6 +1,7 @@
 # Media source
 
-Media source resolution and search. This module turns a user URL or search query into a stream set that `media:player` can play.
+Media source resolution and search. This module turns a user URL or search query into a stream set that `media:player`
+can play.
 
 ## Contents
 

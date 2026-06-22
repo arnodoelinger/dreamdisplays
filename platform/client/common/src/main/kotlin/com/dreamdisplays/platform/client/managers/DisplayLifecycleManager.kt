@@ -47,7 +47,8 @@ object DisplayLifecycleManager {
         val facing = FacingUtil.fromPacket(packet.facing.toByte())
 
         Minecraft.getInstance().player?.let { player ->
-            val renderDistance = DisplayStorage.getDisplayData(packet.id)?.renderDistance ?: ClientStateManager.config.defaultDistance
+            val renderDistance =
+                DisplayStorage.getDisplayData(packet.id)?.renderDistance ?: ClientStateManager.config.defaultDistance
             val dist = distanceToScreen(
                 packet.x, packet.y, packet.z,
                 packet.width, packet.height, facing.toDisplayFacing(),
@@ -145,11 +146,15 @@ object DisplayLifecycleManager {
                 maxY = y
             }
         }
-        return sqrt(playerPos.distSqr(BlockPos(
-            minOf(maxOf(playerPos.x, x), maxX),
-            minOf(maxOf(playerPos.y, y), maxY),
-            minOf(maxOf(playerPos.z, z), maxZ)
-        )))
+        return sqrt(
+            playerPos.distSqr(
+                BlockPos(
+                    minOf(maxOf(playerPos.x, x), maxX),
+                    minOf(maxOf(playerPos.y, y), maxY),
+                    minOf(maxOf(playerPos.z, z), maxZ)
+                )
+            )
+        )
     }
 
     /** True if both dimensions are within `1..`[MAX_DISPLAY_BLOCKS]. */

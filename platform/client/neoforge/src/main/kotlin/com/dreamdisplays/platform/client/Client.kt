@@ -80,7 +80,8 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.platform.client.Mod {
         registrar.playToServer(Packets.SetLocked.PACKET_ID, Packets.SetLocked.PACKET_CODEC) { _, _ -> }
     }
 
-    @SubscribeEvent fun onLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
+    @SubscribeEvent
+    fun onLogin(event: ClientPlayerNetworkEvent.LoggingIn) {
         val mc = Minecraft.getInstance()
         if (mc.level != null && mc.player != null) {
             val serverId = if (mc.hasSingleplayerServer()) "singleplayer"
@@ -89,16 +90,19 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.platform.client.Mod {
         }
     }
 
-    @SubscribeEvent fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
+    @SubscribeEvent
+    fun onDisconnect(event: ClientPlayerNetworkEvent.LoggingOut) {
         Initializer.onServerLeft()
     }
 
-    @SubscribeEvent fun onClientStopping(event: ClientStoppingEvent) {
+    @SubscribeEvent
+    fun onClientStopping(event: ClientStoppingEvent) {
         Initializer.onStop()
     }
 
     //? if >=26 {
-    @SubscribeEvent fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterLevel) {
+    @SubscribeEvent
+    fun onRenderAfterLevel(event: RenderLevelStageEvent.AfterLevel) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
         val modelViewStack = RenderSystem.getModelViewStack()
@@ -124,10 +128,13 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.platform.client.Mod {
         return method.invoke(gameRenderer) as Camera
     }
 
-    @SubscribeEvent fun onEndTick(event: ClientTickEvent.Post) {
+    @SubscribeEvent
+    fun onEndTick(event: ClientTickEvent.Post) {
         Initializer.onEndTick(Minecraft.getInstance())
     }
-    @SubscribeEvent fun onRenderGui(event: RenderGuiEvent.Post) {
+
+    @SubscribeEvent
+    fun onRenderGui(event: RenderGuiEvent.Post) {
         Initializer.onRenderHud(
             Minecraft.getInstance(),
             event.guiGraphics,
@@ -137,6 +144,7 @@ class Client(modEventBus: IEventBus) : com.dreamdisplays.platform.client.Mod {
         // so any GL-context switch (macOS GLFW backend) does not disturb in-flight commands.
         DisplayRegistry.getScreens().forEach { it.renderPopout() }
     }
+
     override fun sendPacket(packet: CustomPacketPayload) {
         Minecraft.getInstance().connection?.send(packet)
     }

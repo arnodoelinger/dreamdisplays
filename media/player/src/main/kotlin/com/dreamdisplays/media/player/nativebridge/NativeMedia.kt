@@ -183,7 +183,12 @@ object NativeMedia {
      * Available only when [rgbaFramesEnabled] is true.
      */
     fun videoReadFrameRgba(handle: Long, dst: ByteBuffer, frameBytes: Int, brightnessMilli: Int): Int =
-        videoReadFrameRgbaHandle!!.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), brightnessMilli) as Int
+        videoReadFrameRgbaHandle!!.invoke(
+            handle,
+            MemorySegment.ofBuffer(dst),
+            frameBytes.toLong(),
+            brightnessMilli
+        ) as Int
 
     /**
      * Blocking read of the next frame into [dst] as raw I420 planes (Y, then U, then V) with
@@ -233,7 +238,11 @@ object NativeMedia {
     fun lavEnableCache(handle: Long, windowMs: Long, maxBytes: Long): Boolean {
         val enable = lavEnableCacheHandle ?: return false
         if (windowMs <= 0 || maxBytes <= 0) return false
-        return (enable.invoke(handle, windowMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), maxBytes) as Int) == READ_OK
+        return (enable.invoke(
+            handle,
+            windowMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
+            maxBytes
+        ) as Int) == READ_OK
     }
 
     /** Captures the live LAV packet-ring snapshot for [handle], or null when no data is ready. */
@@ -360,7 +369,11 @@ object NativeMedia {
             return false
         }
         if (Runtime.version().feature() < 21) {
-            logger.warn("Native pipeline requires Java 21+ (running ${Runtime.version().feature()}); using JVM pipeline.")
+            logger.warn(
+                "Native pipeline requires Java 21+ (running ${
+                    Runtime.version().feature()
+                }); using JVM pipeline."
+            )
             return false
         }
         val lib = locateLibrary() ?: run {
@@ -388,9 +401,12 @@ object NativeMedia {
             abiVersion = bind("dd_abi_version", FunctionDescriptor.of(int))
             videoOpen = bind("dd_video_open", FunctionDescriptor.of(long, addr, long, int, int, int))
             videoReadFrame = bind("dd_video_read_frame", FunctionDescriptor.of(int, long, addr, long, int))
-            videoReadFrameRgbaHandle = bindOptional("dd_video_read_frame_rgba", FunctionDescriptor.of(int, long, addr, long, int))
-            videoReadFrameI420Handle = bindOptional("dd_video_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
-            i420ToRgbaHandle = bindOptional("dd_i420_to_rgba", FunctionDescriptor.of(int, addr, long, addr, long, int, int))
+            videoReadFrameRgbaHandle =
+                bindOptional("dd_video_read_frame_rgba", FunctionDescriptor.of(int, long, addr, long, int))
+            videoReadFrameI420Handle =
+                bindOptional("dd_video_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
+            i420ToRgbaHandle =
+                bindOptional("dd_i420_to_rgba", FunctionDescriptor.of(int, addr, long, addr, long, int, int))
             videoStderr = bind("dd_video_stderr", FunctionDescriptor.of(int, long, addr, long))
             videoExitCode = bind("dd_video_exit_code", FunctionDescriptor.of(int, long, int))
             videoKill = bind("dd_video_kill", FunctionDescriptor.ofVoid(long))
@@ -452,17 +468,20 @@ object NativeMedia {
             lavOpenHandle = bind("dd_lav_open", FunctionDescriptor.of(long, addr, long, int, int, long, int))
             lavOpenReplayHandle = bind("dd_lav_open_replay", FunctionDescriptor.of(long, addr, long, int, int, long))
             lavReadFrameHandle = bind("dd_lav_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
-            lavReadFramePtsHandle = bindOptional("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(int, long, addr, long, addr))
+            lavReadFramePtsHandle =
+                bindOptional("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(int, long, addr, long, addr))
             lavErrorHandle = bind("dd_lav_error", FunctionDescriptor.of(int, long, addr, long))
             lavKillHandle = bind("dd_lav_kill", FunctionDescriptor.ofVoid(long))
             lavCloseHandle = bind("dd_lav_close", FunctionDescriptor.ofVoid(long))
             lavEnableCacheHandle = bind("dd_lav_enable_cache", FunctionDescriptor.of(int, long, int, long))
             lavRingSnapshotHandle = bind("dd_lav_ring_snapshot", FunctionDescriptor.of(int, long, addr, long))
-            lavRingSnapshotAtHandle = bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(int, long, long, addr, long))
+            lavRingSnapshotAtHandle =
+                bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(int, long, long, addr, long))
             val surfaceAbi = bindOptional("dd_lav_surface_abi_version", FunctionDescriptor.of(int))
             if (surfaceAbi != null && surfaceAbi.invoke() as Int == LAV_SURFACE_ABI_VERSION) {
                 lavReadSurfaceHandle = bindOptional("dd_lav_read_surface", FunctionDescriptor.of(int, long, addr))
-                lavBindSurfacePlaneGlHandle = bindOptional("dd_lav_bind_surface_plane_gl", FunctionDescriptor.of(int, long, int, int))
+                lavBindSurfacePlaneGlHandle =
+                    bindOptional("dd_lav_bind_surface_plane_gl", FunctionDescriptor.of(int, long, int, int))
                 lavReleaseSurfaceHandle = bindOptional("dd_lav_release_surface", FunctionDescriptor.ofVoid(long))
             }
             val surfaceInterop = lavReadSurfaceHandle != null
@@ -487,7 +506,9 @@ object NativeMedia {
      */
     private fun preloadLavDependencies(dir: File?) {
         if (dir == null || !dir.isDirectory) return
-        val libraries = dir.listFiles()?.filter { it.isFile && isSharedLibrary(it.name) && !isDreamDisplaysLibrary(it.name) } ?: return
+        val libraries =
+            dir.listFiles()?.filter { it.isFile && isSharedLibrary(it.name) && !isDreamDisplaysLibrary(it.name) }
+                ?: return
         if (libraries.isEmpty()) return
         val pending = libraries
             .sortedWith(compareBy<File> { sharedLibraryLoadOrder(it.name) }.thenBy { it.name })

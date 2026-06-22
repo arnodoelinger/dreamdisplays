@@ -17,7 +17,8 @@ import java.util.UUID
 val ZERO_UUID: UUID = UUID(0L, 0L)
 
 /** Wire surrogate for [UUID]: two fixed64 halves (random bits make varint encoding wasteful). */
-@Serializable @SerialName("Uuid")
+@Serializable
+@SerialName("Uuid")
 @OptIn(ExperimentalSerializationApi::class)
 private data class UuidSurrogate(
     @ProtoNumber(1) @ProtoType(ProtoIntegerType.FIXED) val msb: Long = 0L,

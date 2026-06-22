@@ -110,7 +110,12 @@ object MediaProcess {
 
     /** Builds the common part of the `FFmpeg` command line for both video and audio processes. */
     @Throws(IOException::class)
-    private fun baseCommand(ffmpeg: String, url: String, offsetNanos: Long, hwAccel: HwAccelBackend): MutableList<String> {
+    private fun baseCommand(
+        ffmpeg: String,
+        url: String,
+        offsetNanos: Long,
+        hwAccel: HwAccelBackend
+    ): MutableList<String> {
         val safeUrl = MediaHostGuard.resolveSafeUrl(url)
         return mutableListOf<String>().apply {
             add(ffmpeg)

@@ -8,7 +8,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi enum class PlatformSide {
+@DreamDisplaysUnstableApi
+enum class PlatformSide {
     /** The physical client (rendering, input, the local player). */
     CLIENT,
 

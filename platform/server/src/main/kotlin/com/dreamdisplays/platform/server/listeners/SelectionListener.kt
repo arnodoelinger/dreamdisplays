@@ -30,13 +30,15 @@ import org.bukkit.inventory.EquipmentSlot
  * Left-clicking sets the first point, right-clicking sets the second point.
  * Sneaking and right-clicking resets the selection.
  */
-@PaperOnly class SelectionListener(plugin: Main) : Listener {
+@PaperOnly
+class SelectionListener(plugin: Main) : Listener {
     init {
         SelectionVisualizer.startParticleTask(plugin)
     }
 
     /** Handles material interactions: left-click sets pos1, right-click sets pos2, shift-right resets. */
-    @EventHandler fun onPlayerInteract(event: PlayerInteractEvent) {
+    @EventHandler
+    fun onPlayerInteract(event: PlayerInteractEvent) {
         if (event.hand != EquipmentSlot.HAND) return
         val player = event.player
         val block = event.clickedBlock ?: return
@@ -64,15 +66,16 @@ import org.bukkit.inventory.EquipmentSlot
 
     private fun org.bukkit.entity.Player.facingDirection(): org.bukkit.block.BlockFace = when {
         location.pitch < -45f -> org.bukkit.block.BlockFace.DOWN
-        location.pitch > 45f  -> org.bukkit.block.BlockFace.UP
-        else                  -> facing.oppositeFace
+        location.pitch > 45f -> org.bukkit.block.BlockFace.UP
+        else -> facing.oppositeFace
     }
 }
 
 /**
  * `Fabric`-specific implementation of [SelectionListener].
  */
-@FabricOnly object FabricSelectionListener {
+@FabricOnly
+object FabricSelectionListener {
     /** Registers the selection listener. */
     fun register() {
         AttackBlockCallback.EVENT.register { player, world, hand, pos, direction ->

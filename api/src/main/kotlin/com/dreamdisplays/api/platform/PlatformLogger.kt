@@ -3,7 +3,8 @@ package com.dreamdisplays.api.platform
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Minimal structured logger contract used by modules that must not depend on a concrete backend. */
-@DreamDisplaysUnstableApi interface PlatformLogger {
+@DreamDisplaysUnstableApi
+interface PlatformLogger {
     /** Logs an informational message. */
     fun info(message: String)
 

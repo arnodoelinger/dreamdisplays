@@ -16,7 +16,8 @@ import org.bukkit.command.CommandSender
  * @param args the arguments passed to the sub-command.
  * @see CommandSender
  */
-@PaperOnly interface SubCommand {
+@PaperOnly
+interface SubCommand {
     /** The name of the sub-command. */
     val name: String
 

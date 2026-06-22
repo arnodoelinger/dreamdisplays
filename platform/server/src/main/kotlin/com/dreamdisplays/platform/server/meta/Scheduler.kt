@@ -14,7 +14,9 @@ import java.util.concurrent.ConcurrentHashMap
  * `Paper` plugin scheduler. Provides methods for running tasks asynchronously, synchronously, or with a delay, transparently
  * dispatching to `Folia`'s region-aware schedulers when present.
  */
-@PaperOnly @NullMarked object Scheduler {
+@PaperOnly
+@NullMarked
+object Scheduler {
     /** The plugin instance that owns this scheduler. */
     private lateinit var plugin: Plugin
 

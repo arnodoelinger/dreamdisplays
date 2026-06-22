@@ -4,7 +4,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import java.nio.file.Path
 
 /** Platform-resolved filesystem locations used by API consumers and shared modules. */
-@DreamDisplaysUnstableApi interface PlatformPaths {
+@DreamDisplaysUnstableApi
+interface PlatformPaths {
     /** User-editable configuration directory. */
     val configDir: Path
 

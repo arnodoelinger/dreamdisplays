@@ -11,7 +11,8 @@ import java.util.Locale
  *
  * @since 1.0.0
  */
-@DreamDisplaysUnstableApi object YouTubeUrls {
+@DreamDisplaysUnstableApi
+object YouTubeUrls {
     /** Matches a 11-character video ID. */
     private val BARE_ID = Regex("[A-Za-z0-9_-]{11}")
 

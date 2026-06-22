@@ -74,7 +74,7 @@ tasks.withType<ProcessResources>().configureEach {
         if (!nativeBundleDir.isDirectory) {
             throw GradleException(
                 "Native bundle is required, but $nativeBundleDir does not exist. " +
-                    "Run the CI native matrix first or disable DREAMDISPLAYS_REQUIRE_NATIVES."
+                        "Run the CI native matrix first or disable DREAMDISPLAYS_REQUIRE_NATIVES."
             )
         }
 

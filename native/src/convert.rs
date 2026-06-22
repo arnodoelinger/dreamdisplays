@@ -418,7 +418,7 @@ fn convert_pool() -> Option<&'static ThreadPool> {
             .build()
             .ok()
     })
-    .as_ref()
+        .as_ref()
 }
 
 #[inline(always)]

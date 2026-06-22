@@ -43,20 +43,26 @@ object MessageUtil {
     private val gson by lazy { Gson() }
 
     /** Legacy and JSON serializers for legacy color-coded strings. */
-    @PaperOnly private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
+    @PaperOnly
+    private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
 
     /** Legacy and JSON serializers for `Adventure Components`. */
-    @PaperOnly private val gsonSerializer = GsonComponentSerializer.gson()
+    @PaperOnly
+    private val gsonSerializer = GsonComponentSerializer.gson()
 
     /** Sends a localized message identified by [messageKey] to [sender]. */
-    @PaperOnly @NullMarked fun sendMessage(sender: CommandSender?, messageKey: String, vararg args: Any) {
+    @PaperOnly
+    @NullMarked
+    fun sendMessage(sender: CommandSender?, messageKey: String, vararg args: Any) {
         val raw = Main.config.getMessageForPlayer(sender as? Player, messageKey)
         val message = if (args.isNotEmpty() && raw is String) raw.format(*args) else raw
         sendColoredMessage(sender, message)
     }
 
     /** Sends [message] to [sender], auto-detecting Component / legacy string / JSON forms. */
-    @PaperOnly @NullMarked fun sendColoredMessage(sender: CommandSender?, message: Any?) {
+    @PaperOnly
+    @NullMarked
+    fun sendColoredMessage(sender: CommandSender?, message: Any?) {
         if (sender == null || message == null) return
         when (message) {
             is Component -> sender.sendMessage(message)
@@ -66,7 +72,9 @@ object MessageUtil {
     }
 
     /** Sends an already-built `Adventure` [component] to [sender], silently ignoring nulls. */
-    @PaperOnly @NullMarked fun sendComponent(sender: CommandSender?, component: Component?) {
+    @PaperOnly
+    @NullMarked
+    fun sendComponent(sender: CommandSender?, component: Component?) {
         if (sender == null || component == null) return
         sender.sendMessage(component)
     }
@@ -75,7 +83,9 @@ object MessageUtil {
      * Sends a localized message to [sender], replacing `{0}`, `{1}` ... placeholders with
      * inline item sprite icons for each [materials] entry. Hovering reveals the item tooltip.
      */
-    @PaperOnly @NullMarked fun sendMessageWithMaterials(sender: CommandSender?, messageKey: String, vararg materials: Material) {
+    @PaperOnly
+    @NullMarked
+    fun sendMessageWithMaterials(sender: CommandSender?, messageKey: String, vararg materials: Material) {
         if (sender == null) return
         val rawMessage = Main.config.getMessageForPlayer(sender as? Player, messageKey) as? String ?: run {
             sendMessage(sender, messageKey)
@@ -102,7 +112,8 @@ object MessageUtil {
      * Block items live in the `minecraft:blocks` atlas (`block/<name>`);
      * pure items live in `minecraft:items` (`item/<name>`).
      */
-    @PaperOnly private fun materialSpriteComponent(mat: Material): Component {
+    @PaperOnly
+    private fun materialSpriteComponent(mat: Material): Component {
         val ns = mat.key().namespace()
         val name = mat.key().value()
         val atlas: Key
@@ -119,7 +130,8 @@ object MessageUtil {
     }
 
     /** Sends a localized message identified by [messageKey] to [player]. */
-    @FabricOnly fun sendMessage(player: ServerPlayer?, messageKey: String, vararg args: Any) {
+    @FabricOnly
+    fun sendMessage(player: ServerPlayer?, messageKey: String, vararg args: Any) {
         val config = com.dreamdisplays.platform.server.Server.config
         val raw = config.getMessageForPlayer(player, messageKey)
         val message = if (args.isNotEmpty() && raw is String) raw.format(*args) else raw
@@ -127,13 +139,15 @@ object MessageUtil {
     }
 
     /** Sends [message] to [player], converting strings / maps to `NMS Component`. */
-    @FabricOnly fun sendColoredMessage(player: ServerPlayer?, message: Any?) {
+    @FabricOnly
+    fun sendColoredMessage(player: ServerPlayer?, message: Any?) {
         if (player == null || message == null) return
         player.sendSystemMessage(toNmsComponent(message))
     }
 
     /** Converts an `Adventure` [component] to a `NMS Component`. */
-    @FabricOnly private fun toNmsComponent(message: Any): NmsComponent {
+    @FabricOnly
+    private fun toNmsComponent(message: Any): NmsComponent {
         return when (message) {
             is String -> parseAmpersandLegacy(message)
             is Map<*, *> -> runCatching {
@@ -141,6 +155,7 @@ object MessageUtil {
                 ComponentSerialization.CODEC.parse(JsonOps.INSTANCE, jsonElement).result().orElse(null)
                     ?: parseAmpersandLegacy(message.toString())
             }.getOrElse { parseAmpersandLegacy(message.toString()) }
+
             else -> parseAmpersandLegacy(message.toString())
         }
     }
@@ -150,7 +165,8 @@ object MessageUtil {
      * inline item sprite icons for each [materialKeys] entry (e.g. `"minecraft:diamond_axe"`).
      * Hovering reveals the item tooltip.
      */
-    @FabricOnly fun sendMessageWithMaterials(player: ServerPlayer?, messageKey: String, vararg materialKeys: String) {
+    @FabricOnly
+    fun sendMessageWithMaterials(player: ServerPlayer?, messageKey: String, vararg materialKeys: String) {
         if (player == null) return
         val config = com.dreamdisplays.platform.server.Server.config
         val rawMessage = config.getMessageForPlayer(player, messageKey) as? String ?: run {
@@ -169,14 +185,17 @@ object MessageUtil {
                 val item = BuiltInRegistries.ITEM.getValue(itemId)
                 val isBlock = item is net.minecraft.world.item.BlockItem
                 val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
-                val spriteId = Identifier.fromNamespaceAndPath(itemId.namespace, (if (isBlock) "block/" else "item/") + itemId.path)
+                val spriteId = Identifier.fromNamespaceAndPath(
+                    itemId.namespace,
+                    (if (isBlock) "block/" else "item/") + itemId.path
+                )
                 val atlasSprite = AtlasSprite(atlasId, spriteId)
                 //? if >=26 {
                 val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStackTemplate(item))
                 val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite, Optional.empty()))
-                //?} else
-                /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
-                val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
+                    //?} else
+                    /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
+                    val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
                     .withStyle { it.withHoverEvent(hoverEvent) }
                 root.append(spriteComponent)
             }
@@ -188,6 +207,7 @@ object MessageUtil {
     }
 
     /** Converts `&` color codes to a plain NMS text component (strips formatting on `Fabric`). */
-    @FabricOnly private fun parseAmpersandLegacy(text: String): NmsComponent =
+    @FabricOnly
+    private fun parseAmpersandLegacy(text: String): NmsComponent =
         NmsComponent.literal(text.replace(Regex("&[0-9a-fA-FrRlLoOnNmMkK]"), ""))
 }

@@ -75,7 +75,7 @@ pub unsafe extern "C" fn dd_lav_open(
         let url = String::from_utf8_lossy(bytes).into_owned();
         sessions().open(&url, w as usize, h as usize, start_micros, hw_accel)
     }))
-    .unwrap_or(0)
+        .unwrap_or(0)
 }
 
 /// Opens a replay decode session from a serialized packet-ring snapshot.
@@ -101,7 +101,7 @@ pub unsafe extern "C" fn dd_lav_open_replay(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().open_replay(bytes, w as usize, h as usize, resume_nanos)
     }))
-    .unwrap_or(0)
+        .unwrap_or(0)
 }
 
 /// Blocking decode of the next frame into `dst` as tightly packed I420 (Y, then U, then V),
@@ -152,7 +152,7 @@ pub unsafe extern "C" fn dd_lav_read_frame_i420_pts(
         }
         rc
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Blocking decode of the next hardware frame as a retained GPU-importable surface.
@@ -170,7 +170,7 @@ pub unsafe extern "C" fn dd_lav_read_surface(handle: i64, desc: *mut LavSurfaceD
     catch_unwind(AssertUnwindSafe(|| {
         sessions().read_surface(handle, &mut *desc)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Imports one retained surface plane into an existing OpenGL texture object.
@@ -187,7 +187,7 @@ pub extern "C" fn dd_lav_bind_surface_plane_gl(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().bind_surface_plane_gl(surface_handle, plane, texture_id)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Releases a surface returned by [`dd_lav_read_surface`]. Safe to call with 0 or stale handles.
@@ -226,7 +226,7 @@ pub extern "C" fn dd_lav_enable_cache(handle: i64, window_ms: u32, max_bytes: u6
     catch_unwind(AssertUnwindSafe(|| {
         sessions().enable_cache(handle, window_nanos, max_bytes)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Copies the cache snapshot for `handle` into `dst` and returns the total blob length. When the
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn dd_lav_ring_snapshot_at(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().snapshot_at(handle, position_nanos, dst_slice, top_up)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Interrupts the session's network/decode loop, unblocking any reader stuck in

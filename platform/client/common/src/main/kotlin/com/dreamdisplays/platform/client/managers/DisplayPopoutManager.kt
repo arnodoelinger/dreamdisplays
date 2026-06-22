@@ -39,11 +39,27 @@ class DisplayPopoutManager(
     fun attachTo(player: MediaPlayer, contentAspect: () -> Double) {
         popoutWindow?.let { win ->
             if (win.isOpen) {
-                player.setPopoutSink { buf, fw, fh, format -> win.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
+                player.setPopoutSink { buf, fw, fh, format ->
+                    win.updateFrame(
+                        buf,
+                        fw,
+                        fh,
+                        contentAspect(),
+                        format.toUploadFormat()
+                    )
+                }
             }
         }
         pipOverlay?.let { overlay ->
-            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
+            player.setPopoutSink { buf, fw, fh, format ->
+                overlay.updateFrame(
+                    buf,
+                    fw,
+                    fh,
+                    contentAspect(),
+                    format.toUploadFormat()
+                )
+            }
         }
     }
 
@@ -71,7 +87,15 @@ class DisplayPopoutManager(
                 popoutWindow = created
                 created.on { event -> emit(event) }
             }
-            player.setPopoutSink { buf, fw, fh, format -> newWin.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
+            player.setPopoutSink { buf, fw, fh, format ->
+                newWin.updateFrame(
+                    buf,
+                    fw,
+                    fh,
+                    contentAspect(),
+                    format.toUploadFormat()
+                )
+            }
             newWin.open(w, h)
         } catch (e: Exception) {
             logger.warn("Could not open window: ${e.message}.")
@@ -81,12 +105,24 @@ class DisplayPopoutManager(
 
     /** Opens an in-game PiP overlay at [corner], closing any open window first. */
     fun activatePipMode(player: MediaPlayer, corner: PipCorner = PipCorner.BOTTOM_RIGHT, contentAspect: () -> Double) {
-        popoutWindow?.let { win -> if (win.isOpen) { player.setPopoutSink(null); win.close() } }
+        popoutWindow?.let { win ->
+            if (win.isOpen) {
+                player.setPopoutSink(null); win.close()
+            }
+        }
         closePipOverlay()
         val overlay = PipOverlay(displayScreen, corner)
         if (PipOverlayManager.add(overlay)) {
             pipOverlay = overlay
-            player.setPopoutSink { buf, fw, fh, format -> overlay.updateFrame(buf, fw, fh, contentAspect(), format.toUploadFormat()) }
+            player.setPopoutSink { buf, fw, fh, format ->
+                overlay.updateFrame(
+                    buf,
+                    fw,
+                    fh,
+                    contentAspect(),
+                    format.toUploadFormat()
+                )
+            }
             emit(PopoutEvent.Opened(displayScreen.uuid.toString()))
         } else {
             logger.warn("No PiP corners available (max 4).")

@@ -3,7 +3,8 @@ package com.dreamdisplays.api.render
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** Per-frame render input shared with display surfaces. */
-@DreamDisplaysUnstableApi interface RenderContext {
+@DreamDisplaysUnstableApi
+interface RenderContext {
     /** Partial tick / frame interpolation value. */
     val tickDelta: Float
 

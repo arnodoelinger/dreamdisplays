@@ -10,6 +10,7 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
 
@@ -48,11 +49,11 @@ object PipOverlayManager : OverlayManager {
         mc: Minecraft, graphics: GuiGraphicsExtractor,
         mouseX: Int, mouseY: Int, leftPressed: Boolean, partialTick: Float,
     ) {
-    //?} else
-    /*fun renderAll(
-        mc: Minecraft, graphics: GuiGraphics,
-        mouseX: Int, mouseY: Int, leftPressed: Boolean, partialTick: Float,
-    ) {*/
+        //?} else
+        /*fun renderAll(
+            mc: Minecraft, graphics: GuiGraphics,
+            mouseX: Int, mouseY: Int, leftPressed: Boolean, partialTick: Float,
+        ) {*/
         val iter = overlays.iterator()
         while (iter.hasNext()) {
             val overlay = iter.next()

@@ -23,6 +23,7 @@ Create interactive in-game displays that stream YouTube videos in real time, wit
 resolution, and even with synchronization mode for all players on the server.
 
 For this mod to work, players install the client mod, while server admins can install either:
+
 - Server plugin on Paper / Folia / Purpur or other fork
 - Fabric server mod on Fabric servers
 

@@ -6,7 +6,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * How a display drives its playback timeline. This protocol-v2 enum travels on the wire as its
  * [ordinal] int ([wire] / [fromWire]); ordinals are append-only - never reorder or remove an entry.
  */
-@DreamDisplaysUnstableApi enum class PlaybackMode {
+@DreamDisplaysUnstableApi
+enum class PlaybackMode {
     /** No synchronization: every client plays independently from its own saved position. */
     LOCAL,
 
@@ -39,7 +40,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 }
 
 /** Lifecycle state of a watch-party session (see `WatchPartyStart` / `WatchPartyState`). */
-@DreamDisplaysUnstableApi enum class WatchPartySessionState {
+@DreamDisplaysUnstableApi
+enum class WatchPartySessionState {
     /** Host started the party and the display is session-locked; URL is being applied. */
     CREATED,
 
@@ -78,7 +80,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 }
 
 /** A playback intent a client sends to a server-authoritative timeline (`PlaybackCommand`). */
-@DreamDisplaysUnstableApi enum class PlaybackAction {
+@DreamDisplaysUnstableApi
+enum class PlaybackAction {
     PLAY, PAUSE, SEEK, RESTART;
 
     /** The append-only wire value for this action. */
@@ -93,7 +96,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 }
 
 /** A watch-party control sent by a participant ([READY]/[UNREADY]) or the host (everything else). */
-@DreamDisplaysUnstableApi enum class WatchPartyAction {
+@DreamDisplaysUnstableApi
+enum class WatchPartyAction {
     READY, UNREADY, BEGIN, PAUSE, RESUME, SEEK, END, RESTART, CLOSE;
 
     /** The append-only wire value for this action. */

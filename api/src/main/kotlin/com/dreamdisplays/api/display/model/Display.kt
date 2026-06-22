@@ -9,7 +9,8 @@ import com.dreamdisplays.api.watchparty.WatchPartySession
  *
  * @since 1.0.0
  */
-@DreamDisplaysUnstableApi data class Display(
+@DreamDisplaysUnstableApi
+data class Display(
     /** The unique identifier of the display. */
     val id: DisplayId,
 

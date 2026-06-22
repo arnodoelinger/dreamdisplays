@@ -7,7 +7,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class TimelineWireTest {
-    @Test fun syncRoundTripsThroughTimelineWire() {
+    @Test
+    fun syncRoundTripsThroughTimelineWire() {
         val original = Timeline(positionMs = 2_000, serverTimeMs = 50_000, paused = false, durationMs = 600_000)
         val sync = original.toSync(ZERO_UUID, PlaybackMode.SYNCED, nowMs = 50_000)
 

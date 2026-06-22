@@ -3,6 +3,7 @@ pluginManagement {
     val stonecutterVersions = java.util.Properties().apply {
         file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
     }
+
     fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
         ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
 
@@ -28,6 +29,7 @@ pluginManagement {
                     // redirect to fabric-loom's artifact (declared apply false, never applied).
                     else useModule("net.fabricmc:fabric-loom:$loomVersion")
                 }
+
                 "net.neoforged.moddev" -> useVersion(scVersion("moddev.version"))
             }
         }

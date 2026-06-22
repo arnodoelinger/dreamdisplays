@@ -109,8 +109,10 @@ object MediaStreamSelector {
                     height <= 1440 -> 760
                     else -> 1700
                 }
+
                 CodecFamily.UNKNOWN -> 1300
             }
+
             isWindows -> when (codecFamily(stream)) {
                 CodecFamily.H264 -> 0
                 CodecFamily.HEVC -> 90
@@ -118,6 +120,7 @@ object MediaStreamSelector {
                 CodecFamily.AV1 -> 220
                 CodecFamily.UNKNOWN -> 900
             }
+
             else -> when (codecFamily(stream)) {
                 CodecFamily.H264 -> 0
                 CodecFamily.HEVC -> 120

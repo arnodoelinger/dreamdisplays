@@ -31,7 +31,8 @@ internal interface FramePipe {
      * meaningful for pipes producing planar output (GPU-YUV mode); no-op otherwise.
      * Must be called from the render thread. Returns true when a frame was actually uploaded.
      */
-    fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, actualW: Int, actualH: Int): Boolean = false
+    fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, actualW: Int, actualH: Int): Boolean =
+        false
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clear()

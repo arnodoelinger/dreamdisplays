@@ -18,6 +18,10 @@ internal fun daemon(r: Runnable, name: String): Thread = Thread(r, name).apply {
  */
 internal fun joinSafely(t: Thread?) {
     if (t != null && t != Thread.currentThread()) {
-        try { t.join(2000) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
+        try {
+            t.join(2000)
+        } catch (_: InterruptedException) {
+            Thread.currentThread().interrupt()
+        }
     }
 }

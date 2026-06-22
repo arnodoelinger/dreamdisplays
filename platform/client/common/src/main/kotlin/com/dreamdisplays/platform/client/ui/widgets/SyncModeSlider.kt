@@ -40,6 +40,7 @@ class SyncModeSlider(
                 pendingMode = null
                 mode = actual
             }
+
             System.nanoTime() < pendingUntilNanos -> mode = pending
             else -> {
                 pendingMode = null

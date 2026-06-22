@@ -22,7 +22,8 @@ import org.bukkit.entity.Player
  * player when the caller holds the `toggleOthers` permission.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class OnCommand : SubCommand {
+@PaperOnly
+class OnCommand : SubCommand {
     override val name = "on"
     override val permission: String? = null
     override val playerOnly = false
@@ -97,7 +98,8 @@ import org.bukkit.entity.Player
  * `Fabric`-specific implementation of the `/display on` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricOnCommand {
+@FabricOnly
+object FabricOnCommand {
     /** Enables displays for the executing player or the named [targetName], checking op-level permission for the latter. */
     fun execute(ctx: CommandContext<CommandSourceStack>, targetName: String? = null): Int {
         val self = ctx.source.entity as? ServerPlayer

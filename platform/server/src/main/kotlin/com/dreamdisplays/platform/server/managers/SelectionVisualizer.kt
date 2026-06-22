@@ -14,7 +14,8 @@ import org.bukkit.Bukkit
  * Draws particle outlines around active player selections on a repeating scheduler tick,
  * giving visual feedback while the player is making a display selection.
  */
-@PaperOnly object SelectionVisualizer {
+@PaperOnly
+object SelectionVisualizer {
     /**
      * Starts a repeating task that draws particle outlines around every ready selection.
      * No-ops if particles are disabled in config or the server is `Folia` (unsupported there).

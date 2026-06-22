@@ -39,13 +39,16 @@ internal class FramePrebuffer(
     private val queue = ArrayBlockingQueue<Timed>(capacityFrames.coerceAtLeast(1))
 
     /** Set once the producer has finished (normal EOS): the consumer drains the tail then exits. */
-    @Volatile private var inputClosed = false
+    @Volatile
+    private var inputClosed = false
 
     /** Hard stop (teardown): the consumer exits immediately, recycling whatever is queued. */
-    @Volatile private var aborted = false
+    @Volatile
+    private var aborted = false
 
     /** True once enough frames are queued (or input closed) to begin playout. */
-    @Volatile private var primed = false
+    @Volatile
+    private var primed = false
 
     private val firstFramePresented = AtomicBoolean(false)
     private var consumer: Thread? = null
@@ -61,7 +64,8 @@ internal class FramePrebuffer(
      * for the reader to fill next. On teardown the frame is recycled and a spare returned without blocking.
      */
     fun submit(frame: ByteBuffer, pts: Long, nextSize: Int): ByteBuffer {
-        while (!alive()) { /* Fall through to recycle... */ break }
+        while (!alive()) { /* Fall through to recycle... */ break
+        }
         try {
             while (alive()) {
                 if (queue.offer(Timed(frame, pts), POLL_MS, TimeUnit.MILLISECONDS)) {
@@ -101,7 +105,9 @@ internal class FramePrebuffer(
     private fun consume() {
         try {
             while (alive()) {
-                if (!primed) { Thread.sleep(2); continue }
+                if (!primed) {
+                    Thread.sleep(2); continue
+                }
                 val tf = queue.poll(POLL_MS, TimeUnit.MILLISECONDS)
                 if (tf == null) {
                     if (inputClosed) break // Tail drained
@@ -164,7 +170,16 @@ internal class FramePrebuffer(
             // Let the surface pool retain every in-flight buffer (queue + ready + spare) so steady-state
             // playout reuses buffers instead of churning large direct allocations (which would GC-stutter).
             surface.setMaxReusableBuffers(capacity + 2)
-            return FramePrebuffer(surface, capacity, prefill, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel)
+            return FramePrebuffer(
+                surface,
+                capacity,
+                prefill,
+                getAudioClock,
+                onFirstFrame,
+                terminated,
+                stopFlag,
+                debugLabel
+            )
                 .also { it.start() }
         }
     }

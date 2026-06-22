@@ -11,7 +11,8 @@ import com.dreamdisplays.api.display.model.DisplayId
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi interface WatchPartyService {
+@DreamDisplaysUnstableApi
+interface WatchPartyService {
     /**
      * Requests a watch party on [displayId] with [url] (or the display's current video when null),
      * making the local player host. Returns false if the local client knows it isn't allowed.

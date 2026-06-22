@@ -4,7 +4,8 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.display.model.DisplayBounds
 
 /** Renderable display plane with its current texture and visibility state. */
-@DreamDisplaysUnstableApi interface RenderSurface {
+@DreamDisplaysUnstableApi
+interface RenderSurface {
     /** World-space display bounds. */
     val bounds: DisplayBounds
 

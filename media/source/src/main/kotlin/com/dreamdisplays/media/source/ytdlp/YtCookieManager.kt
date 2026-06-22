@@ -28,12 +28,24 @@ class YtCookieManager {
 
     private val cookieFile: Path get() = YtDlpBinary.bundledDir.resolve("cookies.txt")
 
-    @Volatile private var resolvedBrowser: String? = null
-    @Volatile private var browserResolved: Boolean = false
-    @Volatile private var browserResolvedAt: Long = 0
-    @Volatile private var cachedHeader: String? = null
-    @Volatile private var headerExportedAt: Long = 0
-    @Volatile private var unavailableThisSession = false
+    @Volatile
+    private var resolvedBrowser: String? = null
+
+    @Volatile
+    private var browserResolved: Boolean = false
+
+    @Volatile
+    private var browserResolvedAt: Long = 0
+
+    @Volatile
+    private var cachedHeader: String? = null
+
+    @Volatile
+    private var headerExportedAt: Long = 0
+
+    @Volatile
+    private var unavailableThisSession = false
+
     private val refreshInProgress = AtomicBoolean(false)
 
     /** True when the user explicitly disabled browser cookies in the config. */
@@ -186,7 +198,10 @@ class YtCookieManager {
             Thread.currentThread().interrupt()
             throw IOException("Interrupted", e)
         }
-        try { drainer.join(500) } catch (_: InterruptedException) {}
+        try {
+            drainer.join(500)
+        } catch (_: InterruptedException) {
+        }
 
         if (!Files.exists(master)) return null
         val lines = Files.readAllLines(master, StandardCharsets.UTF_8)
@@ -282,10 +297,16 @@ class YtCookieManager {
             val drainer = Processes.drainAsync(p.inputStream)
             if (!p.waitFor(10, TimeUnit.SECONDS)) {
                 Processes.destroyTree(p)
-                try { drainer.join(500) } catch (_: InterruptedException) {}
+                try {
+                    drainer.join(500)
+                } catch (_: InterruptedException) {
+                }
                 return false
             }
-            try { drainer.join(500) } catch (_: InterruptedException) {}
+            try {
+                drainer.join(500)
+            } catch (_: InterruptedException) {
+            }
             if (!Files.exists(testFile)) {
                 return p.exitValue() == 0
             }

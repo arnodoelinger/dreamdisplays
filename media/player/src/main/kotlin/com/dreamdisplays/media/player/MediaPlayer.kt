@@ -97,6 +97,7 @@ class MediaPlayer(
 
     /** True once replay-only video is rendering, so [startStreams] attaches live instead of cold-starting. */
     private val replayVideoActive = AtomicBoolean(false)
+
     /** True when this player was created from a replay bootstrap: it already resumes at the saved position,
      *  so the controller must NOT also fire restoreSavedTime (its corrective seek would cold-restart the bridge). */
     private val startedFromReplay = replayBootstrap != null
@@ -109,7 +110,13 @@ class MediaPlayer(
 
     private val stats = StatsReporter(
         debugLabel = debugLabel,
-        pollCounters = { StatsReporter.Snapshot(samplesIn.getAndSet(0), framesToGpu.getAndSet(0), framesDropped.getAndSet(0)) },
+        pollCounters = {
+            StatsReporter.Snapshot(
+                samplesIn.getAndSet(0),
+                framesToGpu.getAndSet(0),
+                framesDropped.getAndSet(0)
+            )
+        },
         getPositionMs = { getCurrentTime() / 1_000_000L },
         isLive = { liveStream },
     )
@@ -143,14 +150,22 @@ class MediaPlayer(
     private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
     private val initCallbacks = CopyOnWriteArrayList<() -> Unit>()
 
-    @Volatile private var streams: ActiveStreams? = null
-    @Volatile private var liveStream = false
-    @Volatile private var seekable = false
-    @Volatile private var durationHintNanos = 0L
-    @Volatile private var lastQuality = 0
-    @Volatile private var brightness = 1.0
-    @Volatile private var hwAccelDisabled = false
-    @Volatile private var sessionStartNanos = 0L
+    @Volatile
+    private var streams: ActiveStreams? = null
+    @Volatile
+    private var liveStream = false
+    @Volatile
+    private var seekable = false
+    @Volatile
+    private var durationHintNanos = 0L
+    @Volatile
+    private var lastQuality = 0
+    @Volatile
+    private var brightness = 1.0
+    @Volatile
+    private var hwAccelDisabled = false
+    @Volatile
+    private var sessionStartNanos = 0L
 
     private val volume = VolumeController(env.config.defaultDisplayVolume) {
         sessionManager.setVolume(it)
@@ -256,7 +271,9 @@ class MediaPlayer(
      * initialization completes. The callback is called on the init thread.
      */
     fun whenInitialized(callback: () -> Unit) {
-        if (isReady) { callback(); return }
+        if (isReady) {
+            callback(); return
+        }
         initCallbacks.add(callback)
         if (isReady && initCallbacks.remove(callback)) callback()
     }
@@ -536,7 +553,13 @@ class MediaPlayer(
             && HwAccelBackend.looksLikeHwAccelFailure(stderr)
         ) {
             hwAccelDisabled = true
-            logger.warn("$debugLabel Hardware decode failed for this stream. Falling back to software. Stderr: ${MediaUtil.truncate(stderr)}.")
+            logger.warn(
+                "$debugLabel Hardware decode failed for this stream. Falling back to software. Stderr: ${
+                    MediaUtil.truncate(
+                        stderr
+                    )
+                }."
+            )
             val ss = streams
             if (ss != null) safeExecute { if (!terminated.get()) startStreams(ss, 0) }
             return
@@ -573,7 +596,9 @@ class MediaPlayer(
                     startStreams(ss, 0)
                     events.onSeek()
                 }
-            } finally { restartPending.set(false) }
+            } finally {
+                restartPending.set(false)
+            }
         }
     }
 
@@ -700,5 +725,6 @@ class MediaPlayer(
 
     /** True when the player is in a state where playback operations are valid. */
     private val isReady: Boolean
-        get() = state.get().let { it == PlaybackState.PLAYING || it == PlaybackState.PAUSED || it == PlaybackState.RESTARTING }
+        get() = state.get()
+            .let { it == PlaybackState.PLAYING || it == PlaybackState.PAUSED || it == PlaybackState.RESTARTING }
 }

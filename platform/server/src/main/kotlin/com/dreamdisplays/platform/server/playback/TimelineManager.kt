@@ -108,7 +108,9 @@ object TimelineManager {
         return when (display.mode) {
             PlaybackMode.SYNCED -> timelines.getOrPut(display.id) { Timeline.start(transport.nowMs()) }
             PlaybackMode.BROADCAST -> timelines.getOrPut(display.id) { Timeline.start(transport.nowMs(), loop = true) }
-            else -> { timelines.remove(display.id); null }
+            else -> {
+                timelines.remove(display.id); null
+            }
         }
     }
 

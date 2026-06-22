@@ -33,12 +33,16 @@ class DisplayPlaybackHost(private val screen: DisplayScreen) : PlaybackHost {
     /** Aspect ratio of the decoded content, surfaced for popout sizing. */
     override var videoContentAspect: Double
         get() = screen.videoContentAspect
-        set(value) { screen.videoContentAspect = value }
+        set(value) {
+            screen.videoContentAspect = value
+        }
 
     /** The display's current media error, or `null` when healthy. */
     override var mediaError: DreamMediaException?
         get() = screen.mediaError
-        set(value) { screen.mediaError = value }
+        set(value) {
+            screen.mediaError = value
+        }
 
     /** Notifies the screen that a user seek completed (emits the intent upstream). */
     override fun afterSeek() = screen.afterSeek()

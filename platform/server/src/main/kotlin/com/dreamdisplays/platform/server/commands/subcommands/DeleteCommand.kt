@@ -23,7 +23,8 @@ import org.bukkit.entity.Player
  * Used for admin-only deletion of displays.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class DeleteCommand : SubCommand {
+@PaperOnly
+class DeleteCommand : SubCommand {
     override val name = "delete"
     override val permission = Main.config.permissions.delete
     override val playerOnly = true
@@ -50,7 +51,8 @@ import org.bukkit.entity.Player
  * `Fabric`-specific implementation of the `/display delete` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricDeleteCommand {
+@FabricOnly
+object FabricDeleteCommand {
     /** Deletes the display the player is currently looking at (within 32 blocks). */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer

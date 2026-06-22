@@ -4,7 +4,8 @@ Optional Rust native layer for hot media paths.
 
 ## Contents
 
-- `dreamdisplays_native` (`src/`) — low-level helpers for Kotlin media code: pixel-format `convert` and the `session` bridge.
+- `dreamdisplays_native` (`src/`) — low-level helpers for Kotlin media code: pixel-format `convert` and the `session`
+  bridge.
 - `dreamdisplays_lav` (`lav/src/`) — optional in-process video decode path through `FFmpeg` / `libav`:
   `session`, `surface`, and a rolling packet `cache`.
 - C ABI declarations consumed from Kotlin through `Project Panama`.

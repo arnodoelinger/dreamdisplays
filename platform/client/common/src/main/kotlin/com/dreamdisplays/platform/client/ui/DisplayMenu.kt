@@ -94,66 +94,74 @@ class DisplayMenu private constructor(
             DisplayRegistry.saveScreenData(ds)
         }
 
-        volume = addUi(ValueSlider(
-            initial = ds.volume.toDouble(),
-            label = { Component.literal("${floor(it * 200).toInt()}%") },
-        ) { playback.setVolume(displayId, it.toFloat()) })
+        volume = addUi(
+            ValueSlider(
+                initial = ds.volume.toDouble(),
+                label = { Component.literal("${floor(it * 200).toInt()}%") },
+            ) { playback.setVolume(displayId, it.toFloat()) })
         volume.enabledWhen = videoReady
         volume.visibleWhen = notErrored
 
-        renderD = addUi(ValueSlider(
-            initial = chunksToFraction(ds.renderDistance / CHUNK_BLOCKS),
-            label = { Component.translatable("dreamdisplays.button.render-distance.label", fractionToChunks(it)) },
-        ) {
-            ds.renderDistance = fractionToChunks(it) * CHUNK_BLOCKS
-            DisplayRegistry.saveScreenData(ds)
-        })
+        renderD = addUi(
+            ValueSlider(
+                initial = chunksToFraction(ds.renderDistance / CHUNK_BLOCKS),
+                label = { Component.translatable("dreamdisplays.button.render-distance.label", fractionToChunks(it)) },
+            ) {
+                ds.renderDistance = fractionToChunks(it) * CHUNK_BLOCKS
+                DisplayRegistry.saveScreenData(ds)
+            })
         renderD.enabledWhen = { videoReady() && !ds.isPopoutActive }
         renderD.visibleWhen = notErrored
 
-        quality = addUi(ValueSlider(
-            initial = qualityFraction(ds.quality.serialize()),
-            label = {
-                when {
-                    // Broadcast pins everyone to the highest quality within the cap; show that, not the saved setting
-                    ds.qualityCap > 0 -> Component.literal("${broadcastQuality()}p")
-                    ds.qualityList.isNotEmpty() -> Component.literal("${qualityFromFraction(it)}p")
-                    else -> Component.literal("${ds.quality.serialize()}p")
-                }
-            },
-            // Commit on release: a quality change restarts the video, so don't fire on every drag step
-            live = false,
-        ) {
-            if (ds.qualityList.isNotEmpty()) playback.setQuality(displayId, VideoQuality.parse(qualityFromFraction(it)))
-        })
+        quality = addUi(
+            ValueSlider(
+                initial = qualityFraction(ds.quality.serialize()),
+                label = {
+                    when {
+                        // Broadcast pins everyone to the highest quality within the cap; show that, not the saved setting
+                        ds.qualityCap > 0 -> Component.literal("${broadcastQuality()}p")
+                        ds.qualityList.isNotEmpty() -> Component.literal("${qualityFromFraction(it)}p")
+                        else -> Component.literal("${ds.quality.serialize()}p")
+                    }
+                },
+                // Commit on release: a quality change restarts the video, so don't fire on every drag step
+                live = false,
+            ) {
+                if (ds.qualityList.isNotEmpty()) playback.setQuality(
+                    displayId,
+                    VideoQuality.parse(qualityFromFraction(it))
+                )
+            })
         quality.enabledWhen = { videoReady() && ds.qualityList.isNotEmpty() && ds.canChangeQualityHere }
         quality.visibleWhen = notErrored
 
-        brightness = addUi(ValueSlider(
-            initial = ds.brightness.toDouble().coerceIn(0.0, 1.0),
-            label = { Component.literal("${floor(it * 100).toInt()}%") },
-        ) { playback.setBrightness(displayId, it.toFloat()) })
+        brightness = addUi(
+            ValueSlider(
+                initial = ds.brightness.toDouble().coerceIn(0.0, 1.0),
+                label = { Component.literal("${floor(it * 100).toInt()}%") },
+            ) { playback.setBrightness(displayId, it.toFloat()) })
         brightness.enabledWhen = { videoReady() && (!ds.isSync || ds.canEdit) }
         brightness.visibleWhen = notErrored
 
-        sync = addUi(SyncModeSlider(
-            initial = ds.effectiveMode,
-            current = { ds.effectiveMode },
-            enabledFor = {
-                if (ds.watchParty != null) {
-                    it == PlaybackMode.LOCAL && ds.canCloseWatchPartyHere
-                } else {
-                    it != PlaybackMode.WATCH_PARTY && ds.canSetModeHere
+        sync = addUi(
+            SyncModeSlider(
+                initial = ds.effectiveMode,
+                current = { ds.effectiveMode },
+                enabledFor = {
+                    if (ds.watchParty != null) {
+                        it == PlaybackMode.LOCAL && ds.canCloseWatchPartyHere
+                    } else {
+                        it != PlaybackMode.WATCH_PARTY && ds.canSetModeHere
+                    }
+                },
+                label = { Component.translatable(syncModeLabel(it)) },
+            ) { mode ->
+                when {
+                    mode == ds.effectiveMode -> Unit
+                    ds.watchParty != null && mode == PlaybackMode.LOCAL -> watchParty.close(displayId)
+                    PlaybackMode.isBaseMode(mode) -> playback.setMode(displayId, mode)
                 }
-            },
-            label = { Component.translatable(syncModeLabel(it)) },
-        ) { mode ->
-            when {
-                mode == ds.effectiveMode -> Unit
-                ds.watchParty != null && mode == PlaybackMode.LOCAL -> watchParty.close(displayId)
-                PlaybackMode.isBaseMode(mode) -> playback.setMode(displayId, mode)
-            }
-        })
+            })
         sync.enabledWhen = {
             videoReady() && (ds.canSetModeHere || (ds.watchParty != null && ds.canCloseWatchPartyHere))
         }
@@ -167,13 +175,17 @@ class DisplayMenu private constructor(
         volumeReset.visibleWhen = notErrored
 
         val renderDReset = addUi(IconButton("refresh") {
-            val defaultChunks = (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(MIN_CHUNKS, MAX_CHUNKS)
+            val defaultChunks =
+                (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(MIN_CHUNKS, MAX_CHUNKS)
             ds.renderDistance = defaultChunks * CHUNK_BLOCKS
             renderD.value = chunksToFraction(defaultChunks)
             DisplayRegistry.saveScreenData(ds)
         })
         renderDReset.enabledWhen = {
-            val defaultBlocks = (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(MIN_CHUNKS, MAX_CHUNKS) * CHUNK_BLOCKS
+            val defaultBlocks = (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(
+                MIN_CHUNKS,
+                MAX_CHUNKS
+            ) * CHUNK_BLOCKS
             videoReady() && !ds.isPopoutActive && ds.renderDistance != defaultBlocks
         }
         renderDReset.visibleWhen = notErrored
@@ -206,9 +218,10 @@ class DisplayMenu private constructor(
         forwardButton.enabledWhen = canSeekNow
         forwardButton.visibleWhen = notErrored
 
-        val muteButton = addUi(IconButton(
-            icon = { IconButton.modIcon(if (ds.muted) "mute" else "sound") },
-        ) { playback.mute(displayId, !ds.muted) })
+        val muteButton = addUi(
+            IconButton(
+                icon = { IconButton.modIcon(if (ds.muted) "mute" else "sound") },
+            ) { playback.mute(displayId, !ds.muted) })
         muteButton.enabledWhen = videoReady
         muteButton.visibleWhen = notErrored
 
@@ -223,29 +236,32 @@ class DisplayMenu private constructor(
         popoutButton.enabledWhen = { videoReady() && (ds.canPopoutHere || ds.isPopoutActive) }
         popoutButton.visibleWhen = notErrored
 
-        val pauseButton = addUi(IconButton(
-            icon = { IconButton.modIcon(if (ds.isPaused) "play" else "pause") },
-        ) { if (ds.isPaused) playback.play(displayId) else playback.pause(displayId) })
+        val pauseButton = addUi(
+            IconButton(
+                icon = { IconButton.modIcon(if (ds.isPaused) "play" else "pause") },
+            ) { if (ds.isPaused) playback.play(displayId) else playback.pause(displayId) })
         pauseButton.enabledWhen = { ds.canControlPlayback }
         pauseButton.visibleWhen = notErrored
 
-        progress = addUi(SeekBar(
-            current = { ds.currentTimeNanos },
-            duration = { ds.mediaPlayerDurationNanos },
-        ) { nanos ->
-            if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
-                playback.seek(displayId, (nanos / 1_000_000L).milliseconds)
-            }
-        })
+        progress = addUi(
+            SeekBar(
+                current = { ds.currentTimeNanos },
+                duration = { ds.mediaPlayerDurationNanos },
+            ) { nanos ->
+                if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
+                    playback.seek(displayId, (nanos / 1_000_000L).milliseconds)
+                }
+            })
         progress.enabledWhen = { videoReady() && ds.canSeek() && !ds.isLive && ds.canSeekHere }
         progress.visibleWhen = notErrored
 
-        val lockButton = addUi(IconButton(
-            icon = { IconButton.modIcon(if (ds.isLocked == true) "lock" else "unlock") },
-        ) {
-            val locked = ds.isLocked ?: return@IconButton
-            displays.setLocked(displayId, !locked)
-        })
+        val lockButton = addUi(
+            IconButton(
+                icon = { IconButton.modIcon(if (ds.isLocked == true) "lock" else "unlock") },
+            ) {
+                val locked = ds.isLocked ?: return@IconButton
+                displays.setLocked(displayId, !locked)
+            })
         lockButton.enabledWhen = { ds.canToggleLockHere }
         lockButton.visibleWhen = { ds.isLocked != null && !ds.errored }
 
@@ -255,23 +271,25 @@ class DisplayMenu private constructor(
         // Only the error panel places it; keep it hidden in the normal menu so it never strays to (0,0)
         retryButton.visibleWhen = { ds.errored }
 
-        val deleteButton = addUi(IconButton(
-            icon = { IconButton.modIcon("delete") },
-            sprites = IconButton.RED_SPRITES,
-        ) {
-            displays.delete(displayId)
-            onClose()
-        })
+        val deleteButton = addUi(
+            IconButton(
+                icon = { IconButton.modIcon("delete") },
+                sprites = IconButton.RED_SPRITES,
+            ) {
+                displays.delete(displayId)
+                onClose()
+            })
         deleteButton.enabledWhen = { ds.owner || ds.isAdmin }
 
         val reportButton = if (ClientStateManager.isReportingEnabled) {
-            addUi(IconButton(
-                icon = { IconButton.modIcon("report") },
-                sprites = IconButton.RED_SPRITES,
-            ) {
-                displays.report(displayId)
-                onClose()
-            })
+            addUi(
+                IconButton(
+                    icon = { IconButton.modIcon("report") },
+                    sprites = IconButton.RED_SPRITES,
+                ) {
+                    displays.report(displayId)
+                    onClose()
+                })
         } else null
 
         suggestions = addUi(SuggestionsPanel(::onPickSuggested))
@@ -280,7 +298,8 @@ class DisplayMenu private constructor(
         // the panel shows an "unavailable" notice to everyone else instead of pickable suggestions.
         suggestions.available = { ds.canSetVideoHere }
 
-        preview = PreviewSection(ds, backButton, forwardButton, muteButton, popoutButton, pauseButton, progress, dropdown)
+        preview =
+            PreviewSection(ds, backButton, forwardButton, muteButton, popoutButton, pauseButton, progress, dropdown)
         settings = SettingsSection(
             rows = settingsRows(volumeReset, renderDReset, qualityReset, brightnessReset, syncReset),
             ownerActions = listOf(reportButton, deleteButton, lockButton),

@@ -29,6 +29,7 @@ val activeStonecutterVersion = rootProject.file("versions/active.txt").readText(
 val stonecutterVersions = Properties().apply {
     rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
 }
+
 fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
     ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
 

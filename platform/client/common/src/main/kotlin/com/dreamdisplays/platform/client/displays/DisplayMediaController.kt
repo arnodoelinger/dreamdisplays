@@ -20,7 +20,8 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
     private val generation = AtomicLong()
 
     /** The active media player, or null between videos and after [shutdown]. */
-    @Volatile var player: MediaPlayer? = null; private set
+    @Volatile
+    var player: MediaPlayer? = null; private set
 
     /** True once [start] has applied the screen's initial state to the current player. */
     var videoStarted: Boolean = false; private set

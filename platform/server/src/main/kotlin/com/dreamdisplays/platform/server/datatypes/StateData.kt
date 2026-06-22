@@ -11,8 +11,10 @@ import java.util.*
  *
  * @param id the unique identifier of the display.
  */
-@NullMarked class StateData(private val id: UUID) {
-    @PaperOnly private var displayData: PaperDisplayData? = DisplayManager.getDisplayData(id) as? PaperDisplayData
+@NullMarked
+class StateData(private val id: UUID) {
+    @PaperOnly
+    private var displayData: PaperDisplayData? = DisplayManager.getDisplayData(id) as? PaperDisplayData
     private var paused = false
     private var lastReportedTime: Long = 0
     private var lastReportedTimestamp: Long = 0
@@ -30,7 +32,8 @@ import java.util.*
      * Builds a fresh [SyncData] packet describing the current playback position,
      * wrapping the time around the display's duration when known.
      */
-    @PaperOnly fun createPacket(): SyncData {
+    @PaperOnly
+    fun createPacket(): SyncData {
         val nanos = System.nanoTime()
         val currentTime = if (paused) lastReportedTime
         else lastReportedTime + (nanos - lastReportedTimestamp)
@@ -50,7 +53,8 @@ import java.util.*
      *
      * @param display optional display data used to seed [limitTime] on first call.
      */
-    @FabricOnly fun createPacket(display: FabricDisplayData?): SyncData {
+    @FabricOnly
+    fun createPacket(display: FabricDisplayData?): SyncData {
         val nanos = System.nanoTime()
         val currentTime = if (paused) lastReportedTime
         else lastReportedTime + (nanos - lastReportedTimestamp)

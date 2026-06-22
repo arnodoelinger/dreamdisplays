@@ -36,7 +36,8 @@ class ErrorPanel(
         val ex = error()
         val headline = Component.translatable(headlineKey(ex?.kind)).withStyle { it.withColor(ChatFormatting.RED) }
         val detailLines = detailLines(font, ex?.message, textW)
-        val hint = Component.translatable("dreamdisplays.error.loadingerror.hint").withStyle { it.withColor(ChatFormatting.GRAY) }
+        val hint = Component.translatable("dreamdisplays.error.loadingerror.hint")
+            .withStyle { it.withColor(ChatFormatting.GRAY) }
         val headerH = UiTheme.PANEL_PADDING_Y + lh + 6
         val detailH = if (detailLines.isEmpty()) 0 else detailLines.size * (lh + 2) + 8
         val contentH = 8 + lh + 8 + detailH + lh + 12 + BUTTON_SIZE

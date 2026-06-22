@@ -25,7 +25,8 @@ object SelectionManager {
     val selectionPoints: MutableMap<UUID, SelectionData> = ConcurrentHashMap()
 
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
-    @PaperOnly fun setFirstPoint(player: Player, loc: Location, face: Any) {
+    @PaperOnly
+    fun setFirstPoint(player: Player, loc: Location, face: Any) {
         val sel = (selectionPoints[player.uniqueId] as? PaperSelectionData)
             ?: PaperSelectionData(player).also { selectionPoints[player.uniqueId] = it }
         if (sel.pos1?.world != loc.world || sel.pos2?.world != loc.world) sel.reset()
@@ -37,7 +38,8 @@ object SelectionManager {
     }
 
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
-    @FabricOnly fun setFirstPoint(player: ServerPlayer, pos: BlockPos, worldKey: String, face: Direction) {
+    @FabricOnly
+    fun setFirstPoint(player: ServerPlayer, pos: BlockPos, worldKey: String, face: Direction) {
         val sel = (selectionPoints[player.uuid] as? FabricSelectionData)
             ?: FabricSelectionData().also { selectionPoints[player.uuid] = it }
         if (sel.worldKey != worldKey) sel.reset()
@@ -50,7 +52,8 @@ object SelectionManager {
     }
 
     /** Records the second selection corner, validating the worlds match the first point. */
-    @PaperOnly fun setSecondPoint(player: Player, loc: Location) {
+    @PaperOnly
+    fun setSecondPoint(player: Player, loc: Location) {
         val sel = selectionPoints[player.uniqueId] as? PaperSelectionData ?: return
         if (sel.pos1 == null || sel.pos1?.world != loc.world) {
             sel.reset()
@@ -66,7 +69,8 @@ object SelectionManager {
     }
 
     /** Records the second selection corner, validating the worlds match the first point. */
-    @FabricOnly fun setSecondPoint(player: ServerPlayer, pos: BlockPos, worldKey: String) {
+    @FabricOnly
+    fun setSecondPoint(player: ServerPlayer, pos: BlockPos, worldKey: String) {
         val sel = selectionPoints[player.uuid] as? FabricSelectionData ?: return
         if (sel.pos1 == null || sel.worldKey != worldKey) {
             sel.reset()
@@ -82,11 +86,13 @@ object SelectionManager {
     }
 
     /** Returns true if [loc] lies within any player's finalized selection. */
-    @PaperOnly fun isLocationSelected(loc: Location): Boolean =
+    @PaperOnly
+    fun isLocationSelected(loc: Location): Boolean =
         selectionPoints.values.filterIsInstance<PaperSelectionData>().any { it.isReady && it.contains(loc) }
 
     /** Returns true if [pos] lies within any player's finalized selection in [worldKey]. */
-    @FabricOnly fun isLocationSelected(pos: BlockPos, worldKey: String): Boolean =
+    @FabricOnly
+    fun isLocationSelected(pos: BlockPos, worldKey: String): Boolean =
         selectionPoints.values.filterIsInstance<FabricSelectionData>().any { sel ->
             sel.isReady && sel.worldKey == worldKey && sel.contains(pos)
         }
@@ -95,13 +101,16 @@ object SelectionManager {
     fun resetSelection(uuid: UUID) = selectionPoints.remove(uuid)?.reset()
 
     /** Clears [player]'s current selection. */
-    @PaperOnly fun resetSelection(player: Player) = resetSelection(player.uniqueId)
+    @PaperOnly
+    fun resetSelection(player: Player) = resetSelection(player.uniqueId)
 
     /** Clears [player]'s current selection. */
-    @FabricOnly fun resetSelection(player: ServerPlayer) = resetSelection(player.uuid)
+    @FabricOnly
+    fun resetSelection(player: ServerPlayer) = resetSelection(player.uuid)
 
     /** Returns true if [loc] is inside the bounding box defined by this selection. */
-    @PaperOnly private fun PaperSelectionData.contains(loc: Location): Boolean {
+    @PaperOnly
+    private fun PaperSelectionData.contains(loc: Location): Boolean {
         val p1 = pos1 ?: return false
         val p2 = pos2 ?: return false
         return RegionUtil.isInBoundaries(p1, p2, loc)

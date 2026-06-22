@@ -6,8 +6,11 @@ internal class PlaybackClock {
         private const val NOT_STARTED = Long.MIN_VALUE
     }
 
-    @Volatile var seekOffsetNanos = 0L
-    @Volatile private var startWallNanos = NOT_STARTED
+    @Volatile
+    var seekOffsetNanos = 0L
+
+    @Volatile
+    private var startWallNanos = NOT_STARTED
 
     val isRunning: Boolean get() = startWallNanos != NOT_STARTED
 

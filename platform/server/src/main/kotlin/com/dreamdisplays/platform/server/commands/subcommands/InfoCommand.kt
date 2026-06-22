@@ -23,7 +23,8 @@ import org.bukkit.entity.Player
  * of the display the player is currently looking at.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class InfoCommand : SubCommand {
+@PaperOnly
+class InfoCommand : SubCommand {
     override val name = "info"
     override val permission = Main.config.permissions.info
     override val playerOnly = true
@@ -114,7 +115,8 @@ import org.bukkit.entity.Player
  * `Fabric`-specific implementation of the `/display info` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricInfoCommand {
+@FabricOnly
+object FabricInfoCommand {
     /** Prints owner, UUID, region, size, and media metadata of the targeted display. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer

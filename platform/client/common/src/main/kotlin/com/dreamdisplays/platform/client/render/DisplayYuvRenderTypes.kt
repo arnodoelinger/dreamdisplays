@@ -70,7 +70,11 @@ object DisplayYuvRenderTypes {
                 && NativeMedia.yuvGpuEnabled
 
     /** Creates one RED8 plane texture through the built-in (26.1-era) or reflective 26.2 API. */
-    fun createPlaneTexture(label: String, width: Int, height: Int): net.minecraft.client.renderer.texture.AbstractTexture =
+    fun createPlaneTexture(
+        label: String,
+        width: Int,
+        height: Int
+    ): net.minecraft.client.renderer.texture.AbstractTexture =
         if (isSupported) VideoPlaneTexture(label, width, height)
         else Yuv262Reflect.createPlaneTexture(label, width, height)
 
@@ -118,7 +122,8 @@ object DisplayYuvRenderTypes {
     }
 
     /** Shared flat solid-color render type (a 1 x 1 white texture modulated by the vertex color). */
-    @Volatile private var sharedSolidType: RenderType? = null
+    @Volatile
+    private var sharedSolidType: RenderType? = null
 
     /**
      * Shared flat solid-color render type (a 1 x 1 white texture modulated by the vertex color), used

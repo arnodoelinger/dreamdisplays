@@ -1,6 +1,7 @@
 # Platform client: common
 
-Shared client-side Minecraft integration. This module wires the public API, core display system, media player / source, and
+Shared client-side Minecraft integration. This module wires the public API, core display system, media player / source,
+and
 Minecraft client UI / rendering.
 
 ## Contents

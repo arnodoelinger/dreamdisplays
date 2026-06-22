@@ -37,7 +37,9 @@ internal class RetryPolicy(private val maxRetries: Int = 3) {
     fun nextDelay(): Long = backoffMs[retries.coerceAtMost(backoffMs.lastIndex)].also { retries++ }
 
     /** Resets [retries] to 0 after a successful stream start. */
-    fun reset() { retries = 0 }
+    fun reset() {
+        retries = 0
+    }
 
     /** Describes how a retry should be performed. */
     data class Decision(

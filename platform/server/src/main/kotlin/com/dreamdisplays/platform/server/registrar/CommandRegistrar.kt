@@ -20,7 +20,8 @@ import java.util.Locale
 /**
  * Command registrar. Uses Brigadier to build the `/display` command tree.
  */
-@PaperOnly object CommandRegistrar {
+@PaperOnly
+object CommandRegistrar {
     /** Builds the full `Brigadier` tree for the `/display` command with all subcommands. */
     fun buildDisplayCommand(): LiteralCommandNode<CommandSourceStack> = Commands.literal("display")
         .executes { ctx ->
@@ -177,7 +178,8 @@ import java.util.Locale
 /**
  * `Fabric`-specific implementation of [CommandRegistrar].
  */
-@FabricOnly object FabricCommandRegistrar {
+@FabricOnly
+object FabricCommandRegistrar {
     /** Registers the `/display` command tree with `Fabric`'s command dispatcher. */
     fun register() {
         net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->

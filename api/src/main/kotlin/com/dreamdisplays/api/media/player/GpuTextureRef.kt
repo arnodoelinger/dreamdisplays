@@ -9,4 +9,5 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * platform implementation casts it back to the concrete texture type. This keeps Minecraft's
  * `GpuTexture` out of the platform-agnostic player module.
  */
-@DreamDisplaysUnstableApi interface GpuTextureRef
+@DreamDisplaysUnstableApi
+interface GpuTextureRef

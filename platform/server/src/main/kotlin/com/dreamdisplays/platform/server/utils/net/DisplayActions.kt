@@ -32,7 +32,9 @@ import java.util.UUID
  * [PacketReceiver] and the v2 [PaperV2Networking] dispatch here, so permission checks and
  * business logic exist exactly once.
  */
-@PaperOnly @NullMarked object DisplayActions {
+@PaperOnly
+@NullMarked
+object DisplayActions {
     private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayActions")
     private val gson by lazy { Gson() }
 
@@ -227,7 +229,8 @@ import java.util.UUID
 
         val currentVersionString = Main.getInstance().description.version
         if (currentVersionString.contains("-SNAPSHOT", ignoreCase = true) ||
-            currentVersionString.contains("-DEV", ignoreCase = true)) {
+            currentVersionString.contains("-DEV", ignoreCase = true)
+        ) {
             return
         }
 

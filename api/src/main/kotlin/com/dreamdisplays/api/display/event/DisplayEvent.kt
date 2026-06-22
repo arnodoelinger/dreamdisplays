@@ -12,7 +12,8 @@ import com.dreamdisplays.media.DreamMediaException
  *
  * @since 1.8.0
  */
-@DreamDisplaysUnstableApi sealed interface DisplayEvent {
+@DreamDisplaysUnstableApi
+sealed interface DisplayEvent {
     /** The ID of the display that the event occurred on. */
     val displayId: DisplayId
 

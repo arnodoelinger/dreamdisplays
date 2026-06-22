@@ -45,7 +45,9 @@ private fun supportsVertical(uuid: UUID): Boolean {
  * [V2PlayerTracker]: negotiated players receive protocol-v2 envelopes via [PaperV2Networking],
  * everyone else gets the FROZEN v1 plugin messages whose wire format must never change.
  */
-@PaperOnly @NullMarked object PacketUtil {
+@PaperOnly
+@NullMarked
+object PacketUtil {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketUtil")
     private const val CHANNEL_DISPLAY_INFO = "dreamdisplays:display_info"
     private const val CHANNEL_SYNC = "dreamdisplays:sync"
@@ -325,7 +327,8 @@ private fun supportsVertical(uuid: UUID): Boolean {
  * Dual-protocol send facade for the Fabric flavor: v2-negotiated players receive envelope
  * payloads via [FabricV2Networking], everyone else gets the frozen v1 payloads.
  */
-@FabricOnly object FabricPacketUtil {
+@FabricOnly
+object FabricPacketUtil {
     /** Splits the recipients into (v2-negotiated, legacy) lists. */
     private fun partition(players: List<ServerPlayer>): Pair<List<ServerPlayer>, List<ServerPlayer>> =
         players.partition { V2PlayerTracker.isV2(it.uuid) }

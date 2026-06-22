@@ -27,7 +27,8 @@ import kotlin.math.max
  * displays with teleport and URL buttons for in-game players.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@PaperOnly class ListCommand : SubCommand {
+@PaperOnly
+class ListCommand : SubCommand {
     private companion object {
         const val PAGE_SIZE = 10
         const val FILTER_MINE = "mine"
@@ -315,7 +316,8 @@ import kotlin.math.max
  * `Fabric`-specific implementation of the `/display list` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly object FabricListCommand {
+@FabricOnly
+object FabricListCommand {
     private const val PAGE_SIZE = 10
     private const val FILTER_MINE = "mine"
     private const val FILTER_WORLD = "world"

@@ -17,7 +17,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 
 /** Mixin that suppresses crosshair rendering while the player is looking at a display screen. */
 @Suppress("UNUSED", "NonJavaMixin")
-@Pseudo @Mixin(targets = ["net.minecraft.client.gui.Gui", "net.minecraft.client.gui.Hud"])
+@Pseudo
+@Mixin(targets = ["net.minecraft.client.gui.Gui", "net.minecraft.client.gui.Hud"])
 open class Crosshair {
     /** Cancels crosshair extraction when the player is targeting a display surface. */
     //? if >=26 {
@@ -27,13 +28,13 @@ open class Crosshair {
         deltaTracker: DeltaTracker,
         ci: CallbackInfo
     ) {
-    //?} else
-    /*@Inject(method = ["renderCrosshair"], at = [At("HEAD")], cancellable = true, require = 0)
-    open fun extractCrosshair(
-        guiGraphics: GuiGraphics,
-        deltaTracker: DeltaTracker,
-        ci: CallbackInfo
-    ) {*/
+        //?} else
+        /*@Inject(method = ["renderCrosshair"], at = [At("HEAD")], cancellable = true, require = 0)
+        open fun extractCrosshair(
+            guiGraphics: GuiGraphics,
+            deltaTracker: DeltaTracker,
+            ci: CallbackInfo
+        ) {*/
         val suppress = DreamServices.registry.getOrNull<CrosshairPolicy>()
             ?.shouldSuppressCrosshair()
             ?: ClientStateManager.isOnScreen

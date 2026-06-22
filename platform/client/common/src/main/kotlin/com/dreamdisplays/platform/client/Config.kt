@@ -41,7 +41,9 @@ class Config(private val baseDir: File) {
      * If the configuration file does not exist, it will be created with default values.
      */
     private fun load() {
-        if (!file.exists()) { save(); return }
+        if (!file.exists()) {
+            save(); return
+        }
         val data = file.readLines()
             .map { it.trim() }
             .filter { it.isNotEmpty() && !it.startsWith('#') }

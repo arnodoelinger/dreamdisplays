@@ -10,7 +10,9 @@ class DefaultServiceRegistry : ServiceRegistry {
     private val instances = ConcurrentHashMap<Class<*>, Any>()
 
     /** Registers [instance] under contract [type], replacing any previous binding for that type. */
-    override fun <T : Any> register(type: Class<T>, instance: T) { instances[type] = instance }
+    override fun <T : Any> register(type: Class<T>, instance: T) {
+        instances[type] = instance
+    }
 
     /** Returns the instance bound to [type], throwing if nothing was registered. */
     override fun <T : Any> get(type: Class<T>): T = getOrNull(type) ?: error("No service registered for ${type.name}.")

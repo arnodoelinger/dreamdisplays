@@ -73,6 +73,7 @@ internal object Yuv262Reflect {
             .invoke(builder, 0, DefaultVertexFormat.POSITION_TEX_COLOR)
 
         val topologyClass = Class.forName("com.mojang.blaze3d.PrimitiveTopology")
+
         @Suppress("UNCHECKED_CAST")
         val quads = java.lang.Enum.valueOf(topologyClass as Class<out Enum<*>>, "QUADS")
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)

@@ -31,7 +31,8 @@ import org.slf4j.LoggerFactory
  * Protocol-v2 networking for the `Fabric` flavor: one envelope payload in both directions.
  * Business logic is shared with the frozen-v1 receivers through [ServerPacketHandler].
  */
-@FabricOnly object FabricV2Networking {
+@FabricOnly
+object FabricV2Networking {
     private val logger = LoggerFactory.getLogger("DreamDisplays/FabricV2Networking")
 
     /** Encodes [packet] once and sends it to every player in [players]. */
@@ -65,14 +66,23 @@ import org.slf4j.LoggerFactory
             is ReportDisplay -> DisplayManager.report(packet.id, player, server)
             is SetVideo -> ServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
             is SetLocked -> ServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
-            is SetMode -> ServerPacketHandler.setMode(player, server, packet.id, PlaybackMode.fromWire(packet.mode), packet.positionMs)
+            is SetMode -> ServerPacketHandler.setMode(
+                player,
+                server,
+                packet.id,
+                PlaybackMode.fromWire(packet.mode),
+                packet.positionMs
+            )
+
             is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
                 ServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
             }
+
             is WatchPartyStart -> ServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
             is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
                 ServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
             }
+
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }

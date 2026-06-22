@@ -1,6 +1,7 @@
 # Media runtime
 
-Runtime support for media sessions and system helpers needed by the media pipeline, but not part of the public domain model.
+Runtime support for media sessions and system helpers needed by the media pipeline, but not part of the public domain
+model.
 
 ## Contents
 

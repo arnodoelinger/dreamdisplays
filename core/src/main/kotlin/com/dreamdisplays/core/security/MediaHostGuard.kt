@@ -58,7 +58,11 @@ object MediaHostGuard {
     fun resolveSafeUrl(url: String, maxRedirects: Int = 5): String {
         requireAllowed(url)
         if (allowPrivate) return url
-        val scheme = try { URI(url.trim()).scheme?.lowercase() } catch (_: Exception) { null }
+        val scheme = try {
+            URI(url.trim()).scheme?.lowercase()
+        } catch (_: Exception) {
+            null
+        }
         if (scheme != "http" && scheme != "https") return url
 
         var current = url
@@ -128,8 +132,8 @@ object MediaHostGuard {
         val o0 = bytes[0].toInt() and 0xff
         val o1 = bytes[1].toInt() and 0xff
         return o0 == 0 ||                      // 0.0.0.0/8 "this network" (only 0.0.0.0 is isAnyLocal)
-            (o0 == 100 && o1 in 64..127) ||    // 100.64.0.0/10 carrier-grade NAT (RFC 6598)
-            o0 >= 240                          // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
+                (o0 == 100 && o1 in 64..127) ||    // 100.64.0.0/10 carrier-grade NAT (RFC 6598)
+                o0 >= 240                          // 240.0.0.0/4 reserved + 255.255.255.255 broadcast
     }
 
     /** Non-public IPv6: unique-local fc00::/7, plus IPv4-mapped addresses re-checked as IPv4. */
@@ -137,7 +141,7 @@ object MediaHostGuard {
         if ((bytes[0].toInt() and 0xfe) == 0xfc) return true // fc00::/7 unique-local
         // IPv4-mapped (::ffff:a.b.c.d): the flag checks above don't unwrap it, so re-check the IPv4.
         val isMappedV4 = (0..9).all { bytes[it].toInt() == 0 } &&
-            bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
+                bytes[10] == 0xff.toByte() && bytes[11] == 0xff.toByte()
         return isMappedV4 && isNonPublicV4(bytes.copyOfRange(12, 16))
     }
 }

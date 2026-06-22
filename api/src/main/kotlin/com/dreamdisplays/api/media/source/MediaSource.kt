@@ -3,7 +3,8 @@ package com.dreamdisplays.api.media.source
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /** User-provided media locator before resolver-specific stream extraction. */
-@DreamDisplaysUnstableApi sealed interface MediaSource {
+@DreamDisplaysUnstableApi
+sealed interface MediaSource {
     /** Generic remote URL, passed through to the resolver pipeline. */
     data class Remote(val url: String) : MediaSource
 
@@ -36,6 +37,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
                 val id = YOUTUBE_ID_RE.find(url)?.groupValues?.get(1)
                 if (id != null) YouTube(id) else Remote(url)
             }
+
             "twitch.tv" in url -> Twitch(url.substringAfterLast("/"))
             else -> Remote(url)
         }
