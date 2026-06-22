@@ -40,6 +40,7 @@ import org.bukkit.plugin.java.JavaPlugin
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
 import java.io.File
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Entry point of `Dream Displays` server-side plugin.
@@ -55,8 +56,8 @@ import java.io.File
  *
  * @see <a href="https://github.com/arsmotorin/OFRAT">OFRAT</a>
  */
-@Suppress("UnstableApiUsage")
 @PaperOnly @NullMarked class Main : JavaPlugin() {
+    /** Storage manager for persistent data. */
     lateinit var storage: StorageManager
 
     /** Captures the plugin instance, loads config, and registers `Brigadier` commands before any worlds load. */
@@ -73,7 +74,7 @@ import java.io.File
         doEnable()
     }
 
-    /** Standard `Bukkit` hook, delegates to [doDisable]. */
+    /** Disables the plugin, disconnecting from the database and tearing down resources. */
     override fun onDisable() {
         doDisable()
     }
@@ -115,9 +116,16 @@ import java.io.File
     }
 
     companion object {
+        /** Logger. */
         val logger = LoggerFactory.getLogger("DreamDisplays/Plugin")
+
+        /** Mod config (`Fabric` server included). */
         lateinit var config: Config
+
+        /** Mod version */
         var modVersion: Semver? = null
+
+        /** Latest plugin version string from GitHub (populated by updater). */
         var pluginLatestVersion: String? = null
 
         /** Returns the singleton plugin instance. */
@@ -128,6 +136,7 @@ import java.io.File
             instance.server.pluginManager.disablePlugin(instance)
         }
 
+        /** The plugin instance. */
         private lateinit var instance: Main
     }
 }
@@ -213,7 +222,7 @@ import java.io.File
             registerPayload(serverbound, Packets.SetLocked.PACKET_ID, Packets.SetLocked.PACKET_CODEC)
             registerPayload(serverbound, Packets.DisplayEnabled.PACKET_ID, Packets.DisplayEnabled.PACKET_CODEC)
         } catch (e: Exception) {
-            logger.error("Failed to register payload types", e)
+            logger.error("Failed to register payload types.", e)
             throw e
         }
     }
@@ -239,7 +248,7 @@ import java.io.File
 
         ServerCoroutines.io.launch {
             while (!server.isStopped) {
-                delay(1000L)
+                delay(1000L.milliseconds)
                 runCatching {
                     server.execute {
                         DisplayManager.updateAllDisplays(server)
@@ -253,10 +262,10 @@ import java.io.File
 
         if (settings.updatesEnabled) {
             ServerCoroutines.io.launch {
-                delay(1000L)
+                delay(1000L.milliseconds)
                 runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 while (!server.isStopped) {
-                    delay(60L * 60L * 1000L)
+                    delay((60L * 60L * 1000L).milliseconds)
                     runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 }
             }
@@ -264,6 +273,7 @@ import java.io.File
     }
 
     companion object {
+        /** Logger. */
         val logger = LoggerFactory.getLogger("DreamDisplays")
 
         /** The mod version string, resolved from the `Fabric` mod container. */
@@ -288,14 +298,9 @@ import java.io.File
         private var serverInstance: MinecraftServer? = null
         private var storageInstance: StorageManager? = null
 
-        val config: FabricConfig
-            get() = configInstance
-
-        val server: MinecraftServer?
-            get() = serverInstance
-
-        val storage: StorageManager?
-            get() = storageInstance
+        val config: FabricConfig; get() = configInstance
+        val server: MinecraftServer?; get() = serverInstance
+        val storage: StorageManager?; get() = storageInstance
 
         /** Copies the pre-1.8.1 global `SQLite DB` into [worldDataDir] on first startup for this world. */
         private fun migrateGlobalDb(worldDataDir: File) {
@@ -310,7 +315,7 @@ import java.io.File
                         "The old file at ${oldDb.absolutePath} can be deleted once all worlds have been started at least once."
                     )
                 }
-                .onFailure { logger.error("Failed to migrate global DB to ${newDb.absolutePath}", it) }
+                .onFailure { logger.error("Failed to migrate global DB to ${newDb.absolutePath}.", it) }
         }
     }
 }

@@ -11,6 +11,7 @@ import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
  * Manages the registration of plugin channels for incoming and outgoing messages.
  */
 @PaperOnly object ChannelRegistrar {
+    /** Incoming plugin channels. */
     private val incomingChannels = listOf(
         "dreamdisplays:sync",
         "dreamdisplays:req_sync",
@@ -22,6 +23,7 @@ import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
         "dreamdisplays:set_locked"
     )
 
+    /** Outgoing plugin channels. */
     private val outgoingChannels = listOf(
         "dreamdisplays:premium",
         "dreamdisplays:is_admin",

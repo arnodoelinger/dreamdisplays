@@ -20,13 +20,18 @@ import org.bukkit.entity.Player
  * per-reporter) is enforced upstream by [DisplayManager] before any request reaches here.
  */
 object ReporterUtil {
+    /** Shared HTTP client for sending webhook requests. */
     private val httpClient: HttpClient by lazy { HttpClient.newHttpClient() }
+
+    /** Embed constants for the Discord webhook payload. */
     private const val EMBED_COLOR = 0x2F3136
+
+    /** Embed constants for the Discord webhook payload. */
     private const val EMBED_TITLE = "# 🛡️ New report"
 
     /**
      * Sends a report to Discord. `Fabric` overload. Accepts a pre-formatted [locationStr]
-     * because `Fabric server` code already converts [BlockPos] and world key to a readable string.
+     * because `Fabric` server code already converts [BlockPos] and world key to a readable string.
      */
     @FabricOnly fun sendReport(
         locationStr: String,
@@ -99,7 +104,7 @@ object ReporterUtil {
             .build()
         val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
         if (response.statusCode() / 100 != 2) {
-            throw IOException("Discord webhook failed: ${response.statusCode()} - ${response.body()}.")
+            throw IOException("Discord webhook failed: ${response.statusCode()}: ${response.body()}.")
         }
     }
 }

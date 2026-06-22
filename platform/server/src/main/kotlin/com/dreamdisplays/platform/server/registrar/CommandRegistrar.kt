@@ -20,7 +20,6 @@ import java.util.Locale
 /**
  * Command registrar. Uses Brigadier to build the `/display` command tree.
  */
-@Suppress("UnstableApiUsage")
 @PaperOnly object CommandRegistrar {
     /** Builds the full `Brigadier` tree for the `/display` command with all subcommands. */
     fun buildDisplayCommand(): LiteralCommandNode<CommandSourceStack> = Commands.literal("display")

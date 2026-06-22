@@ -39,8 +39,13 @@ import java.util.Optional
  * Used throughout the plugin for consistent message formatting and localization support.
  */
 object MessageUtil {
+    /** Global instance of [Gson] used for JSON serialization. */
     private val gson by lazy { Gson() }
+
+    /** Legacy and JSON serializers for legacy color-coded strings. */
     @PaperOnly private val legacySerializer = LegacyComponentSerializer.legacyAmpersand()
+
+    /** Legacy and JSON serializers for `Adventure Components`. */
     @PaperOnly private val gsonSerializer = GsonComponentSerializer.gson()
 
     /** Sends a localized message identified by [messageKey] to [sender]. */
@@ -127,6 +132,7 @@ object MessageUtil {
         player.sendSystemMessage(toNmsComponent(message))
     }
 
+    /** Converts an `Adventure` [component] to a `NMS Component`. */
     @FabricOnly private fun toNmsComponent(message: Any): NmsComponent {
         return when (message) {
             is String -> parseAmpersandLegacy(message)

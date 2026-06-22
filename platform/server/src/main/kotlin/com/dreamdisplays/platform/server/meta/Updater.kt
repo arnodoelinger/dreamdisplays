@@ -24,6 +24,7 @@ import java.time.Duration
  * Checks for updates of the `Paper` plugin and mod from GitHub releases.
  */
 @PaperOnly object Updater {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
 
     /**

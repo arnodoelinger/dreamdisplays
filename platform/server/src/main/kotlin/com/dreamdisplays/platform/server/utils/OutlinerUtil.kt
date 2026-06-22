@@ -14,8 +14,10 @@ import java.util.*
  * Utility object for outlining areas with particles.
  */
 @PaperOnly @NullMarked object OutlinerUtil {
+    /** The currently active outlines, keyed by player UUID. */
     private val activeOutlines: MutableMap<UUID, OutlineData> = mutableMapOf()
 
+    /** Data class for an outline. */
     data class OutlineData(
         val box: BoundingBox,
         val world: org.bukkit.World,

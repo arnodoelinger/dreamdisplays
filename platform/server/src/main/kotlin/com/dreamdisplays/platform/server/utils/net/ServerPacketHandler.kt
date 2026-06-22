@@ -27,12 +27,14 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.server.players.NameAndId
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Fabric-specific packet actions, shared between the frozen v1 receivers registered here and the
  * protocol-v2 dispatch in [FabricV2Networking].
  */
 @FabricOnly object ServerPacketHandler {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
 
     /** Records the player's reported mod version and runs the mod / plugin update checks. */
@@ -99,7 +101,7 @@ import org.slf4j.LoggerFactory
         val displayData = DisplayManager.getDisplayData(displayId) as? FabricDisplayData
             ?: return MessageUtil.sendMessage(player, "noDisplay")
 
-        // On Fabric: own display = always allowed; others' display = op-only (no permission-node API).
+        // On Fabric: own display = always allowed; others' display = op-only (no permission-node API)
         if (displayData.ownerId != player.uuid && !isOpLevel2(player)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
@@ -290,7 +292,7 @@ import org.slf4j.LoggerFactory
             return
         }
         ServerCoroutines.io.launch {
-            delay(delayTicks * 50L)
+            delay((delayTicks * 50L).milliseconds)
             server.execute(task)
         }
     }

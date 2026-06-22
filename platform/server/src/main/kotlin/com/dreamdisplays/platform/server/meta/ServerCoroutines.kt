@@ -16,6 +16,7 @@ import kotlinx.coroutines.cancel
  * on a clean server stop. A [SupervisorJob] keeps one failed task from cancelling the rest.
  */
 object ServerCoroutines {
+    /** The server-side coroutine scope for all background IO. */
     val io: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO + CoroutineName("DD-Server-IO"))
 
     /** Cancels all background server IO coroutines. Called on server stop / plugin disable. */

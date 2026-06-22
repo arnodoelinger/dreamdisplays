@@ -19,20 +19,31 @@ import java.nio.file.StandardCopyOption
  * Manages the configuration of the plugin.
  */
 @PaperOnly @NullMarked class Config(private val plugin: Main) {
+    /** The plugin's configuration file. */
     private val configFile = File(plugin.dataFolder, "config.toml")
+
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/Config")
 
-    lateinit var language: LanguageSection
-        private set
-    lateinit var settings: SettingsSection
-        private set
-    lateinit var storage: StorageSection
-        private set
-    lateinit var permissions: PermissionsSection
-        private set
+    /** Config language. */
+    lateinit var language: LanguageSection; private set
+
+    /** Config settings. */
+    lateinit var settings: SettingsSection; private set
+
+    /** Config storage type. */
+    lateinit var storage: StorageSection; private set
+
+    /** Config permissions. */
+    lateinit var permissions: PermissionsSection; private set
+
+    /** Config messages. */
     val messages = mutableMapOf<String, Any>()
+
+    /** Config languages. */
     val languages = mutableMapOf<String, Map<String, Any>>()
 
+    /** Initializes the plugin's configuration. */
     init {
         createDefaultConfig()
         extractLangFiles(true)
@@ -169,10 +180,12 @@ import java.nio.file.StandardCopyOption
         messages.putAll(languages["en"] ?: emptyMap())
     }
 
+    /** Language section of the config. */
     data class LanguageSection(
         val default_language: String = "en",
     )
 
+    /** Settings section of the config. */
     data class SettingsSection(
         val reports: ReportsConfig = ReportsConfig(),
         val updates: UpdatesConfig = UpdatesConfig(),
@@ -211,17 +224,20 @@ import java.nio.file.StandardCopyOption
             baseMaterial = Material.matchMaterial(display.base_material) ?: Material.BLACK_CONCRETE
         }
 
+        /** Reports section. */
         data class ReportsConfig(
             val webhook_url: String = "",
             val cooldown: Int = 15,
         )
 
+        /** Updates section. */
         data class UpdatesConfig(
             val enabled: Boolean = true,
             val repo_name: String = "dreamdisplays",
             val repo_owner: String = "arsmotorin",
         )
 
+        /** Display section. */
         data class DisplayConfig(
             val selection_material: String = "DIAMOND_AXE",
             val base_material: String = "BLACK_CONCRETE",
@@ -237,7 +253,7 @@ import java.nio.file.StandardCopyOption
         )
     }
 
-    // Storage configuration
+    /** Storage section of the config. */
     data class StorageSection(
         val storage: StorageConfig = StorageConfig(),
     ) {
@@ -260,7 +276,7 @@ import java.nio.file.StandardCopyOption
         )
     }
 
-    // Permissions configuration
+    /** Permissions section of the config. */
     data class PermissionsSection(
         val permissions: PermissionsConfig = PermissionsConfig(),
     ) {
@@ -334,7 +350,10 @@ import java.nio.file.StandardCopyOption
     }
 
     companion object {
+        /** Default config file contents. */
         private val GSON = Gson()
+
+        /** Language files to extract from the plugin's JAR. */
         private val LANGUAGE_FILES =
             listOf(
                 "en.json",
@@ -358,8 +377,8 @@ import java.nio.file.StandardCopyOption
  * Server-side configuration. Mirrors the `Paper` config structure but uses registry names as strings
  * for materials and does not depend on `Bukkit`.
  */
-// TODO: merge
-@FabricOnly class FabricConfig {
+@Deprecated("Fabric config will be merged with Paper config in the future.")
+@FabricOnly class FabricConfig { // TODO: merge
     private val logger = LoggerFactory.getLogger("DreamDisplays/ServerConfig")
 
     private val configDir: File = FabricLoader.getInstance().configDir.resolve("dreamdisplays").toFile()

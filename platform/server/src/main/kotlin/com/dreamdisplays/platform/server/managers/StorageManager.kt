@@ -26,7 +26,8 @@ import java.nio.ByteBuffer
 import java.util.*
 
 /**
- * Database table for storing display data.
+ * Exposed table definition for persistent display rows. Positions and dimensions are packed to keep
+ * the schema compact across both `Paper` and `Fabric` server variants.
  */
 class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     val id = binary("id", 16)
@@ -46,6 +47,10 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     override val primaryKey = PrimaryKey(id)
 }
 
+/**
+ * SQL-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
+ * objects and writes updates from managers back to SQLite or MySQL through Exposed / Hikari.
+ */
 @NullMarked class StorageManager(
     type: String,
     dataDir: File,
@@ -63,7 +68,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         jdbcUrl = when (type.uppercase()) {
             "SQLITE" -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
             "MYSQL" -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false&useInformationSchema=false"
-            else -> error("Unsupported storage type: $type")
+            else -> error("Unsupported storage type: $type.")
         }
         if (type.uppercase() != "SQLITE") {
             this.username = username
@@ -75,6 +80,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         isAutoCommit = false
     })
 
+    /** Exposed database connection. */
     private val db = Database.connect(dataSource)
 
     /**
@@ -90,6 +96,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     /** Persists all in-memory displays and closes the database connection on plugin shutdown. */
     fun disconnect() = dataSource.close()
 
+    /** Load all displays from the database, returning a list of [DisplayData] objects. */
     @PaperOnly fun loadAllPaperDisplays(): List<PaperDisplayData> = transaction(db) {
         table.selectAll().mapNotNull(::rowToPaper)
     }
@@ -97,7 +104,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     /** Upserts the full row for [data] into the displays table. */
     @PaperOnly fun saveDisplay(data: PaperDisplayData) {
         val worldName = data.pos1.world?.name ?: run {
-            logger.error("Cannot save display ${data.id}: world is null")
+            logger.error("Cannot save display ${data.id}: world is null.")
             return
         }
         upsert(data, worldName,
@@ -109,13 +116,14 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     /** Deletes the display with the given [data] from the displays table. */
     fun deleteDisplay(data: DisplayData) = delete(data.id)
 
+    /** Converts a row from the displays table into a [PaperDisplayData] object, or null if the row */
     @PaperOnly private fun rowToPaper(row: ResultRow): PaperDisplayData? {
         val id = row[table.id].toUUID()
         val worldName = row[table.world]
         val world = Bukkit.getWorld(worldName)
             ?: runCatching { UUID.fromString(worldName) }.getOrNull()?.let { Bukkit.getWorld(it) }
         if (world == null) {
-            logger.warn("Skipping display $id: world '$worldName' not found")
+            logger.warn("Skipping display $id: world '$worldName' not found.")
             return null
         }
         val (x1, y1, z1) = unpackPos(row[table.pos1])
@@ -132,10 +140,12 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         ).applyCommon(row)
     }
 
+    /** Load all displays from the database, returning a list of [FabricDisplayData] objects. */
     @FabricOnly fun loadAllFabricDisplays(): List<FabricDisplayData> = transaction(db) {
         table.selectAll().mapNotNull(::rowToFabric)
     }
 
+    /** Upserts the full row for [data] into the displays table. */
     @FabricOnly fun saveDisplay(data: FabricDisplayData) {
         upsert(data, data.worldKey,
             packPos(data.pos1.x, data.pos1.y, data.pos1.z),
@@ -143,6 +153,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
             packFacing(DIRECTION_TO_ORDINAL.getValue(data.facing), data.rotation))
     }
 
+    /** Converts a row from the displays table into a [FabricDisplayData] object. */
     @FabricOnly private fun rowToFabric(row: ResultRow): FabricDisplayData {
         val (x1, y1, z1) = unpackPos(row[table.pos1])
         val (x2, y2, z2) = unpackPos(row[table.pos2])
@@ -158,6 +169,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         ).applyCommon(row)
     }
 
+    /** Upserts the given display data into the displays table. */
     private fun upsert(data: DisplayData, worldName: String, p1: Long, p2: Long, facingOrd: Int) {
         transaction(db) {
             table.replace {
@@ -178,10 +190,12 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         }
     }
 
+    /** Deletes the display with the given [displayId] from the display table. */
     private fun delete(displayId: UUID) {
         transaction(db) { table.deleteWhere { id eq displayId.toBytes() } }
     }
 
+    /** Applies common properties from a row to a display data object, such as URL and playback mode. */
     private fun <T : DisplayData> T.applyCommon(row: ResultRow): T = apply {
         url = row[table.videoCode]
         val stored = PlaybackMode.fromWire(row[table.mode])
@@ -193,10 +207,13 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     }
 
     companion object {
+        /** Directions and content rotations are packed into a single column. */
         private val DIRECTION_TO_ORDINAL = mapOf(
             Direction.NORTH to 0, Direction.EAST to 1, Direction.SOUTH to 2, Direction.WEST to 3,
             Direction.UP to 4, Direction.DOWN to 5,
         )
+
+        /** Inverse mapping of [DIRECTION_TO_ORDINAL]. */
         private val ORDINAL_TO_DIRECTION = mapOf(
             0 to Direction.NORTH, 1 to Direction.EAST, 2 to Direction.SOUTH, 3 to Direction.WEST,
             4 to Direction.UP, 5 to Direction.DOWN,
@@ -212,25 +229,31 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
         /** Extracts the content rotation from a [packFacing] value. */
         private fun unpackRotation(packed: Int): Int = (packed shr 8) and 0xFF
 
+        /** Packs a 3D position into a 64-bit long. */
         private fun packPos(x: Int, y: Int, z: Int): Long =
             ((x and 0x3FFFFFF).toLong() shl 38) or ((z and 0x3FFFFFF).toLong() shl 12) or (y and 0xFFF).toLong()
 
+        /** Unpacks a 64-bit long into a 3D position. */
         private fun unpackPos(packed: Long) = Triple(
             (packed shr 38).toInt(),
             (packed shl 52 shr 52).toInt(),
             (packed shl 26 shr 38).toInt()
         )
 
+        /** Packs two 16-bit integers into a 64-bit long. */
         private fun packInts(high: Int, low: Int): Long =
             (high.toLong() shl 32) or (low.toLong() and 0xFFFFFFFFL)
 
+        /** Unpacks a 64-bit long into two 16-bit integers. */
         private fun unpackInts(packed: Long): Pair<Int, Int> =
             (packed shr 32).toInt() to packed.toInt()
 
+        /** Converts a UUID to a byte array and vice versa. */
         private fun UUID.toBytes(): ByteArray = ByteBuffer.allocate(16).apply {
             putLong(mostSignificantBits); putLong(leastSignificantBits)
         }.array()
 
+        /** Converts a byte array to a UUID. */
         private fun ByteArray.toUUID(): UUID = ByteBuffer.wrap(this).let { UUID(it.getLong(), it.getLong()) }
     }
 }

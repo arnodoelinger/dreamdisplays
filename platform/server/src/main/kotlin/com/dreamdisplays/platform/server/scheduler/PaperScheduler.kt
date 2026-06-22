@@ -10,6 +10,9 @@ import java.util.concurrent.TimeUnit
  * `Paper` scheduler adapter for regular, non-`Folia` servers.
  */
 @PaperOnly @NullMarked object PaperScheduler : AdapterScheduler {
+    /** Tick delay in milliseconds. */
+    private const val TICK_MILLIS = 50L
+
     /** Schedules [task] on the primary server thread. */
     override fun runRepeatingSync(plugin: Plugin, delayTicks: Long, intervalTicks: Long, task: Runnable) {
         plugin.server.scheduler.runTaskTimer(plugin, task, delayTicks, intervalTicks)
@@ -25,6 +28,4 @@ import java.util.concurrent.TimeUnit
             TimeUnit.MILLISECONDS,
         )
     }
-
-    private const val TICK_MILLIS = 50L
 }
