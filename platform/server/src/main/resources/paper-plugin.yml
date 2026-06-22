@@ -16,5 +16,11 @@ permissions:
     default: true
   dreamdisplays.info:
     default: true
+  dreamdisplays.local:
+    default: true
+  dreamdisplays.synced:
+    default: true
+  dreamdisplays.broadcast:
+    default: true
   dreamdisplays.toggle.others:
     default: op
