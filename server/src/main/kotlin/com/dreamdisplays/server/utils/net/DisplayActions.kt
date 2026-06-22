@@ -11,11 +11,12 @@ import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
 import com.dreamdisplays.server.managers.StateManager
 import com.dreamdisplays.server.meta.Scheduler
+import com.dreamdisplays.server.meta.Scheduler.runAsync
 import com.dreamdisplays.server.playback.PlaybackContexts
 import com.dreamdisplays.server.playback.TimelineManager
 import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
-import com.dreamdisplays.server.utils.YouTubeUtil
+import com.dreamdisplays.server.utils.VersionUtil
 import com.google.gson.Gson
 import io.github.arsmotorin.ofrat.PaperOnly
 import net.kyori.adventure.text.TextReplacementConfig
@@ -41,8 +42,7 @@ import java.util.UUID
             ?: return MessageUtil.sendMessage(player, "noDisplay")
 
         val isOwner = displayData.ownerId == player.uniqueId
-        val canDelete = if (isOwner) player.hasPermission(Main.config.permissions.delete)
-                        else player.hasPermission(Main.config.permissions.deleteOthers)
+        val canDelete = isOwner || player.hasPermission(Main.config.permissions.deleteOthers)
         if (!canDelete) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
@@ -62,9 +62,9 @@ import java.util.UUID
         displayData.url = url
         displayData.lang = lang
 
-        val receivers = DisplayManager.getReceivers(displayData)
-        DisplayManager.sendUpdate(displayData, receivers)
-        if (wasSync) StateManager.resetAndBroadcast(displayData.id, receivers) // frozen-v1 clock
+        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        DisplayManager.broadcastUpdate(displayData)
+        if (wasSync) StateManager.resetAndBroadcast(displayData) // Frozen-v1 clock
         TimelineManager.onVideoChanged(displayData)
     }
 
@@ -75,8 +75,8 @@ import java.util.UUID
 
         displayData.isLocked = locked
 
-        val receivers = DisplayManager.getReceivers(displayData)
-        DisplayManager.sendUpdate(displayData, receivers)
+        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        DisplayManager.broadcastUpdate(displayData)
     }
 
     /** Switches a display's persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`) and re-anchors its clock. */
@@ -92,7 +92,8 @@ import java.util.UUID
         }
 
         displayData.mode = mode
-        DisplayManager.sendUpdate(displayData, DisplayManager.getReceivers(displayData))
+        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        DisplayManager.broadcastUpdate(displayData)
         TimelineManager.onModeChanged(displayData, positionMs)
     }
 
@@ -154,7 +155,7 @@ import java.util.UUID
     /** Records the player's reported mod version and runs the mod / plugin update checks. */
     fun recordVersionAndCheckUpdates(player: Player, versionString: String) {
         logger.info("${player.name} joined with Dream Displays $versionString.")
-        val version = parseVersionOrNull(versionString)
+        val version = VersionUtil.parseOrNull(versionString)
         PlayerManager.setVersion(player, version)
 
         if (version != null) checkModUpdate(player, version)
@@ -178,7 +179,7 @@ import java.util.UUID
             if (delayTicks == 0L) {
                 sendDisplayBatch(player, batch)
             } else {
-                Scheduler.runLater(delayTicks) {
+                Scheduler.runPlayerLater(player, delayTicks) {
                     if (player.isOnline) sendDisplayBatch(player, batch)
                 }
             }
@@ -263,11 +264,5 @@ import java.util.UUID
         val template = Main.config.getMessageForPlayer(player, "newPluginVersion") as? String ?: return
         val message = String.format(template, version)
         MessageUtil.sendColoredMessage(player, message)
-    }
-
-    /** Sanitizes [raw] and coerces it into a [Semver], returning null if parsing fails. */
-    private fun parseVersionOrNull(raw: String): Semver? {
-        val sanitized = YouTubeUtil.sanitize(raw)?.takeIf { it.isNotEmpty() } ?: return null
-        return Semver.coerce(sanitized)
     }
 }

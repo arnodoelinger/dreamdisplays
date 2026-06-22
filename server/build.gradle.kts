@@ -53,6 +53,7 @@ dependencies {
 
     implementation(project(":protocol"))
     implementation(libs.kotlinxSerializationProtobuf)
+    implementation(libs.kotlinxCoroutinesCore)
     implementation(libs.semver4j)
     implementation(libs.tomlj)
     implementation(libs.exposedCore)

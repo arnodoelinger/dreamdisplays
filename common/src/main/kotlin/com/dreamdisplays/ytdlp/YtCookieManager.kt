@@ -1,7 +1,9 @@
 package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.managers.ClientStateManager
+import com.dreamdisplays.utils.DreamCoroutines
 import com.dreamdisplays.utils.Processes
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.io.RandomAccessFile
@@ -10,7 +12,6 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.Locale
-import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -20,11 +21,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * parsed cookie header for plain HTTP clients (InnerTube).
  *
  * On any export failure the manager disables itself for the session ([unavailableThisSession])
- * instead of letting every fetch hang on a broken browser export.
- *
- * @param executor background executor for prewarm / refresh work.
+ * instead of letting every fetch hang on a broken browser export. Background prewarm / refresh work
+ * runs on [DreamCoroutines.clientIo].
  */
-class YtCookieManager(private val executor: Executor) {
+class YtCookieManager {
     private val logger = LoggerFactory.getLogger("DreamDisplays/yt-dlp")
 
     private val cookieFile: Path get() = YtDlpBinary.bundledDir.resolve("cookies.txt")
@@ -144,7 +144,7 @@ class YtCookieManager(private val executor: Executor) {
     /** Re-exports the browser cookie file in the background if not already in progress. */
     private fun refreshAsync() {
         if (!refreshInProgress.compareAndSet(false, true)) return
-        executor.execute {
+        DreamCoroutines.clientIo.launch {
             try {
                 exportHeader()
             } catch (_: Exception) {
@@ -158,7 +158,7 @@ class YtCookieManager(private val executor: Executor) {
     @Throws(IOException::class)
     private fun exportHeader(): String? {
         val browser = resolveBrowser() ?: return null
-        val binary = YtDlpBinary.resolve(executor)
+        val binary = YtDlpBinary.resolve()
         val master = cookieFile
         Files.createDirectories(master.parent)
 
@@ -233,7 +233,7 @@ class YtCookieManager(private val executor: Executor) {
             // Cookies are opt-in, so "configured" is always a single explicit browser name here
             // (see disabledByConfig). No auto-detection sweep -> no macOS keychain popup.
             val binary: String? = try {
-                YtDlpBinary.resolve(executor)
+                YtDlpBinary.resolve()
             } catch (_: IOException) {
                 browserResolved = true
                 return null

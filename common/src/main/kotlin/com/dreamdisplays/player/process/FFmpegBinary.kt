@@ -1,7 +1,9 @@
 package com.dreamdisplays.player.process
 
+import com.dreamdisplays.utils.DreamCoroutines
 import com.dreamdisplays.utils.OsInfo
 import com.dreamdisplays.utils.Processes
+import kotlinx.coroutines.launch
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory
@@ -31,13 +33,13 @@ object FFmpegBinary {
 
     /** Resolves the `FFmpeg` binary in the background to minimize latency on first use. */
     fun prewarmAsync() {
-        Thread({
+        DreamCoroutines.clientIo.launch {
             try {
                 getPath()
             } catch (e: Exception) {
                 logger.warn("Prewarm failed", e)
             }
-        }, "FFmpeg-prewarm").apply { isDaemon = true }.start()
+        }
     }
 
     /**
@@ -169,12 +171,12 @@ object FFmpegBinary {
         for (candidate in candidates) {
             try {
                 val p = ProcessBuilder(candidate, "-version").redirectErrorStream(true).start()
-                Thread {
+                DreamCoroutines.clientIo.launch {
                     try {
                         p.inputStream.transferTo(OutputStream.nullOutputStream())
                     } catch (_: Exception) {
                     }
-                }.apply { isDaemon = true }.start()
+                }
                 if (p.waitFor(3, TimeUnit.SECONDS) && p.exitValue() == 0) {
                     logger.info("Using system ffmpeg: $candidate...")
                     return candidate

@@ -82,13 +82,13 @@ tasks.shadowJar {
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core"))
+        include(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"))
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))
         include(dependency("org.semver4j:semver4j"))
         include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
         include(dependency("org.jetbrains:annotations"))
-        // NewPipeExtractor (in-process YouTube resolver) + its runtime deps. jsr305 is intentionally
-        // omitted: its annotations are not needed at runtime and Guava already provides them.
         include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
         include(dependency("com.github.TeamNewPipe:nanojson"))
         include(dependency("org.jsoup:jsoup"))

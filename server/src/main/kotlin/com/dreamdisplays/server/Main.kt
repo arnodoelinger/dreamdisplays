@@ -11,6 +11,7 @@ import com.dreamdisplays.server.managers.StateManager
 import com.dreamdisplays.server.managers.StorageManager
 import com.dreamdisplays.server.meta.FabricUpdater
 import com.dreamdisplays.server.meta.Scheduler
+import com.dreamdisplays.server.meta.ServerCoroutines
 import com.dreamdisplays.server.metrics.TelemetryMetrics
 import com.dreamdisplays.server.playback.FabricPlaybackTransport
 import com.dreamdisplays.server.playback.PaperPlaybackTransport
@@ -30,6 +31,8 @@ import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry
 import net.fabricmc.loader.api.FabricLoader
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.level.storage.LevelResource
 import org.bstats.bukkit.Metrics
@@ -106,6 +109,7 @@ import java.io.File
         logger.info("Disabling Dream Displays ${pluginMeta.version}...")
         if (::storage.isInitialized) {
             DisplayManager.save { data: PaperDisplayData -> storage.saveDisplay(data) }
+            ServerCoroutines.shutdown()
             storage.disconnect()
         }
     }
@@ -177,6 +181,7 @@ import java.io.File
         ServerLifecycleEvents.SERVER_STOPPING.register { _ ->
             logger.info("Server stopping. Saving displays...")
             DisplayManager.save { storageInstance?.saveDisplay(it) }
+            ServerCoroutines.shutdown()
             storageInstance?.disconnect()
         }
 
@@ -228,13 +233,13 @@ import java.io.File
         register.invoke(registry, packetId, packetCodec)
     }
 
-    /** Starts repeating tasks for display updates and update checking. */
+    /** Starts repeating coroutines for display updates and update checking on [ServerCoroutines.io]. */
     private fun startRepeatingTasks(server: MinecraftServer) {
         val settings = configInstance.settings
 
-        Thread({
+        ServerCoroutines.io.launch {
             while (!server.isStopped) {
-                try { Thread.sleep(1000L) } catch (_: InterruptedException) { break }
+                delay(1000L)
                 runCatching {
                     server.execute {
                         DisplayManager.updateAllDisplays(server)
@@ -244,17 +249,17 @@ import java.io.File
                     }
                 }
             }
-        }, "dreamdisplays-display-updater").also { it.isDaemon = true }.start()
+        }
 
         if (settings.updatesEnabled) {
-            Thread({
-                try { Thread.sleep(1000L) } catch (_: InterruptedException) { return@Thread }
+            ServerCoroutines.io.launch {
+                delay(1000L)
                 runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 while (!server.isStopped) {
-                    try { Thread.sleep(60L * 60L * 1000L) } catch (_: InterruptedException) { break }
+                    delay(60L * 60L * 1000L)
                     runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 }
-            }, "dreamdisplays-updater").also { it.isDaemon = true }.start()
+            }
         }
     }
 

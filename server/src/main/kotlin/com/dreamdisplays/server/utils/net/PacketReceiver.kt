@@ -23,6 +23,7 @@ import java.util.*
 @PaperOnly @NullMarked class PacketReceiver(private val plugin: Main) : PluginMessageListener {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
     private val maxVersionBytes = 128
+    private val maxStringBytes = 4096
 
     /** Routes an incoming plugin message to the per-channel handler. */
     override fun onPluginMessageReceived(channel: String, player: Player, message: ByteArray) {
@@ -164,13 +165,22 @@ import java.util.*
 
     /** Reads a 128-bit UUID using the shared encoding in [PacketUtil]. */
     private fun DataInputStream.readUUID() = PacketUtil.run { readUUID() }
+
     /** Reads a Minecraft-style VarInt using the shared encoding in [PacketUtil]. */
     private fun DataInputStream.readVarInt() = PacketUtil.run { readVarInt() }
+
     /** Reads a Minecraft-style VarLong using the shared encoding in [PacketUtil]. */
     private fun DataInputStream.readVarLong() = PacketUtil.run { readVarLong() }
-    /** Reads a UTF-8 string prefixed by its byte length as a VarInt. */
+
+    /** Reads a UTF-8 string prefixed by its byte length as a VarInt, with the same bounds checks as [readVersionString]. */
     private fun DataInputStream.readString(): String {
         val length = readVarInt()
+        require(length in 0..maxStringBytes) {
+            "Invalid string packet length: $length."
+        }
+        require(length <= available()) {
+            "Invalid string packet size. Declared = $length, but available = ${available()}."
+        }
         val data = ByteArray(length)
         readFully(data)
         return String(data, Charsets.UTF_8)

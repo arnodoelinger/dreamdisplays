@@ -12,12 +12,15 @@ import com.dreamdisplays.server.datatypes.SyncData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.PlayerManager
 import com.dreamdisplays.server.managers.StateManager
+import com.dreamdisplays.server.meta.ServerCoroutines
 import com.dreamdisplays.server.playback.PlaybackContexts
 import com.dreamdisplays.server.playback.TimelineManager
 import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.utils.MessageUtil
-import com.dreamdisplays.server.utils.YouTubeUtil
+import com.dreamdisplays.server.utils.VersionUtil
 import io.github.arsmotorin.ofrat.FabricOnly
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
@@ -35,7 +38,7 @@ import org.slf4j.LoggerFactory
     /** Records the player's reported mod version and runs the mod / plugin update checks. */
     fun recordVersionAndCheckUpdates(player: ServerPlayer, version: String) {
         logger.info("${player.name.string} joined with Dream Displays $version.")
-        val parsedVersion = parseVersionOrNull(version)
+        val parsedVersion = VersionUtil.parseOrNull(version)
         PlayerManager.setVersion(player, parsedVersion)
 
         val config = Server.config
@@ -117,6 +120,7 @@ import org.slf4j.LoggerFactory
         val wasSync = displayData.isSync
         displayData.url = url
         displayData.lang = lang
+        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
@@ -134,7 +138,7 @@ import org.slf4j.LoggerFactory
         }
 
         displayData.isLocked = locked
-        Server.storage?.saveDisplay(displayData)
+        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
@@ -150,7 +154,7 @@ import org.slf4j.LoggerFactory
         // here because Fabric has no permission-node API. Enforcement is Paper-only (DisplayActions.kt).
 
         displayData.mode = mode
-        Server.storage?.saveDisplay(displayData)
+        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
         FabricPacketUtil.sendDisplayInfo(DisplayManager.getReceivers(displayData, server), displayData)
         TimelineManager.onModeChanged(displayData, positionMs)
     }
@@ -272,12 +276,6 @@ import org.slf4j.LoggerFactory
         }
     }
 
-    /** Sanitizes [raw] and coerces it into a [Semver], returning null if parsing fails. */
-    private fun parseVersionOrNull(raw: String): Semver? {
-        val sanitized = YouTubeUtil.sanitize(raw)?.takeIf { it.isNotEmpty() } ?: return null
-        return Semver.coerce(sanitized)
-    }
-
     /** Checks if [player] has operator level 2 permissions, which is the threshold for privileged actions. */
     fun isOpLevel2(player: ServerPlayer): Boolean {
         return player.level().server.playerList.isOp(NameAndId(player.gameProfile))
@@ -291,11 +289,9 @@ import org.slf4j.LoggerFactory
             server.execute(task)
             return
         }
-        Thread({
-            runCatching {
-                Thread.sleep(delayTicks * 50L)
-                server.execute(task)
-            }
-        }, "dreamdisplays-delayed-task").also { it.isDaemon = true }.start()
+        ServerCoroutines.io.launch {
+            delay(delayTicks * 50L)
+            server.execute(task)
+        }
     }
 }

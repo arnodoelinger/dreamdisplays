@@ -4,18 +4,16 @@ import com.dreamdisplays.client.core.DreamServices
 import com.dreamdisplays.client.core.getOrNull
 import com.dreamdisplays.media.api.MediaSearchResult
 import com.dreamdisplays.media.api.MediaSearchService
+import com.dreamdisplays.utils.DreamCoroutines
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
 
 /** In-memory cache of [MediaSearchResult] keyed by YouTube video ID. */
 object VideoMetadataCache {
     private val logger = LoggerFactory.getLogger("DreamDisplays/VideoMetadataCache")
     private val CACHE = ConcurrentHashMap<String, MediaSearchResult>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
-    private val EXEC = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DD-VideoMeta").apply { isDaemon = true }
-    }
 
     /** Stores [info] in the cache under [videoId] and also updates [VideoTitleCache]. */
     fun put(videoId: String, info: MediaSearchResult) {
@@ -32,7 +30,7 @@ object VideoMetadataCache {
         if (videoId.isEmpty()) return
         if (CACHE.containsKey(videoId)) return
         if (IN_FLIGHT.putIfAbsent(videoId, true) != null) return
-        EXEC.submit { fetchAndStore(videoId) }
+        DreamCoroutines.clientIo.launch { fetchAndStore(videoId) }
     }
 
     /** Uses the registry [MediaSearchService] to fetch metadata for [videoId] and stores the result. */

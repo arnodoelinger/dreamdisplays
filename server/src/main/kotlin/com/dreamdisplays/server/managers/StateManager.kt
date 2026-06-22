@@ -15,6 +15,7 @@ import com.dreamdisplays.server.managers.DisplayManager.getDisplayData
 import com.dreamdisplays.server.managers.DisplayManager.getReceivers
 import com.dreamdisplays.server.playback.PlaybackContexts
 import com.dreamdisplays.server.playback.WatchPartyManager
+import com.dreamdisplays.server.utils.PlatformUtil
 import com.dreamdisplays.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.server.utils.net.PacketUtil
 import com.dreamdisplays.server.utils.net.V2PlayerTracker
@@ -88,6 +89,14 @@ import java.util.concurrent.ConcurrentHashMap
     @PaperOnly @JvmStatic fun processSyncPacket(packet: SyncData, player: Player) {
         if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(Main.config.permissions.delete))) return
         val data = getDisplayData(packet.id) ?: return
+        if (PlatformUtil.isFolia) {
+            DisplayManager.sendLegacySyncToTrackedNearbyPlayers(
+                data as PaperDisplayData,
+                packet.copy(id = packet.id),
+                excludedPlayerId = player.uniqueId,
+            )
+            return
+        }
         val receivers = getReceivers(data as PaperDisplayData)
         PacketUtil.sendSync(
             receivers.filter { it.uniqueId != player.uniqueId }.toMutableList(),
@@ -146,6 +155,18 @@ import java.util.concurrent.ConcurrentHashMap
         PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
     }
 
+    /** Resets and broadcasts over the correct `Paper` / `Folia` player scheduling path. */
+    @PaperOnly fun resetAndBroadcast(display: PaperDisplayData) {
+        if (PlatformUtil.isFolia) resetAndBroadcastForTrackedPlayers(display)
+        else resetAndBroadcast(display.id, getReceivers(display))
+    }
+
+    /** `Folia`-safe reset broadcast: location checks and plugin messages run on each player's entity scheduler. */
+    @PaperOnly fun resetAndBroadcastForTrackedPlayers(display: PaperDisplayData) {
+        val state = resetState(display.id) ?: return
+        DisplayManager.sendLegacySyncToTrackedNearbyPlayers(display, state.createPacket())
+    }
+
     /** Resets the server-side clock for [displayId] to 0 (called when owner switches video). */
     @FabricOnly fun resetAndBroadcast(displayId: UUID, receivers: List<ServerPlayer>) {
         val state = resetState(displayId) ?: return
@@ -179,6 +200,14 @@ import java.util.concurrent.ConcurrentHashMap
         val receivers = getReceivers(display as PaperDisplayData)
             .filterNot { V2PlayerTracker.isV2(it.uniqueId) }
         if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
+    }
+
+    /**
+     * `Folia` variant of [tickBroadcast]. The due-state bookkeeping runs on the global coordinator,
+     * while location checks and plugin messages are dispatched to each player's entity scheduler.
+     */
+    @PaperOnly fun tickBroadcastForTrackedPlayers() = forEachBroadcastDue { state, display ->
+        DisplayManager.sendLegacySyncToTrackedNearbyPlayers(display as PaperDisplayData, state.createPacket())
     }
 
     /**

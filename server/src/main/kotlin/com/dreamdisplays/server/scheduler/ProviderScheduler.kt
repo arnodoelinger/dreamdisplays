@@ -11,6 +11,6 @@ import org.jspecify.annotations.NullMarked
  */
 @PaperOnly @NullMarked object ProviderScheduler {
     val adapter: AdapterScheduler by lazy {
-        if (isFolia) FoliaScheduler else BukkitScheduler
+        if (isFolia) FoliaScheduler else PaperScheduler
     }
 }

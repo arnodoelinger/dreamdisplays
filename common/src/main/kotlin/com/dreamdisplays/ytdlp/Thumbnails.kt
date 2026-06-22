@@ -1,6 +1,7 @@
 package com.dreamdisplays.ytdlp
 
 import com.dreamdisplays.Initializer
+import com.dreamdisplays.utils.DreamCoroutines
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -15,11 +16,10 @@ import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
 
 /**
@@ -32,15 +32,8 @@ object Thumbnails {
     private val logger = LoggerFactory.getLogger("DreamDisplays/Thumbnails")
     private val READY = ConcurrentHashMap<String, Identifier>()
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
-    private val COUNTER = AtomicInteger()
     private val THUMB_CACHE_DIR: Path = Path.of("config", "dreamdisplays", "thumb-cache")
     private const val THUMB_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1_000L
-
-    private val EXECUTOR = Executors.newFixedThreadPool(
-        (Runtime.getRuntime().availableProcessors() * 2).coerceIn(4, 8)
-    ) { r ->
-        Thread(r, "DD-Thumbnail-${COUNTER.incrementAndGet()}").apply { isDaemon = true }
-    }
 
     init {
         try {
@@ -58,7 +51,7 @@ object Thumbnails {
     fun request(videoId: String, url: String) {
         if (READY.containsKey(videoId)) return
         if (IN_FLIGHT.putIfAbsent(videoId, true) != null) return
-        EXECUTOR.submit { download(videoId, url) }
+        DreamCoroutines.clientIo.launch { download(videoId, url) }
     }
 
     /** Fetches the thumbnail for [videoId] from [url] (or disk cache) and registers it on the render thread. */
@@ -92,9 +85,9 @@ object Thumbnails {
         null
     }
 
-    /** Atomically writes [bytes] to the disk cache for [videoId] via a temp-file rename on the executor. */
+    /** Atomically writes [bytes] to the disk cache for [videoId] via a temp-file rename in the background. */
     private fun writeDiskCacheAsync(videoId: String, bytes: ByteArray) {
-        EXECUTOR.submit {
+        DreamCoroutines.clientIo.launch {
             try {
                 Files.createDirectories(THUMB_CACHE_DIR)
                 val target = thumbFile(videoId)

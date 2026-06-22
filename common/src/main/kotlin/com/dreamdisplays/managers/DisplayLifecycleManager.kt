@@ -100,7 +100,8 @@ object DisplayLifecycleManager {
 
         val displayScreen = DisplayScreen(
             data.uuid, data.ownerUuid, data.x, data.y, data.z, data.facing,
-            data.width, data.height, data.mode ?: PlaybackMode.LOCAL, rotation = data.rotation
+            data.width, data.height, data.mode ?: PlaybackMode.LOCAL,
+            qualityCap = data.qualityCap, rotation = data.rotation,
         )
         displayScreen.renderDistance = data.renderDistance
         displayScreen.savedTimeNanos = data.currentTimeNanos

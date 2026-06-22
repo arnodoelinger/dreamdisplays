@@ -2,6 +2,7 @@ package com.dreamdisplays.media
 
 import org.slf4j.LoggerFactory
 import java.io.IOException
+import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URI
 
@@ -43,6 +44,60 @@ object MediaHostGuard {
     @Throws(IOException::class)
     fun requireAllowed(url: String) {
         if (!isAllowed(url)) throw IOException("Refusing to open a media URL on a non-public host.")
+    }
+
+    /**
+     * Validates [url] and, for `http(s)` URLs, walks its redirect chain ourselves (each hop
+     * re-checked with [requireAllowed]), returning the final URL to hand to `FFmpeg` / `libav`.
+     *
+     * [isAllowed]/[requireAllowed] alone only validate the URL we were given; `FFmpeg` and the
+     * in-process `libav` path resolve DNS and follow redirects entirely on their own, moments
+     * later and outside this guard's view.
+     */
+    @Throws(IOException::class)
+    fun resolveSafeUrl(url: String, maxRedirects: Int = 5): String {
+        requireAllowed(url)
+        if (allowPrivate) return url
+        val scheme = try { URI(url.trim()).scheme?.lowercase() } catch (_: Exception) { null }
+        if (scheme != "http" && scheme != "https") return url
+
+        var current = url
+        repeat(maxRedirects) {
+            val location = peekRedirectLocation(current) ?: return current
+            val next = try {
+                URI(current.trim()).resolve(location.trim()).toString()
+            } catch (e: Exception) {
+                throw IOException("Refusing to follow an unparseable media redirect: ${e.message}.")
+            }
+            requireAllowed(next)
+            current = next
+        }
+        throw IOException("Refusing to follow more than $maxRedirects media redirects.")
+    }
+
+    /**
+     * Issues a redirect-less `HEAD` probe against [url] and returns its `Location` header, or
+     * null when the response is not a redirect (including when the probe itself fails, so a
+     * server that rejects `HEAD` degrades to "trust the URL as-is" rather than blocking playback).
+     */
+    private fun peekRedirectLocation(url: String): String? {
+        val conn = try {
+            URI(url.trim()).toURL().openConnection() as? HttpURLConnection
+        } catch (_: Exception) {
+            null
+        } ?: return null
+        return try {
+            conn.instanceFollowRedirects = false
+            conn.requestMethod = "HEAD"
+            conn.connectTimeout = 5_000
+            conn.readTimeout = 5_000
+            if (conn.responseCode in 300..399) conn.getHeaderField("Location") else null
+        } catch (e: Exception) {
+            logger.debug("Redirect probe failed for ${url.take(120)}: ${e.message}.")
+            null
+        } finally {
+            conn.disconnect()
+        }
     }
 
     /** Extracts the host from [url] (stripping IPv6 literal brackets), or null when it cannot be parsed. */

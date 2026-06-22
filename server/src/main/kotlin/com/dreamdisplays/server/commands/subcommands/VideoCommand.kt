@@ -2,8 +2,11 @@ package com.dreamdisplays.server.commands.subcommands
 
 import com.dreamdisplays.protocol.PlaybackPermissions
 import com.dreamdisplays.server.Main
+import com.dreamdisplays.server.Server
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.StateManager
+import com.dreamdisplays.server.meta.Scheduler.runAsync
+import com.dreamdisplays.server.meta.ServerCoroutines
 import com.dreamdisplays.server.playback.PlaybackContexts
 import com.dreamdisplays.server.playback.TimelineManager
 import com.dreamdisplays.server.utils.MessageUtil
@@ -14,6 +17,7 @@ import com.dreamdisplays.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
+import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
@@ -76,9 +80,9 @@ import java.util.*
             lang = normalizeLangCode(args.getOrNull(2).orEmpty())
         }
 
-        val receivers = DisplayManager.getReceivers(data)
-        DisplayManager.sendUpdate(data, receivers)
-        if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
+        runAsync { Main.getInstance().storage.saveDisplay(data) }
+        DisplayManager.broadcastUpdate(data)
+        if (wasSync) StateManager.resetAndBroadcast(data)
         TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
@@ -168,6 +172,7 @@ import java.util.*
         data.url = if ("/shorts/" in urlRaw) "https://www.youtube.com/shorts/$code"
                    else "https://www.youtube.com/watch?v=$code"
         data.lang = normalizeLangCode(langRaw)
+        ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
         FabricPacketUtil.sendDisplayInfo(receivers, data)

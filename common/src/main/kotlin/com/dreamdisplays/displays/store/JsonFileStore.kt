@@ -6,9 +6,11 @@ import org.slf4j.Logger
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileReader
-import java.io.FileWriter
 import java.io.IOException
 import java.lang.reflect.Type
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 
 /**
  * Shared plumbing for the JSON-backed display stores: the config directory, a pretty-printing [Gson]
@@ -39,16 +41,24 @@ internal object JsonFileStore {
     } catch (_: FileNotFoundException) {
         null
     } catch (e: IOException) {
-        logger.error("Failed to read ${file.name}", e)
+        logger.error("Failed to read ${file.name}.", e)
         null
     }
 
-    /** Serializes [value] to [file], logging any IO error. */
+    /**
+     * Serializes [value] to [file] via a temp file and atomic rename, so a crash mid-write can
+     * never leave a truncated / corrupt [file] behind. Logs any IO error.
+     */
     fun write(file: File, value: Any, logger: Logger) {
         try {
-            FileWriter(file).use { gson.toJson(value, it) }
+            val tmp = File(file.parentFile, "${file.name}.tmp")
+            Files.writeString(tmp.toPath(), gson.toJson(value), StandardCharsets.UTF_8)
+            Files.move(
+                tmp.toPath(), file.toPath(),
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE,
+            )
         } catch (e: IOException) {
-            logger.error("Failed to write ${file.name}", e)
+            logger.error("Failed to write ${file.name}.", e)
         }
     }
 }

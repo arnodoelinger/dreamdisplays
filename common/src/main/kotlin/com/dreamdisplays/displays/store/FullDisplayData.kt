@@ -29,5 +29,9 @@ class FullDisplayData(
     var renderDistance: Int = 96,
     var currentTimeNanos: Long = 0,
     /** Content quarter-turn rotation (0-3); only used for floor/ceiling (`UP`/`DOWN`) screens. */
+
     var rotation: Int = 0,
+
+    /** Broadcast quality clamp (0 = unclamped); see [com.dreamdisplays.displays.DisplayScreen.qualityCap]. */
+    var qualityCap: Int = 0,
 )

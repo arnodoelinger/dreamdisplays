@@ -9,6 +9,7 @@ import com.dreamdisplays.server.meta.Updater.checkForUpdates
 import com.dreamdisplays.server.playback.TimelineManager
 import com.dreamdisplays.server.playback.WatchPartyManager
 import com.dreamdisplays.server.scheduler.ProviderScheduler
+import com.dreamdisplays.server.utils.PlatformUtil
 
 /**
  * Manages the registration of scheduled tasks.
@@ -20,13 +21,18 @@ import com.dreamdisplays.server.scheduler.ProviderScheduler
 
     /** Schedules the periodic display update tick and, when enabled, the hourly update check. */
     fun runRepeatingTasks(plugin: Main) {
-        ProviderScheduler.adapter.runRepeatingAsync(
+        ProviderScheduler.adapter.runRepeatingSync(
             plugin,
             DISPLAY_UPDATE_INTERVAL_TICKS,
             DISPLAY_UPDATE_INTERVAL_TICKS
         ) {
-            DisplayManager.updateAllDisplays()
-            StateManager.tickBroadcast()
+            if (PlatformUtil.isFolia) {
+                DisplayManager.updateAllDisplaysForTrackedPlayers()
+                StateManager.tickBroadcastForTrackedPlayers()
+            } else {
+                DisplayManager.updateAllDisplays()
+                StateManager.tickBroadcast()
+            }
             TimelineManager.tick()
             WatchPartyManager.tick()
         }

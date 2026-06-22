@@ -36,8 +36,9 @@ import org.jspecify.annotations.NullMarked
      */
     @EventHandler fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
+        Scheduler.trackPlayer(player)
 
-        if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
+        if (!PlatformUtil.isFolia && !hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
             Scheduler.runLater(40L) {
                 val removedDisplayUuids = DisplayManager.validateDisplaysAndCleanup()
@@ -51,10 +52,7 @@ import org.jspecify.annotations.NullMarked
         if (!config.settings.modDetectionEnabled) return
         if (DisplayManager.getDisplays().isEmpty()) return
 
-        // TODO: implement Folia-compatible entity scheduler for delayed player tasks
-        if (PlatformUtil.isFolia) return
-
-        Scheduler.runLater(600L) {
+        Scheduler.runPlayerLater(player, 600L) {
             if (PlayerManager.getVersion(player) == null && !PlayerManager.hasBeenNotifiedAboutModRequired(player)) {
                 MessageUtil.sendMessage(player, "modRequired")
                 PlayerManager.setModRequiredNotified(player, true)
@@ -67,6 +65,8 @@ import org.jspecify.annotations.NullMarked
         PlayerManager.removeVersion(event.player)
         V2PlayerTracker.clear(event.player.uniqueId)
         WatchPartyManager.onPlayerQuit(event.player.uniqueId)
+        DisplayManager.forgetNearbyPlayer(event.player.uniqueId)
+        Scheduler.untrackPlayer(event.player)
     }
 }
 

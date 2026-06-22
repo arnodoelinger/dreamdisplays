@@ -8,7 +8,6 @@ import com.dreamdisplays.client.core.ClientMutableState
  */
 object ClientStateManager : ClientMutableState {
     val config: Config get() = ClientStartupManager.config
-    val qualityRefreshThread: Thread get() = ClientStartupManager.qualityRefreshThread
 
     override var isOnScreen: Boolean = false
     override var focusMode: Boolean = false

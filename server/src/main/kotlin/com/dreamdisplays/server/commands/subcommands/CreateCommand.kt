@@ -6,12 +6,14 @@ import com.dreamdisplays.server.datatypes.FabricSelectionData
 import com.dreamdisplays.server.datatypes.PaperSelectionData
 import com.dreamdisplays.server.managers.DisplayManager
 import com.dreamdisplays.server.managers.SelectionManager
+import com.dreamdisplays.server.meta.ServerCoroutines
 import com.dreamdisplays.server.utils.MessageUtil
 import com.dreamdisplays.server.utils.RegionUtil
 import com.dreamdisplays.server.utils.net.FabricPacketUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
+import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -169,7 +171,7 @@ import kotlin.math.abs
         SelectionManager.selectionPoints.remove(player.uuid)
 
         DisplayManager.register(displayData)
-        Server.storage?.saveDisplay(displayData)
+        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
         FabricPacketUtil.sendDisplayInfo(receivers, displayData)
