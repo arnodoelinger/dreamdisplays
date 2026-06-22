@@ -1,9 +1,11 @@
 package com.dreamdisplays.client.input
 
+import com.dreamdisplays.api.DisplayFacing
 import com.dreamdisplays.api.DisplayId
 import com.dreamdisplays.displays.DisplayRegistry
 import com.dreamdisplays.utils.RayCastingUtil
 import net.minecraft.client.Minecraft
+import net.minecraft.core.Direction
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -31,8 +33,9 @@ object MinecraftDisplayInteractionService : DisplayInteractionService {
         val mc = Minecraft.getInstance()
         val player = mc.player ?: return RaycastResult.Miss
         val hit = RayCastingUtil.rCBlock(MAX_REACH) ?: return RaycastResult.Miss
-        val screen = DisplayRegistry.getScreens().firstOrNull { it.isInScreen(hit.blockPos) }
-            ?: return RaycastResult.Miss
+        val screen = DisplayRegistry.getScreens().firstOrNull {
+            it.isInScreen(hit.blockPos) && hit.direction == it.facing.toDirection()
+        } ?: return RaycastResult.Miss
         val loc = hit.location
         val distanceSq = player.getEyePosition(1.0f).distanceToSqr(loc)
         return RaycastResult.Hit(
@@ -46,6 +49,16 @@ object MinecraftDisplayInteractionService : DisplayInteractionService {
 
     /** Convenience wrapper around [raycast] that returns the [RaycastResult.Hit] or null on a miss. */
     override fun getCurrentTarget(): RaycastResult.Hit? = raycast() as? RaycastResult.Hit
+
+    /** Maps a [DisplayFacing] to the outward block-face [Direction] the display surface sits on. */
+    private fun DisplayFacing.toDirection(): Direction = when (this) {
+        DisplayFacing.NORTH -> Direction.NORTH
+        DisplayFacing.EAST -> Direction.EAST
+        DisplayFacing.SOUTH -> Direction.SOUTH
+        DisplayFacing.WEST -> Direction.WEST
+        DisplayFacing.UP -> Direction.UP
+        DisplayFacing.DOWN -> Direction.DOWN
+    }
 
     /** Subscribes [listener] to [DisplayInteraction] events; close the returned handle to unsubscribe. */
     override fun on(listener: (DisplayInteraction) -> Unit): AutoCloseable {
