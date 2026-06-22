@@ -5,14 +5,28 @@ import kotlin.math.roundToInt
 
 /** Client configuration loaded from and persisted to `config.yml`. */
 class Config(private val baseDir: File) {
+    /** The backing `config.yml` file on disk. */
     private val file = File(baseDir, "config.yml")
 
+    /** Whether to mute all displays while the game window is not focused. */
     var muteOnAltTab: Boolean = false
+
+    /** Default render distance for new displays, in blocks (snapped to a multiple of 16). */
     var defaultDistance: Int = 96
+
+    /** Default volume for new displays, in range `0.0`..`1.0`. */
     var defaultDisplayVolume: Double = 0.5
+
+    /** Whether displays are enabled at all. */
     var displaysEnabled: Boolean = true
+
+    /** Browser to import `yt-dlp` cookies from, or `none` to disable. */
     var ytdlpCookiesFromBrowser: String = "none"
+
+    /** Proxy URL passed to `yt-dlp`, or empty for a direct connection. */
     var ytdlpProxy: String = ""
+
+    /** Whether to use hardware-accelerated video decoding. */
     var useHwAccel: Boolean = true
 
     init {

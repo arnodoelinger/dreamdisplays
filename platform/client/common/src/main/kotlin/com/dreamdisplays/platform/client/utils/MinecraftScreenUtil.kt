@@ -3,13 +3,20 @@ package com.dreamdisplays.platform.client.utils
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.Screen
 
+/**
+ * Utilities for accessing and setting the current Minecraft screen.
+ */
 object MinecraftScreenUtil {
     //? if >=26 {
     // NeoForge 26.1.x keeps mc.screen as a public field; Fabric 26.2+ moved it to mc.gui.screen().
     // Detect once at startup to avoid per-frame exception overhead.
+    /** Get the current screen, or null if none. */
     private val getScreen: (Minecraft) -> Screen?
+
+    /** Set the current screen, or null to close the current screen. */
     private val setScreenFn: (Minecraft, Screen?) -> Unit
 
+    /** Initialize the screen getter and setter. */
     init {
         val screenField = try { Minecraft::class.java.getField("screen") } catch (_: NoSuchFieldException) { null }
         if (screenField != null) {
@@ -27,6 +34,7 @@ object MinecraftScreenUtil {
     //?} else
     /**/
 
+    /** Get the current screen, or null if none. */
     fun currentScreen(mc: Minecraft): Screen? {
         //? if >=26 {
         return getScreen(mc)
@@ -34,6 +42,7 @@ object MinecraftScreenUtil {
         /*return mc.screen*/
     }
 
+    /** Set the current screen, or null to close the current screen. */
     fun setScreen(mc: Minecraft, screen: Screen?) {
         //? if >=26 {
         setScreenFn(mc, screen)

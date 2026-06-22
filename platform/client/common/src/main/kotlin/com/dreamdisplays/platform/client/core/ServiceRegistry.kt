@@ -1,15 +1,9 @@
-@file:OptIn(DreamDisplaysUnstableApi::class)
-
 package com.dreamdisplays.platform.client.core
-
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /**
  * Registry for services available to the client. Modules can use this to provide and consume services, allowing for
  * loose coupling and modularity. Services are identified by their type, and can be registered and retrieved at runtime.
- *
- * @since 1.8.0
- * */
+ */
 interface ServiceRegistry {
     /** Registers [instance] under contract [type], replacing any previous binding for that type. */
     fun <T : Any> register(type: Class<T>, instance: T)

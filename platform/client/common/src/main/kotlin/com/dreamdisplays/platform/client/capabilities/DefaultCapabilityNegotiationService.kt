@@ -15,6 +15,8 @@ import org.slf4j.LoggerFactory
 class DefaultCapabilityNegotiationService(
     private val detector: ClientCapabilityDetector,
 ) : CapabilityNegotiationService {
+    /** Logger. */
+    private val logger = LoggerFactory.getLogger("DreamDisplays/CapabilityNegotiation")
 
     /** Probed once on first access; capability detection is stable for the process lifetime. */
     override val localCapabilities: ClientHello by lazy {
@@ -51,8 +53,4 @@ class DefaultCapabilityNegotiationService(
     /** True if the negotiated server allows [feature]; false before negotiation completes. */
     override fun isFeatureEnabled(feature: String): Boolean =
         serverCapabilities?.allowedFeatures?.contains(feature) == true
-
-    private companion object {
-        private val logger = LoggerFactory.getLogger("DreamDisplays/CapabilityNegotiation")
-    }
 }

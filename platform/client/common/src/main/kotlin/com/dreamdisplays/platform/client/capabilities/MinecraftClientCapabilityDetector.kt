@@ -19,12 +19,10 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
     override val maxTextureSize: Int = 8192
 
     /** True when `GLFW` can create the shared-context popout window on this platform. */
-    override val supportsPopout: Boolean
-        get() = VideoPopoutWindow.isAvailable
+    override val supportsPopout: Boolean get() = VideoPopoutWindow.isAvailable
 
     /** True when the host OS has a known `FFmpeg` hwaccel backend. */
-    override val supportsHardwareDecode: Boolean
-        get() = HwAccelBackend.detectDefault() != HwAccelBackend.NONE
+    override val supportsHardwareDecode: Boolean get() = HwAccelBackend.detectDefault() != HwAccelBackend.NONE
 
     /** Codecs the `FFmpeg` decode pipeline accepts regardless of hwaccel availability. */
     override val supportedCodecs: List<String> = listOf("h264", "hevc", "vp9", "av1")
@@ -61,8 +59,9 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
         )
     }
 
+    /** Runs [block] and returns `false` on any exception. */
     private fun safeBool(block: () -> Boolean): Boolean = runCatching(block).getOrDefault(false)
 
-    private fun safeString(default: String, block: () -> String): String =
-        runCatching(block).getOrDefault(default).ifBlank { default }
+    /** Runs [block] and returns the empty string on any exception. */
+    private fun safeString(default: String, block: () -> String): String = runCatching(block).getOrDefault(default).ifBlank { default }
 }

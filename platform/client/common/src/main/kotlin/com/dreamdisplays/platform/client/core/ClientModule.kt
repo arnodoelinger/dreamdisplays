@@ -1,13 +1,7 @@
-@file:OptIn(DreamDisplaysUnstableApi::class)
-
 package com.dreamdisplays.platform.client.core
-
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /**
  * Client module: a self-contained unit of functionality, which can be installed into the client context.
- *
- * @since 1.8.0
  */
 interface ClientModule {
     /** Unique identifier for this module. Should be in the format `namespace:name`. */

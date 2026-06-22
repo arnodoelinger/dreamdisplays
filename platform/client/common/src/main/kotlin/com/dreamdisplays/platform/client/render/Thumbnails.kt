@@ -29,12 +29,22 @@ import javax.imageio.ImageIO
  * are performed asynchronously to avoid blocking the main thread.
  */
 object Thumbnails {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/Thumbnails")
+
+    /** The Minecraft texture [Identifier] for each video ID, or null if not yet loaded. */
     private val READY = ConcurrentHashMap<String, Identifier>()
+
+    /** Tracks which video IDs are currently in flight (downloading or decoding). */
     private val IN_FLIGHT = ConcurrentHashMap<String, Boolean>()
+
+    /** Directory for cached thumbnails. */
     private val THUMB_CACHE_DIR: Path = Path.of("config", "dreamdisplays", "thumb-cache")
+
+    /** TTL for cached thumbnails, in milliseconds. */
     private const val THUMB_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1_000L
 
+    /** Initializes the thumbnail manager and scans for image plugins. */
     init {
         try {
             ImageIO.scanForPlugins()
@@ -42,7 +52,6 @@ object Thumbnails {
             logger.warn("ImageIO.scanForPlugins failed: ${t.message}. This should never happen.")
         }
     }
-
 
     /** Returns the registered Minecraft texture [Identifier] for [videoId], or null if not yet loaded. */
     fun get(videoId: String): Identifier? = READY[videoId]

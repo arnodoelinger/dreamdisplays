@@ -22,6 +22,7 @@ object Packets {
     private fun <T : CustomPacketPayload> createType(path: String): CustomPacketPayload.Type<T> =
         CustomPacketPayload.Type(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, path))
 
+    /** Deletes the display with [uuid]. */
     data class Delete(val uuid: UUID) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -35,6 +36,7 @@ object Packets {
         }
     }
 
+    /** Toggles whether displays are enabled for the client. */
     data class DisplayEnabled(val enabled: Boolean) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -48,6 +50,7 @@ object Packets {
         }
     }
 
+    /** Full display description: position, size, video, facing, sync, and lock state. */
     data class Info(
         val uuid: UUID,
         val ownerUuid: UUID,
@@ -98,6 +101,7 @@ object Packets {
         }
     }
 
+    /** Sets the lock state of display [uuid]. */
     data class SetLocked(val uuid: UUID, val locked: Boolean) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -111,6 +115,7 @@ object Packets {
         }
     }
 
+    /** Reports whether the client has admin permissions. */
     data class IsAdmin(val isAdmin: Boolean) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -124,6 +129,7 @@ object Packets {
         }
     }
 
+    /** Reports whether the client is a premium user. */
     data class Premium(val premium: Boolean) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -137,6 +143,7 @@ object Packets {
         }
     }
 
+    /** Reports display [uuid] to the server for moderation. */
     data class Report(val uuid: UUID) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -150,6 +157,7 @@ object Packets {
         }
     }
 
+    /** Requests the current playback timeline for display [uuid]. */
     data class RequestSync(val uuid: UUID) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -163,6 +171,7 @@ object Packets {
         }
     }
 
+    /** Server timeline snapshot for a display: sync flag, paused state, and current / limit positions. */
     data class Sync(
         val uuid: UUID,
         val isSync: Boolean,
@@ -196,6 +205,7 @@ object Packets {
         }
     }
 
+    /** Advertises the client mod version during the legacy handshake. */
     data class Version(val version: String) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -209,6 +219,7 @@ object Packets {
         }
     }
 
+    /** Reports whether video reporting is enabled for the client. */
     data class ReportEnabled(val enabled: Boolean) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -222,6 +233,7 @@ object Packets {
         }
     }
 
+    /** Requests a video change (url + language) on display [uuid]. */
     data class SetVideo(val uuid: UUID, val url: String, val lang: String) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID
@@ -239,6 +251,7 @@ object Packets {
         }
     }
 
+    /** Drops the listed displays from the client cache. */
     data class ClearCache(val displayUuids: List<UUID>) : CustomPacketPayload {
         /** The packet type. */
         override fun type(): CustomPacketPayload.Type<out CustomPacketPayload> = PACKET_ID

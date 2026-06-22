@@ -8,10 +8,16 @@ import kotlin.math.abs
 
 /** In-memory LRU of native video replay snapshots retained across soft display unloads. */
 internal object DisplayReplayCache {
+    /** Default TTL for replay snapshots in milliseconds. */
     private const val DEFAULT_TTL_MS = 5L * 60L * 1000L
+
+    /** Default JVM-side memory cap for retained replay snapshots. */
     private const val DEFAULT_MAX_BYTES = 512L * 1024L * 1024L
+
+    /** Maximum allowed difference between requested and actual replay position. */
     private const val POSITION_TOLERANCE_NS = 1_000_000_000L
 
+    /** One retained replay snapshot: the encoded video bytes, optional audio PCM, and resolved streams. */
     private data class Entry(
         val url: String,
         val positionNanos: Long,
@@ -21,13 +27,17 @@ internal object DisplayReplayCache {
         val createdAtMs: Long,
     )
 
+    /** Lock for all cache operations. */
     private val lock = Any()
+
+    /** Snapshots by UUID. */
     private val entries = object : LinkedHashMap<UUID, Entry>(16, 0.75f, true) {}
+
+    /** Total retained bytes. */
     private var totalBytes = 0L
 
     /** Snapshot time-to-live in milliseconds. */
-    private val ttlMs: Long =
-        System.getProperty("dreamdisplays.cache.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: DEFAULT_TTL_MS
+    private val ttlMs: Long = System.getProperty("dreamdisplays.cache.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: DEFAULT_TTL_MS
 
     /** Total JVM-side memory cap for retained replay snapshots. */
     private val maxBytes: Long =

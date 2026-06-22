@@ -28,8 +28,13 @@ internal object Yuv262Reflect {
         }.isSuccess
     }
 
+    /** Cached `BindGroupLayout` class handle. */
     private val bglClass: Class<*> by lazy { Class.forName("com.mojang.blaze3d.pipeline.BindGroupLayout") }
+
+    /** Cached `GpuFormat` class handle. */
     private val gpuFormatClass: Class<*> by lazy { Class.forName("com.mojang.blaze3d.GpuFormat") }
+
+    /** The `GpuFormat.R8_UNORM` enum constant, resolved reflectively. */
     private val gpuFormatR8: Any by lazy {
         @Suppress("UNCHECKED_CAST")
         java.lang.Enum.valueOf(gpuFormatClass as Class<out Enum<*>>, "R8_UNORM")

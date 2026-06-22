@@ -8,9 +8,10 @@ package com.dreamdisplays.platform.client.render
  * The only thing that we can accept from shaders is fog (it's clear why).
  */
 internal object ShaderPackCompat {
-    val isShaderPackActive: Boolean
-        get() = shaderBackendName() != "none"
+    /** True when any supported shader pack is currently in use. */
+    val isShaderPackActive: Boolean; get() = shaderBackendName() != "none"
 
+    /** Name of the active shader backend (`iris` / `optifine` / `canvas`), or `none`. */
     fun shaderBackendName(): String = when {
         irisShaderPackActive() -> "iris"
         optifineShaderPackActive() -> "optifine"
@@ -34,6 +35,7 @@ internal object ShaderPackCompat {
     private fun canvasRendererActive(): Boolean =
         classPresent("grondag.canvas.CanvasMod") || classPresent("io.vram.canvas.CanvasFabricMod")
 
+    /** True if the given class is present. */
     private fun classPresent(name: String): Boolean = runCatching {
         Class.forName(name, false, ShaderPackCompat::class.java.classLoader)
         true

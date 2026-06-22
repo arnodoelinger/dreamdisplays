@@ -22,24 +22,33 @@ import net.minecraft.client.Minecraft
  * the service registry. One shared instance is passed to every [com.dreamdisplays.media.player.MediaPlayer].
  */
 object DreamPlaybackEnvironment : PlaybackEnvironment {
-
+    /** Live playback config backed by the client config and state. */
     override val config: PlaybackConfig = object : PlaybackConfig {
+        /** Default volume for new displays. */
         override val defaultDisplayVolume: Double get() = ClientStateManager.config.defaultDisplayVolume
+
+        /** Whether to use hardware acceleration. */
         override val useHwAccel: Boolean get() = ClientStateManager.config.useHwAccel
+
+        /** Is the client premium? */
         override val isPremium: Boolean get() = ClientStateManager.isPremium
+
+        /** Active GPU YUV render type. */
         override val gpuYuvActive: Boolean get() = DisplayYuvRenderTypes.active
     }
 
-    override val renderExecutor: RenderThreadExecutor =
-        RenderThreadExecutor { task -> Minecraft.getInstance().execute(task) }
+    /** Runs tasks on Minecraft's render/main thread. */
+    override val renderExecutor: RenderThreadExecutor = RenderThreadExecutor { task -> Minecraft.getInstance().execute(task) }
 
-    override val uploaderFactory: FrameUploaderFactory =
-        FrameUploaderFactory { GpuFrameUploader() as FrameUploader }
+    /** Creates per-player GPU frame uploaders. */
+    override val uploaderFactory: FrameUploaderFactory = FrameUploaderFactory { GpuFrameUploader() as FrameUploader }
 
-    override val cacheInvalidator: CacheInvalidator =
-        CacheInvalidator { url -> YtDlp.invalidateCache(url) }
+    /** Invalidates the `yt-dlp` URL cache for a stream. */
+    override val cacheInvalidator: CacheInvalidator = CacheInvalidator { url -> YtDlp.invalidateCache(url) }
 
+    /** The registered media resolver chain. */
     override fun resolverChain(): MediaResolverRegistry = DreamServices.registry.get<MediaResolverRegistry>()
 
+    /** The registered stream selector. */
     override fun streamSelector(): StreamSelector = DreamServices.registry.get<StreamSelector>()
 }

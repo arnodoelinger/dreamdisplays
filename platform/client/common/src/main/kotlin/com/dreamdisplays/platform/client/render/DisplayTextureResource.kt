@@ -27,7 +27,6 @@ import java.util.UUID
  * @param uuid the owning display's id, used to build a unique texture identifier.
  */
 class DisplayTextureResource(private val uuid: UUID) {
-
     /** One complete set of GPU resources (either RGBA or the three YUV planes) plus its render types. */
     private class Allocation(
         val width: Int,
@@ -41,6 +40,7 @@ class DisplayTextureResource(private val uuid: UUID) {
         val renderType: RenderType,
         val fallbackRenderType: RenderType,
     ) {
+        /** If YUV is active, the Y plane is always present. */
         val isYuv: Boolean get() = yPlane != null
 
         /** All texture-manager ids backing this allocation (for release). */
@@ -66,21 +66,33 @@ class DisplayTextureResource(private val uuid: UUID) {
         }
     }
 
+    /** Allocated GPU resources, or null if none are allocated. */
     private var current: Allocation? = null
 
-    // Read from the control thread (decode-target size) but written from the render thread, so the
-    // handoff state must publish across threads.
+    /**
+     * Pending allocation, or null if none is staged. This is the new-resolution allocation that
+     * will be swapped in once the first frame has landed.
+     */
     @Volatile private var pending: Allocation? = null
 
-    @Volatile var width: Int = 0
-        private set
-    @Volatile var height: Int = 0
-        private set
+    /** Width of the current allocation, or 0 if none is allocated. */
+    @Volatile var width: Int = 0; private set
 
+    /** Height of the current allocation, or 0 if none is allocated. */
+    @Volatile var height: Int = 0; private set
+
+    /** Current GPU texture, or null if none is allocated. */
     val texture: DynamicTexture? get() = current?.texture
+
+    /** Current GPU texture identifier, or null if none is allocated. */
     val textureId: Identifier? get() = current?.textureId
+
+    /** [RenderType] used to draw the live video frame, or null if none is allocated. */
     val renderType: RenderType? get() = current?.renderType
 
+    /**
+     * Three I420 plane textures, or null if none is allocated.
+     */
     val yPlane: AbstractTexture? get() = current?.yPlane
     val uPlane: AbstractTexture? get() = current?.uPlane
     val vPlane: AbstractTexture? get() = current?.vPlane
@@ -109,7 +121,7 @@ class DisplayTextureResource(private val uuid: UUID) {
     val pendingUPlane: AbstractTexture? get() = pending?.uPlane
     val pendingVPlane: AbstractTexture? get() = pending?.vPlane
 
-    /** Approximate current + pending GPU texture bytes. */
+    /** Approximate current and pending GPU texture bytes. */
     fun estimatedBytes(): Long = (current?.estimatedBytes() ?: 0L) + (pending?.estimatedBytes() ?: 0L)
 
     /**
@@ -210,8 +222,8 @@ class DisplayTextureResource(private val uuid: UUID) {
         var u: AbstractTexture? = null
         var v: AbstractTexture? = null
         val ids = listOf("y" to (w to h), "u" to (cw to ch), "v" to (cw to ch)).map { (plane, dims) ->
-            val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "screen-$plane-plane-$suffix")
-            val tex = DisplayYuvRenderTypes.createPlaneTexture("dreamdisplays $plane plane $uuid", dims.first, dims.second)
+            val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "screen-$plane-plane-$suffix.")
+            val tex = DisplayYuvRenderTypes.createPlaneTexture("dreamdisplays $plane plane $uuid.", dims.first, dims.second)
             manager.register(id, tex)
             when (plane) {
                 "y" -> y = tex
@@ -251,7 +263,7 @@ class DisplayTextureResource(private val uuid: UUID) {
     }
 
     companion object {
-        /** Creates a custom unlit [RenderType] that samples texture [id] without block light/fog. */
+        /** Creates a custom unlit [RenderType] that samples texture [id] without block light / fog. */
         private fun createRenderType(id: Identifier): RenderType = DisplayUnlitRenderTypes.create("dream-displays", id)
     }
 }

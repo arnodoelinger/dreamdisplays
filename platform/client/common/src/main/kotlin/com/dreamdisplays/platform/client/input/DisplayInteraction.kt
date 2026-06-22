@@ -10,9 +10,9 @@ sealed interface DisplayInteraction {
     /** Represents a right-click interaction with a display. */
     data class RightClicked(val displayId: DisplayId) : DisplayInteraction
 
-    /** Represents a left-click interaction with a display. */
+    /** Represents the player starting to look at a display. */
     data class Looked(val displayId: DisplayId) : DisplayInteraction
 
-    /** Represents a left-click release interaction with a display. */
+    /** Represents the player looking away from a display. */
     data class LookedAway(val displayId: DisplayId) : DisplayInteraction
 }

@@ -7,5 +7,6 @@ import com.dreamdisplays.api.render.RenderContext
  * executed at specific points in the rendering pipeline.
  */
 fun interface RenderHook {
+    /** Called during rendering with the current [context]. */
     fun onRender(context: RenderContext)
 }

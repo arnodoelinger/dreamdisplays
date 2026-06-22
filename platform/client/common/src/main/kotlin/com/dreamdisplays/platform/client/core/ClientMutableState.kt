@@ -8,15 +8,16 @@ interface ClientMutableState : ClientState {
     override var isOnScreen: Boolean
 
     // TODO: implement focus mode
+    /** Whether the client is currently in focus mode. */
     override var focusMode: Boolean
 
     /** Enables or disables the display. */
     override var displaysEnabled: Boolean
 
-    /** Whether the client is a premium user (has `dreamdisplays.premium` permission) */
+    /** Whether the client is a premium user (has `dreamdisplays.premium` permission). */
     override var isPremium: Boolean
 
-    /** Whether the client is an admin user (has OP permissions) */
+    /** Whether the client is an admin user (has OP permissions). */
     override var isAdmin: Boolean
 
     /** Whether the client can report videos to the server. */

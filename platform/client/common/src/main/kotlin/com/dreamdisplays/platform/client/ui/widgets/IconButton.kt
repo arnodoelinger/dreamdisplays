@@ -40,7 +40,6 @@ class IconButton(
         val sprite = sprites.get(active, isHoveredOrFocused)
         g.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height, ARGB.white(alpha))
 
-        // All mod icons are square; size to the larger inner dimension, centered (matches old behavior).
         val iconSide = max(width - 2 * margin, height - 2 * margin)
         val dx = x + width / 2 - iconSide / 2
         val dy = y + height / 2 - iconSide / 2

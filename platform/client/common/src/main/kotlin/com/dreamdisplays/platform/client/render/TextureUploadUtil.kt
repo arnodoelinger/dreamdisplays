@@ -5,11 +5,13 @@ import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
 import java.lang.reflect.InvocationTargetException
+import java.lang.reflect.Method
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
 /** Uploads raw video frames to Minecraft textures on `OpenGL` and backend-neutral renderers. */
 object TextureUploadUtil {
+    /** Uploads a raw RGB24 video frame to a Minecraft texture. */
     fun uploadRgb(
         texture: GpuTexture,
         src: ByteBuffer,
@@ -29,6 +31,7 @@ object TextureUploadUtil {
         setRgbaScratch = setRgbaScratch,
     )
 
+    /** Uploads texture data to a Minecraft texture. */
     fun upload(
         texture: GpuTexture,
         src: ByteBuffer,
@@ -58,6 +61,7 @@ object TextureUploadUtil {
         writeToTexture(texture, rgba, w, h, NativeImage.Format.RGBA)
     }
 
+    /** Write to a Minecraft texture using the `writeToTexture` method. */
     private fun writeToTexture(texture: GpuTexture, pixels: ByteBuffer, w: Int, h: Int, format: NativeImage.Format) {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
         val encoderClass = encoder.javaClass
@@ -95,7 +99,8 @@ object TextureUploadUtil {
             .invokeOrThrowTarget(encoder, texture, pixels, 0, 0, 0, 0, w, h)
     }
 
-    private fun java.lang.reflect.Method.invokeOrThrowTarget(target: Any, vararg args: Any?) {
+    /** Invokes the given method on the given target. Throws the target exception if any. */
+    private fun Method.invokeOrThrowTarget(target: Any, vararg args: Any?) {
         try {
             invoke(target, *args)
         } catch (e: InvocationTargetException) {
@@ -103,6 +108,7 @@ object TextureUploadUtil {
         }
     }
 
+    /** RGB24 -> RGBA32 conversion. */
     private fun rgbToRgba(src: ByteBuffer, dst: ByteBuffer, w: Int, h: Int) {
         val size = w * h * 3
         if (size <= 0 || src.remaining() < size) return

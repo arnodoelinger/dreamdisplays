@@ -7,6 +7,7 @@ import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.resources.Identifier
 
 internal object RenderPipelineCompat {
+    /** Creates a render pipeline for a display quad. */
     fun createDisplayPipeline(
         location: Identifier,
         vertexShader: Identifier,
@@ -29,6 +30,7 @@ internal object RenderPipelineCompat {
         return builder.build()
     }
 
+    /** Configures the depth state of the pipeline. */
     fun configureDepth(builder: RenderPipeline.Builder) {
         val builderClass = builder.javaClass
         val depthStencilStateClass = runCatching {
@@ -51,9 +53,11 @@ internal object RenderPipelineCompat {
         }
     }
 
+    /** True if the current version of Minecraft supports `BindGroupLayout`s. */
     private fun supportsBindGroupLayouts(): Boolean =
         runCatching { Class.forName("com.mojang.blaze3d.pipeline.BindGroupLayout") }.isSuccess
 
+    /** Configures the pipeline for a display quad. */
     private fun configureLegacy(builder: RenderPipeline.Builder, samplers: List<String>) {
         val builderClass = builder.javaClass
         val withUniform = builderClass.getMethod("withUniform", String::class.java, UniformType::class.java)
@@ -79,6 +83,7 @@ internal object RenderPipelineCompat {
             .invoke(builder, DefaultVertexFormat.POSITION_TEX_COLOR, quads)*/
     }
 
+    /** Configures the pipeline for a display quad. */
     private fun configure262(builder: RenderPipeline.Builder, samplers: List<String>) {
         val builderClass = builder.javaClass
         val bglClass = Class.forName("com.mojang.blaze3d.pipeline.BindGroupLayout")
@@ -101,6 +106,7 @@ internal object RenderPipelineCompat {
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)
     }
 
+    /** Creates a `BindGroupLayout` for the given samplers. */
     private fun samplerLayout(samplers: List<String>): Any {
         val bglClass = Class.forName("com.mojang.blaze3d.pipeline.BindGroupLayout")
         val layoutBuilder = bglClass.getMethod("builder").invoke(null)
@@ -111,6 +117,7 @@ internal object RenderPipelineCompat {
         return layoutBuilder.javaClass.getMethod("build").invoke(layoutBuilder)
     }
 
+    /** Gets the `BindGroupLayout` for the given name. */
     private fun vanillaLayout(name: String): Any =
         Class.forName("net.minecraft.client.renderer.BindGroupLayouts").getField(name).get(null)
 }

@@ -30,12 +30,16 @@ class AsyncMemo<K : Any, V : Any>(
     private val scope: CoroutineScope,
     private val tag: String,
 ) {
+    /** Entry in the cache. */
     private class Entry<V>(val value: V, val createdAtMs: Long)
 
+    /** Cache mapping keys to (value, createdAtMs) pairs. */
     private val cache: MutableMap<K, Entry<V>> =
         Collections.synchronizedMap(object : LinkedHashMap<K, Entry<V>>(maxSize + 1, 0.75f, true) {
             override fun removeEldestEntry(eldest: Map.Entry<K, Entry<V>>) = size > maxSize
         })
+
+    /** Deferreds for in-flight loads. */
     private val inFlight: ConcurrentMap<K, Deferred<V>> = ConcurrentHashMap()
 
     /** Returns the cached value for [key] if present and younger than the TTL, else null. */
@@ -86,7 +90,7 @@ class AsyncMemo<K : Any, V : Any>(
                 else deferred.await()
             }
         } catch (e: Throwable) {
-            throw (e as? IOException) ?: (e.cause as? IOException) ?: IOException("$tag failed for $key", e)
+            throw (e as? IOException) ?: (e.cause as? IOException) ?: IOException("$tag failed for $key.", e)
         }
     }
 }

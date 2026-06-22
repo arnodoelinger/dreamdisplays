@@ -32,9 +32,13 @@ import kotlin.time.Duration.Companion.milliseconds
  * Handles client bootstrapping and background maintenance coroutines.
  */
 object ClientStartupManager {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientStartupManager")
+
+    /** The client configuration, loaded from the mod's config directory. */
     val config: Config = Config(File("./config/${Initializer.MOD_ID}"))
 
+    /** How often the background loop re-pushes each display's quality setting. */
     private val qualityRefreshInterval = 2500.milliseconds
 
     /**
@@ -45,6 +49,7 @@ object ClientStartupManager {
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** Loads config, wires services, hosts the application, prewarms backends, and launches maintenance loops. */
     fun start() {
         config.reload()
         ClientSettingsStore.load()

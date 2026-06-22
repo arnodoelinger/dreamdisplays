@@ -10,9 +10,13 @@ import org.lwjgl.opengl.GL11
  * objects and asks `dreamdisplays_lav` to import each retained surface plane into them.
  */
 internal class LavGlSurfaceTextures : AutoCloseable {
+    /** GL texture ids for each imported plane (0 until allocated). */
     private val textureIds = IntArray(MAX_PLANES)
 
+    /** GL texture id of the Y plane. */
     val yTextureId: Int get() = textureIds[0]
+
+    /** GL texture id of the interleaved UV plane. */
     val uvTextureId: Int get() = textureIds[1]
 
     /**
@@ -36,6 +40,7 @@ internal class LavGlSurfaceTextures : AutoCloseable {
         return NativeMedia.READ_OK
     }
 
+    /** Lazily allocates a GL texture id for each plane that doesn't have one yet. */
     private fun ensureTextures() {
         for (i in textureIds.indices) {
             if (textureIds[i] == 0) {
@@ -44,6 +49,7 @@ internal class LavGlSurfaceTextures : AutoCloseable {
         }
     }
 
+    /** Deletes the GL textures owned by this object. */
     override fun close() {
         for (id in textureIds) {
             if (id != 0) GL11.glDeleteTextures(id)
@@ -52,6 +58,7 @@ internal class LavGlSurfaceTextures : AutoCloseable {
     }
 
     private companion object {
+        /** NV12 has two planes: Y and interleaved UV. */
         private const val MAX_PLANES = 2
     }
 }

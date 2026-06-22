@@ -67,6 +67,7 @@ internal class PlaybackSessionManager(
     /** Whether the GPU-side planar (I420) render path is active. */
     private val gpuYuvActive: Boolean,
 ) {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/PlaybackSession")
 
     private companion object {
@@ -346,8 +347,8 @@ internal class PlaybackSessionManager(
         updateRawFrameSink()
         isPlaying = true
         logger.debug(
-            "$debugLabel [reappear] replay-only video started ${w} x $h resume=${"%.1f".format(resumeNanos / 1_000_000.0)}ms " +
-                    "edge=${"%.1f".format(liveEdgeNanos / 1_000_000.0)}ms audioPcm=${audioPcm?.size ?: 0}B.",
+            "$debugLabel [reappear] replay-only video started ${w} x $h resume=${"%.1f".format(resumeNanos / 1_000_000.0)} ms " +
+                    "edge=${"%.1f".format(liveEdgeNanos / 1_000_000.0)} ms audioPcm=${audioPcm?.size ?: 0}B.",
         )
         return true
     }
@@ -391,8 +392,8 @@ internal class PlaybackSessionManager(
                 audio.onBridgeHandoff() // Let the bridge line's (live-relative) clock drive pacing now
                 bridgeCeilingNanos = Long.MAX_VALUE
                 firstLiveFrame.countDown()
-                logger.debug("$debugLabel [reappear] live channel presented first frame; handoff at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)}ms.")
-            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}") },
+                logger.debug("$debugLabel [reappear] live channel presented first frame; handoff at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)} ms.")
+            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}.") },
                 parkFlag = parkFlag)
 
             val ap = MediaProcess.buildAudio(ffmpeg, streamSet.currentAudio.url, liveOffsetNanos, AudioSink.SAMPLE_RATE)
@@ -415,10 +416,10 @@ internal class PlaybackSessionManager(
                 discardChannelBlocking(channel)
                 return false
             }
-            logger.debug("$debugLabel [reappear] live attached ${w} x $h at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)}ms, warming up...")
+            logger.debug("$debugLabel [reappear] live attached ${w} x $h at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)} ms, warming up...")
             true
         } catch (e: IOException) {
-            logger.error("$debugLabel [reappear] failed to attach live after replay", e)
+            logger.error("$debugLabel [reappear] failed to attach live after replay.", e)
             val wasCurrent = synchronized(switchLock) {
                 if (incoming === channel && incomingGeneration == generation) { incoming = null; true } else false
             }
@@ -560,14 +561,14 @@ internal class PlaybackSessionManager(
             // No latch / audio gate: the clock is already running. EOS aborts only this handoff
             if (MediaPlayer.DEBUG) {
                 logger.debug(
-                    "$debugLabel Starting incoming video handoff #$generation ${w}x$h " +
-                            "at ${"%.1f".format(offsetNanos / 1_000_000.0)}ms.",
+                    "$debugLabel Starting incoming video handoff #$generation ${w} x $h " +
+                            "at ${"%.1f".format(offsetNanos / 1_000_000.0)} ms.",
                 )
             }
             channel.launch(ffmpeg, streamSet, w, h, offsetNanos, hwAccel, onFirstFrame = {
                 clock.markFirstFrame()
                 if (MediaPlayer.DEBUG) logger.debug("$debugLabel Incoming video handoff #$generation presented its first frame.")
-            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}") },
+            }, onEos = { stderr, normalEos -> abortIncoming(generation, "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}.") },
                 parkFlag = parkFlag)
             val shouldDiscard = synchronized(switchLock) {
                 if (!terminated.get() && active != null && incoming === channel && incomingGeneration == generation) {
@@ -581,7 +582,7 @@ internal class PlaybackSessionManager(
             }
             if (shouldDiscard) discardChannelBlocking(channel)
         } catch (e: IOException) {
-            logger.error("$debugLabel Failed to start incoming video for quality switch", e)
+            logger.error("$debugLabel Failed to start incoming video for quality switch.", e)
             val wasCurrent = synchronized(switchLock) {
                 if (incoming === channel && incomingGeneration == generation) {
                     incoming = null
@@ -616,7 +617,7 @@ internal class PlaybackSessionManager(
         return true
     }
 
-    /** Aborts an in-flight quality switch (incoming EOS/failure): drops the incoming channel, keeps the live one. */
+    /** Aborts an in-flight quality switch (incoming EOS / failure): drops the incoming channel, keeps the live one. */
     private fun abortIncoming(generation: Long, reason: String) {
         val inc = synchronized(switchLock) {
             if (incomingGeneration != generation) null else incoming.also { incoming = null }
@@ -647,7 +648,7 @@ internal class PlaybackSessionManager(
     fun stop() {
         isPlaying = false
         bridgeCeilingNanos = Long.MAX_VALUE
-        parkFlag.set(false) // release any parked readers so they observe the stop flags and exit
+        parkFlag.set(false) // Release any parked readers so they observe the stop flags and exit
         // A reappearance bridge whose live process never attached: flag it; audio.stop() below releases the
         // line and the pending live-input gate, and the thread is joined at the end.
         bridgeAudio?.let { it.stop.set(true) }

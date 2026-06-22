@@ -12,8 +12,13 @@ import java.util.UUID
  * reflects the latest viewer preferences.
  */
 object ClientSettingsStore {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientSettingsStore")
+
+    /** File name for the JSON settings file. */
     private const val FILE_NAME = "client-display-settings.json"
+
+    /** In-memory cache of settings, keyed by display UUID. */
     private val settings = HashMap<UUID, ClientDisplaySettings>()
 
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */

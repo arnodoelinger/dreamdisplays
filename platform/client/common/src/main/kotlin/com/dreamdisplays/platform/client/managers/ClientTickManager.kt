@@ -26,15 +26,31 @@ import java.util.UUID
  * Handles per-tick client display state: level changes, hover, unloading, shortcuts, and focus mode.
  */
 object ClientTickManager {
+    /** Edge-detect state for the menu-open button. */
     private var wasPressed = false
+
+    /** True while the player is connected to a server / local world. */
     private var wasInMultiplayer = false
+
+    /** The level seen last tick, used to detect level changes. */
     @Volatile private var lastLevel: ClientLevel? = null
+
+    /** Whether focus-mode blindness was applied last tick. */
     private var wasFocused = false
+
+    /** Counter that throttles the unloaded-screen restore check. */
     private var unloadCheckTick = 0
+
+    /** The display currently under the crosshair, or `null`. */
     private var hoveredDisplayScreen: DisplayScreen? = null
+
+    /** Id of the display hovered last tick, used to emit look events on change. */
     private var lastHoveredId: UUID? = null
+
+    /** Monotonic tick counter emitted with [ClientLifecycleEvent.Tick]. */
     private var tickCount = 0L
 
+    /** Main per-tick update: level changes, hover, render-distance (un)loading, the menu shortcut, and focus mode. */
     fun tick(minecraft: Minecraft) {
         tickCount++
         DreamServices.registry.getOrNull<ClientApplication>()

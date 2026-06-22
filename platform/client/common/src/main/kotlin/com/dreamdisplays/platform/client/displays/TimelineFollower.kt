@@ -23,10 +23,17 @@ package com.dreamdisplays.platform.client.displays
 internal class TimelineFollower(private val screen: DisplayScreen) {
     /** [System.nanoTime] of the last corrective seek; gates the re-seek cooldown. 0 = never. */
     private var lastSeekNanos = 0L
+
+    /** Server timestamp of the most recently applied packet; older packets are dropped. `MIN_VALUE` = none yet. */
     private var lastServerTimeMs = Long.MIN_VALUE
+
+    /** Monotonic sequence stamped on each pending packet so stale deferred applies can be discarded. */
     private var nextSeq = 0L
+
+    /** The latest timeline packet awaiting (re)application, or `null` when none is pending. */
     private var pending: Pending? = null
 
+    /** A buffered timeline packet, captured at receive time so its target can be projected forward. */
     private data class Pending(
         val seq: Long,
         val targetMs: Long,
@@ -54,13 +61,14 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
      * forward by the time elapsed across that defer so the comparison uses an up-to-date position.
      */
     fun apply(targetMs: Long, serverTimeMs: Long, paused: Boolean, loop: Boolean) {
-        if (serverTimeMs > 0L && serverTimeMs < lastServerTimeMs) return
+        if (serverTimeMs in 1..<lastServerTimeMs) return
         if (serverTimeMs > 0L) lastServerTimeMs = serverTimeMs
         val packet = Pending(++nextSeq, targetMs, serverTimeMs, paused, loop, System.nanoTime())
         pending = packet
         applyPending(packet)
     }
 
+    /** Applies [packet] once the player is initialized: matches pause state and seeks only when drift leaves the tolerance band. */
     private fun applyPending(packet: Pending) {
         screen.primeTimelineStart(projectTargetMs(packet) * 1_000_000L)
         val generation = screen.mediaGeneration
@@ -119,6 +127,7 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
         }
     }
 
+    /** Projects [packet]'s target forward by the time elapsed since it was received (unchanged while paused). */
     private fun projectTargetMs(packet: Pending): Long {
         val elapsedMs = if (packet.paused) 0L else (System.nanoTime() - packet.receivedAtNanos) / 1_000_000L
         return packet.targetMs + elapsedMs

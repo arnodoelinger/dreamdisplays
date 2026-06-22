@@ -1,8 +1,4 @@
-@file:OptIn(DreamDisplaysUnstableApi::class)
-
 package com.dreamdisplays.platform.client.core
-
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 import com.dreamdisplays.api.display.service.DisplayService
 import com.dreamdisplays.api.playback.PlaybackService
@@ -60,8 +56,6 @@ import com.dreamdisplays.media.source.ytdlp.YtDlpResolver
  * call [registry].`get<MediaResolverRegistry>()` instead of touching the concrete resolver objects.
  * [bootstrap] wires the default service graph and is idempotent, so it is safe to call from each
  * platform's startup path.
- *
- * @since 1.8.0
  */
 object DreamServices {
     /** The shared registry. Services are populated by [bootstrap]. */

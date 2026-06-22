@@ -10,10 +10,16 @@ import java.nio.charset.StandardCharsets
 
 /** Checks mod updates against the latest stable GitHub release. **/
 object UpdateCheck {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/UpdateCheck")
+
+    /** GitHub releases API. */
     private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
 
+    /** Check state. */
     @Volatile private var checked = false
+
+    /** Latest release version of the mod, or null if the check failed or the version is unknown. */
     @Volatile private var latestVersion: String? = null
 
     /**
@@ -27,18 +33,18 @@ object UpdateCheck {
         return compareVersions(latest, GeneralUtil.getModVersion()) > 0
     }
 
-    /** Returns true if [version] is a DEV or SNAPSHOT build. */
+    /** If [version] is a DEV or SNAPSHOT build, returns true. */
     fun isPreRelease(version: String): Boolean =
         version.contains("-DEV", ignoreCase = true) || version.contains("-SNAPSHOT", ignoreCase = true)
 
-    /** Starts the background update check exactly once; subsequent calls are no-ops. */
+    /** Start the background update check exactly once; subsequent calls are no-ops. */
     @Synchronized private fun startCheck() {
         if (checked) return
         checked = true
         DreamCoroutines.clientIo.launch { doCheck() }
     }
 
-    /** Queries the GitHub releases API and sets [latestVersion]. */
+    /** Check the latest release version against the current version. */
     private fun doCheck() {
         var conn: HttpURLConnection? = null
         try {

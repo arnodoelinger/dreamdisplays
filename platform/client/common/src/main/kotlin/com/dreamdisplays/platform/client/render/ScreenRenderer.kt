@@ -4,9 +4,6 @@ import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.platform.client.render.ClientRenderService
-import com.dreamdisplays.platform.client.render.DisplayRenderEntry
-import com.dreamdisplays.platform.client.render.RenderHook
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.api.render.RenderContext
@@ -17,7 +14,7 @@ import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sin
 
-/** Renders screens in the world. */
+/** Renders screens in the world. Better not to touch this shit. */
 object ScreenRenderer : ClientRenderService {
     private typealias QuadAppender = (PoseStack.Pose, VertexConsumer) -> Unit
     private typealias QuadRenderer = (RenderType, QuadAppender) -> Unit
@@ -53,8 +50,7 @@ object ScreenRenderer : ClientRenderService {
     override fun updateTexture(displayId: DisplayId, handle: TextureHandle) = Unit
 
     /** Number of live screens with an uploaded texture. Those this renderer will actually draw. */
-    override val registeredCount: Int
-        get() = DisplayRegistry.getScreens().count { it.hasTexture }
+    override val registeredCount: Int; get() = DisplayRegistry.getScreens().count { it.hasTexture }
 
     /** Iterates all registered screens and lets the caller submit quads through the active renderer. */
     fun render(stack: PoseStack, camera: Camera, drawQuad: QuadRenderer) {
@@ -128,7 +124,7 @@ object ScreenRenderer : ClientRenderService {
         stack: PoseStack, drawQuad: QuadRenderer, type: RenderType,
         facing: DisplayFacing, w: Int, h: Int, error: Boolean,
     ) {
-        // Backdrop on the screen plane.
+        // Backdrop on the screen plane
         drawLayer(stack, facing, w, h, 0f) {
             val (r, g, b) = if (error) {
                 Triple(28, 6, 6)
@@ -196,6 +192,7 @@ object ScreenRenderer : ClientRenderService {
     /** Texture corners in vertex order; rotating the list by [rotation] quarter-turns spins the image. */
     private val baseUv = arrayOf(0f to 1f, 1f to 1f, 1f to 0f, 0f to 0f)
 
+    /** Appends a quad with the given [rotation] (0..3) and color [r,g,b] (0..255). */
     private fun appendQuad(pose: PoseStack.Pose, builder: VertexConsumer, r: Int, g: Int, b: Int, rotation: Int) {
         val rot = ((rotation % 4) + 4) % 4
         val uv = Array(4) { baseUv[(it + rot) % 4] }
@@ -205,6 +202,7 @@ object ScreenRenderer : ClientRenderService {
         addVertex(pose, builder, 0f, 1f, 0f, r, g, b, uv[3].first, uv[3].second)
     }
 
+    /** Adds a vertex with the given [r,g,b] (0..255) and [u,v] (0..1) coordinates. */
     private fun addVertex(
         pose: PoseStack.Pose,
         builder: VertexConsumer,
@@ -220,10 +218,12 @@ object ScreenRenderer : ClientRenderService {
         builder.addVertex(pose, x, y, z).setUv(u, v).setColor(r, g, b, 255)
     }
 
+    /** Draws a quad using the given [type] and [appendVertices] function. A bit of a hack. */
     private fun drawImmediate(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
         ImmediateRenderCompat.draw(stack, type, appendVertices)
     }
 
+    /** Compatibility layer for the new immediate mode API. */
     private object ImmediateRenderCompat {
         fun draw(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
             //? if >=26 {

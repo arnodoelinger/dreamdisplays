@@ -14,11 +14,19 @@ import net.minecraft.client.Camera
  * Minecraft-free while the concrete render path keeps the rich types it needs.
  */
 class MinecraftRenderContext(
+    /** The live pose stack for the current frame. */
     val stack: PoseStack,
+    /** The active world camera. */
     val camera: Camera,
+    /** Fraction of a tick elapsed since the last full tick. */
     override val tickDelta: Float,
 ) : RenderContext {
+    /** Camera world X. */
     override val cameraX: Double get() = camera.position().x
+
+    /** Camera world Y. */
     override val cameraY: Double get() = camera.position().y
+
+    /** Camera world Z. */
     override val cameraZ: Double get() = camera.position().z
 }

@@ -1,15 +1,9 @@
-@file:OptIn(DreamDisplaysUnstableApi::class)
-
 package com.dreamdisplays.platform.client.core
-
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 import com.dreamdisplays.api.platform.Platform
 
 /**
  * Context for a client application.
- *
- * @since 1.8.0
  */
 interface ClientContext {
     /** Mutable state of the client, which can be updated by modules and observed by other modules. */

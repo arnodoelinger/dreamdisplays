@@ -27,10 +27,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * Put everything in one place and don't make garbage.
 */
 class DefaultClientApplication(override val context: ClientContext) : ClientApplication {
+    /** Map of registered modules by id. */
     private val modules = LinkedHashMap<String, ClientModule>()
+
+    /** Set of installed module ids. */
     private val installed = LinkedHashSet<String>()
+
+    /** Listeners for lifecycle events. */
     private val listeners = CopyOnWriteArrayList<(ClientLifecycleEvent) -> Unit>()
 
+    /** Whether the application has been started. */
     @Volatile private var started = false
 
     /**

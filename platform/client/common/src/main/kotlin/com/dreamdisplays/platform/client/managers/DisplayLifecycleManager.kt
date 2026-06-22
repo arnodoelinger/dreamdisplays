@@ -24,10 +24,13 @@ import kotlin.math.sqrt
  * Handles client-side display creation, restoration, and render-distance lifecycle.
  */
 object DisplayLifecycleManager {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayLifecycleManager")
 
+    /** Maximum allowed display dimension, in blocks. */
     private const val MAX_DISPLAY_BLOCKS = 256
 
+    /** Creates or updates a display from a server [DisplayInfo] packet, honoring render distance and size limits. */
     fun handleInfoPacket(packet: DisplayInfo) {
         if (!ClientStateManager.displaysEnabled) return
         if (!isValidDisplaySize(packet.width, packet.height)) {
@@ -63,6 +66,7 @@ object DisplayLifecycleManager {
         )
     }
 
+    /** Builds and registers a new [DisplayScreen], applying saved render distance and loading the video. */
     fun createScreen(
         uuid: UUID, ownerUuid: UUID, pos: Vector3i, facingUtil: FacingUtil,
         width: Int, height: Int, code: String, lang: String,
@@ -81,6 +85,7 @@ object DisplayLifecycleManager {
         if (code != "") displayScreen.loadVideo(code, lang)
     }
 
+    /** Restores any softly-unloaded screens that are back within render distance of [playerPos]. */
     fun restoreVisibleUnloadedScreens(playerPos: BlockPos) {
         DisplayRegistry.unloadedScreens.values
             .filter { it.videoUrl.isNotEmpty() && distanceToData(it, playerPos) <= it.renderDistance }
@@ -91,6 +96,7 @@ object DisplayLifecycleManager {
             }
     }
 
+    /** Rebuilds a [DisplayScreen] from persisted [data] and re-registers it. */
     private fun restoreScreen(data: FullDisplayData) {
         if (!isValidDisplaySize(data.width, data.height)) {
             logger.warn("Skipping cached display ${data.uuid}: invalid size ${data.width}x${data.height}.")
@@ -119,9 +125,11 @@ object DisplayLifecycleManager {
         }
     }
 
+    /** Distance from [playerPos] to the persisted display [data]'s bounding box. */
     private fun distanceToData(data: FullDisplayData, playerPos: BlockPos) =
         distanceToScreen(data.x, data.y, data.z, data.width, data.height, data.facing, playerPos)
 
+    /** Shortest distance from [playerPos] to the screen's block bounding box (facing-aware). */
     private fun distanceToScreen(
         x: Int, y: Int, z: Int, width: Int, height: Int, facing: DisplayFacing, playerPos: BlockPos
     ): Double {
@@ -144,6 +152,7 @@ object DisplayLifecycleManager {
         )))
     }
 
+    /** True if both dimensions are within `1..`[MAX_DISPLAY_BLOCKS]. */
     private fun isValidDisplaySize(width: Int, height: Int): Boolean =
         width in 1..MAX_DISPLAY_BLOCKS && height in 1..MAX_DISPLAY_BLOCKS
 }

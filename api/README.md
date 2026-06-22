@@ -1,14 +1,24 @@
 # API
 
 Public, experimental Dream Displays API. This module is the boundary external code, platform integrations, and sibling
-modules can use without depending on `core` internals.
+modules can use without depending on `core` internals. Everything here is annotated as unstable via `DreamDisplaysUnstableApi`.
 
 ## Contents
 
-- Public domain models: `DisplayId`, `Display`, `DisplayBounds`, `DisplaySettings`, `DisplayRuntimeState`, `DisplayEvent`
-- Public playback and watch-party modes/actions: `PlaybackMode`, `PlaybackAction`, `WatchPartyAction`, `WatchPartySessionState`
-- Service contracts: `DisplayService`, `PlaybackService`, `WatchPartyService`
-- Media/render/platform integration contracts under `com.dreamdisplays.media.api`, `com.dreamdisplays.render.api`, and `com.dreamdisplays.platform.api`
+- `display` — domain models (`DisplayId`, `Display`, `DisplayBounds`, `DisplayFacing`, `DisplaySettings`,
+  `DisplayRuntimeState`, `DisplayEvent`) and the `DisplayService` contract
+- `playback` — `PlaybackService`, plus `PlaybackMode` / `PlaybackAction` in `PlaybackTypes`
+- `watchparty` — `WatchPartyService`, `WatchPartySession`, `WatchPartyAction`, `WatchPartySessionState`
+- `media.source` — resolver contracts: `MediaSource`, `MediaResolver`, `MediaResolverRegistry`, `ResolvedMedia`, `MediaMetadata`
+- `media.stream` — `MediaStream`, `MediaStreamType`
+- `media.session` — `MediaSession`, `MediaSessionState`, `MediaSessionEvent`
+- `media.search` — `MediaSearchService`, `MediaSearchResult`, `YouTubeUrls`
+- `media.sink` — decoder output contracts: `VideoFrameSink`, `DecodedVideoFrame`, `AudioSink`
+- `media.player` — playback host hooks: `PlaybackHost`, `FrameUploader`, `GpuTextureRef`, `RenderThreadExecutor`
+- `render` — render/upload contracts: `DisplayRenderer`, `RenderContext`, `RenderSurface`, `RenderStats`,
+  `TextureUploader` / `TextureUploaderFactory`, `TextureHandle`, `UploadBudget`, `FrameDropPolicy`
+- `platform` — loader-neutral platform hooks: `Platform`, `PlatformSide`, `PlatformLogger`, `PlatformPaths`,
+  `PlatformScheduler`, `TaskHandle`
 
 ## Boundaries
 

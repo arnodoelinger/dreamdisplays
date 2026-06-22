@@ -4,7 +4,7 @@ import com.dreamdisplays.api.display.model.DisplayFacing
 
 /**
  * Facing directions for block placement and interaction. The ordinal doubles as the wire byte (see
- * [toPacket] / [fromPacket]), so the declaration order N/E/S/W is part of the protocol. Don't
+ * [toPacket] / [fromPacket]), so the declaration order N / E / S / W is part of the protocol. Don't
  * reorder.
  */
 enum class FacingUtil {
@@ -36,7 +36,7 @@ enum class FacingUtil {
         /** Deserializes a facing from [data] byte; throws [IllegalArgumentException] for out-of-range values. */
         @JvmStatic fun fromPacket(data: Byte): FacingUtil {
             val values = entries
-            require(data in values.indices) { "Invalid facing ID: $data" }
+            require(data in values.indices) { "Invalid facing ID: $data." }
             return values[data.toInt()]
         }
     }

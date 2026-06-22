@@ -11,6 +11,7 @@ import com.dreamdisplays.util.DreamCoroutines
  * Handles client shutdown cleanup.
  */
 object ClientShutdownManager {
+    /** Stops the application, saves and unloads screens, shuts down coroutines, and interrupts the focuser. */
     fun stop() {
         DreamServices.registry.getOrNull<ClientApplication>()?.stop()
         DisplayRegistry.saveAllScreens()

@@ -11,24 +11,19 @@ import net.minecraft.client.Minecraft
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Owns the media/player lifecycle for a single [DisplayScreen]: swapping in a fresh [MediaPlayer] on
+ * Owns the media / player lifecycle for a single [DisplayScreen]: swapping in a fresh [MediaPlayer] on
  * URL change, generation-guarding async init callbacks against stale players, applying the screen's
  * saved state on start, and teardown.
- *
- * Pulled out of [DisplayScreen] (the same way as [DisplaySyncController]) so the screen no longer
- * interleaves player creation and swap bookkeeping with settings and packet handling. The controller
- * drives the screen back through a small set of `internal` hooks.
  */
 internal class DisplayMediaController(private val screen: DisplayScreen) {
+    /** Generation counter for async callbacks. */
     private val generation = AtomicLong()
 
     /** The active media player, or null between videos and after [shutdown]. */
-    @Volatile var player: MediaPlayer? = null
-        private set
+    @Volatile var player: MediaPlayer? = null; private set
 
     /** True once [start] has applied the screen's initial state to the current player. */
-    var videoStarted: Boolean = false
-        private set
+    var videoStarted: Boolean = false; private set
 
     /** Current player generation; bumped on every swap so stale async callbacks can be detected. */
     val generationNow: Long get() = generation.get()

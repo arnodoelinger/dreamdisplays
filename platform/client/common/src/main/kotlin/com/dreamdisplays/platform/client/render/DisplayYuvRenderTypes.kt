@@ -4,6 +4,7 @@ import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.platform.NativeImage
+import com.mojang.blaze3d.textures.*
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
@@ -22,7 +23,8 @@ import net.minecraft.resources.Identifier
  * multiplies by 2).
  */
 object DisplayYuvRenderTypes {
-    private var sharedPlaneSampler: com.mojang.blaze3d.textures.GpuSampler? = null
+    /** Shared linear / clamp sampler used by all video planes. */
+    private var sharedPlaneSampler: GpuSampler? = null
 
     /**
      * Lazily creates the shared linear/clamp sampler used by all video planes. The device does
@@ -30,14 +32,15 @@ object DisplayYuvRenderTypes {
      * `createSampler` signature is binary-stable across 26.1 and 26.2, so this lives here
      * rather than in the version-specific texture classes.
      */
-    fun planeSampler(): com.mojang.blaze3d.textures.GpuSampler =
+    fun planeSampler(): GpuSampler =
         sharedPlaneSampler ?: com.mojang.blaze3d.systems.RenderSystem.getDevice().createSampler(
-            com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE,
-            com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE,
-            com.mojang.blaze3d.textures.FilterMode.LINEAR,
-            com.mojang.blaze3d.textures.FilterMode.LINEAR,
+            AddressMode.CLAMP_TO_EDGE,
+            AddressMode.CLAMP_TO_EDGE,
+            FilterMode.LINEAR,
+            FilterMode.LINEAR,
             1, java.util.OptionalDouble.empty(),
         ).also { sharedPlaneSampler = it }
+
     /** Sampler names bound to the Y / U / V planes. */
     private const val SAMPLER_Y = "Sampler0"
     private const val SAMPLER_U = "Sampler1"
@@ -92,6 +95,7 @@ object DisplayYuvRenderTypes {
             .createRenderSetup(),
     )
 
+    /** Shared 1x1 white texture used for the loading / error quads in YUV mode. */
     private var whiteTextureId: Identifier? = null
 
     /**
@@ -113,6 +117,7 @@ object DisplayYuvRenderTypes {
         return DisplayUnlitRenderTypes.create("dream-displays-fallback", id)
     }
 
+    /** Shared flat solid-color render type (a 1 x 1 white texture modulated by the vertex color). */
     @Volatile private var sharedSolidType: RenderType? = null
 
     /**

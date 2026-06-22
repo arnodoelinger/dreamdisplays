@@ -17,14 +17,20 @@ import java.util.concurrent.CopyOnWriteArrayList
  */
 class DefaultDisplayRenderer : DisplayRenderer {
 
+    /** Registered self-rendering surfaces, drawn each pass. */
     private val surfaces = CopyOnWriteArrayList<RenderSurface>()
 
+    /** Start of the current one-second FPS measurement window. */
     private var frameWindowStartNanos = 0L
+
+    /** Passes counted in the current FPS window. */
     private var frameWindowCount = 0
 
+    /** Most recent measured pass rate (passes per second). */
     @Volatile
     private var measuredFps = 0f
 
+    /** Duration of the last render pass, in milliseconds. */
     @Volatile
     private var lastPassMillis = 0L
 
@@ -48,9 +54,11 @@ class DefaultDisplayRenderer : DisplayRenderer {
         tickFpsWindow(start)
     }
 
+    /** Number of registered surfaces. */
     override val registeredCount: Int
         get() = surfaces.size
 
+    /** Orchestrator-level render stats (surface pass rate and last-pass latency only). */
     override val stats: RenderStats
         get() = RenderStats(
             decodedFps = 0f,

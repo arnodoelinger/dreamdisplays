@@ -24,8 +24,10 @@ import org.slf4j.LoggerFactory
  * raw payload sender bound to the platform [Mod] implementation.
  */
 object ClientPacketManager {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientPacketManager")
 
+    /** The platform [Mod] used to send raw payloads; set via [bind]. */
     private lateinit var mod: Mod
 
     /** The latest applied [ServerHello]; legacy per-flag packets merge into this snapshot. */
@@ -33,6 +35,7 @@ object ClientPacketManager {
     var serverSnapshot: ServerHello = ServerHello()
         private set
 
+    /** Binds the platform [Mod] used to send packets. */
     fun bind(mod: Mod) {
         this.mod = mod
     }
@@ -79,6 +82,7 @@ object ClientPacketManager {
         ClientStateManager.config.save()
     }
 
+    /** Removes a deleted display from the registry and erases its saved data. */
     private fun handleDelete(packet: DisplayDelete) {
         DisplayRegistry.screens[packet.id]?.let { DisplayRegistry.unregisterScreen(it) }
         DisplayRegistry.unloadedScreens.remove(packet.id)
@@ -86,6 +90,7 @@ object ClientPacketManager {
         logger.info("Display deleted and removed from saved data: ${packet.id}.")
     }
 
+    /** Drops the listed displays from the registry, display system, and saved data. */
     private fun handleClearCache(packet: ClearCache) {
         packet.ids.forEach { uuid ->
             DisplayRegistry.screens.remove(uuid)?.unregister()

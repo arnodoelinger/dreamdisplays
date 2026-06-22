@@ -22,7 +22,6 @@ import java.nio.ByteBuffer
  * @param stateCache If true, cached `GlStateManager` methods are used for state optimization.
  */
 class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
-
     /** [PBO_COUNT] buffer IDs that we rotate through. */
     private val pboIds: IntArray = IntArray(PBO_COUNT) { GL15.glGenBuffers() }
 
@@ -32,13 +31,22 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
     /** Index of the `PBO` to write into; advanced on each upload. */
     private var ringIndex: Int = 0
 
+    /** Managed texture ID and size. */
     private var managedTexId: Int = -1
+
+    /** Managed texture size (width). */
     private var managedTexW: Int = -1
+
+    /** Managed texture size (height). */
     private var managedTexH: Int = -1
 
+    /** Async support. */
     override val supportsAsync: Boolean = true
+
+    /** Maximum texture size. This should not be changed. */
     override val maxTextureSize: Int = 8192
 
+    /** Upload texture. */
     override fun upload(frame: DecodedVideoFrame): TextureHandle {
         if (managedTexId == -1) {
             managedTexId = GL11.glGenTextures()
@@ -65,6 +73,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
         return TextureHandle(managedTexId)
     }
 
+    /** Releases the texture. */
     override fun release(handle: TextureHandle) {
         if (handle.id == managedTexId && managedTexId != -1) {
             GL11.glDeleteTextures(managedTexId)
@@ -72,6 +81,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
         }
     }
 
+    /** Releases the texture and cleans up `PBO`s. */
     override fun close() {
         if (managedTexId != -1) {
             GL11.glDeleteTextures(managedTexId)
@@ -129,6 +139,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
     }
 
     /** Binds a buffer to the specified target. */
+    @Suppress("SameParameterValue")
     private fun bindBuffer(target: Int, id: Int) {
         if (stateCache) GlStateManager._glBindBuffer(target, id) else GL15.glBindBuffer(target, id)
     }
@@ -176,6 +187,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
         src.position(savedPos)
     }
 
+    /** Texture sub-image 2D from a `PBO`. */
     private fun texSubImage2DFromPbo(w: Int, h: Int, glFormat: Int) {
         if (stateCache) {
             GlStateManager._texSubImage2D(
@@ -189,6 +201,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
     }
 
     companion object {
+        /** Number of `PBO`s in the ring. */
         private const val PBO_COUNT = 3
     }
 }

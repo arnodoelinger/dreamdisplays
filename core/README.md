@@ -4,11 +4,12 @@ Internal domain implementation for Dream Displays. `core` knows product rules, b
 
 ## Contents
 
-- Implementations of public services from `api`: display, playback, and watch-party
-- Internal ports: `DisplaySystem`, `DisplayLookup`, `DisplayMutationPort`, `PlaybackPort`, `WatchPartyPort`, `DisplayCommandExecutor`
-- Playback logic: permissions and timeline
-- Protocol v2 wire classes and serialization
-- Storage models and security policies / guards
+- Service implementations of the public `api` contracts: `DefaultDisplayService`, `DefaultPlaybackService`, `DefaultWatchPartyService`
+- Internal display ports: `DisplaySystem` / `DefaultDisplaySystem`, `DisplayLookup`, `DisplayMutationPort`, `DisplayCommandExecutor`
+- Playback / watch-party ports and logic: `PlaybackPort`, `WatchPartyPort`, `PlaybackPermissions`, `Timeline`
+- Protocol v2 wire layer: `DreamPacket`, `Packets`, `PacketRegistry`, `ProtocolVersion`, `TimelineWire`, `UuidSerializer`
+- Storage models: `DisplayStorage`, `FullDisplayData`
+- Security policies / guards: `MediaUrlPolicy`, `MediaHostGuard`
 
 ## Boundaries
 

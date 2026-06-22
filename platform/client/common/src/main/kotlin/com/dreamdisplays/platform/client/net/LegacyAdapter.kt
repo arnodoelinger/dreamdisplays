@@ -21,7 +21,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
  */
 @Deprecated("Protocol v1 adapter; remove along with Packets when v1 client support is dropped.")
 object LegacyAdapter {
-
     /**
      * Maps an outgoing v2 [packet] to its frozen-v1 payload for servers without v2, or null for
      * v2-only packets (playback modes / watch parties) that have no legacy equivalent and are simply

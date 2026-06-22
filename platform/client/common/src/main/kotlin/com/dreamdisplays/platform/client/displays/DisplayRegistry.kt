@@ -15,12 +15,17 @@ import java.util.concurrent.CopyOnWriteArrayList
 
 /** Central registry of all live [DisplayScreen]s and the event bus for their lifecycle changes. */
 object DisplayRegistry {
+    /** Screens registered by the application. */
     val screens = ConcurrentHashMap<UUID, DisplayScreen>()
+
+    /** Screens unregistered by the application, but still in memory. */
     val unloadedScreens = ConcurrentHashMap<UUID, FullDisplayData>()
 
+    /** Event listeners subscribed to display lifecycle events. */
     private val eventListeners = CopyOnWriteArrayList<(DisplayEvent) -> Unit>()
-    private val displaySystem: DisplaySystem?
-        get() = DreamServices.registry.getOrNull<DisplaySystem>()
+
+    /** The display system, if available. */
+    private val displaySystem: DisplaySystem? get() = DreamServices.registry.getOrNull<DisplaySystem>()
 
     /** Returns a snapshot of all currently registered screens. */
     fun getScreens(): Collection<DisplayScreen> = screens.values

@@ -12,8 +12,10 @@ import org.slf4j.LoggerFactory
  * answering the blind [com.dreamdisplays.core.protocol.ClientHello] with a [ServerHello].
  */
 object ProtocolRouter {
+    /** Logger for negotiation and decode diagnostics. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ProtocolRouter")
 
+    /** True once the server has proven v2 support by answering with a [ServerHello]. */
     @Volatile
     var v2Negotiated: Boolean = false
         private set

@@ -34,6 +34,7 @@ class Focuser : Thread() {
     }
 
     companion object {
+        /** The running focuser thread, or `null` before it is started. */
         @Volatile var instance: Focuser? = null
             private set
     }

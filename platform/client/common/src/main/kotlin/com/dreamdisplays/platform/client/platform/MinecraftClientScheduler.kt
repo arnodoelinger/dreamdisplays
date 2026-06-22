@@ -15,14 +15,16 @@ import java.util.concurrent.TimeUnit
  */
 object MinecraftClientScheduler : PlatformScheduler {
 
+    /** Milliseconds per game tick, used to convert tick counts to wall-clock delays. */
     private const val MS_PER_TICK = 50L
 
+    /** Shared single-thread daemon pool for async and timed work. */
     private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(1) { r ->
         Thread(r, "DD-Scheduler").apply { isDaemon = true }
     }
 
-    override val isOnMainThread: Boolean
-        get() = Minecraft.getInstance().isSameThread
+    /** True when called from the render / main thread. */
+    override val isOnMainThread: Boolean; get() = Minecraft.getInstance().isSameThread
 
     /** Runs [task] on the render/main thread; immediately if already there. */
     override fun runOnMainThread(task: () -> Unit) {

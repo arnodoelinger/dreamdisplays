@@ -11,8 +11,6 @@ import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.render.DisplayGeometry
 import com.dreamdisplays.platform.client.render.DisplayTextureResource
-import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
-import com.dreamdisplays.platform.client.render.GpuTextureHandle
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.render.toUploadFormat
 import com.dreamdisplays.api.watchparty.WatchPartySession
@@ -29,7 +27,6 @@ import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.api.playback.WatchPartySessionState
-import com.dreamdisplays.core.protocol.WatchPartyStart
 import com.dreamdisplays.core.protocol.WatchPartyState
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
@@ -41,6 +38,7 @@ import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
 import net.minecraft.resources.Identifier
+import org.jetbrains.annotations.ApiStatus
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.*
@@ -48,39 +46,71 @@ import kotlin.math.abs
 
 /** Represents a video display screen in the game world. */
 class DisplayScreen(
+    /** Stable unique id of this display, shared with the server. */
     val uuid: UUID,
+
+    /** Id of the player who created and owns this display. */
     val ownerUuid: UUID,
+
+    /** Anchor block X coordinate. */
     private var x: Int,
+
+    /** Anchor block Y coordinate. */
     private var y: Int,
+
+    /** Anchor block Z coordinate. */
     private var z: Int,
+
+    /** Direction the screen surface faces. */
     var facing: DisplayFacing,
+
+    /** Screen width in blocks. */
     var width: Int,
+
+    /** Screen height in blocks. */
     var height: Int,
+
+    /** Current base playback mode (`LOCAL` / `SYNCED` / `BROADCAST`). */
     var mode: PlaybackMode,
+
+    /** Hard quality cap in pixel height for Broadcast, or `0` for no cap. */
     var qualityCap: Int = 0,
+
     /** Content quarter-turn rotation (0-3); only used for floor/ceiling (`UP`/`DOWN`) screens. */
     var rotation: Int = 0,
 ) {
+    /** Per-display client settings (volume, quality, mute, ...) loaded from disk. */
     private val savedSettings = ClientSettingsStore.getSettings(uuid)
 
+    /** True if the local player owns this display. */
     var owner: Boolean = Minecraft.getInstance().player?.gameProfile?.id?.toString() == ownerUuid.toString()
+
+    /** True if the local player has admin (OP) permissions. */
     val isAdmin: Boolean get() = ClientStateManager.isAdmin
+
+    /** Server-reported lock state, or `null` until the server reports it. */
     var isLocked: Boolean? = null
+
+    /** The last media failure on this display, or `null` when healthy. */
     @Volatile var mediaError: DreamMediaException? = null
+
+    /** True while a media error is active. */
     val errored: Boolean get() = mediaError != null
+
+    /** True if the local player may edit this display (owner, admin, or not effectively locked). */
     val canEdit: Boolean get() = owner || isAdmin || !effectiveLocked
+
+    /** Whether the user has muted this display. */
     var muted: Boolean = savedSettings.muted
 
     /** Legacy mirror of [mode]; true only for [PlaybackMode.SYNCED]. */
     val isSync: Boolean get() = mode == PlaybackMode.SYNCED
 
     /** Live watch-party session over this display, or null when none is running. */
-    @Volatile var watchParty: WatchPartySession? = null
-        private set
+    @Volatile var watchParty: WatchPartySession? = null; internal set
 
     /** Whether the local player has marked themselves ready in the current session (UI toggle state). */
-    @Volatile var localWatchPartyReady: Boolean = false
-        private set
+    @Volatile var localWatchPartyReady: Boolean = false; internal set
 
     /** The effective mode the player experiences — `WATCH_PARTY` while a session is live. */
     val effectiveMode: PlaybackMode get() = if (watchParty != null) PlaybackMode.WATCH_PARTY else mode
@@ -125,9 +155,16 @@ class DisplayScreen(
     /** The lock the player actually sees: base lock, or forced on by Watch Party / Broadcast. */
     val effectiveLocked: Boolean get() = PlaybackPermissions.isEffectivelyLocked(effectiveMode, isLocked == true)
 
+    /** Backing store for this display's GPU texture(s) and render types. */
     private val textureResource = DisplayTextureResource(uuid)
+
+    /** The live RGBA texture, or `null` in YUV mode / before allocation. */
     val texture: DynamicTexture? get() = textureResource.texture
+
+    /** Resource identifier of the live texture, or `null` before allocation. */
     val textureId: Identifier? get() = textureResource.textureId
+
+    /** [RenderType] used to draw the live video frame, or `null` before allocation. */
     val renderType: RenderType? get() = textureResource.renderType
 
     /** True once either texture flavor (RGBA or YUV planes) is allocated and the screen can be drawn. */
@@ -142,8 +179,11 @@ class DisplayScreen(
     // not the live one — otherwise its frames never match the staged texture and the display freezes.
     val textureWidth: Int get() = if (textureResource.hasPending) textureResource.pendingWidth else textureResource.width
     val textureHeight: Int get() = if (textureResource.hasPending) textureResource.pendingHeight else textureResource.height
+
+    /** Aspect ratio of the decoded video content (width / height); `0.0` until the first frame. */
     @Volatile var videoContentAspect: Double = 0.0
 
+    /** User-set volume (`0.0`..`1.0`); writes apply the effective volume and persist the setting. */
     var volume: Float = savedSettings.volume
         set(value) {
             field = value
@@ -151,6 +191,8 @@ class DisplayScreen(
             ClientSettingsStore.updateSettings(uuid, value, quality, brightness, muted, paused)
             DisplayRegistry.recordScreen(this)
         }
+
+    /** Display brightness (`0`..`2`); writes push to the player and persist the setting. */
     var brightness: Float = savedSettings.brightness
         set(value) {
             field = value.coerceIn(0f, 2f)
@@ -158,6 +200,8 @@ class DisplayScreen(
             ClientSettingsStore.updateSettings(uuid, volume, quality, field, muted, paused)
             DisplayRegistry.recordScreen(this)
         }
+
+    /** Requested video quality; writes push the effective quality to the player and persist the setting. */
     var quality: VideoQuality = VideoQuality.parse(savedSettings.quality)
         set(value) {
             field = value
@@ -175,33 +219,65 @@ class DisplayScreen(
         if (qualityCap <= 0) return requested
         return VideoQuality.Fixed(qualityCap)
     }
+
+    /** True once the controller has applied the screen's initial state to the current player. */
     internal val videoStarted: Boolean get() = media.videoStarted
+
+    /** Local paused state (user intent / server-followed). */
     internal var paused: Boolean = savedSettings.paused
+
+    /** Temporary mute applied while the game window is unfocused; does not change [muted]. */
     private var focusMuted: Boolean = false
+
+    /** Distance in blocks past which the display is unloaded; writes record the new value. */
     var renderDistance: Int = 96
         set(value) {
             field = value
             DisplayRegistry.recordScreen(this)
         }
+
+    /** Last known playback position in nanoseconds, restored on reconnect. */
     var savedTimeNanos: Long = 0
+
+    /** Follows the server-authoritative timeline (Synced / Broadcast / watch party). */
     internal val timelineFollower = TimelineFollower(this)
+
+    /** Owns the media player lifecycle (creation, swaps, teardown). */
     private val media = DisplayMediaController(this)
+
+    /** Emits the local player's watch-party control intents. */
+    private val watchPartyController = WatchPartyController(this)
+
+    /** Pushes decoded frames into the GPU texture(s) on the render thread. */
+    private val frameUploader = DisplayFrameUploader(uuid)
+
+    /** The active media player, or `null` between videos. */
     private val mediaPlayer: MediaPlayer? get() = media.player
 
-    /** True while this display is parked warm out of render distance: not rendered and not advancing, but
-     *  its decoder + audio stay open so walking back resumes instantly (see [goDormant] / [wake]). */
-    @Volatile var isDormant: Boolean = false
-        private set
+    /** True, while this display is parked warm out of render distance: not rendered and not advancing, but
+     *  its decoder and audio stay open, so walking back resumes instantly.
+     *
+     *  @see [goDormant]
+     *  @see [wake]
+     */
+    @Volatile var isDormant: Boolean = false; private set
+
+    /** [System.nanoTime] when the display entered warm park; used for TTL eviction. */
     private var dormantSinceNanos = 0L
+
+    /** Manages the PiP / window popout for this display. */
     private val popoutManager = DisplayPopoutManager(this) {
         mediaPlayer?.setPopoutSink(null)
     }
-    var videoUrl: String? = null
-        private set
+
+    /** The currently loaded video URL, or `null` when idle. */
+    var videoUrl: String? = null; private set
+
+    /** True while a client-side URL override is active (suppresses server URL changes). */
     private var clientUrlOverride: Boolean = false
 
+    /** Cached [BlockPos] for the anchor, lazily rebuilt when [x]/[y]/[z] change. */
     @Transient private var blockPos: BlockPos? = null
-    @Transient private var shaderPackYuvFallbackRequested = false
 
     /**
      * True once at least one decoded frame has been uploaded to the live texture. Keeps the screen
@@ -210,13 +286,18 @@ class DisplayScreen(
      * Reset by [createTexture] (full reallocation: new video, resize, backend restart).
      */
     @Transient @Volatile private var hasEverRendered = false
-    @Transient @Volatile private var firstFrameNanos = 0L
-    @Transient @Volatile private var waitingForInitialTimeline = false
-    var lang: String? = null
-        private set
 
-    val isVideoStarted: Boolean get() =
-        !waitingForInitialTimeline && (hasEverRendered || mediaPlayer?.textureFilled() == true)
+    /** [System.nanoTime] of the first uploaded frame, driving the appear fade-in. `0` = none yet. */
+    @Transient @Volatile private var firstFrameNanos = 0L
+
+    /** True while waiting for the server's first timeline before showing the video (Synced / Broadcast / WP). */
+    @Transient @Volatile private var waitingForInitialTimeline = false
+
+    /** Audio track / language of the current video, or `null` when idle. */
+    var lang: String? = null; private set
+
+    /** True once the video is effectively playing: not awaiting the initial timeline and a frame has filled. */
+    val isVideoStarted: Boolean get() = !waitingForInitialTimeline && (hasEverRendered || mediaPlayer?.textureFilled() == true)
 
     /** Marks that a frame has rendered, stamping the first-frame time so the appear fade-in can run. */
     private fun markRendered() {
@@ -238,26 +319,29 @@ class DisplayScreen(
         return t * t * (3f - 2f * t) // Smoothstep
     }
 
-    val isPopoutActive: Boolean
-        get() = popoutManager.isActive
+    /** True while a PiP or window popout is open for this display. */
+    val isPopoutActive: Boolean; get() = popoutManager.isActive
 
-    val pos: BlockPos
-        get() = blockPos ?: BlockPos(x, y, z).also { blockPos = it }
+    /** Anchor block position of the display (cached). */
+    val pos: BlockPos; get() = blockPos ?: BlockPos(x, y, z).also { blockPos = it }
 
     // Resume position, not the raw clock: while a replay -> live bridge is mid-flight this reports the live
     // edge instead of the replay playhead, so unloading then (rapid leave / return) never regresses the
     // saved / captured position by the replay lead. Identical to the clock in normal playback.
     val currentTimeNanos: Long get() = mediaPlayer?.getResumePositionNanos() ?: 0L
 
+    /** True when the current stream is a live broadcast (no seekable duration). */
     val isLive: Boolean get() = mediaPlayer?.isLive() == true
 
+    /** Total duration of the current video in nanoseconds, or `0` if unknown / live. */
     val mediaPlayerDurationNanos: Long get() = mediaPlayer?.getDuration() ?: 0L
 
+    /** Pixel heights of the qualities available for the current video. */
     val qualityList: List<Int>
         get() = mediaPlayer?.getAvailableQualities() ?: emptyList()
 
     init {
-        // Ask the server for the current timeline / session; it replies only if it has one.
+        // Ask the server for the current timeline / session; it replies only if it has one
         sendRequestSyncPacket()
     }
 
@@ -305,22 +389,27 @@ class DisplayScreen(
         waitingForInitialTimeline = requiresServerTimeline()
     }
 
+    /** True while the screen is holding back the picture until the server's first timeline arrives. */
     internal val isWaitingForInitialTimeline: Boolean get() = waitingForInitialTimeline
 
+    /** Clears the initial-timeline gate so the video may render. */
     internal fun markInitialTimelineReady() {
         waitingForInitialTimeline = false
     }
 
+    /** Primes the player to begin at [positionNanos] so the first frame lands on the synced position. */
     internal fun primeTimelineStart(positionNanos: Long) {
         mediaPlayer?.primeStartPosition(positionNanos.coerceAtLeast(0L))
     }
 
+    /** Drops the rendered frame so the screen re-fades in after a timeline-driven seek. */
     internal fun clearRenderedFrameForTimeline() {
         hasEverRendered = false
         firstFrameNanos = 0L
         mediaPlayer?.clearFrame()
     }
 
+    /** True when the current mode takes its timeline from the server (Synced / Broadcast / watch party). */
     private fun requiresServerTimeline(): Boolean =
         mode == PlaybackMode.SYNCED || mode == PlaybackMode.BROADCAST || watchParty != null
 
@@ -351,11 +440,13 @@ class DisplayScreen(
         rotation = packet.rotation
         width = packet.width
         height = packet.height
+
         mode = if (packet.mode == PlaybackMode.LOCAL.wire && packet.isSync) {
             PlaybackMode.SYNCED
         } else {
             PlaybackMode.fromWire(packet.mode)
         }
+
         qualityCap = packet.qualityCap
         isLocked = packet.isLocked
         owner = Minecraft.getInstance().player?.gameProfile?.id?.toString() == packet.ownerId.toString()
@@ -370,6 +461,7 @@ class DisplayScreen(
 
             val ds = ClientSettingsStore.getSettings(uuid)
             val override = ds.urlOverride
+
             if (!override.isNullOrEmpty() && canSetVideoHere) {
                 clientUrlOverride = true
                 val overrideLang = ds.langOverride ?: packet.lang
@@ -395,7 +487,6 @@ class DisplayScreen(
 
     /** Applies the authoritative server timeline: matches pause state and corrects drift. */
     fun updateData(packet: DisplaySync) {
-        // A live watch party owns the timeline; ignore base-mode sync while one is running.
         if (watchParty != null) return
         if (isLegacySync(packet) && usesV2Timeline()) return
         timelineFollower.apply(packet.currentTimeMs, packet.serverTimeMs, packet.isPaused, packet.loop)
@@ -477,70 +568,13 @@ class DisplayScreen(
     /** Uploads the latest decoded frame to the GPU texture(s). Called on the render thread once per frame. */
     fun fitTexture() {
         val mp = mediaPlayer ?: return
-        if (textureResource.isYuv && !DisplayYuvRenderTypes.active) {
-            if (!shaderPackYuvFallbackRequested) {
-                shaderPackYuvFallbackRequested = true
-                mp.restartVideoPipeline()
-            }
-            return
-        }
-        if (!textureResource.isYuv) shaderPackYuvFallbackRequested = false
-        try {
-            // The live channel always keeps drawing the current texture, so the picture never freezes
-            if (uploadLive(mp)) markRendered()
-
-            // Quality switch: the new resolution warms up in a parallel channel. Feed its frames into
-            // the staged texture; the instant the first one lands, promote channel and texture together
-            // so the picture snaps to the new quality with no freeze and no blank.
-            if (textureResource.hasPending && mp.hasIncomingVideo() && uploadIncoming(mp)) {
-                if (mp.promoteIncomingVideo()) {
-                    textureResource.promotePending()
-                    markRendered()
-                    if (MediaPlayer.DEBUG) logger.debug("$uuid promoted quality handoff texture ${textureResource.width} x ${textureResource.height}.")
-                } else {
-                    if (MediaPlayer.DEBUG) logger.debug("$uuid discarded staged quality handoff after incoming abort.")
-                    cancelQualityHandoff()
-                }
-            }
-        } catch (e: Exception) {
-            logger.warn("$uuid fitTexture failed: ${e.message ?: e::class.java.name}")
-        }
-    }
-
-    /** Uploads the live channel's ready frame into the current texture(s). Returns true when uploaded. */
-    private fun uploadLive(mp: MediaPlayer): Boolean {
-        val w = textureResource.width
-        val h = textureResource.height
-        return if (textureResource.isYuv) {
-            val y = textureResource.yPlane ?: return false
-            val u = textureResource.uPlane ?: return false
-            val v = textureResource.vPlane ?: return false
-            mp.updateFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
-        } else {
-            val tex = textureResource.texture ?: return false
-            mp.updateFrame(GpuTextureHandle(tex.getTexture()), w, h)
-        }
-    }
-
-    /** Uploads the incoming (quality-switch) channel's ready frame into the staged texture(s). */
-    private fun uploadIncoming(mp: MediaPlayer): Boolean {
-        val w = textureResource.pendingWidth
-        val h = textureResource.pendingHeight
-        return if (textureResource.isYuv) {
-            val y = textureResource.pendingYPlane ?: return false
-            val u = textureResource.pendingUPlane ?: return false
-            val v = textureResource.pendingVPlane ?: return false
-            mp.updateIncomingFramePlanar(GpuTextureHandle(y.getTexture()), GpuTextureHandle(u.getTexture()), GpuTextureHandle(v.getTexture()), w, h)
-        } else {
-            val tex = textureResource.pendingTexture ?: return false
-            mp.updateIncomingFrame(GpuTextureHandle(tex.getTexture()), w, h)
-        }
+        frameUploader.upload(mp, textureResource, ::markRendered)
     }
 
     /**
      * Renders the current frame to the popout window.
      * Must be called after all Minecraft / mod rendering for the frame is complete so that any
-     * GL-context switch (GLFW backend on macOS) does not corrupt in-flight command buffers.
+     * GL-context switch (`GLFW` backend on macOS) does not corrupt in-flight command buffers.
      */
     fun renderPopout() {
         popoutManager.renderFrame()
@@ -581,6 +615,7 @@ class DisplayScreen(
     /** Applies volume, brightness, and paused state to the media player, then seeks to the saved position. */
     fun startVideo() = media.start()
 
+    /** Whether playback is currently paused. */
     val isPaused: Boolean get() = paused
 
     /** User intent to pause / resume: applied locally for instant feedback and emitted upstream per mode. */
@@ -659,8 +694,6 @@ class DisplayScreen(
     fun seekToMillis(ms: Long) {
         if (!canSeekHere) return
         val mp = mediaPlayer ?: return
-        // fire=true so events.onSeek -> afterSeek -> emitPlaybackIntent(SEEK) propagates via the server.
-        // (seekVideoTo is the inbound-follow path and passes false, so it never re-emits.)
         if (mp.canSeek()) mp.seekTo(ms * 1_000_000L, true)
     }
 
@@ -692,7 +725,7 @@ class DisplayScreen(
         val elapsedMs = (System.nanoTime() - started) / 1_000_000.0
         logger.debug(
             "$uuid captured replay snapshot bytes=${snapshot.size} audioPcm=${audioPcm?.size ?: 0}B at " +
-                    "${"%.1f".format(position / 1_000_000.0)}ms in ${"%.1f".format(elapsedMs)}ms.",
+                    "${"%.1f".format(position / 1_000_000.0)} ms in ${"%.1f".format(elapsedMs)} ms.",
         )
     }
 
@@ -741,46 +774,23 @@ class DisplayScreen(
     }
 
     /** Starts a watch party here with the current (or given) video; the local player becomes host. */
-    fun startWatchParty(url: String = videoUrl ?: "", lang: String = this.lang ?: "") {
-        if (!canStartWatchPartyHere) return
-        if (url.isNotEmpty()) Initializer.sendPacket(WatchPartyStart(uuid, url, lang))
-    }
+    fun startWatchParty(url: String = videoUrl ?: "", lang: String = this.lang ?: "") =
+        watchPartyController.start(url, lang)
 
     /** Marks the local player ready / not-ready in the active watch party. */
-    fun setWatchPartyReady(ready: Boolean) {
-        if (watchParty == null) return
-        localWatchPartyReady = ready
-        sendWatchPartyControl(if (ready) WatchPartyAction.READY else WatchPartyAction.UNREADY)
-    }
+    fun setWatchPartyReady(ready: Boolean) = watchPartyController.setReady(ready)
 
     /** Host action: starts the countdown for the active watch party. */
-    fun beginWatchParty() {
-        if (watchParty?.isHost != true) return
-        sendWatchPartyControl(WatchPartyAction.BEGIN)
-    }
+    fun beginWatchParty() = watchPartyController.begin()
 
     /** Host action: ends the active watch party (freezes on the final frame). */
-    fun endWatchParty() {
-        if (watchParty?.isHost != true) return
-        sendWatchPartyControl(WatchPartyAction.END)
-    }
+    fun endWatchParty() = watchPartyController.end()
 
     /** Host action: restarts an ended watch party from preparation. */
-    fun restartWatchParty() {
-        if (watchParty?.isHost != true) return
-        sendWatchPartyControl(WatchPartyAction.RESTART)
-    }
+    fun restartWatchParty() = watchPartyController.restart()
 
     /** Closes the watch party, handing the display back to its base mode (host / owner / admin). */
-    fun closeWatchParty() {
-        if (!canCloseWatchPartyHere) return
-        sendWatchPartyControl(WatchPartyAction.CLOSE)
-    }
-
-    /** Sends a watch-party control for this display; the server enforces participant/host rules. */
-    private fun sendWatchPartyControl(action: WatchPartyAction, positionMs: Long = currentTimeNanos / 1_000_000L) {
-        Initializer.sendPacket(WatchPartyControl(uuid, action.wire, positionMs))
-    }
+    fun closeWatchParty() = watchPartyController.close()
 
     /** Seeks to the saved playback position after reconnection; only meaningful for Local displays. */
     fun restoreSavedTime() {
@@ -864,8 +874,13 @@ class DisplayScreen(
     }
 
     companion object {
+        /** Logger for replay-capture and diagnostic messages. */
         private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayScreen")
+
+        /** Fallback target quality (pixel height) when none is resolvable. */
         private const val DEFAULT_QUALITY = 720
+
+        /** Skip the restore seek when already within this tolerance of the saved position. */
         private const val RESTORE_SEEK_TOLERANCE_NS = 250_000_000L
 
         /** Duration of the first-frame fade-in (see [appearProgress]). */

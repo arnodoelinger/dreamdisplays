@@ -13,12 +13,19 @@ import java.nio.ByteBuffer
  * rendering-API code out of the platform-agnostic media/player module.
  */
 class GpuFrameUploader : FrameUploader {
+    /** PBO uploader for the interleaved (RGB / RGBA) path; created on first use. */
     private var uploader: AsyncTextureUploader? = null
+
+    /** Per-plane PBO uploaders for the planar (Y / U / V) path. */
     private val planeUploaders = arrayOfNulls<AsyncTextureUploader>(3)
+
+    /** Scratch buffer reused for RGB -> RGBA expansion. */
     private var rgbaUploadBuffer: ByteBuffer? = null
 
+    /** False while the window is minimized (no GL context to upload into). */
     override fun canUpload(): Boolean = !Minecraft.getInstance().window.isMinimized
 
+    /** Uploads an interleaved [src] frame into [target] in the given [format]. */
     override fun uploadInterleaved(target: GpuTextureRef, src: ByteBuffer, format: FramePixelFormat): Boolean {
         val texture = (target as GpuTextureHandle).texture
         TextureUploadUtil.upload(
@@ -34,6 +41,7 @@ class GpuFrameUploader : FrameUploader {
         return true
     }
 
+    /** Uploads the Y / U / V planes packed in [src] into their respective textures. */
     override fun uploadPlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, src: ByteBuffer): Boolean {
         var offset = 0
         for ((i, ref) in arrayOf(y, u, v).withIndex()) {
@@ -60,6 +68,7 @@ class GpuFrameUploader : FrameUploader {
     private fun planeUploader(i: Int): AsyncTextureUploader =
         planeUploaders[i] ?: AsyncTextureUploader(stateCache = true).also { planeUploaders[i] = it }
 
+    /** Releases all PBO uploaders and the scratch buffer. */
     override fun cleanup() {
         uploader?.cleanup()
         uploader = null

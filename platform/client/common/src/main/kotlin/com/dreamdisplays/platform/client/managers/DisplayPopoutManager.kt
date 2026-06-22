@@ -22,12 +22,20 @@ class DisplayPopoutManager(
     private val displayScreen: DisplayScreen,
     private val clearPopoutSink: () -> Unit,
 ) {
+    /** Logger. */
+    private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayPopoutManager")
+
+    /** The separate `GLFW` popout window, or `null` when none has been created. */
     private var popoutWindow: VideoPopoutWindow? = null
+
+    /** The in-game PiP overlay, or `null` when none is active. */
     private var pipOverlay: PipOverlay? = null
 
+    /** True while either a window or a PiP overlay is active. */
     val isActive: Boolean
         get() = (popoutWindow?.isOpen == true) || (pipOverlay != null)
 
+    /** Re-attaches the active popout's frame sink to [player] after a player swap. */
     fun attachTo(player: MediaPlayer, contentAspect: () -> Double) {
         popoutWindow?.let { win ->
             if (win.isOpen) {
@@ -39,10 +47,12 @@ class DisplayPopoutManager(
         }
     }
 
+    /** Draws the latest frame into the popout window, if one is open. */
     fun renderFrame() {
         popoutWindow?.renderFrame()
     }
 
+    /** Opens (or re-sizes) the separate window, closing any active PiP overlay first. */
     fun activateWindowMode(player: MediaPlayer, textureWidth: Int, textureHeight: Int, contentAspect: () -> Double) {
         if (!VideoPopoutWindow.isAvailable) return
         closePipOverlay()
@@ -69,6 +79,7 @@ class DisplayPopoutManager(
         }
     }
 
+    /** Opens an in-game PiP overlay at [corner], closing any open window first. */
     fun activatePipMode(player: MediaPlayer, corner: PipCorner = PipCorner.BOTTOM_RIGHT, contentAspect: () -> Double) {
         popoutWindow?.let { win -> if (win.isOpen) { player.setPopoutSink(null); win.close() } }
         closePipOverlay()
@@ -82,12 +93,14 @@ class DisplayPopoutManager(
         }
     }
 
+    /** Closes whichever popout mode is active and detaches the frame sink. */
     fun deactivate(player: MediaPlayer?) {
         player?.setPopoutSink(null)
         popoutWindow?.let { if (it.isOpen) it.close() }
         closePipOverlay()
     }
 
+    /** Tears down all popout state when the display is unregistered. */
     fun unregister(player: MediaPlayer?) {
         player?.setPopoutSink(null)
         popoutWindow?.let { if (it.isOpen) it.close() }
@@ -109,9 +122,5 @@ class DisplayPopoutManager(
     /** Publishes [event] through the registered [PopoutManager]; silently skipped before bootstrap. */
     private fun emit(event: PopoutEvent) {
         DreamServices.registry.getOrNull<PopoutManager>()?.emit(event)
-    }
-
-    private companion object {
-        private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayPopoutManager")
     }
 }
