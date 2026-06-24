@@ -3,6 +3,7 @@ pluginManagement {
     val stonecutterVersions = java.util.Properties().apply {
         file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
     }
+
     fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
         ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
 
@@ -28,6 +29,7 @@ pluginManagement {
                     // redirect to fabric-loom's artifact (declared apply false, never applied).
                     else useModule("net.fabricmc:fabric-loom:$loomVersion")
                 }
+
                 "net.neoforged.moddev" -> useVersion(scVersion("moddev.version"))
             }
         }
@@ -55,12 +57,19 @@ dependencyResolutionManagement {
 
 rootProject.name = "dreamdisplays"
 include(":native")
-include(":protocol")
-include(":common")
-include(":client")
-include(":client:fabric")
-include(":client:neoforge")
-include(":server")
+include(":core")
+include(":api")
+include(":media")
+include(":media:runtime")
+include(":media:player")
+include(":media:source")
+include(":util")
+include(":platform")
+include(":platform:client")
+include(":platform:client:common")
+include(":platform:client:fabric")
+include(":platform:client:neoforge")
+include(":platform:server")
 
 stonecutter {
     create(rootProject) {

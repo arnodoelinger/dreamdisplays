@@ -8,17 +8,17 @@
 
 use std::collections::HashMap;
 use std::ffi::c_void;
-use std::{mem, ptr};
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Once};
+use std::{mem, ptr};
 
 use ffmpeg::ffi;
 use ffmpeg::format::context::Input;
 use ffmpeg::format::Pixel;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling;
-use ffmpeg::util::log::Level;
 use ffmpeg::util::frame::video::Video as VideoFrame;
+use ffmpeg::util::log::Level;
 use ffmpeg::{codec, Dictionary};
 use ffmpeg_next as ffmpeg;
 
@@ -64,7 +64,8 @@ fn init_ffmpeg() -> Result<(), ffmpeg::Error> {
     Ok(())
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)] enum HwAccelRequest {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum HwAccelRequest {
     None,
     Auto,
     VideoToolbox,
@@ -97,7 +98,8 @@ impl HwAccelRequest {
     }
 }
 
-#[derive(Clone, Copy)] struct HwBackend {
+#[derive(Clone, Copy)]
+struct HwBackend {
     device_type: ffi::AVHWDeviceType,
     pix_fmts: &'static [ffi::AVPixelFormat],
 }
@@ -130,9 +132,12 @@ const HW_CUDA: HwBackend = HwBackend {
     pix_fmts: &[ffi::AVPixelFormat::AV_PIX_FMT_CUDA],
 };
 
-#[cfg(target_os = "macos")] fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VIDEOTOOLBOX] }
-#[cfg(target_os = "windows")] fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_D3D11VA, HW_DXVA2, HW_CUDA] }
-#[cfg(all(unix, not(target_os = "macos")))] fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VAAPI, HW_CUDA] }
+#[cfg(target_os = "macos")]
+fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VIDEOTOOLBOX] }
+#[cfg(target_os = "windows")]
+fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_D3D11VA, HW_DXVA2, HW_CUDA] }
+#[cfg(all(unix, not(target_os = "macos")))]
+fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VAAPI, HW_CUDA] }
 
 #[cfg(not(any(
     target_os = "macos",
@@ -1070,7 +1075,8 @@ unsafe extern "C" fn prefer_selected_hw_format(
     *formats
 }
 
-#[cfg(test)] mod tests {
+#[cfg(test)]
+mod tests {
     use super::*;
 
     /// Decodes a locally generated test clip end-to-end and checks frame count and padding.

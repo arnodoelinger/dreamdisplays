@@ -1,0 +1,14 @@
+package com.dreamdisplays.media.player.stream
+
+import com.dreamdisplays.api.media.stream.MediaStream
+
+/**
+ * All currently-selected and available streams for one playback session.
+ * Replaced atomically on quality change or re-initialization; never partially updated.
+ */
+data class ActiveStreams(
+    val availableVideo: List<MediaStream>,
+    val availableAudio: List<MediaStream>,
+    val currentVideo: MediaStream,
+    val currentAudio: MediaStream,
+)

@@ -1,6 +1,3 @@
-import org.gradle.api.GradleException
-import org.gradle.language.jvm.tasks.ProcessResources
-
 private val nativePlatformKeys = listOf(
     "linux-x64",
     "linux-aarch64",
@@ -77,7 +74,7 @@ tasks.withType<ProcessResources>().configureEach {
         if (!nativeBundleDir.isDirectory) {
             throw GradleException(
                 "Native bundle is required, but $nativeBundleDir does not exist. " +
-                    "Run the CI native matrix first or disable DREAMDISPLAYS_REQUIRE_NATIVES."
+                        "Run the CI native matrix first or disable DREAMDISPLAYS_REQUIRE_NATIVES."
             )
         }
 

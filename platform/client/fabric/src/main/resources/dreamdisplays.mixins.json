@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.dreamdisplays.platform.client.mixins",
+  "compatibilityLevel": "JAVA_${javaVersion}",
+  "client": [
+    "Crosshair",
+    "ScreenOverlay"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

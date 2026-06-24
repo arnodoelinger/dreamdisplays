@@ -1,3 +1,49 @@
+# Version 1.8.3
+
+## Client
+
+### Improvements
+
+- Improved experimental API
+- Hardened background maintenance tasks against hanging the game on exit
+- Reworked background networking, thumbnail, and cache work onto a unified coroutine scheduler for cleaner shutdown and
+  fewer idle threads
+- Display targeting now only triggers on the screen's own block face instead of the whole block
+- Enhanced documentation in codebase
+- Updated version dependencies
+- Improved Dream Displays security
+
+### Fixes
+
+- Fixed 360p quality lock in some cases
+- Fixed the display menu preview blitting a just-released texture during a quality switch, causing repeated "Missing
+  resource" warnings and a GL error
+
+## Server
+
+### Improvements
+
+- Improved experimental API
+- Improved display data saving
+- Improved version parsing
+- Moved webhook reports and `Fabric` database saves off the main server thread
+- Enhanced documentation in codebase
+- Updated version dependencies
+- Improved Dream Displays security
+
+### Fixes
+
+- Fixed periodic display / player update ticks running on an async scheduler on `Paper` servers
+- Fixed unsafe async `Bukkit` / `Paper` API usage
+- Fixed displays not being saved until the server shuts down cleanly, so a crash could lose newly created or edited
+  displays
+- Fixed display owners on `Paper` servers needing extra permission to delete their own display, unlike `Fabric`
+- Fixed a malformed legacy network packet being able to crash decoding instead of being safely rejected
+- Fixed broadcast displays briefly losing their quality clamp right after reconnecting until the server resent it
+- Fixed the display cache file being able to get corrupted if the game / server crashed mid-save
+- Fixed a race that let concurrent reports slip past the report cooldown
+- Fixed default permissions; (local), synced and broadcast are for all players, no only for OPs
+
 # Version 1.8.2
 
 ## Client
@@ -10,7 +56,7 @@
 - Enhanced error screen when video loading fails
 - Enhanced video loading animation
 - Added 26.2 version to Paper building system
-- Improved Dream Display security
+- Improved Dream Displays security
 
 ### Fixes
 
@@ -22,7 +68,7 @@
 ### Improvements
 
 - Players can no longer spam the report system
-- Improved Dream Display security
+- Improved Dream Displays security
 
 # Version 1.8.1
 

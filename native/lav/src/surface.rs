@@ -17,7 +17,9 @@ pub const SURFACE_FORMAT_P010_10: u32 = 2;
 
 pub const GL_TEXTURE_RECTANGLE: u32 = 0x84F5;
 
-#[repr(C)] #[derive(Clone, Copy)] pub struct LavSurfaceDesc {
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct LavSurfaceDesc {
     pub handle: i64,
     pub platform: u32,
     pub format: u32,

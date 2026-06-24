@@ -1,0 +1,26 @@
+name: DreamDisplays
+version: '${version}'
+main: com.dreamdisplays.platform.server.Main
+api-version: '${paperMinecraftApi}'
+description: 'Plugin for the Dream Displays mod.'
+authors:
+  - arsmotorin
+  - INotSleep
+  - Kolyakot33
+  - Toffikk
+folia-supported: true
+permissions:
+  dreamdisplays.create:
+    default: true
+  dreamdisplays.video:
+    default: true
+  dreamdisplays.info:
+    default: true
+  dreamdisplays.local:
+    default: true
+  dreamdisplays.synced:
+    default: true
+  dreamdisplays.broadcast:
+    default: true
+  dreamdisplays.toggle.others:
+    default: op

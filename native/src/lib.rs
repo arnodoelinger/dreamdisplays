@@ -60,7 +60,7 @@ pub unsafe extern "C" fn dd_video_open(
             .collect();
         sessions().open(&args, w, h, pix)
     }))
-    .unwrap_or(0)
+        .unwrap_or(0)
 }
 
 /// Blocking read of the next frame into `dst` as RGB24 with brightness applied
@@ -84,7 +84,7 @@ pub unsafe extern "C" fn dd_video_read_frame(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().read_frame(handle, dst, brightness_milli)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Blocking read of the next frame into `dst` as RGBA32 with brightness applied
@@ -108,7 +108,7 @@ pub unsafe extern "C" fn dd_video_read_frame_rgba(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().read_frame_rgba(handle, dst, brightness_milli)
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Blocking read of the next frame as raw I420 planes (Y, then U, then V) with no color
@@ -156,7 +156,7 @@ pub unsafe extern "C" fn dd_i420_to_rgba(
         convert::i420_to_rgba32_identity(src, w, h, dst);
         0
     }))
-    .unwrap_or(ERR_IO)
+        .unwrap_or(ERR_IO)
 }
 
 /// Copies the captured FFmpeg stderr (UTF-8, capped) into `dst`; returns bytes written
@@ -179,7 +179,7 @@ pub extern "C" fn dd_video_exit_code(handle: i64, wait_millis: u32) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         sessions().exit_code(handle, wait_millis)
     }))
-    .unwrap_or(ERR_BAD_HANDLE)
+        .unwrap_or(ERR_BAD_HANDLE)
 }
 
 /// Kills the `FFmpeg` process, unblocking any reader stuck in [`dd_video_read_frame`].

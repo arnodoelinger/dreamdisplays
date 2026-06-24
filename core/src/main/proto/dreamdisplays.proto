@@ -1,0 +1,260 @@
+syntax = "proto2";
+
+package dreamdisplays.v2;
+
+// serial name 'com.dreamdisplays.core.protocol.Envelope'
+message Envelope {
+  // WARNING: a default value decoded when value is missing
+  optional int32 type = 1;
+  // WARNING: a default value decoded when value is missing
+  optional bytes payload = 2;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.ClientHello'
+message ClientHello {
+  // WARNING: a default value decoded when value is missing
+  optional int32 protocolVersion = 1;
+  // WARNING: a default value decoded when value is missing
+  optional string modVersion = 2;
+  // WARNING: a default value decoded when value is missing
+  optional bool supportsPopout = 3;
+  // WARNING: a default value decoded when value is missing
+  optional bool supportsHardwareDecode = 4;
+  // WARNING: a default value decoded when value is missing
+  optional bool supportsHighResolution = 5;
+  // WARNING: a default value decoded when value is missing
+  optional int32 maxTextureSize = 6;
+  // WARNING: a default value decoded when value is missing
+  repeated string supportedCodecs = 7;
+  // WARNING: a default value decoded when value is missing
+  optional bool supportsPip = 8;
+  // WARNING: a default value decoded when value is missing
+  optional bool supportsAudio = 9;
+  // WARNING: a default value decoded when value is missing
+  optional string renderBackend = 10;
+  // WARNING: a default value decoded when value is missing
+  optional string shaderBackend = 11;
+  // WARNING: a default value decoded when value is missing
+  optional string textureUploadPath = 12;
+  // WARNING: a default value decoded when value is missing
+  optional string hwAccelBackend = 13;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeBackendAvailable = 14;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeRgbaFramesEnabled = 15;
+  // WARNING: a default value decoded when value is missing
+  optional bool nativeYuvGpuEnabled = 16;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavAvailable = 17;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavInProcessEnabled = 18;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavSurfaceInteropAvailable = 19;
+  // WARNING: a default value decoded when value is missing
+  optional bool lavZeroCopyEnabled = 20;
+  // WARNING: a default value decoded when value is missing
+  optional int32 systemRamMb = 21;
+  // WARNING: a default value decoded when value is missing
+  optional int32 maxJvmMemoryMb = 22;
+  // WARNING: a default value decoded when value is missing
+  optional int32 dedicatedVramMb = 23;
+  // WARNING: a default value decoded when value is missing
+  optional int32 warmDisplayLimit = 24;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.ServerHello'
+message ServerHello {
+  // WARNING: a default value decoded when value is missing
+  optional int32 protocolVersion = 1;
+  // WARNING: a default value decoded when value is missing
+  optional bool isPremium = 2;
+  // WARNING: a default value decoded when value is missing
+  optional bool isAdmin = 3;
+  // WARNING: a default value decoded when value is missing
+  optional bool isReportingEnabled = 4;
+  // WARNING: a default value decoded when value is missing
+  optional int32 maxDisplays = 6;
+  // WARNING: a default value decoded when value is missing
+  repeated string allowedFeatures = 7;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.DisplayInfo'
+message DisplayInfo {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional Uuid ownerId = 2;
+  // WARNING: a default value decoded when value is missing
+  optional sint32 x = 3;
+  // WARNING: a default value decoded when value is missing
+  optional sint32 y = 4;
+  // WARNING: a default value decoded when value is missing
+  optional sint32 z = 5;
+  // WARNING: a default value decoded when value is missing
+  optional int32 width = 6;
+  // WARNING: a default value decoded when value is missing
+  optional int32 height = 7;
+  // WARNING: a default value decoded when value is missing
+  optional string url = 8;
+  // WARNING: a default value decoded when value is missing
+  optional int32 facing = 9;
+  // WARNING: a default value decoded when value is missing
+  optional bool isSync = 10;
+  // WARNING: a default value decoded when value is missing
+  optional string lang = 11;
+  // WARNING: a default value decoded when value is missing
+  optional bool isLocked = 12;
+  // WARNING: a default value decoded when value is missing
+  optional int32 mode = 13;
+  // WARNING: a default value decoded when value is missing
+  optional int32 qualityCap = 14;
+  // WARNING: a default value decoded when value is missing
+  optional int32 rotation = 15;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.DisplayDelete'
+message DisplayDelete {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.DisplaySync'
+message DisplaySync {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional bool isSync = 2;
+  // WARNING: a default value decoded when value is missing
+  optional bool isPaused = 3;
+  // WARNING: a default value decoded when value is missing
+  optional int64 currentTimeMs = 4;
+  // WARNING: a default value decoded when value is missing
+  optional int64 durationMs = 5;
+  // WARNING: a default value decoded when value is missing
+  optional int64 serverTimeMs = 6;
+  // WARNING: a default value decoded when value is missing
+  optional bool loop = 7;
+  // WARNING: a default value decoded when value is missing
+  optional int32 mode = 8;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.RequestSync'
+message RequestSync {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.SetVideo'
+message SetVideo {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional string url = 2;
+  // WARNING: a default value decoded when value is missing
+  optional string lang = 3;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.SetLocked'
+message SetLocked {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional bool locked = 2;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.ReportDisplay'
+message ReportDisplay {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.SetDisplaysEnabled'
+message SetDisplaysEnabled {
+  // WARNING: a default value decoded when value is missing
+  optional bool enabled = 1;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.ClearCache'
+message ClearCache {
+  // WARNING: a default value decoded when value is missing
+  repeated Uuid ids = 1;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.PlaybackCommand'
+message PlaybackCommand {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional int32 action = 2;
+  // WARNING: a default value decoded when value is missing
+  optional int64 positionMs = 3;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.SetMode'
+message SetMode {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional int32 mode = 2;
+  // WARNING: a default value decoded when value is missing
+  optional int64 positionMs = 3;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.WatchPartyStart'
+message WatchPartyStart {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional string url = 2;
+  // WARNING: a default value decoded when value is missing
+  optional string lang = 3;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.WatchPartyControl'
+message WatchPartyControl {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional int32 action = 2;
+  // WARNING: a default value decoded when value is missing
+  optional int64 positionMs = 3;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.WatchPartyState'
+message WatchPartyState {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional string sessionId = 2;
+  // WARNING: a default value decoded when value is missing
+  optional int32 state = 3;
+  // WARNING: a default value decoded when value is missing
+  optional Uuid hostId = 4;
+  // WARNING: a default value decoded when value is missing
+  optional string hostName = 5;
+  // WARNING: a default value decoded when value is missing
+  optional string url = 6;
+  // WARNING: a default value decoded when value is missing
+  optional string lang = 7;
+  // WARNING: a default value decoded when value is missing
+  optional int32 readyCount = 8;
+  // WARNING: a default value decoded when value is missing
+  optional int32 nearbyCount = 9;
+  // WARNING: a default value decoded when value is missing
+  optional int64 countdownStartEpochMs = 10;
+  // WARNING: a default value decoded when value is missing
+  optional int64 positionMs = 11;
+  // WARNING: a default value decoded when value is missing
+  optional int64 serverTimeMs = 12;
+  // WARNING: a default value decoded when value is missing
+  optional int64 durationMs = 13;
+  // WARNING: a default value decoded when value is missing
+  optional bool paused = 14;
+}
+
+message Uuid {
+  // WARNING: a default value decoded when value is missing
+  optional fixed64 msb = 1;
+  // WARNING: a default value decoded when value is missing
+  optional fixed64 lsb = 2;
+}

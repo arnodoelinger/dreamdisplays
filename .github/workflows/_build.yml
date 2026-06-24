@@ -71,7 +71,7 @@ jobs:
           tasks = (
               [{"kind": "fabric", "mc": version} for version in versions] +
               [{"kind": "neoforge", "mc": version} for version in versions] +
-              [{"kind": "paper", "mc": versions[0]}]
+              [{"kind": "paper", "mc": versions[-1]}]
           )
 
           native_matrix = [
@@ -532,9 +532,9 @@ jobs:
       - name: Build with Gradle
         run: |
           ./gradlew \
-            :client:fabric:publishJar \
-            :client:neoforge:shadowJar \
-            :server:shadowJar \
+            :platform:client:fabric:publishJar \
+            :platform:client:neoforge:shadowJar \
+            :platform:server:shadowJar \
             --no-daemon \
             --parallel \
             --build-cache

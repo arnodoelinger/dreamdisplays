@@ -13,7 +13,7 @@ fn find_ffmpeg() -> Option<String> {
         }
     }
     let candidates = [
-        "../client/fabric/run/dreamdisplays/ffmpeg/macos-aarch64/ffmpeg",
+        "../platform/client/fabric/run/dreamdisplays/ffmpeg/macos-aarch64/ffmpeg",
         "/opt/homebrew/bin/ffmpeg",
         "/usr/local/bin/ffmpeg",
         "/usr/bin/ffmpeg",
@@ -45,9 +45,9 @@ fn run_pipe(pix: PixFmt, vf: &str, frames: u32) {
         "rawvideo",
         "-",
     ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
     let sessions = Sessions::new();
     let handle = sessions.open(&args, w, h, pix);
@@ -96,9 +96,9 @@ fn run_pipe_rgba(pix: PixFmt, vf: &str, frames: u32) {
         "rawvideo",
         "-",
     ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
     let sessions = Sessions::new();
     let handle = sessions.open(&args, w, h, pix);
@@ -135,23 +135,28 @@ fn stderr_of(sessions: &Sessions, handle: i64) -> String {
     String::from_utf8_lossy(&buf[..n]).into_owned()
 }
 
-#[test] fn nv12_pipe_end_to_end() {
+#[test]
+fn nv12_pipe_end_to_end() {
     run_pipe(PixFmt::Nv12, "format=nv12", 10);
 }
 
-#[test] fn rgb24_pipe_end_to_end() {
+#[test]
+fn rgb24_pipe_end_to_end() {
     run_pipe(PixFmt::Rgb24, "format=rgb24", 10);
 }
 
-#[test] fn nv12_pipe_rgba_end_to_end() {
+#[test]
+fn nv12_pipe_rgba_end_to_end() {
     run_pipe_rgba(PixFmt::Nv12, "format=nv12", 10);
 }
 
-#[test] fn rgb24_pipe_rgba_end_to_end() {
+#[test]
+fn rgb24_pipe_rgba_end_to_end() {
     run_pipe_rgba(PixFmt::Rgb24, "format=rgb24", 10);
 }
 
-#[test] fn kill_unblocks_reader() {
+#[test]
+fn kill_unblocks_reader() {
     let Some(ffmpeg) = find_ffmpeg() else {
         eprintln!("Skipping: no FFmpeg binary found.");
         return;
@@ -173,9 +178,9 @@ fn stderr_of(sessions: &Sessions, handle: i64) -> String {
         "rawvideo",
         "-",
     ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
 
     let sessions = std::sync::Arc::new(Sessions::new());
     let handle = sessions.open(&args, w, h, PixFmt::Nv12);

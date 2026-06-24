@@ -1,7 +1,7 @@
-import java.util.Properties
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import java.util.*
 
 plugins {
     java
@@ -12,8 +12,10 @@ private val activeVersion = rootProject.file("versions/active.txt").readText().t
 private val versionProps = Properties().apply {
     rootProject.file("versions/$activeVersion/gradle.properties").inputStream().use { load(it) }
 }
+
 private fun scVersion(name: String): String = versionProps.getProperty(name)
     ?: error("Missing Stonecutter version property '$name' for $activeVersion.")
+
 private val javaVersion = scVersion("java.version").toInt()
 
 java {

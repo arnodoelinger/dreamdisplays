@@ -1,3 +1,9 @@
+If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arsmotorin). Every contribution helps keep the project alive!
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/arsmotorin)
+
+- - -
+
 [![Latest release](https://img.shields.io/github/release/arsmotorin/dreamdisplays.svg)](https://github.com/arsmotorin/dreamdisplays/releases/latest)
 [![License](https://img.shields.io/github/license/arsmotorin/dreamdisplays)](https://github.com/arsmotorin/dreamdisplays/blob/master/LICENSE)
 [![Discord](http://img.shields.io/discord/1456716690879676501?label=Discord&style=flat&logo=discord)](https://discord.gg/uwMMZ2KWk6)
@@ -23,6 +29,7 @@ Create interactive in-game displays that stream YouTube videos in real time, wit
 resolution, and even with synchronization mode for all players on the server.
 
 For this mod to work, players install the client mod, while server admins can install either:
+
 - Server plugin on Paper / Folia / Purpur or other fork
 - Fabric server mod on Fabric servers
 
@@ -65,20 +72,3 @@ Done! To customize the display, look at it and press `Shift + RMB`
 [Read more in our wiki](https://github.com/arsmotorin/dreamdisplays/wiki).
 
 ![img](https://i.imgur.com/6tEWQrv.png)
-
-## For developers
-
-We welcome contributions! If you want to improve the mod, fix bugs, or add new features, feel free to submit a PR!
-
-- Fork the repository and make your changes
-- Follow the existing code style and structure (that's really important)
-- Test your changes carefully before submitting, and that's it!
-
-## Any questions?
-
-Questions you can ask in [Discord server](https://discord.gg/uwMMZ2KWk6).
-
-## Donate us
-
-Dream Displays is developed with passion and dedication by me and my friends. If you enjoy our mod and want to support
-further development, consider making a [donation](https://www.paypal.com/paypalme/frogdream).
