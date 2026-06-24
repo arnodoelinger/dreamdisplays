@@ -1,5 +1,8 @@
 package com.dreamdisplays.platform.server.managers
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Expiry
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 
@@ -42,6 +45,7 @@ import org.bukkit.util.BoundingBox
 import org.jspecify.annotations.NullMarked
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 /**
@@ -50,9 +54,39 @@ import java.util.function.Consumer
  */
 @NullMarked
 object DisplayManager {
+    private const val REPORT_RATE_LIMIT_MAX_SIZE = 20_000L
+
+    private data class ReportCooldown(val durationNanos: Long)
+
+    private val reportCooldownExpiry = object : Expiry<UUID, ReportCooldown> {
+        override fun expireAfterCreate(key: UUID, value: ReportCooldown, currentTime: Long): Long =
+            value.durationNanos
+
+        override fun expireAfterUpdate(
+            key: UUID,
+            value: ReportCooldown,
+            currentTime: Long,
+            currentDuration: Long
+        ): Long = value.durationNanos
+
+        override fun expireAfterRead(
+            key: UUID,
+            value: ReportCooldown,
+            currentTime: Long,
+            currentDuration: Long
+        ): Long = currentDuration
+    }
+
     private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
-    private val reportTime: MutableMap<UUID, Long> = ConcurrentHashMap()
-    private val reporterTime: MutableMap<UUID, Long> = ConcurrentHashMap()
+    private val reportTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
+        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
+        .expireAfter(reportCooldownExpiry)
+        .build()
+    private val reporterTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
+        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
+        .expireAfter(reportCooldownExpiry)
+        .build()
+    private val reportRateLimitLock = Any()
     private val nearbyPlayersByDisplay: MutableMap<UUID, MutableSet<UUID>> = ConcurrentHashMap()
     private val nearbyDisplaysByPlayer: MutableMap<UUID, Set<UUID>> = ConcurrentHashMap()
 
@@ -95,27 +129,21 @@ object DisplayManager {
      * Checks whether a report from [reporterId] about display [id] should be rate-limited. Drops
      * the request when either the per-display or the per-reporter cooldown is still active; the
      * per-reporter limit stops an attacker from amplifying the webhook by spreading reports across
-     * many displays. Records both timestamps and returns false only when the report may proceed.
+     * many displays. Records both cooldown markers only when the report may proceed.
      */
     private fun isReportThrottled(id: UUID, reporterId: UUID, cooldownMs: Long): Boolean {
-        val now = System.currentTimeMillis()
-        var displayAllowed = false
-        reportTime.compute(id) { _, last ->
-            if (last != null && now - last < cooldownMs) last
-            else {
-                displayAllowed = true; now
-            }
-        }
-        if (!displayAllowed) return true
+        val durationNanos = TimeUnit.MILLISECONDS.toNanos(cooldownMs).coerceAtLeast(0L)
+        if (durationNanos == 0L) return false
 
-        var reporterAllowed = false
-        reporterTime.compute(reporterId) { _, last ->
-            if (last != null && now - last < cooldownMs) last
-            else {
-                reporterAllowed = true; now
+        synchronized(reportRateLimitLock) {
+            if (reportTime.getIfPresent(id) != null || reporterTime.getIfPresent(reporterId) != null) {
+                return true
             }
+            val marker = ReportCooldown(durationNanos)
+            reportTime.put(id, marker)
+            reporterTime.put(reporterId, marker)
+            return false
         }
-        return !reporterAllowed
     }
 
     /**

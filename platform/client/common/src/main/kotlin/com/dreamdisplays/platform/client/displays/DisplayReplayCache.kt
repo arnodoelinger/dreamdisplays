@@ -1,9 +1,12 @@
 package com.dreamdisplays.platform.client.displays
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.preparation.PreparedMedia
 import com.dreamdisplays.platform.client.managers.WarmParkPolicy
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
 /** In-memory LRU of native video replay snapshots retained across soft display unloads. */
@@ -24,17 +27,7 @@ internal object DisplayReplayCache {
         val snapshot: ByteArray,
         val audioPcm: ByteArray?,
         val prepared: PreparedMedia?,
-        val createdAtMs: Long,
     )
-
-    /** Lock for all cache operations. */
-    private val lock = Any()
-
-    /** Snapshots by UUID. */
-    private val entries = object : LinkedHashMap<UUID, Entry>(16, 0.75f, true) {}
-
-    /** Total retained bytes. */
-    private var totalBytes = 0L
 
     /** Snapshot time-to-live in milliseconds. */
     private val ttlMs: Long =
@@ -45,6 +38,15 @@ internal object DisplayReplayCache {
         System.getProperty("dreamdisplays.cache.jvmMaxBytes")?.toLongOrNull()?.coerceAtLeast(0L)
             ?: WarmParkPolicy.replayCacheBudgetBytes.coerceAtMost(DEFAULT_MAX_BYTES)
 
+    private val cacheEnabled = ttlMs > 0L && maxBytes > 0L
+
+    /** Snapshots by UUID; TTL and byte-weighted eviction. */
+    private val entries: Cache<UUID, Entry> = Caffeine.newBuilder()
+        .maximumWeight(if (cacheEnabled) maxBytes else 0L)
+        .weigher { _: UUID, entry: Entry -> entryBytes(entry).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() }
+        .expireAfterWrite(ttlMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+        .build()
+
     /** Stores [snapshot] (plus optional cached [audioPcm] / resolved [prepared] streams) for [uuid]. */
     fun put(
         uuid: UUID,
@@ -54,30 +56,20 @@ internal object DisplayReplayCache {
         audioPcm: ByteArray?,
         prepared: PreparedMedia?
     ) {
-        if (snapshot.isEmpty() || ttlMs == 0L || maxBytes == 0L) return
-        synchronized(lock) {
-            entries.remove(uuid)?.let { totalBytes -= entryBytes(it) }
-            val entry = Entry(url, positionNanos, snapshot, audioPcm, prepared, System.currentTimeMillis())
-            entries[uuid] = entry
-            totalBytes += entryBytes(entry)
-            evictExpiredLocked()
-            evictOverflowLocked()
-        }
+        if (snapshot.isEmpty() || !cacheEnabled) return
+        entries.put(uuid, Entry(url, positionNanos, snapshot, audioPcm, prepared))
+        entries.cleanUp()
     }
 
     /** Returns and removes a matching one-shot replay bootstrap for [uuid], if still fresh. */
     fun take(uuid: UUID, url: String, positionNanos: Long): MediaPlayer.ReplayBootstrap? {
-        synchronized(lock) {
-            evictExpiredLocked()
-            val entry = entries[uuid] ?: return null
-            if (entry.url != url || abs(entry.positionNanos - positionNanos) > POSITION_TOLERANCE_NS) {
-                removeLocked(uuid)
-                return null
-            }
-            removeLocked(uuid)
-            return MediaPlayer.ReplayBootstrap(entry.snapshot, entry.positionNanos, entry.audioPcm)
-                .also { it.prepared = entry.prepared }
+        val entry = entries.getIfPresent(uuid) ?: return null
+        entries.invalidate(uuid)
+        if (entry.url != url || abs(entry.positionNanos - positionNanos) > POSITION_TOLERANCE_NS) {
+            return null
         }
+        return MediaPlayer.ReplayBootstrap(entry.snapshot, entry.positionNanos, entry.audioPcm)
+            .also { it.prepared = entry.prepared }
     }
 
     /** Total retained bytes for an entry (video snapshot + optional cached audio PCM). */
@@ -85,47 +77,11 @@ internal object DisplayReplayCache {
 
     /** Drops any retained snapshot for [uuid]. */
     fun remove(uuid: UUID) {
-        synchronized(lock) { removeLocked(uuid) }
+        entries.invalidate(uuid)
     }
 
     /** Drops every retained replay snapshot. */
     fun clear() {
-        synchronized(lock) { clearLocked() }
-    }
-
-    /** Evicts expired entries; caller must hold [lock]. */
-    private fun evictExpiredLocked() {
-        if (ttlMs <= 0L) {
-            clearLocked()
-            return
-        }
-        val now = System.currentTimeMillis()
-        val expired = entries.entries
-            .asSequence()
-            .filter { now - it.value.createdAtMs > ttlMs }
-            .map { it.key }
-            .toList()
-        expired.forEach(::removeLocked)
-    }
-
-    /** Evicts least-recently-used snapshots until [maxBytes] is honored. */
-    private fun evictOverflowLocked() {
-        val iterator = entries.entries.iterator()
-        while (totalBytes > maxBytes && iterator.hasNext()) {
-            val entry = iterator.next()
-            totalBytes -= entryBytes(entry.value)
-            iterator.remove()
-        }
-    }
-
-    /** Removes one entry; caller must hold [lock]. */
-    private fun removeLocked(uuid: UUID) {
-        entries.remove(uuid)?.let { totalBytes -= entryBytes(it) }
-    }
-
-    /** Clears the cache; caller must hold [lock]. */
-    private fun clearLocked() {
-        entries.clear()
-        totalBytes = 0L
+        entries.invalidateAll()
     }
 }

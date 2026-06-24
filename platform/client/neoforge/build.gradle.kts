@@ -25,6 +25,7 @@ dependencies {
     shadow(project(":platform:client:common"))
     shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinStdlib)
+    shadow(libs.caffeine)
     shadow(libs.newpipeExtractor)
 }
 
@@ -100,6 +101,7 @@ tasks.shadowJar {
         include(dependency("org.apache.commons:commons-compress"))
         include(dependency("org.tukaani:xz"))
         include(dependency("org.semver4j:semver4j"))
+        include(dependency("com.github.ben-manes.caffeine:caffeine"))
         include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
         include(dependency("org.jetbrains:annotations"))
         include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
@@ -114,6 +116,7 @@ tasks.shadowJar {
         "org.apache.commons.compress",
         "org.tukaani.xz",
         "org.semver4j",
+        "com.github.benmanes.caffeine",
         "kotlin",
         "kotlinx",
         "org.jetbrains.annotations",

@@ -1,14 +1,16 @@
 package com.dreamdisplays.util
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import java.io.IOException
-import java.util.Collections
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
+import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -30,32 +32,28 @@ class AsyncMemo<K : Any, V : Any>(
     private val scope: CoroutineScope,
     private val tag: String,
 ) {
-    /** Entry in the cache. */
-    private class Entry<V>(val value: V, val createdAtMs: Long)
+    private val cacheEnabled = maxSize > 0 && ttlMs > 0
 
-    /** Cache mapping keys to (value, createdAtMs) pairs. */
-    private val cache: MutableMap<K, Entry<V>> =
-        Collections.synchronizedMap(object : LinkedHashMap<K, Entry<V>>(maxSize + 1, 0.75f, true) {
-            override fun removeEldestEntry(eldest: Map.Entry<K, Entry<V>>) = size > maxSize
-        })
+    /** Fresh values. */
+    private val cache: Cache<K, V> = Caffeine.newBuilder()
+        .maximumSize(if (cacheEnabled) maxSize.toLong() else 0L)
+        .expireAfterWrite(ttlMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+        .build()
 
     /** Deferreds for in-flight loads. */
     private val inFlight: ConcurrentMap<K, Deferred<V>> = ConcurrentHashMap()
 
     /** Returns the cached value for [key] if present and younger than the TTL, else null. */
-    fun peekFresh(key: K): V? {
-        val e = cache[key] ?: return null
-        return if (System.currentTimeMillis() - e.createdAtMs <= ttlMs) e.value else null
-    }
+    fun peekFresh(key: K): V? = cache.getIfPresent(key)
 
     /** Inserts [value] for [key], refreshing its TTL. */
     fun put(key: K, value: V) {
-        cache[key] = Entry(value, System.currentTimeMillis())
+        if (cacheEnabled) cache.put(key, value)
     }
 
     /** Drops [key] from both the cache and the in-flight map. */
     fun invalidate(key: K) {
-        cache.remove(key)
+        cache.invalidate(key)
         inFlight.remove(key)
     }
 

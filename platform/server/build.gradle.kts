@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.sqliteJdbc)
     implementation(libs.kotlinStdlib)
     implementation(libs.bstats)
+    implementation(libs.caffeine)
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -116,6 +117,7 @@ tasks.shadowJar {
         "org.bstats",
         "org.tomlj",
         "org.semver4j",
+        "com.github.benmanes.caffeine",
         "org.jetbrains.exposed",
         "kotlinx.serialization",
         "com.zaxxer.hikari",

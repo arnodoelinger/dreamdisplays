@@ -121,6 +121,7 @@ dependencies {
     shadow(libs.kotlinStdlib)
     shadow(libs.tomlj)
     shadow(libs.semver4j)
+    shadow(libs.caffeine)
     shadow(libs.sqliteJdbc)
     shadow(libs.exposedCore)
     shadow(libs.exposedJdbc)
@@ -195,6 +196,7 @@ tasks.shadowJar {
         include(dependency("org.tomlj:tomlj"))
         include(dependency("org.antlr:antlr4-runtime"))
         include(dependency("org.semver4j:semver4j"))
+        include(dependency("com.github.ben-manes.caffeine:caffeine"))
         include(dependency("org.jetbrains.exposed:exposed-core"))
         include(dependency("org.jetbrains.exposed:exposed-jdbc"))
         include(dependency("org.jetbrains.exposed:exposed-migration-core"))
@@ -221,6 +223,7 @@ tasks.shadowJar {
         "org.tomlj",
         "org.antlr",
         "org.semver4j",
+        "com.github.benmanes.caffeine",
         "org.jetbrains.exposed",
         "com.zaxxer.hikari",
         "org.schabi.newpipe",

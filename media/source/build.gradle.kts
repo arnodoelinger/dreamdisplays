@@ -13,6 +13,7 @@ dependencies {
     api(project(":media"))
     api(project(":media:runtime"))
     api(project(":util"))
+    api(libs.caffeine)
     api(project(":media:player"))
     api(libs.newpipeExtractor)
     api(libs.commonsCompress)

@@ -20,6 +20,7 @@ dependencies {
     api(project(":util"))
     api(libs.jspecify)
     api(libs.commonsCompress)
+    api(libs.caffeine)
     api(libs.tukaaniXz)
     api(libs.semver4j)
     api(libs.newpipeExtractor)
