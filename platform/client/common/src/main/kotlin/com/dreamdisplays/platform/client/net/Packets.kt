@@ -265,6 +265,7 @@ object Packets {
                 },
                 { buf ->
                     val size = buf.readVarInt()
+                    require(size in 0..(buf.readableBytes() / 16)) { "Invalid clear_cache size: $size." }
                     ClearCache(List(size) { buf.readUUID() })
                 }
             )
