@@ -188,11 +188,20 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Install FFmpeg dependencies on macOS
+        if: runner.os == 'macOS'
+        run: |
+          set -euo pipefail
+          brew install ffmpeg pkg-config
+          ffmpeg_ver="$(brew list --versions ffmpeg | awk '{print $2}')"
+          echo "FFMPEG_CACHE_SUFFIX=ffmpeg-${ffmpeg_ver}" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig" >> "$GITHUB_ENV"
+
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: native -> target
-          key: ${{ matrix.native.target }}
+          key: ${{ matrix.native.target }}-${{ env.FFMPEG_CACHE_SUFFIX }}
           cache-on-failure: true
 
       - name: Install FFmpeg dependencies on Linux
@@ -250,10 +259,6 @@ jobs:
           mv "$inner" "$dest"
           echo "PKG_CONFIG_PATH=${dest}/lib/pkgconfig" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=${dest}/lib:${LD_LIBRARY_PATH:-}" >> "$GITHUB_ENV"
-
-      - name: Install FFmpeg dependencies on macOS
-        if: runner.os == 'macOS'
-        run: brew install ffmpeg pkg-config
 
       - name: Install FFmpeg dependencies on Windows
         if: runner.os == 'Windows'
