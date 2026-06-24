@@ -34,13 +34,17 @@ object PlayerManager {
     @FabricOnly
     fun setVersion(player: ServerPlayer, version: Semver?) = setVersion(player.uuid, version)
 
-    /** Drops all cached per-player state on disconnect. */
+    /**
+     * Drops transient per-player state on disconnect. The update / mod-required notification flags
+     * are deliberately kept for the server's lifetime so a player is told about an update only once
+     * per server session, not on every re-join; they reset naturally on server restart.
+     */
     fun removePlayer(uuid: UUID) {
         versions.remove(uuid)
-        modUpdateNotified.remove(uuid)
-        pluginUpdateNotified.remove(uuid)
-        modRequiredNotified.remove(uuid)
         displaysDisabled.remove(uuid)
+        // modUpdateNotified.remove(uuid)
+        // pluginUpdateNotified.remove(uuid)
+        // modRequiredNotified.remove(uuid)
     }
 
     /** Drops all cached per-player state on disconnect. */
