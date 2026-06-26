@@ -22,6 +22,7 @@ import com.dreamdisplays.platform.server.registrar.CommandRegistrar
 import com.dreamdisplays.platform.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.platform.server.registrar.ListenerRegistrar
 import com.dreamdisplays.platform.server.registrar.SchedulerRegistrar
+import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.FabricV2Networking
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import io.github.arsmotorin.ofrat.*
@@ -89,8 +90,9 @@ class Main : JavaPlugin() {
         Scheduler.init(this)
 
         val s = Companion.config.storage
+        val backend = StorageBackend.fromConfig(s.type)
         storage = StorageManager(
-            type = s.type, dataDir = dataFolder, tablePrefix = s.tablePrefix,
+            backend = backend, dataDir = dataFolder, tablePrefix = s.tablePrefix,
             host = s.host, port = s.port, database = s.database,
             username = s.username, password = s.password,
         )
@@ -174,9 +176,10 @@ class Server : ModInitializer {
             val s = configInstance.storage
             val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
                 .resolve("dreamdisplays").toFile().also { it.mkdirs() }
-            if (s.type.uppercase() == "SQLITE") migrateGlobalDb(dataDir)
+            val backend = StorageBackend.fromConfig(s.type)
+            if (backend == StorageBackend.SQLITE) migrateGlobalDb(dataDir)
             storageInstance = StorageManager(
-                type = s.type, dataDir = dataDir,
+                backend = backend, dataDir = dataDir,
                 tablePrefix = s.tablePrefix,
                 host = s.host, port = s.port, database = s.database,
                 username = s.username, password = s.password,

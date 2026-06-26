@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.server
 
+import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import org.tomlj.Toml
@@ -98,7 +99,7 @@ class Config(private val plugin: Main) {
         ).apply { initMaterials() }
         storage = StorageSection(
             storage = StorageSection.StorageConfig(
-                type = t?.getString("storage.type") ?: "SQLITE",
+                type = t?.getString("storage.type") ?: StorageBackend.SQLITE.configToken,
                 host = t?.getString("storage.host") ?: "localhost",
                 port = t?.getString("storage.port") ?: "3306",
                 database = t?.getString("storage.database") ?: "my_database",
@@ -268,7 +269,7 @@ class Config(private val plugin: Main) {
         val tablePrefix get() = storage.table_prefix
 
         data class StorageConfig(
-            val type: String = "SQLITE",
+            val type: String = StorageBackend.SQLITE.configToken,
             val host: String = "localhost",
             val port: String = "3306",
             val database: String = "my_database",
@@ -455,7 +456,7 @@ class FabricConfig { // TODO: merge
         )
         storage = StorageSection(
             storage = StorageSection.StorageConfig(
-                type = t?.getString("storage.type") ?: "SQLITE",
+                type = t?.getString("storage.type") ?: StorageBackend.SQLITE.configToken,
                 host = t?.getString("storage.host") ?: "localhost",
                 port = t?.getString("storage.port") ?: "3306",
                 database = t?.getString("storage.database") ?: "my_database",
@@ -633,7 +634,7 @@ class FabricConfig { // TODO: merge
         val tablePrefix get() = storage.table_prefix
 
         data class StorageConfig(
-            val type: String = "SQLITE",
+            val type: String = StorageBackend.SQLITE.configToken,
             val host: String = "localhost",
             val port: String = "3306",
             val database: String = "my_database",

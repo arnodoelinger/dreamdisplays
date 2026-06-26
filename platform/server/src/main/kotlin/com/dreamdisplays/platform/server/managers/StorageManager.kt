@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.platform.server.datatypes.*
+import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.arsmotorin.ofrat.*
@@ -53,7 +54,7 @@ class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
  */
 @NullMarked
 class StorageManager(
-    type: String,
+    backend: StorageBackend,
     dataDir: File,
     tablePrefix: String = "",
     host: String = "",
@@ -66,18 +67,17 @@ class StorageManager(
     private val table = DisplaysTable(tablePrefix)
 
     private val dataSource = HikariDataSource(HikariConfig().apply {
-        jdbcUrl = when (type.uppercase()) {
-            "SQLITE" -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
-            "MYSQL" -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false&useInformationSchema=false"
-            else -> error("Unsupported storage type: $type.")
+        jdbcUrl = when (backend) {
+            StorageBackend.SQLITE -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
+            StorageBackend.MYSQL -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false&useInformationSchema=false"
         }
-        if (type.uppercase() != "SQLITE") {
+        if (backend != StorageBackend.SQLITE) {
             this.username = username
             this.password = password
         }
         // Read more why SQLite should use a single connection:
         // https://github.com/brettwooldridge/HikariCP/wiki/About-Pool-Sizing
-        maximumPoolSize = if (type.uppercase() == "SQLITE") 1 else 3
+        maximumPoolSize = if (backend == StorageBackend.SQLITE) 1 else 3
         isAutoCommit = false
     })
 

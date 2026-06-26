@@ -4,6 +4,7 @@ import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.ProtocolVersion
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.managers.DisplayManager
+import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import io.github.arsmotorin.ofrat.PaperOnly
 import org.bstats.bukkit.Metrics
@@ -20,7 +21,9 @@ object TelemetryMetrics {
     /** Registers all bStats charts. */
     fun register(plugin: Main, metrics: Metrics) {
         metrics.addCustomChart(SimplePie("server_protocol_current") { ProtocolVersion.CURRENT.toString() })
-        metrics.addCustomChart(SimplePie("storage_backend") { Main.config.storage.type.lowercase() })
+        metrics.addCustomChart(SimplePie("storage_backend") {
+            StorageBackend.fromConfig(Main.config.storage.type).metricToken
+        })
         metrics.addCustomChart(SimplePie("reports_enabled") {
             if (Main.config.settings.webhookUrl.isNotBlank()) "enabled" else "disabled"
         })
