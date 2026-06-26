@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.server.datatypes
 
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
@@ -83,18 +84,18 @@ class PaperSelectionData(player: Player) : SelectionData {
         val isVertical = f == BlockFace.UP || f == BlockFace.DOWN
         val screenWidth = if (isVertical) region.deltaX else region.width
         val screenHeight = if (isVertical) region.deltaZ else region.height
-        val rotation = if (isVertical) horizontalIndex(horizontal) else 0
+        val rotation = if (isVertical) horizontalRotation(horizontal) else ContentRotation.NONE
 
         return PaperDisplayData(randomUUID(), playerId, dPos1, dPos2, screenWidth, screenHeight, f, rotation)
     }
 
-    /** Maps a horizontal cardinal to a 0-3 quarter-turn index for floor/ceiling content. */
-    private fun horizontalIndex(face: BlockFace): Int = when (face) {
-        BlockFace.NORTH -> 0
-        BlockFace.EAST -> 1
-        BlockFace.SOUTH -> 2
-        BlockFace.WEST -> 3
-        else -> 0
+    /** Maps a horizontal cardinal to a content rotation for floor / ceiling screens. */
+    private fun horizontalRotation(face: BlockFace): ContentRotation = when (face) {
+        BlockFace.NORTH -> ContentRotation.NONE
+        BlockFace.EAST -> ContentRotation.RIGHT
+        BlockFace.SOUTH -> ContentRotation.HALF_TURN
+        BlockFace.WEST -> ContentRotation.LEFT
+        else -> ContentRotation.NONE
     }
 }
 
@@ -183,17 +184,17 @@ class FabricSelectionData : SelectionData {
             width = if (isVertical) r.deltaX else r.width,
             height = if (isVertical) r.deltaZ else r.height,
             facing = facing,
-            rotation = if (isVertical) horizontalIndex(horizontalFacing) else 0,
+            rotation = if (isVertical) horizontalRotation(horizontalFacing) else ContentRotation.NONE,
         )
     }
 
-    /** Maps a horizontal cardinal to a 0-3 quarter-turn index for floor/ceiling content. */
-    private fun horizontalIndex(dir: Direction): Int = when (dir) {
-        Direction.NORTH -> 0
-        Direction.EAST -> 1
-        Direction.SOUTH -> 2
-        Direction.WEST -> 3
-        else -> 0
+    /** Maps a horizontal cardinal to a content rotation for floor/ceiling screens. */
+    private fun horizontalRotation(dir: Direction): ContentRotation = when (dir) {
+        Direction.NORTH -> ContentRotation.NONE
+        Direction.EAST -> ContentRotation.RIGHT
+        Direction.SOUTH -> ContentRotation.HALF_TURN
+        Direction.WEST -> ContentRotation.LEFT
+        else -> ContentRotation.NONE
     }
 
     /** Compact result of a selection region calculation. */

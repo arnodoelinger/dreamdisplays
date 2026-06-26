@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.managers
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.core.storage.DisplayStorage
 import com.dreamdisplays.core.storage.FullDisplayData
 import com.dreamdisplays.media.VideoQuality
@@ -69,7 +70,7 @@ object DisplayLifecycleManager {
         createScreen(
             packet.id, packet.ownerId, Vector3i(packet.x, packet.y, packet.z), facing,
             packet.width, packet.height, packet.url, packet.lang,
-            mode, packet.qualityCap, packet.rotation,
+            mode, packet.qualityCap, ContentRotation.fromQuarterTurns(packet.rotation),
         )
     }
 
@@ -77,7 +78,7 @@ object DisplayLifecycleManager {
     fun createScreen(
         uuid: UUID, ownerUuid: UUID, pos: Vector3i, facingUtil: FacingUtil,
         width: Int, height: Int, code: String, lang: String,
-        mode: PlaybackMode, qualityCap: Int, rotation: Int = 0,
+        mode: PlaybackMode, qualityCap: Int, rotation: ContentRotation = ContentRotation.NONE,
     ) {
         val displayScreen = DisplayScreen(
             uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toDisplayFacing(),
@@ -114,7 +115,7 @@ object DisplayLifecycleManager {
         val displayScreen = DisplayScreen(
             data.uuid, data.ownerUuid, data.x, data.y, data.z, data.facing,
             data.width, data.height, data.mode ?: PlaybackMode.LOCAL,
-            qualityCap = data.qualityCap, rotation = data.rotation,
+            qualityCap = data.qualityCap, rotation = ContentRotation.fromQuarterTurns(data.rotation),
         )
         displayScreen.renderDistance = data.renderDistance
         displayScreen.savedTimeNanos = data.currentTimeNanos

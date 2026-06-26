@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.server.datatypes
 
 import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.core.playback.PlaybackPermissions
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
@@ -25,8 +26,8 @@ interface DisplayData {
     val width: Int
     val height: Int
 
-    /** Content quarter-turn rotation (0-3); only meaningful for floor/ceiling (`UP`/`DOWN`) facings. */
-    val rotation: Int
+    /** Content rotation; only meaningful for floor / ceiling (`UP` / `DOWN`) facings. */
+    val rotation: ContentRotation
     var url: String
     var lang: String
 
@@ -71,7 +72,7 @@ class PaperDisplayData(
     override val width: Int,
     override val height: Int,
     val facing: BlockFace = BlockFace.NORTH,
-    override val rotation: Int = 0,
+    override val rotation: ContentRotation = ContentRotation.NONE,
 ) : DisplayData {
     override var url: String = ""
     override var lang: String = ""
@@ -102,7 +103,7 @@ class FabricDisplayData(
     override val width: Int,
     override val height: Int,
     val facing: Direction,
-    override val rotation: Int = 0,
+    override val rotation: ContentRotation = ContentRotation.NONE,
 ) : DisplayData {
     override var url: String = ""
     override var lang: String = ""

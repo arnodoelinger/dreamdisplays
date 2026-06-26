@@ -4,6 +4,7 @@ import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 
 import com.dreamdisplays.platform.client.net.Packets
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.core.protocol.ClearCache
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
@@ -75,7 +76,7 @@ object PacketUtil {
         isLocked: Boolean = true,
         mode: PlaybackMode = if (isSync) PlaybackMode.SYNCED else PlaybackMode.LOCAL,
         qualityCap: Int = 0,
-        rotation: Int = 0,
+        rotation: ContentRotation = ContentRotation.NONE,
     ) {
         val isVertical = facing == BlockFace.UP || facing == BlockFace.DOWN
         val recipients = if (isVertical) players.filterNotNull().filter { supportsVertical(it.uniqueId) } else players
@@ -89,7 +90,7 @@ object PacketUtil {
                 facing = facing.toPacketByte().toInt(),
                 isSync = isSync, lang = lang, isLocked = isLocked,
                 mode = mode.wire, qualityCap = qualityCap,
-                rotation = rotation,
+                rotation = rotation.quarterTurns,
             ),
         )
         if (players.isEmpty()) return
@@ -347,7 +348,7 @@ object FabricPacketUtil {
                 facing = directionToFacingUtil(display.facing).toPacket().toInt(),
                 isSync = display.isSync, lang = display.lang, isLocked = display.isLocked,
                 mode = display.mode.wire, qualityCap = display.qualityCap,
-                rotation = display.rotation,
+                rotation = display.rotation.quarterTurns,
             ),
         )
         if (legacy.isEmpty()) return

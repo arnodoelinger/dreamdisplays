@@ -49,5 +49,5 @@ internal fun DisplayScreen.toRuntimeState(): DisplayRuntimeState = when {
 internal fun DisplayScreen.toFullDisplayData(): FullDisplayData = FullDisplayData(
     uuid, pos.x, pos.y, pos.z, facing, width, height,
     videoUrl ?: "", lang ?: "", volume, quality.serialize(), brightness,
-    muted, mode, ownerUuid, renderDistance, currentTimeNanos, rotation, qualityCap,
+    muted, mode, ownerUuid, renderDistance, currentTimeNanos, rotation.quarterTurns, qualityCap,
 )

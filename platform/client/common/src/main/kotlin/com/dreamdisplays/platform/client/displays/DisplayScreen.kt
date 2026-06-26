@@ -15,6 +15,7 @@ import com.dreamdisplays.platform.client.render.DisplayTextureResource
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.render.toUploadFormat
 import com.dreamdisplays.api.watchparty.WatchPartySession
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.DisplaySync
 import com.dreamdisplays.api.playback.PlaybackAction
@@ -79,8 +80,8 @@ class DisplayScreen(
     /** Hard quality cap in pixel height for Broadcast, or `0` for no cap. */
     var qualityCap: Int = 0,
 
-    /** Content quarter-turn rotation (0-3); only used for floor/ceiling (`UP`/`DOWN`) screens. */
-    var rotation: Int = 0,
+    /** Content rotation; only used for floor/ceiling (`UP`/`DOWN`) screens. */
+    var rotation: ContentRotation = ContentRotation.NONE,
 ) {
     /** Per-display client settings (volume, quality, mute, ...) loaded from disk. */
     private val savedSettings = ClientSettingsStore.getSettings(uuid, defaultVolumeFor(mode))
@@ -453,7 +454,7 @@ class DisplayScreen(
         z = packet.z
         blockPos = null
         facing = FacingUtil.fromPacket(packet.facing.toByte()).toDisplayFacing()
-        rotation = packet.rotation
+        rotation = ContentRotation.fromQuarterTurns(packet.rotation)
         width = packet.width
         height = packet.height
 

@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.core.getOrNull
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
@@ -197,12 +198,19 @@ object ScreenRenderer : ClientRenderService {
         addVertex(pose, builder, x0, y1, 0f, r, g, b, 0f, 0f)
     }
 
-    /** Texture corners in vertex order; rotating the list by [rotation] quarter-turns spins the image. */
+    /** Texture corners in vertex order; rotating the list by [rotation] spins the image. */
     private val baseUv = arrayOf(0f to 1f, 1f to 1f, 1f to 0f, 0f to 0f)
 
-    /** Appends a quad with the given [rotation] (0..3) and color [r,g,b] (0..255). */
-    private fun appendQuad(pose: PoseStack.Pose, builder: VertexConsumer, r: Int, g: Int, b: Int, rotation: Int) {
-        val rot = ((rotation % 4) + 4) % 4
+    /** Appends a quad with the given [rotation] and color [[r], [g], [b] (0..255). */
+    private fun appendQuad(
+        pose: PoseStack.Pose,
+        builder: VertexConsumer,
+        r: Int,
+        g: Int,
+        b: Int,
+        rotation: ContentRotation,
+    ) {
+        val rot = rotation.quarterTurns
         val uv = Array(4) { baseUv[(it + rot) % 4] }
         addVertex(pose, builder, 0f, 0f, 0f, r, g, b, uv[0].first, uv[0].second)
         addVertex(pose, builder, 1f, 0f, 0f, r, g, b, uv[1].first, uv[1].second)

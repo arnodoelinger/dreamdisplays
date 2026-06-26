@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.core.display.ContentRotation
 import com.dreamdisplays.platform.server.datatypes.*
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.zaxxer.hikari.HikariConfig
@@ -231,14 +232,15 @@ class StorageManager(
         )
 
         /** Packs the facing ordinal (low byte) and content rotation (next byte) into one column int. */
-        private fun packFacing(facingOrdinal: Int, rotation: Int): Int =
-            (facingOrdinal and 0xFF) or ((rotation and 0xFF) shl 8)
+        private fun packFacing(facingOrdinal: Int, rotation: ContentRotation): Int =
+            (facingOrdinal and 0xFF) or ((rotation.quarterTurns and 0xFF) shl 8)
 
         /** Extracts the facing ordinal from a [packFacing] value; legacy rows (rotation=0) decode unchanged. */
         private fun unpackFacingOrdinal(packed: Int): Int = packed and 0xFF
 
         /** Extracts the content rotation from a [packFacing] value. */
-        private fun unpackRotation(packed: Int): Int = (packed shr 8) and 0xFF
+        private fun unpackRotation(packed: Int): ContentRotation =
+            ContentRotation.fromQuarterTurns((packed shr 8) and 0xFF)
 
         /** Packs a 3D position into a 64-bit long. */
         private fun packPos(x: Int, y: Int, z: Int): Long =
