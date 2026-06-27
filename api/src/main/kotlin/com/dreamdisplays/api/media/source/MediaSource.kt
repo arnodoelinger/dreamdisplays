@@ -1,6 +1,9 @@
 package com.dreamdisplays.api.media.source
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.api.security.MediaHttpUrl
+import java.util.Locale
 
 /**
  * User-provided media locator before resolver-specific stream extraction.
@@ -26,24 +29,27 @@ sealed interface MediaSource {
      * such URL (currently [Twitch], which the resolution pipeline does not support).
      */
     fun toResolvableUrl(): String? = when (this) {
-        is YouTube -> "https://www.youtube.com/watch?v=$videoId"
+        is YouTube -> YouTubeUrls.watchUrl(videoId)
         is Remote -> url
         is DirectStream -> streamUrl
         is Twitch -> null
     }
 
     companion object {
-        private val YOUTUBE_ID_RE = Regex("(?:v=|youtu\\.be/|shorts/|live/)([A-Za-z0-9_-]{11})")
-
         /** Parses [url] into a typed source when a known host is recognized; falls back to [Remote]. */
-        fun from(url: String): MediaSource = when {
-            "youtube.com" in url || "youtu.be" in url -> {
-                val id = YOUTUBE_ID_RE.find(url)?.groupValues?.get(1)
-                if (id != null) YouTube(id) else Remote(url)
+        fun from(url: String): MediaSource {
+            YouTubeUrls.extractVideoId(url)?.let { return YouTube(it) }
+
+            val parsed = MediaHttpUrl.parse(url) ?: MediaHttpUrl.parse("https://${url.trim()}")
+            val host = parsed?.uri?.host?.lowercase(Locale.ROOT)
+            if (host == "twitch.tv" || host?.endsWith(".twitch.tv") == true) {
+                val channel = parsed.uri.path
+                    ?.split('/')
+                    ?.firstOrNull { it.isNotBlank() }
+                if (!channel.isNullOrBlank()) return Twitch(channel)
             }
 
-            "twitch.tv" in url -> Twitch(url.substringAfterLast("/"))
-            else -> Remote(url)
+            return Remote(url)
         }
     }
 }

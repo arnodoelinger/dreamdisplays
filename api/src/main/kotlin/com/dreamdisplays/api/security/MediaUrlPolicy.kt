@@ -1,6 +1,7 @@
 package com.dreamdisplays.api.security
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import com.dreamdisplays.api.media.search.YouTubeVideoId
 
 /**
  * Trust-boundary policy for client-supplied media URLs.
@@ -9,9 +10,6 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  */
 @DreamDisplaysUnstableApi
 object MediaUrlPolicy {
-    /** 11-character YouTube id (which may legitimately start with `-`). */
-    private val BARE_YOUTUBE_ID = Regex("[A-Za-z0-9_-]{11}")
-
     /**
      * Maximum accepted URL length. Comfortably above any legitimate media URL while capping the
      * amplification a single client can trigger: the server stores, persists and rebroadcasts the
@@ -27,11 +25,7 @@ object MediaUrlPolicy {
      * truncates to [MAX_LANG_LENGTH]. Returns a value always safe to store and rebroadcast;
      * canonicalization (aliases, region suffixes) is the caller's concern.
      */
-    fun sanitizeLang(lang: String): String =
-        lang.asSequence()
-            .filterNot { it.isWhitespace() || it.isISOControl() }
-            .take(MAX_LANG_LENGTH)
-            .joinToString("")
+    fun sanitizeLang(lang: String): String = LanguageTag.sanitize(lang, MAX_LANG_LENGTH).value
 
     /**
      * A bare 11-character YouTube id (which may legitimately start with `-`), or a trimmed
@@ -42,9 +36,8 @@ object MediaUrlPolicy {
         if (url.length > MAX_URL_LENGTH) return false
         val s = url.trim()
         if (s.isEmpty()) return false
-        if (s.any { it.isWhitespace() || it.isISOControl() }) return false
-        if (s.length == 11 && BARE_YOUTUBE_ID.matches(s)) return true
-        val lower = s.lowercase()
-        return lower.startsWith("http://") || lower.startsWith("https://")
+        if (s.length > MAX_URL_LENGTH) return false
+        if (YouTubeVideoId.parse(s) != null) return true
+        return MediaHttpUrl.isValid(s, MAX_URL_LENGTH)
     }
 }

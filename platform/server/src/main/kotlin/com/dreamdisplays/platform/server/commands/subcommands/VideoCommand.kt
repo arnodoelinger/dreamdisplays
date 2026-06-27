@@ -1,6 +1,8 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
+import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.playback.PlaybackPermissions
+import com.dreamdisplays.api.security.LanguageTag
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -11,7 +13,6 @@ import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.YouTubeUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
@@ -50,8 +51,11 @@ class VideoCommand : SubCommand {
             return
         }
 
-        val code = YouTubeUtil.extractVideoIdFromUri(args[1] ?: "")
-            ?: return MessageUtil.sendMessage(player, "invalidURL")
+        val videoId = YouTubeUrls.extractVideoIdTyped(args[1] ?: "")
+        if (videoId == null) {
+            MessageUtil.sendMessage(player, "invalidURL")
+            return
+        }
 
         val block = player.getTargetBlock(null, 32)
 
@@ -76,9 +80,8 @@ class VideoCommand : SubCommand {
 
         val wasSync = data.isSync
         data.apply {
-            url = if ("/shorts/" in (args[1] ?: "")) "https://www.youtube.com/shorts/$code"
-            else "https://www.youtube.com/watch?v=$code"
-            lang = normalizeLangCode(args.getOrNull(2).orEmpty())
+            url = YouTubeUrls.watchUrl(videoId)
+            lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
         }
 
         runAsync { Main.getInstance().storage.saveDisplay(data) }
@@ -95,19 +98,6 @@ class VideoCommand : SubCommand {
             return languageSuggestions
         }
         return emptyList()
-    }
-
-    /** Lowercases [raw], trims region suffixes and maps the `ua` alias to the canonical `uk`. */
-    private fun normalizeLangCode(raw: String): String {
-        val base = raw.trim()
-            .lowercase(Locale.ROOT)
-            .replace('-', '_')
-            .substringBefore('_')
-
-        return when (base) {
-            "ua" -> "uk"
-            else -> base
-        }
     }
 
     companion object {
@@ -152,7 +142,7 @@ object FabricVideoCommand {
             return 0
         }
 
-        val code = YouTubeUtil.extractVideoIdFromUri(urlRaw)
+        val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
             ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
         val targetPos = getTargetBlockPos(player)
@@ -171,9 +161,8 @@ object FabricVideoCommand {
         }
 
         val wasSync = data.isSync
-        data.url = if ("/shorts/" in urlRaw) "https://www.youtube.com/shorts/$code"
-        else "https://www.youtube.com/watch?v=$code"
-        data.lang = normalizeLangCode(langRaw)
+        data.url = YouTubeUrls.watchUrl(videoId)
+        data.lang = LanguageTag.canonicalAudioCode(langRaw).value
         ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
@@ -183,14 +172,6 @@ object FabricVideoCommand {
 
         MessageUtil.sendMessage(player, "settedURL")
         return 1
-    }
-
-    /** Lowercases [raw], trims region suffixes, and maps the `ua` alias to the canonical `uk`. */
-    private fun normalizeLangCode(raw: String): String {
-        return when (val base = raw.trim().lowercase(Locale.ROOT).replace('-', '_').substringBefore('_')) {
-            "ua" -> "uk"
-            else -> base
-        }
     }
 
     /** Gets the block position the player is currently looking at (within 32 blocks). */

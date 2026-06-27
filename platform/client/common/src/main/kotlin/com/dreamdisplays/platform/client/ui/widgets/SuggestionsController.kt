@@ -4,6 +4,7 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.get
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
+import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.platform.client.render.Thumbnails
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
@@ -61,8 +62,7 @@ class SuggestionsController {
             return
         }
         val svc = DreamServices.registry.get(MediaServices.SEARCH)
-        val maybeId = if (q.startsWith("http") || "youtube.com" in q || "youtu.be" in q)
-            svc.extractVideoId(q) else null
+        val maybeId = YouTubeUrls.extractVideoId(q)
         if (maybeId != null) {
             startLoad()
             val seq = requestSeq.incrementAndGet()
@@ -133,7 +133,7 @@ class SuggestionsController {
 
     /** Minimal result used when URL metadata could not be fetched. */
     private fun fallbackResult(videoId: String) =
-        MediaSearchResult(videoId, "https://youtu.be/$videoId", null, null, null)
+        MediaSearchResult(videoId, YouTubeUrls.watchUrl(videoId), null, null, null)
 
     companion object {
         const val RESULT_LIMIT = 72
