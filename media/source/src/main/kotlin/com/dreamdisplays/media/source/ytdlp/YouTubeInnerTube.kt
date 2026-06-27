@@ -2,12 +2,12 @@ package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.util.optString
+import com.dreamdisplays.util.net.DreamHttpClient
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
@@ -94,45 +94,32 @@ object YouTubeInnerTube {
     @Throws(IOException::class)
     private fun post(endpoint: String, body: JsonObject): JsonObject {
         val url = "$BASE_URL/$endpoint?prettyPrint=false"
-        val conn = openConnection(url)
-        conn.requestMethod = "POST"
-        conn.doOutput = true
-        conn.connectTimeout = 8_000
-        conn.readTimeout = 15_000
-        conn.setRequestProperty("Content-Type", "application/json")
-        conn.setRequestProperty("User-Agent", UA)
-        conn.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
         val cookies = YtDlp.getPublicCookieHeader()
-        conn.setRequestProperty("Cookie", cookies ?: "CONSENT=YES+cb; SOCS=CAI; PREF=hl=en")
-
-        try {
-            val bytes = body.toString().toByteArray(StandardCharsets.UTF_8)
-            conn.outputStream.use { it.write(bytes) }
-
-            val status = conn.responseCode
-            if (status !in 200..299) {
-                val e = try {
-                    conn.errorStream?.readAllBytes()?.toString(StandardCharsets.UTF_8)?.take(500) ?: ""
-                } catch (_: Exception) {
-                    ""
-                }
-                throw IOException("$endpoint returned HTTP $status: $e")
-            }
-            conn.inputStream.use { input ->
-                val raw = String(input.readAllBytes(), StandardCharsets.UTF_8)
-                return try {
-                    JsonParser.parseString(raw).asJsonObject
-                } catch (e: Exception) {
-                    throw IOException("Failed to parse InnerTube $endpoint response", e)
-                }
-            }
-        } finally {
-            conn.disconnect()
+        val response = DreamHttpClient.execute(
+            url,
+            DreamHttpClient.RequestOptions(
+                method = "POST",
+                body = body.toString().toByteArray(StandardCharsets.UTF_8),
+                contentType = "application/json",
+                headers = DreamHttpClient.headersOf(
+                    "User-Agent" to UA,
+                    "Accept-Language" to "en-US,en;q=0.9",
+                    "Cookie" to (cookies ?: "CONSENT=YES+cb; SOCS=CAI; PREF=hl=en"),
+                ),
+                connectTimeoutMs = 8_000,
+                readTimeoutMs = 15_000,
+                proxyUrl = ResolverConfig.ytdlpProxy,
+            ),
+        )
+        if (!response.isSuccessful) {
+            throw IOException("$endpoint returned HTTP ${response.code}: ${response.bodyString().take(500)}")
+        }
+        return try {
+            JsonParser.parseString(response.bodyString()).asJsonObject
+        } catch (e: Exception) {
+            throw IOException("Failed to parse InnerTube $endpoint response", e)
         }
     }
-
-    /** Opens an [HttpURLConnection] for [url], routing through the configured proxy if one is set. */
-    private fun openConnection(url: String): HttpURLConnection = ProxyConnections.open(url)
 
     /** Builds the base InnerTube request body with client context (name, version, language). */
     private fun baseContext(): JsonObject {

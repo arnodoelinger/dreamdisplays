@@ -1,6 +1,7 @@
 package com.dreamdisplays.media.player.nativebridge
 
 import com.dreamdisplays.media.runtime.OsInfo
+import com.dreamdisplays.util.net.DreamHttpClient
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory
@@ -10,7 +11,6 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.URI
 import java.util.zip.ZipInputStream
 
@@ -172,87 +172,47 @@ object LavFfmpeg {
     /** Downloads [url] to [dest] with periodic progress log lines (every 10 %). */
     @Throws(IOException::class)
     private fun downloadWithProgress(url: String, dest: File) {
-        var current = url
-        for (hop in 0 until 10) {
-            val conn = URI.create(current).toURL().openConnection() as HttpURLConnection
-            conn.instanceFollowRedirects = false
-            conn.setRequestProperty("User-Agent", "DreamDisplays-lav-ffmpeg")
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 300_000
-            val status = conn.responseCode
-            if (status in 300..399) {
-                val loc = conn.getHeaderField("Location") ?: run {
-                    conn.disconnect(); throw IOException("Redirect without Location at $current.")
-                }
-                conn.disconnect()
-                current = loc
-                continue
-            }
-            if (status != 200) {
-                conn.disconnect(); throw IOException("HTTP $status for $current.")
-            }
-            try {
-                val total = conn.contentLengthLong
+        var announced = false
+        var lastLoggedPct = -1
+        DreamHttpClient.downloadToFile(
+            url,
+            dest.toPath(),
+            DreamHttpClient.RequestOptions(
+                headers = DreamHttpClient.headersOf("User-Agent" to "DreamDisplays-lav-ffmpeg"),
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 300_000,
+            ),
+        ) { downloaded, total ->
+            if (!announced) {
                 val totalMb = if (total > 0) "%.1f MB".format(total / 1_048_576.0) else "unknown size"
                 logger.info("Downloading FFmpeg ($totalMb)...")
-                var downloaded = 0L
-                var lastLoggedPct = -1
-                val buf = ByteArray(65_536)
-                conn.inputStream.use { input ->
-                    BufferedOutputStream(FileOutputStream(dest)).use { out ->
-                        var n = input.read(buf)
-                        while (n >= 0) {
-                            out.write(buf, 0, n)
-                            downloaded += n
-                            if (total > 0) {
-                                val pct = (downloaded * 100 / total).toInt() / 10 * 10
-                                if (pct > lastLoggedPct) {
-                                    lastLoggedPct = pct
-                                    val dlMb = "%.1f".format(downloaded / 1_048_576.0)
-                                    logger.info("Downloading FFmpeg... $pct% ($dlMb / $totalMb).")
-                                }
-                            }
-                            n = input.read(buf)
-                        }
-                    }
-                }
-            } finally {
-                conn.disconnect()
+                announced = true
             }
-            return
+            if (total > 0) {
+                val pct = (downloaded * 100 / total).toInt() / 10 * 10
+                if (pct > lastLoggedPct) {
+                    lastLoggedPct = pct
+                    val dlMb = "%.1f".format(downloaded / 1_048_576.0)
+                    val totalMb = "%.1f MB".format(total / 1_048_576.0)
+                    logger.info("Downloading FFmpeg... $pct% ($dlMb / $totalMb).")
+                }
+            }
         }
-        throw IOException("Too many redirects: $url.")
     }
 
     /** Reads [url], following up to 10 redirect hops. */
     @Throws(IOException::class)
     private fun readUrl(url: String): String {
-        var current = url
-        for (hop in 0 until 10) {
-            val conn = URI.create(current).toURL().openConnection() as HttpURLConnection
-            conn.instanceFollowRedirects = false
-            conn.setRequestProperty("User-Agent", "DreamDisplays-lav-ffmpeg")
-            conn.setRequestProperty("Accept", "application/vnd.github+json")
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 60_000
-            val status = conn.responseCode
-            if (status in 300..399) {
-                val loc = conn.getHeaderField("Location") ?: run {
-                    conn.disconnect(); throw IOException("Redirect without Location at $current.")
-                }
-                conn.disconnect()
-                current = loc
-                continue
-            }
-            if (status != 200) {
-                conn.disconnect(); throw IOException("HTTP $status for $current.")
-            }
-            return try {
-                conn.inputStream.bufferedReader().use { it.readText() }
-            } finally {
-                conn.disconnect()
-            }
-        }
-        throw IOException("Too many redirects: $url.")
+        return DreamHttpClient.readText(
+            url,
+            DreamHttpClient.RequestOptions(
+                headers = DreamHttpClient.headersOf(
+                    "User-Agent" to "DreamDisplays-lav-ffmpeg",
+                    "Accept" to "application/vnd.github+json",
+                ),
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 60_000,
+            ),
+        )
     }
 }

@@ -25,6 +25,8 @@ dependencies {
     shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinStdlib)
     shadow(libs.caffeine)
+    shadow(libs.okhttp)
+    shadow(libs.okio)
     shadow(libs.newpipeExtractor)
 }
 
@@ -100,6 +102,10 @@ tasks.shadowJar {
         include(dependency("org.tukaani:xz"))
         include(dependency("org.semver4j:semver4j"))
         include(dependency("com.github.ben-manes.caffeine:caffeine"))
+        include(dependency("com.squareup.okhttp3:okhttp"))
+        include(dependency("com.squareup.okhttp3:okhttp-jvm"))
+        include(dependency("com.squareup.okio:okio"))
+        include(dependency("com.squareup.okio:okio-jvm"))
         include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
         include(dependency("org.jetbrains:annotations"))
         include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
@@ -115,6 +121,8 @@ tasks.shadowJar {
         "org.tukaani.xz",
         "org.semver4j",
         "com.github.benmanes.caffeine",
+        "okhttp3",
+        "okio",
         "kotlin",
         "kotlinx",
         "org.jetbrains.annotations",

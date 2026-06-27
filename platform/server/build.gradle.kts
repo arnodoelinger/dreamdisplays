@@ -55,6 +55,7 @@ dependencies {
     }
 
     implementation(project(":core"))
+    implementation(project(":util"))
     implementation(libs.gson)
     implementation(libs.kotlinxSerializationProtobuf)
     implementation(libs.kotlinxCoroutinesCore)
@@ -118,6 +119,8 @@ tasks.shadowJar {
         "org.tomlj",
         "org.semver4j",
         "com.github.benmanes.caffeine",
+        "okhttp3",
+        "okio",
         "org.jetbrains.exposed",
         "kotlinx.serialization",
         "com.zaxxer.hikari",

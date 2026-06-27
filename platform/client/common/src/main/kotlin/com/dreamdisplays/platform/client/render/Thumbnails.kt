@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.util.DreamCoroutines
+import com.dreamdisplays.util.net.DreamHttpClient
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -11,8 +12,6 @@ import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -163,20 +162,21 @@ object Thumbnails {
 
     /** Downloads raw image bytes from [url]; returns null on any HTTP or network error. */
     private fun fetch(url: String): ByteArray? {
-        var conn: HttpURLConnection? = null
         return try {
-            conn = (URI.create(url).toURL().openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = true
-                connectTimeout = 8_000
-                readTimeout = 15_000
-                setRequestProperty("User-Agent", "Mozilla/5.0 Dream Displays")
-                setRequestProperty("Accept", "image/jpeg,image/png")
-            }
-            if (conn.responseCode != 200) null else conn.inputStream.use { it.readAllBytes() }
+            val response = DreamHttpClient.execute(
+                url,
+                DreamHttpClient.RequestOptions(
+                    headers = DreamHttpClient.headersOf(
+                        "User-Agent" to "Mozilla/5.0 Dream Displays",
+                        "Accept" to "image/jpeg,image/png",
+                    ),
+                    connectTimeoutMs = 8_000,
+                    readTimeoutMs = 15_000,
+                ),
+            )
+            if (response.code != 200) null else response.body
         } catch (_: Exception) {
             null
-        } finally {
-            conn?.disconnect()
         }
     }
 }

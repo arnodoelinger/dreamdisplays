@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.server.Main.Companion.modVersion
 import com.dreamdisplays.platform.server.Main.Companion.pluginLatestVersion
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.utils.GitHubFetcherUtil
+import com.dreamdisplays.util.net.DreamHttpClient
 import org.semver4j.Semver
 import com.google.gson.Gson
 import com.google.gson.annotations.SerializedName
@@ -14,12 +15,7 @@ import com.google.gson.reflect.TypeToken
 import org.slf4j.LoggerFactory
 import java.net.ConnectException
 import java.net.SocketTimeoutException
-import java.net.URI
 import java.net.UnknownHostException
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 
 /**
  * Checks for updates of the `Paper` plugin and mod from GitHub releases.
@@ -77,7 +73,6 @@ object Updater {
 object FabricUpdater {
     private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
     private val gson = Gson()
-    private val client: HttpClient = HttpClient.newHttpClient()
 
     /**
      * Fetches GitHub releases and stores the latest mod and plugin versions in `Main`.
@@ -117,18 +112,22 @@ object FabricUpdater {
     /** Fetches releases from GitHub API, returning an empty list on non-200 responses. Rethrows connection errors. */
     private fun fetchReleases(owner: String, repo: String): List<Release> {
         val url = "https://api.github.com/repos/$owner/$repo/releases"
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .header("Accept", "application/vnd.github.v3+json")
-            .header("User-Agent", "DreamDisplays-Updater")
-            .timeout(Duration.ofSeconds(10))
-            .build()
-
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() != 200) return emptyList()
+        val response = DreamHttpClient.execute(
+            url,
+            DreamHttpClient.RequestOptions(
+                headers = DreamHttpClient.headersOf(
+                    "Accept" to "application/vnd.github.v3+json",
+                    "User-Agent" to "DreamDisplays-Updater",
+                ),
+                connectTimeoutMs = 10_000,
+                readTimeoutMs = 10_000,
+                callTimeoutMs = 10_000,
+            ),
+        )
+        if (response.code != 200) return emptyList()
 
         return gson.fromJson(
-            response.body(),
+            response.bodyString(),
             object : TypeToken<List<Release>>() {}.type
         ) ?: emptyList()
     }

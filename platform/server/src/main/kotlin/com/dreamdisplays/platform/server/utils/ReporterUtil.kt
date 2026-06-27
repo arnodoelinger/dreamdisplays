@@ -1,14 +1,12 @@
 package com.dreamdisplays.platform.server.utils
 
+import com.dreamdisplays.util.net.DreamHttpClient
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 import java.io.IOException
-import java.net.URI
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
+import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
 import java.time.format.DateTimeFormatter
 import java.util.*
@@ -20,9 +18,6 @@ import org.bukkit.entity.Player
  * per-reporter) is enforced upstream by [DisplayManager] before any request reaches here.
  */
 object ReporterUtil {
-    /** Shared HTTP client for sending webhook requests. */
-    private val httpClient: HttpClient by lazy { HttpClient.newHttpClient() }
-
     /** Embed constants for the Discord webhook payload. */
     private const val EMBED_COLOR = 0x2F3136
 
@@ -99,14 +94,18 @@ object ReporterUtil {
 
     /** Sends a webhook request with the given [payload] to the given [webhookUrl]. */
     private fun sendWebhookRequest(webhookUrl: String, payload: String) {
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(webhookUrl))
-            .header("Content-Type", "application/json")
-            .POST(HttpRequest.BodyPublishers.ofString(payload))
-            .build()
-        val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-        if (response.statusCode() / 100 != 2) {
-            throw IOException("Discord webhook failed: ${response.statusCode()}: ${response.body()}.")
+        val response = DreamHttpClient.execute(
+            webhookUrl,
+            DreamHttpClient.RequestOptions(
+                method = "POST",
+                body = payload.toByteArray(StandardCharsets.UTF_8),
+                contentType = "application/json",
+                connectTimeoutMs = 10_000,
+                readTimeoutMs = 10_000,
+            ),
+        )
+        if (response.code / 100 != 2) {
+            throw IOException("Discord webhook failed: ${response.code}: ${response.bodyString()}.")
         }
     }
 }

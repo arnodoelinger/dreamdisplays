@@ -3,12 +3,11 @@ package com.dreamdisplays.media.source.ytdlp
 import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.media.runtime.OsInfo
 import com.dreamdisplays.media.runtime.Processes
+import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URI
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -281,16 +280,15 @@ object YtDlpBinary {
         val url = DOWNLOAD_BASE + asset
         logger.debug("Downloading $asset from $url...")
 
-        val conn = URI.create(url).toURL().openConnection() as HttpURLConnection
-        conn.instanceFollowRedirects = true
-        conn.connectTimeout = 15_000
-        conn.readTimeout = 120_000
-        conn.setRequestProperty("User-Agent", "DreamDisplays-yt-dlp-bootstrap")
-        try {
-            conn.inputStream.use { Files.copy(it, tmp, StandardCopyOption.REPLACE_EXISTING) }
-        } finally {
-            conn.disconnect()
-        }
+        DreamHttpClient.downloadToFile(
+            url,
+            tmp,
+            DreamHttpClient.RequestOptions(
+                headers = DreamHttpClient.headersOf("User-Agent" to "DreamDisplays-yt-dlp-bootstrap"),
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 120_000,
+            ),
+        )
 
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
 

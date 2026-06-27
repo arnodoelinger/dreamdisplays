@@ -2,7 +2,6 @@ package com.dreamdisplays.core.runtime
 
 import com.dreamdisplays.api.runtime.ServiceKey
 import com.dreamdisplays.api.runtime.ServiceRegistry
-import com.dreamdisplays.api.runtime.serviceKey
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -16,7 +15,6 @@ class DefaultServiceRegistry : ServiceRegistry {
             "Service instance for $key must implement ${key.type.name}."
         }
         instances[key] = instance
-        instances[serviceKey(key.type)] = instance
     }
 
     override fun <T : Any> getOrNull(key: ServiceKey<T>): T? =

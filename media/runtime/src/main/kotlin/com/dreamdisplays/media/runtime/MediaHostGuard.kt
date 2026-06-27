@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.runtime
 
+import com.dreamdisplays.util.net.DreamHttpClient
 import org.slf4j.LoggerFactory
 import java.io.IOException
-import java.net.HttpURLConnection
 import java.net.InetAddress
 import java.net.URI
 
@@ -85,23 +85,18 @@ object MediaHostGuard {
      * rejects the probe degrades to "trust the URL as-is" rather than blocking playback).
      */
     private fun peekRedirectLocation(url: String): String? {
-        val conn = try {
-            URI(url.trim()).toURL().openConnection() as? HttpURLConnection
-        } catch (_: Exception) {
-            null
-        } ?: return null
         return try {
-            conn.instanceFollowRedirects = false
-            conn.requestMethod = "GET"
-            conn.setRequestProperty("Range", "bytes=0-0")
-            conn.connectTimeout = 5_000
-            conn.readTimeout = 5_000
-            if (conn.responseCode in 300..399) conn.getHeaderField("Location") else null
+            DreamHttpClient.peekRedirectLocation(
+                url.trim(),
+                DreamHttpClient.RequestOptions(
+                    headers = DreamHttpClient.headersOf("Range" to "bytes=0-0"),
+                    connectTimeoutMs = 5_000,
+                    readTimeoutMs = 5_000,
+                ),
+            )
         } catch (e: Exception) {
             logger.debug("Redirect probe failed for ${url.take(120)}: ${e.message}.")
             null
-        } finally {
-            conn.disconnect()
         }
     }
 

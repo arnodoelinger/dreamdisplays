@@ -121,6 +121,8 @@ dependencies {
     shadow(libs.tomlj)
     shadow(libs.semver4j)
     shadow(libs.caffeine)
+    shadow(libs.okhttp)
+    shadow(libs.okio)
     shadow(libs.sqliteJdbc)
     shadow(libs.exposedCore)
     shadow(libs.exposedJdbc)
@@ -195,6 +197,10 @@ tasks.shadowJar {
         include(dependency("org.antlr:antlr4-runtime"))
         include(dependency("org.semver4j:semver4j"))
         include(dependency("com.github.ben-manes.caffeine:caffeine"))
+        include(dependency("com.squareup.okhttp3:okhttp"))
+        include(dependency("com.squareup.okhttp3:okhttp-jvm"))
+        include(dependency("com.squareup.okio:okio"))
+        include(dependency("com.squareup.okio:okio-jvm"))
         include(dependency("org.jetbrains.exposed:exposed-core"))
         include(dependency("org.jetbrains.exposed:exposed-jdbc"))
         include(dependency("org.jetbrains.exposed:exposed-migration-core"))
@@ -222,6 +228,8 @@ tasks.shadowJar {
         "org.antlr",
         "org.semver4j",
         "com.github.benmanes.caffeine",
+        "okhttp3",
+        "okio",
         "org.jetbrains.exposed",
         "com.zaxxer.hikari",
         "org.schabi.newpipe",

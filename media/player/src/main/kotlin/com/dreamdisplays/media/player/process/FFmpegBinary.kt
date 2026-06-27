@@ -3,12 +3,11 @@ package com.dreamdisplays.media.player.process
 import com.dreamdisplays.media.runtime.OsInfo
 import com.dreamdisplays.media.runtime.Processes
 import com.dreamdisplays.media.player.util.daemon
+import com.dreamdisplays.util.net.DreamHttpClient
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory
 import java.io.*
-import java.net.HttpURLConnection
-import java.net.URI
 import java.util.concurrent.TimeUnit
 import java.util.zip.ZipInputStream
 
@@ -97,35 +96,15 @@ object FFmpegBinary {
     /** Downloads [url] to [dest], following up to 10 HTTP redirects manually (GitHub releases use multiple hops). */
     @Throws(IOException::class)
     private fun downloadWithRedirects(url: String, dest: File) {
-        var currentUrl = url
-        for (hops in 0 until 10) {
-            val conn = URI.create(currentUrl).toURL().openConnection() as HttpURLConnection
-            conn.instanceFollowRedirects = false
-            conn.setRequestProperty("User-Agent", "DreamDisplays-ffmpeg-bootstrap")
-            conn.connectTimeout = 15_000
-            conn.readTimeout = 300_000
-            val status = conn.responseCode
-            if (status in 300..399) {
-                val loc = conn.getHeaderField("Location")
-                conn.disconnect()
-                if (loc == null) throw IOException("Redirect without Location at $currentUrl.")
-                currentUrl = loc
-                continue
-            }
-            if (status != 200) {
-                conn.disconnect()
-                throw IOException("HTTP $status for $currentUrl.")
-            }
-            try {
-                conn.inputStream.use { input ->
-                    BufferedOutputStream(FileOutputStream(dest)).use { out -> input.transferTo(out) }
-                }
-            } finally {
-                conn.disconnect()
-            }
-            return
-        }
-        throw IOException("Too many redirects: $url.")
+        DreamHttpClient.downloadToFile(
+            url,
+            dest.toPath(),
+            DreamHttpClient.RequestOptions(
+                headers = DreamHttpClient.headersOf("User-Agent" to "DreamDisplays-ffmpeg-bootstrap"),
+                connectTimeoutMs = 15_000,
+                readTimeoutMs = 300_000,
+            ),
+        )
     }
 
     /** Extracts the first ZIP entry whose name ends with [suffix] from [archive] to [dest]. */

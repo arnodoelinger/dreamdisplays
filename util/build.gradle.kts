@@ -10,7 +10,7 @@ dependencies {
     api(project(":core"))
     api(libs.caffeine)
     api(libs.kotlinxCoroutinesCore)
-    // gson, slf4j and semver4j are provided at runtime by the platform; compile-only here.
+    implementation(libs.okhttp)
     compileOnly(libs.gson)
     compileOnly(libs.slf4jApi)
     compileOnly(libs.semver4j)

@@ -5,6 +5,7 @@ import com.dreamdisplays.api.media.source.MediaResolver
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
 import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.util.net.DreamHttpClient
 import kotlin.time.Duration.Companion.nanoseconds
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
@@ -18,11 +19,9 @@ import org.schabi.newpipe.extractor.stream.StreamExtractor
 import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.extractor.stream.VideoStream
 import org.slf4j.LoggerFactory
-import java.net.HttpURLConnection
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.zip.GZIPInputStream
 
 /**
  * In-process YouTube stream resolver backed by NewPipeExtractor. This is the fast path used before
@@ -305,41 +304,30 @@ object NewPipeResolver : MediaResolver {
     private class CacheEntry(val value: Resolved?, val expiresAtNanos: Long)
 
     /**
-     * Minimal [Downloader] implementation over [HttpURLConnection], honoring the configured proxy
-     * (same handling as [YouTubeInnerTube]) and transparently decompressing gzip responses.
+     * Minimal [Downloader] implementation over the shared facade, honoring the configured proxy
+     * (same handling as [YouTubeInnerTube]).
      */
     private object YtHttpDownloader : Downloader() {
         override fun execute(request: Request): Response {
-            val conn = openConnection(request.url())
-            conn.requestMethod = request.httpMethod()
-            conn.connectTimeout = 10_000
-            conn.readTimeout = 15_000
-            conn.instanceFollowRedirects = true
-            for ((name, values) in request.headers()) {
-                for (value in values) conn.addRequestProperty(name, value)
-            }
             val data = request.dataToSend()
-            if (data != null) {
-                conn.doOutput = true
-                conn.outputStream.use { it.write(data) }
-            }
-            val code = conn.responseCode
-            val body = readBody(conn, code)
-            return Response(code, conn.responseMessage, conn.headerFields, body, conn.url.toString())
+            val response = DreamHttpClient.execute(
+                request.url(),
+                DreamHttpClient.RequestOptions(
+                    method = request.httpMethod(),
+                    headers = request.headers(),
+                    body = data,
+                    connectTimeoutMs = 10_000,
+                    readTimeoutMs = 15_000,
+                    proxyUrl = ResolverConfig.ytdlpProxy,
+                ),
+            )
+            return Response(
+                response.code,
+                response.message,
+                response.headers,
+                response.body.toString(StandardCharsets.UTF_8),
+                response.finalUrl,
+            )
         }
-
-        /** Reads the response (or error) body, decompressing it if the server sent gzip. */
-        private fun readBody(conn: HttpURLConnection, code: Int): String {
-            val raw = (if (code in 200..299) conn.inputStream else conn.errorStream) ?: return ""
-            val stream = if (conn.contentEncoding?.equals("gzip", ignoreCase = true) == true) {
-                GZIPInputStream(raw)
-            } else {
-                raw
-            }
-            return stream.use { String(it.readBytes(), StandardCharsets.UTF_8) }
-        }
-
-        /** Opens a connection for [urlStr], routing through the configured proxy if one is set. */
-        private fun openConnection(urlStr: String): HttpURLConnection = ProxyConnections.open(urlStr)
     }
 }

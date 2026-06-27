@@ -8,6 +8,7 @@ repositories {
 
 dependencies {
     api(project(":api"))
+    api(project(":util"))
     compileOnly(libs.slf4jApi)
     compileOnly(libs.kotlinStdlib)
     testImplementation(libs.kotlinStdlib)

@@ -1,12 +1,10 @@
 package com.dreamdisplays.util
 
+import com.dreamdisplays.util.net.DreamHttpClient
 import com.google.gson.JsonParser
 import kotlinx.coroutines.launch
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
-import java.net.HttpURLConnection
-import java.net.URI
-import java.nio.charset.StandardCharsets
 
 /** Checks mod updates against the latest stable GitHub release. **/
 object UpdateCheck {
@@ -49,19 +47,19 @@ object UpdateCheck {
 
     /** Check the latest release version against the current version. */
     private fun doCheck() {
-        var conn: HttpURLConnection? = null
         try {
-            conn = (URI.create(API).toURL().openConnection() as HttpURLConnection).apply {
-                connectTimeout = 5_000
-                readTimeout = 8_000
-                setRequestProperty(
-                    "User-Agent",
-                    "DreamDisplays/${GeneralUtil.getModVersion()} (+github.com/arsmotorin/dreamdisplays)"
-                )
-                setRequestProperty("Accept", "application/vnd.github+json")
-            }
-            if (conn.responseCode != 200) return
-            val body = conn.inputStream.use { it.readAllBytes().toString(StandardCharsets.UTF_8) }
+            val body = DreamHttpClient.readText(
+                API,
+                DreamHttpClient.RequestOptions(
+                    headers = DreamHttpClient.headersOf(
+                        "User-Agent" to
+                                "DreamDisplays/${GeneralUtil.getModVersion()} (+github.com/arsmotorin/dreamdisplays)",
+                        "Accept" to "application/vnd.github+json",
+                    ),
+                    connectTimeoutMs = 5_000,
+                    readTimeoutMs = 8_000,
+                ),
+            )
             val root = JsonParser.parseString(body)
             val rawTag: String = when {
                 root.isJsonObject -> {
@@ -79,8 +77,6 @@ object UpdateCheck {
             latestVersion = rawTag.trimStart('v', 'V')
         } catch (e: Exception) {
             logger.warn("Update check failed: ${e.message}")
-        } finally {
-            conn?.disconnect()
         }
     }
 
