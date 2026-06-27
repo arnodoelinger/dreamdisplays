@@ -1,8 +1,7 @@
-package com.dreamdisplays.core.display
+package com.dreamdisplays.api.display.service
 
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.*
-import com.dreamdisplays.core.display.service.impl.DefaultDisplaySystem
 import java.util.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
