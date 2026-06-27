@@ -222,7 +222,7 @@ internal class VideoFramePipe(
                         continue
                     }
 
-                    if (FramePacing.pace(videoPts, getAudioClock())) {
+                    if (FramePacing.pace(videoPts, getAudioClock)) {
                         if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
                         videoPts += frameNs
                         continue

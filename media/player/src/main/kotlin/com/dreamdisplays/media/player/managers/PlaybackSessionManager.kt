@@ -512,11 +512,12 @@ internal class PlaybackSessionManager(
      */
     fun suspend(): Boolean {
         if (!canPark() || parkFlag.get()) return false
+        parkFlag.set(true)
+        audio.pauseForPark()
+        active?.pipe?.trimForPark()
         val fp = audio.framePosition
         frozenPositionNanos = if (fp >= 0) clock.audioClockNanos(fp, AudioSink.SAMPLE_RATE) else clock.currentTime()
         parkStartNanos = System.nanoTime()
-        parkFlag.set(true)
-        active?.pipe?.trimForPark()
         logger.debug("$debugLabel [park] session parked warm at ${"%.1f".format(frozenPositionNanos / 1_000_000.0)}ms.")
         return true
     }
@@ -525,9 +526,10 @@ internal class PlaybackSessionManager(
      *  shifted past the dormant interval so the position continues instead of jumping ahead. */
     fun resume() {
         if (!parkFlag.get()) return
-        parkFlag.set(false)
-        frozenPositionNanos = -1L
         clock.addPausedDuration(System.nanoTime() - parkStartNanos)
+        frozenPositionNanos = -1L
+        parkFlag.set(false)
+        audio.resumeFromPark()
         logger.debug("$debugLabel [park] session un-parked; resuming from frozen position.")
     }
 

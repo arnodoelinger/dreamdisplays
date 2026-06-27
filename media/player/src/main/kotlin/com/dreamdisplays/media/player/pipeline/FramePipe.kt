@@ -53,13 +53,24 @@ internal object FramePacing {
     /** Drop a frame when it's more than 80 ms behind the audio clock. */
     private const val DROP_THRESHOLD_NS = 80_000_000L
 
+    /** Single-sample clock entry point. */
+    fun pace(videoPts: Long, audioClock: Long): Boolean = pace(videoPts) { audioClock }
+
     /**
-     * Paces the reader thread against the audio clock: sleeps (or spins, for sub-2 ms waits)
-     * until [videoPts] is due. Returns true when the frame is so far behind that it should be
-     * dropped instead of shown. [audioClock] may be -1 when no audio line is open yet.
+     * Paces the reader thread against the audio clock: parks/spins until [videoPts] is due, then
+     * re-samples the clock so an overslept frame is dropped instead of being presented late.
+     * [audioClock] may return -1 when no audio line is open yet.
      */
-    fun pace(videoPts: Long, audioClock: Long): Boolean {
-        val diff = videoPts - if (audioClock >= 0) audioClock else videoPts
+    fun pace(videoPts: Long, audioClock: () -> Long): Boolean {
+        val firstClock = audioClock()
+        val diff = videoPts - if (firstClock >= 0) firstClock else videoPts
+        waitUntilDue(diff)
+        val latestClock = audioClock()
+        val latestDiff = videoPts - if (latestClock >= 0) latestClock else videoPts
+        return latestDiff < -DROP_THRESHOLD_NS
+    }
+
+    private fun waitUntilDue(diff: Long) {
         if (diff > 0) {
             val target = System.nanoTime() + diff
             while (true) {
@@ -76,6 +87,5 @@ internal object FramePacing {
                 }
             }
         }
-        return diff < -DROP_THRESHOLD_NS
     }
 }

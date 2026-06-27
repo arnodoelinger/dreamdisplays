@@ -187,6 +187,16 @@ internal class AudioSink(private val debugLabel: String) {
         runCatching { ln.close() }
     }
 
+    /** Pauses playback for a warm park without closing or flushing the queued PCM. */
+    fun pauseForPark() {
+        line?.let { runCatching { it.stop() } }
+    }
+
+    /** Resumes a line paused by [pauseForPark]. */
+    fun resumeFromPark() {
+        line?.let { runCatching { it.start() } }
+    }
+
     /**
      * Runs the audio reading / writing loop until the process ends or [terminated] / [stopFlag] is set.
      */

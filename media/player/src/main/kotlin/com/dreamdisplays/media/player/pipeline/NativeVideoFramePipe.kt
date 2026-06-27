@@ -350,6 +350,11 @@ internal class NativeVideoFramePipe(
             val readElapsedNs = System.nanoTime() - readStartNs
             if (MediaPlayer.DEBUG) metrics.recordRead(readElapsedNs, rc)
             if (rc != NativeMedia.READ_OK) break
+            if (parked?.get() == true) {
+                lastFrameReceivedNanos.set(System.nanoTime())
+                spare.clear()
+                continue
+            }
             spare.limit(frameSize).position(0)
 
             lastFrameReceivedNanos.set(System.nanoTime())
@@ -408,7 +413,7 @@ internal class NativeVideoFramePipe(
 
             val audioClock = getAudioClock()
             val avDiffNs = if (audioClock >= 0) framePts - audioClock else 0L
-            if (FramePacing.pace(framePts, audioClock)) {
+            if (FramePacing.pace(framePts, getAudioClock)) {
                 if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
                 if (MediaPlayer.DEBUG) metrics.recordPacedDrop(avDiffNs)
                 videoPts = framePts + frameNs

@@ -113,7 +113,7 @@ internal class FramePrebuffer(
                     if (inputClosed) break // Tail drained
                     continue
                 }
-                if (FramePacing.pace(tf.pts, getAudioClock())) {
+                if (FramePacing.pace(tf.pts, getAudioClock)) {
                     surface.recycleFrameBuffer(tf.buf)
                     continue
                 }
