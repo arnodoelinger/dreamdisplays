@@ -2,6 +2,7 @@ import java.util.*
 
 plugins {
     id("dreamdisplays.kotlin-conventions")
+    id("dreamdisplays.serialization-conventions")
     id("dreamdisplays.shadow-conventions")
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
 }
@@ -58,6 +59,7 @@ dependencies {
     implementation(project(":util"))
     implementation(libs.gson)
     implementation(libs.kotlinxSerializationProtobuf)
+    implementation(libs.kotlinxSerializationJson)
     implementation(libs.kotlinxCoroutinesCore)
     implementation(libs.semver4j)
     implementation(libs.tomlj)

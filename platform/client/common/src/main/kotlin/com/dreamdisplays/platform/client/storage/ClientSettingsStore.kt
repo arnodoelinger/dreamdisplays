@@ -3,7 +3,9 @@ package com.dreamdisplays.platform.client.storage
 import com.dreamdisplays.api.storage.ClientDisplaySettings
 import com.dreamdisplays.api.storage.ClientSettingsStorage
 import com.dreamdisplays.api.media.VideoQuality
-import com.google.gson.reflect.TypeToken
+import com.dreamdisplays.util.json.JsonFileStore
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
@@ -20,15 +22,16 @@ object ClientSettingsStore : ClientSettingsStorage {
     /** File name for the JSON settings file. */
     private const val FILE_NAME = "client-display-settings.json"
 
+    private val jsonFiles = JsonFileStore()
+    private val settingsSerializer = MapSerializer(String.serializer(), ClientDisplaySettings.serializer())
+
     /** In-memory cache of settings, keyed by display UUID. */
     private val settings = HashMap<UUID, ClientDisplaySettings>()
 
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */
     override fun load() {
-        if (!JsonFileStore.ensureDir(logger)) return
-        val type = object : TypeToken<Map<String, ClientDisplaySettings>>() {}.type
         val loaded: Map<String, ClientDisplaySettings> =
-            JsonFileStore.read(JsonFileStore.file(FILE_NAME), type, logger) ?: return
+            jsonFiles.read(jsonFiles.file(FILE_NAME), settingsSerializer, logger) ?: return
         settings.clear()
         loaded.forEach { (key, value) ->
             runCatching { settings[UUID.fromString(key)] = value }
@@ -38,9 +41,9 @@ object ClientSettingsStore : ClientSettingsStorage {
 
     /** Persists the in-memory settings map to disk. */
     override fun save() {
-        if (!JsonFileStore.ensureDir(logger)) return
+        if (!jsonFiles.ensureDir(logger)) return
         val toSave = settings.entries.associate { (k, v) -> k.toString() to v }
-        JsonFileStore.write(JsonFileStore.file(FILE_NAME), toSave, logger)
+        jsonFiles.write(jsonFiles.file(FILE_NAME), settingsSerializer, toSave, logger)
     }
 
     /** Returns the settings for [displayUuid], creating a default entry if absent. */

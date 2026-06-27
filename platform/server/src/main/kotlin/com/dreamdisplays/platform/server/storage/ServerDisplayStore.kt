@@ -2,7 +2,9 @@ package com.dreamdisplays.platform.server.storage
 
 import com.dreamdisplays.api.storage.FullDisplayData
 import com.dreamdisplays.core.storage.DisplayStorage
-import com.google.gson.reflect.TypeToken
+import com.dreamdisplays.util.json.JsonFileStore
+import kotlinx.serialization.builtins.MapSerializer
+import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
@@ -18,11 +20,13 @@ import java.util.UUID
 object ServerDisplayStore {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ServerDisplayStore")
+    private val jsonFiles = JsonFileStore()
+    private val displayMapSerializer = MapSerializer(String.serializer(), FullDisplayData.serializer())
 
     /** Loads the display registry for [serverId] from disk and marks it as the current server. */
     fun load(serverId: String) {
-        val type = object : TypeToken<Map<String, FullDisplayData>>() {}.type
-        val loaded: Map<String, FullDisplayData>? = JsonFileStore.read(readableServerFile(serverId), type, logger)
+        val loaded: Map<String, FullDisplayData>? =
+            jsonFiles.read(readableServerFile(serverId), displayMapSerializer, logger)
         val displays = HashMap<UUID, FullDisplayData>()
         loaded?.forEach { (key, value) ->
             runCatching { displays[UUID.fromString(key)] = value }
@@ -34,10 +38,10 @@ object ServerDisplayStore {
 
     /** Persists the display registry for [serverId] to disk. */
     fun save(serverId: String) {
-        if (!JsonFileStore.ensureDir(logger)) return
+        if (!jsonFiles.ensureDir(logger)) return
         val displays = DisplayStorage.snapshot(serverId)
         val toSave = displays.entries.associate { (k, v) -> k.toString() to v }
-        JsonFileStore.write(safeServerFile(serverId), toSave, logger)
+        jsonFiles.write(safeServerFile(serverId), displayMapSerializer, toSave, logger)
     }
 
     /** Returns the cached [FullDisplayData] for [displayUuid] on the current server, or null if absent. */
@@ -62,13 +66,13 @@ object ServerDisplayStore {
      */
     private fun readableServerFile(serverId: String): File {
         val safe = safeServerFile(serverId)
-        val legacy = JsonFileStore.file("server-$serverId-displays.json")
+        val legacy = jsonFiles.file("server-$serverId-displays.json")
         return if (safe.exists() || !legacy.exists()) safe else legacy
     }
 
     /** Returns the file to write the display registry for [serverId], using a safe hashed filename. */
     private fun safeServerFile(serverId: String): File =
-        JsonFileStore.file("server-${safeServerFileId(serverId)}-displays.json")
+        jsonFiles.file("server-${safeServerFileId(serverId)}-displays.json")
 
     /** Returns a safe filename component for [serverId] based on its lowercased slug and SHA-256 hash. */
     private fun safeServerFileId(serverId: String): String {

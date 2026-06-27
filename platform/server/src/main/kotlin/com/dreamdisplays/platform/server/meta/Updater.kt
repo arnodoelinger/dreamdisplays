@@ -8,10 +8,11 @@ import com.dreamdisplays.platform.server.Main.Companion.pluginLatestVersion
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.utils.GitHubFetcherUtil
 import com.dreamdisplays.util.net.DreamHttpClient
+import com.dreamdisplays.util.json.DreamJson
 import org.semver4j.Semver
-import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
-import com.google.gson.reflect.TypeToken
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import org.slf4j.LoggerFactory
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -72,7 +73,6 @@ object Updater {
 @FabricOnly
 object FabricUpdater {
     private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
-    private val gson = Gson()
 
     /**
      * Fetches GitHub releases and stores the latest mod and plugin versions in `Main`.
@@ -126,18 +126,17 @@ object FabricUpdater {
         )
         if (response.code != 200) return emptyList()
 
-        return gson.fromJson(
-            response.bodyString(),
-            object : TypeToken<List<Release>>() {}.type
-        ) ?: emptyList()
+        return DreamJson.compact.decodeFromString<List<Release>>(response.bodyString())
+            .filter { it.tagName.isNotBlank() }
     }
 
     /** Extracts a stable semver from a GitHub release tag; returns null for snapshots and unparseable tags. */
     private fun parseVersion(tag: String): Semver? =
         Semver.coerce(tag)?.takeIf { it.isStable() }
 
+    @Serializable
     data class Release(
-        @field:SerializedName("tag_name") val tagName: String,
-        @field:SerializedName("name") val name: String,
+        @SerialName("tag_name") val tagName: String = "",
+        val name: String = "",
     )
 }

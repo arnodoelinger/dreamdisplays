@@ -1,10 +1,11 @@
 package com.dreamdisplays.platform.server.utils
 
 import com.dreamdisplays.util.net.DreamHttpClient
-import com.google.gson.JsonArray
-import com.google.gson.JsonObject
+import com.dreamdisplays.util.json.DreamJson
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
@@ -67,30 +68,24 @@ object ReporterUtil {
         reporterName: String,
         ownerName: String?,
     ): String {
-        val embed = JsonObject().apply {
-            addProperty("description", EMBED_TITLE)
-            addProperty("color", EMBED_COLOR)
-            addProperty("timestamp", OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME))
-            add("fields", JsonArray().apply {
-                add(createField("Location", locationStr))
-                add(createField("Video", videoLink))
-                add(createField("UUID", displayId.toString()))
-                add(createField("Reporter", reporterName))
-                add(createField("Owner", ownerName))
-            })
-        }
-        return JsonObject().apply {
-            add("embeds", JsonArray().apply { add(embed) })
-        }.toString()
+        val embed = WebhookEmbed(
+            description = EMBED_TITLE,
+            color = EMBED_COLOR,
+            timestamp = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+            fields = listOf(
+                createField("Location", locationStr),
+                createField("Video", videoLink),
+                createField("UUID", displayId.toString()),
+                createField("Reporter", reporterName),
+                createField("Owner", ownerName),
+            ),
+        )
+        return DreamJson.compact.encodeToString(WebhookPayload(listOf(embed)))
     }
 
     /** Creates a Discord embed field with the given [name], [value], and [inline] status. */
     private fun createField(name: String, value: String?, inline: Boolean = false) =
-        JsonObject().apply {
-            addProperty("name", name)
-            addProperty("value", value ?: "N/A")
-            addProperty("inline", inline)
-        }
+        WebhookField(name, value ?: "N/A", inline)
 
     /** Sends a webhook request with the given [payload] to the given [webhookUrl]. */
     private fun sendWebhookRequest(webhookUrl: String, payload: String) {
@@ -108,4 +103,25 @@ object ReporterUtil {
             throw IOException("Discord webhook failed: ${response.code}: ${response.bodyString()}.")
         }
     }
+
+    /** Webhook payload and embed data classes for serialization. */
+    @Serializable
+    private data class WebhookPayload(val embeds: List<WebhookEmbed>)
+
+    /** Webhook embed data class for serialization. */
+    @Serializable
+    private data class WebhookEmbed(
+        val description: String,
+        val color: Int,
+        val timestamp: String,
+        val fields: List<WebhookField>,
+    )
+
+    /** Webhook field data class for serialization. */
+    @Serializable
+    private data class WebhookField(
+        val name: String,
+        val value: String,
+        val inline: Boolean,
+    )
 }

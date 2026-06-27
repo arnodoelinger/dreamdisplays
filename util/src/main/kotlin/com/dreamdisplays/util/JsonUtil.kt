@@ -1,35 +1,55 @@
 package com.dreamdisplays.util
 
-import com.google.gson.JsonObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Lenient field accessors for Gson [JsonObject]s, shared by every JSON consumer in the mod
- * (`yt-dlp` output, InnerTube responses, Modrinth update metadata). Each returns null instead of
- * throwing when the field is absent, JSON-null, or of the wrong type.
- *
- * Replaces three private near-identical copies that lived in YtDlp, YouTubeInnerTube, and UpdateCheck.
+ * Lenient field accessors for `kotlinx.serialization` [JsonObject]s. Each helper returns null instead
+ * of throwing when the field is absent, JSON-null, or of the wrong type.
  */
 
-/** Returns the string value of [key], or null if absent, JSON-null, or not a string. */
+/** Returns [this] as a JSON object, or null when it has another shape. */
+fun JsonElement?.asJsonObjectOrNull(): JsonObject? = this as? JsonObject
+
+/** Returns [this] as a JSON array, or null when it has another shape. */
+fun JsonElement?.asJsonArrayOrNull(): JsonArray? = this as? JsonArray
+
+/** Returns the object value of [key], or null when missing / wrong-shaped. */
+fun JsonObject.obj(key: String): JsonObject? = this[key].asJsonObjectOrNull()
+
+/** Returns the array value of [key], or null when missing / wrong-shaped. */
+fun JsonObject.array(key: String): JsonArray? = this[key].asJsonArrayOrNull()
+
+/** Returns the string value of [key], or null if absent, JSON-null, or not a primitive. */
 fun JsonObject.optString(key: String): String? {
-    if (!has(key) || get(key).isJsonNull) return null
-    return runCatching { get(key).asString }.getOrNull()
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    return runCatching { value.jsonPrimitive.content }.getOrNull()
 }
 
 /** Returns the int value of [key], or null if absent, JSON-null, or not numeric. */
 fun JsonObject.optInt(key: String): Int? {
-    if (!has(key) || get(key).isJsonNull) return null
-    return runCatching { get(key).asInt }.getOrNull()
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    return runCatching { value.jsonPrimitive.intOrNull }.getOrNull()
 }
 
 /** Returns the double value of [key], or null if absent, JSON-null, or not numeric. */
 fun JsonObject.optDouble(key: String): Double? {
-    if (!has(key) || get(key).isJsonNull) return null
-    return runCatching { get(key).asDouble }.getOrNull()
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    return runCatching { value.jsonPrimitive.doubleOrNull }.getOrNull()
 }
 
 /** Returns the boolean value of [key], or [default] if absent, JSON-null, or not a boolean. */
 fun JsonObject.optBoolean(key: String, default: Boolean = false): Boolean {
-    if (!has(key) || get(key).isJsonNull) return default
-    return runCatching { get(key).asBoolean }.getOrDefault(default)
+    val value = this[key] ?: return default
+    if (value is JsonNull) return default
+    return runCatching { value.jsonPrimitive.booleanOrNull }.getOrNull() ?: default
 }

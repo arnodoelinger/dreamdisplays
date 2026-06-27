@@ -24,7 +24,6 @@ dependencies {
     api(libs.semver4j)
     api(libs.newpipeExtractor)
     api(libs.kotlinxCoroutinesCore)
-    compileOnly(libs.gson)
     compileOnly(libs.kotlinStdlib)
 }
 

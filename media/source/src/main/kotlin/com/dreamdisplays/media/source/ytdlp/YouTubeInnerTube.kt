@@ -1,50 +1,80 @@
 package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.search.MediaSearchResult
+import com.dreamdisplays.util.array
+import com.dreamdisplays.util.asJsonArrayOrNull
+import com.dreamdisplays.util.asJsonObjectOrNull
+import com.dreamdisplays.util.obj
 import com.dreamdisplays.util.optString
+import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
-import com.google.gson.JsonElement
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.regex.Pattern
 
 /**
- * Direct client for YouTube's InnerTube API.
+ * Direct client for YouTube's `InnerTube` API.
  */
 object YouTubeInnerTube {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/InnerTube")
 
+    /** Base URL for the `InnerTube` API. */
     private const val BASE_URL = "https://www.youtube.com/youtubei/v1"
-    private const val CLIENT_NAME = "WEB"
-    private const val CLIENT_VERSION = "2.20250501.00.00"
-    private const val UA =
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
+    /** Client metadata. */
+    private const val CLIENT_NAME = "WEB"
+
+    /** Client version. */
+    private const val CLIENT_VERSION = "2.20250501.00.00"
+
+    /** User-Agent header. */
+    private const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+
+    /** Pattern for parsing YouTube-style "age" strings (e.g. "2 years ago"). */
     private val AGE_PATTERN: Pattern = Pattern.compile(
         "(\\d+)\\s+(second|minute|hour|day|week|month|year)s?\\s+ago",
         Pattern.CASE_INSENSITIVE
     )
 
+    /** `InnerTube` API request structure. */
+    @Serializable
+    private data class InnerTubeRequest(
+        val context: InnerTubeContext = InnerTubeContext(),
+        val query: String? = null,
+        val videoId: String? = null,
+    )
+
+    /** `InnerTube` API response structure. */
+    @Serializable
+    private data class InnerTubeContext(
+        val client: InnerTubeClient = InnerTubeClient(),
+    )
+
+    /** `InnerTube` API client structure. */
+    @Serializable
+    private data class InnerTubeClient(
+        val clientName: String = CLIENT_NAME,
+        val clientVersion: String = CLIENT_VERSION,
+        val hl: String = "en",
+    )
+
     /** Searches YouTube for [query] and returns up to [limit] video results via the InnerTube search endpoint. */
     @Throws(IOException::class)
     fun search(query: String, limit: Int): List<MediaSearchResult> {
-        val body = baseContext().apply {
-            addProperty("query", query)
-        }
-        val root = post("search", body)
+        val root = post("search", InnerTubeRequest(query = query))
         return extractSearchVideos(root, limit)
     }
 
-    /** Fetches watch-next metadata and related videos for [videoId] via the InnerTube `next` endpoint. */
+    /** Fetches watch-next metadata and related videos for [videoId] via the `InnerTube` `next` endpoint. */
     @Throws(IOException::class)
     fun next(videoId: String): NextResult {
-        val body = baseContext().apply {
-            addProperty("videoId", videoId)
-        }
-        val root = post("next", body)
+        val root = post("next", InnerTubeRequest(videoId = videoId))
         val meta = extractWatchMetadata(root)
         val related = extractRelatedVideos(root, videoId, 25)
         return NextResult(meta?.title, meta?.uploader, meta?.viewCountRaw, meta?.likeCountRaw, related)
@@ -62,10 +92,7 @@ object YouTubeInnerTube {
     /** Fetches title, uploader, and view / like counts for a single [videoId]; returns null if the video is unavailable. */
     @Throws(IOException::class)
     fun metadata(videoId: String): MediaSearchResult? {
-        val body = baseContext().apply {
-            addProperty("videoId", videoId)
-        }
-        val root = post("next", body)
+        val root = post("next", InnerTubeRequest(videoId = videoId))
         val meta = extractWatchMetadata(root) ?: return null
         return MediaSearchResult(
             videoId, meta.title ?: return null, meta.uploader, null,
@@ -92,14 +119,14 @@ object YouTubeInnerTube {
 
     /** Sends a POST request to the InnerTube [endpoint] with [body] and returns the parsed JSON response. */
     @Throws(IOException::class)
-    private fun post(endpoint: String, body: JsonObject): JsonObject {
+    private fun post(endpoint: String, body: InnerTubeRequest): JsonObject {
         val url = "$BASE_URL/$endpoint?prettyPrint=false"
         val cookies = YtDlp.getPublicCookieHeader()
         val response = DreamHttpClient.execute(
             url,
             DreamHttpClient.RequestOptions(
                 method = "POST",
-                body = body.toString().toByteArray(StandardCharsets.UTF_8),
+                body = DreamJson.compact.encodeToString(body).toByteArray(StandardCharsets.UTF_8),
                 contentType = "application/json",
                 headers = DreamHttpClient.headersOf(
                     "User-Agent" to UA,
@@ -115,28 +142,14 @@ object YouTubeInnerTube {
             throw IOException("$endpoint returned HTTP ${response.code}: ${response.bodyString().take(500)}")
         }
         return try {
-            JsonParser.parseString(response.bodyString()).asJsonObject
+            DreamJson.compact.parseToJsonElement(response.bodyString()).asJsonObjectOrNull()
+                ?: throw IOException("InnerTube $endpoint returned unexpected JSON shape")
         } catch (e: Exception) {
             throw IOException("Failed to parse InnerTube $endpoint response", e)
         }
     }
 
-    /** Builds the base InnerTube request body with client context (name, version, language). */
-    private fun baseContext(): JsonObject {
-        val client = JsonObject().apply {
-            addProperty("clientName", CLIENT_NAME)
-            addProperty("clientVersion", CLIENT_VERSION)
-            addProperty("hl", "en")
-        }
-        val context = JsonObject().apply {
-            add("client", client)
-        }
-        return JsonObject().apply {
-            add("context", context)
-        }
-    }
-
-    /** Walks the InnerTube search response JSON and collects up to [limit] parsed video entries. */
+    /** Walks the `InnerTube` search response JSON and collects up to [limit] parsed video entries. */
     private fun extractSearchVideos(root: JsonObject, limit: Int): List<MediaSearchResult> {
         val out = ArrayList<MediaSearchResult>()
         try {
@@ -144,17 +157,13 @@ object YouTubeInnerTube {
                 root, "contents", "twoColumnSearchResultsRenderer", "primaryContents",
                 "sectionListRenderer", "contents"
             )
-            if (!sections.isJsonArray) return out
-            for (sec in sections.asJsonArray) {
-                if (!sec.isJsonObject) continue
-                val isr = sec.asJsonObject.get("itemSectionRenderer")
-                if (isr == null || !isr.isJsonObject) continue
-                val contents = isr.asJsonObject.getAsJsonArray("contents") ?: continue
+            val sectionArray = sections.asJsonArrayOrNull() ?: return out
+            for (sec in sectionArray) {
+                val isr = sec.asJsonObjectOrNull()?.obj("itemSectionRenderer") ?: continue
+                val contents = isr.array("contents") ?: continue
                 for (el in contents) {
-                    if (!el.isJsonObject) continue
-                    val vr = el.asJsonObject.get("videoRenderer")
-                    if (vr == null || !vr.isJsonObject) continue
-                    parseVideoRenderer(vr.asJsonObject)?.let {
+                    val vr = el.asJsonObjectOrNull()?.obj("videoRenderer") ?: continue
+                    parseVideoRenderer(vr)?.let {
                         out.add(it)
                         if (out.size >= limit) return out
                     }
@@ -170,14 +179,14 @@ object YouTubeInnerTube {
     private fun parseVideoRenderer(vr: JsonObject): MediaSearchResult? {
         val id = vr.optString("videoId") ?: return null
         if (looksLikeShorts(vr)) return null
-        val title = runsText(vr.getAsJsonObject("title"))
-            ?: simpleText(vr.getAsJsonObject("title")) ?: id
-        val uploader = runsText(vr.getAsJsonObject("ownerText"))
-            ?: runsText(vr.getAsJsonObject("longBylineText"))
-        val duration = parseDuration(simpleText(vr.getAsJsonObject("lengthText")))
-        val views = parseViews(simpleText(vr.getAsJsonObject("viewCountText")))
-            ?: parseViews(simpleText(vr.getAsJsonObject("shortViewCountText")))
-        val publishedText = simpleText(vr.getAsJsonObject("publishedTimeText"))
+        val title = runsText(vr.obj("title"))
+            ?: simpleText(vr.obj("title")) ?: id
+        val uploader = runsText(vr.obj("ownerText"))
+            ?: runsText(vr.obj("longBylineText"))
+        val duration = parseDuration(simpleText(vr.obj("lengthText")))
+        val views = parseViews(simpleText(vr.obj("viewCountText")))
+            ?: parseViews(simpleText(vr.obj("shortViewCountText")))
+        val publishedText = simpleText(vr.obj("publishedTimeText"))
         val daysAgo = parseDaysAgo(publishedText)
         return MediaSearchResult(id, title, uploader, duration, views, null, publishedText, daysAgo)
     }
@@ -189,38 +198,30 @@ object YouTubeInnerTube {
                 root, "contents", "twoColumnWatchNextResults", "results",
                 "results", "contents"
             )
-            if (!contents.isJsonArray) return null
+            val contentArray = contents.asJsonArrayOrNull() ?: return null
             var title: String? = null
             var channel: String? = null
             var views: Long? = null
             var likes: Long? = null
             var publishedText: String? = null
             var daysAgo: Int? = null
-            for (el in contents.asJsonArray) {
-                if (!el.isJsonObject) continue
-                val obj = el.asJsonObject
-                if (obj.has("videoPrimaryInfoRenderer")) {
-                    val vp = obj.getAsJsonObject("videoPrimaryInfoRenderer")
-                    if (title == null) title = runsText(vp.getAsJsonObject("title"))
-                    val dateText = simpleText(vp.getAsJsonObject("dateText"))
+            for (el in contentArray) {
+                val obj = el.asJsonObjectOrNull() ?: continue
+                val vp = obj.obj("videoPrimaryInfoRenderer")
+                if (vp != null) {
+                    if (title == null) title = runsText(vp.obj("title"))
+                    val dateText = simpleText(vp.obj("dateText"))
                     if (publishedText == null) publishedText = dateText
                     if (daysAgo == null) daysAgo = parseDaysAgo(dateText)
-                    val vc = vp.getAsJsonObject("viewCount")
-                    val viewCountObj = vc?.getAsJsonObject("videoViewCountRenderer")?.getAsJsonObject("viewCount")
+                    val viewCountObj = vp.obj("viewCount")?.obj("videoViewCountRenderer")?.obj("viewCount")
                     var v = parseViews(runsText(viewCountObj))
                     if (v == null) v = parseViews(simpleText(maybeViewCountText(vp)))
                     if (v != null) views = v
                     likes = extractLikeCount(vp)
                 }
-                if (obj.has("videoSecondaryInfoRenderer")) {
-                    val vs = obj.getAsJsonObject("videoSecondaryInfoRenderer")
-                    if (channel == null) {
-                        val owner = vs.getAsJsonObject("owner")
-                        if (owner != null) {
-                            val vor = owner.getAsJsonObject("videoOwnerRenderer")
-                            if (vor != null) channel = runsText(vor.getAsJsonObject("title"))
-                        }
-                    }
+                val vs = obj.obj("videoSecondaryInfoRenderer")
+                if (vs != null && channel == null) {
+                    channel = runsText(vs.obj("owner")?.obj("videoOwnerRenderer")?.obj("title"))
                 }
             }
             if (title == null) return null
@@ -239,12 +240,10 @@ object YouTubeInnerTube {
                 root, "contents", "twoColumnWatchNextResults", "secondaryResults",
                 "secondaryResults", "results"
             )
-            if (!results.isJsonArray) return out
-            for (el in results.asJsonArray) {
-                if (!el.isJsonObject) continue
-                val cvr = el.asJsonObject.get("compactVideoRenderer")
-                if (cvr == null || !cvr.isJsonObject) continue
-                val info = parseCompactVideoRenderer(cvr.asJsonObject)
+            val resultArray = results.asJsonArrayOrNull() ?: return out
+            for (el in resultArray) {
+                val cvr = el.asJsonObjectOrNull()?.obj("compactVideoRenderer") ?: continue
+                val info = parseCompactVideoRenderer(cvr)
                 if (info != null && info.id != selfId) {
                     out.add(info)
                     if (out.size >= limit) return out
@@ -260,44 +259,36 @@ object YouTubeInnerTube {
     private fun parseCompactVideoRenderer(cvr: JsonObject): MediaSearchResult? {
         val id = cvr.optString("videoId") ?: return null
         if (looksLikeShorts(cvr)) return null
-        val title = simpleText(cvr.getAsJsonObject("title")) ?: id
-        val uploader = simpleText(cvr.getAsJsonObject("longBylineText"))
-            ?: simpleText(cvr.getAsJsonObject("shortBylineText"))
-        val duration = parseDuration(simpleText(cvr.getAsJsonObject("lengthText")))
-        val views = parseViews(simpleText(cvr.getAsJsonObject("viewCountText")))
-            ?: parseViews(simpleText(cvr.getAsJsonObject("shortViewCountText")))
-        val publishedText = simpleText(cvr.getAsJsonObject("publishedTimeText"))
+        val title = simpleText(cvr.obj("title")) ?: id
+        val uploader = simpleText(cvr.obj("longBylineText"))
+            ?: simpleText(cvr.obj("shortBylineText"))
+        val duration = parseDuration(simpleText(cvr.obj("lengthText")))
+        val views = parseViews(simpleText(cvr.obj("viewCountText")))
+            ?: parseViews(simpleText(cvr.obj("shortViewCountText")))
+        val publishedText = simpleText(cvr.obj("publishedTimeText"))
         val daysAgo = parseDaysAgo(publishedText)
         return MediaSearchResult(id, title, uploader, duration, views, null, publishedText, daysAgo)
     }
 
     /** Navigates the nested `viewCount.videoViewCountRenderer.viewCount` path in [vp]; returns null if absent. */
     private fun maybeViewCountText(vp: JsonObject): JsonObject? {
-        if (!vp.has("viewCount")) return null
-        val vc = vp.getAsJsonObject("viewCount") ?: return null
-        if (vc.has("videoViewCountRenderer")) {
-            val vvcr = vc.getAsJsonObject("videoViewCountRenderer")
-            if (vvcr != null && vvcr.has("viewCount")) return vvcr.getAsJsonObject("viewCount")
-        }
-        return null
+        return vp.obj("viewCount")?.obj("videoViewCountRenderer")?.obj("viewCount")
     }
 
     /** Drills through the deeply nested like-button view model in [vp] to extract a numeric like count. */
     private fun extractLikeCount(vp: JsonObject): Long? {
-        val menu = vp.getAsJsonObject("videoActions") ?: return null
-        val mr = menu.getAsJsonObject("menuRenderer") ?: return null
-        val topLevel = mr.get("topLevelButtons")
-        if (topLevel == null || !topLevel.isJsonArray) return null
-        for (btn in topLevel.asJsonArray) {
-            if (!btn.isJsonObject) continue
-            val bo = btn.asJsonObject
-            val sbvr = bo.getAsJsonObject("segmentedLikeDislikeButtonViewModel") ?: continue
-            val lb = sbvr.getAsJsonObject("likeButtonViewModel") ?: continue
-            val inner = lb.getAsJsonObject("likeButtonViewModel") ?: continue
-            val toggleButton = inner.getAsJsonObject("toggleButtonViewModel") ?: continue
-            val tbvm = toggleButton.getAsJsonObject("toggleButtonViewModel") ?: continue
-            val defaultButton = tbvm.getAsJsonObject("defaultButtonViewModel") ?: continue
-            val buttonViewModel = defaultButton.getAsJsonObject("buttonViewModel") ?: continue
+        val topLevel = vp.obj("videoActions")?.obj("menuRenderer")?.array("topLevelButtons") ?: return null
+        for (btn in topLevel) {
+            val bo = btn.asJsonObjectOrNull() ?: continue
+            val buttonViewModel = bo
+                .obj("segmentedLikeDislikeButtonViewModel")
+                ?.obj("likeButtonViewModel")
+                ?.obj("likeButtonViewModel")
+                ?.obj("toggleButtonViewModel")
+                ?.obj("toggleButtonViewModel")
+                ?.obj("defaultButtonViewModel")
+                ?.obj("buttonViewModel")
+                ?: continue
             val parsed = parseViews(buttonViewModel.optString("title"))
             if (parsed != null) return parsed
         }
@@ -307,17 +298,11 @@ object YouTubeInnerTube {
     /** Returns true if [vr] appears to be a YouTube Shorts entry based on its navigation URL or JSON markers. */
     private fun looksLikeShorts(vr: JsonObject): Boolean {
         try {
-            val nav = vr.getAsJsonObject("navigationEndpoint")
-            if (nav != null) {
-                val cmd = nav.getAsJsonObject("commandMetadata")
-                if (cmd != null) {
-                    val web = cmd.getAsJsonObject("webCommandMetadata")
-                    if (web != null) {
-                        val webUrl = web.optString("url")
-                        if (webUrl != null && webUrl.startsWith("/shorts/")) return true
-                    }
-                }
-            }
+            val webUrl = vr.obj("navigationEndpoint")
+                ?.obj("commandMetadata")
+                ?.obj("webCommandMetadata")
+                ?.optString("url")
+            if (webUrl != null && webUrl.startsWith("/shorts/")) return true
         } catch (_: Exception) {
         }
         val s = vr.toString()
@@ -325,22 +310,20 @@ object YouTubeInnerTube {
     }
 
     /** Traverses [obj] along [keys] and returns the element at the end, or an empty object if any step is missing. */
-    private fun path(obj: JsonObject, vararg keys: String): JsonElement {
+    private fun path(obj: JsonObject, vararg keys: String): JsonElement? {
         var cur: JsonElement? = obj
         for (k in keys) {
-            if (cur == null || !cur.isJsonObject) return JsonObject()
-            cur = cur.asJsonObject.get(k)
+            cur = cur.asJsonObjectOrNull()?.get(k) ?: return null
         }
-        return cur ?: JsonObject()
+        return cur
     }
 
     /** Concatenates all `text` values from the `runs` array in [obj]; returns null if the array is absent or empty. */
     private fun runsText(obj: JsonObject?): String? {
-        if (obj == null || !obj.has("runs") || !obj.get("runs").isJsonArray) return null
+        val runs = obj?.array("runs") ?: return null
         val sb = StringBuilder()
-        for (el in obj.getAsJsonArray("runs")) {
-            if (!el.isJsonObject) continue
-            el.asJsonObject.optString("text")?.let { sb.append(it) }
+        for (el in runs) {
+            el.asJsonObjectOrNull()?.optString("text")?.let { sb.append(it) }
         }
         return if (sb.isEmpty()) null else sb.toString()
     }

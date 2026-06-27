@@ -4,9 +4,11 @@ import com.dreamdisplays.util.optBoolean
 import com.dreamdisplays.util.optDouble
 import com.dreamdisplays.util.optInt
 import com.dreamdisplays.util.optString
-import com.google.gson.JsonElement
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
+import com.dreamdisplays.util.asJsonArrayOrNull
+import com.dreamdisplays.util.asJsonObjectOrNull
+import com.dreamdisplays.util.json.DreamJson
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonElement
 import java.io.IOException
 import java.util.Locale
 import java.util.regex.Pattern
@@ -27,20 +29,18 @@ internal object YtDlpOutputParser {
     fun parseFormats(json: String): List<YtStream> {
         val result = ArrayList<YtStream>()
         val root: JsonElement = try {
-            JsonParser.parseString(json)
+            DreamJson.compact.parseToJsonElement(json)
         } catch (e: Exception) {
             throw IOException("Failed to parse yt-dlp JSON output", e)
         }
-        if (!root.isJsonObject) throw IOException("Returned unexpected JSON shape.")
-        val obj = root.asJsonObject
+        val obj = root.asJsonObjectOrNull() ?: throw IOException("Returned unexpected JSON shape.")
         val live = isLive(obj)
         val durationNanos = durationNanos(obj)
         val seekable = !live && durationNanos > 0L
-        if (!obj.has("formats") || !obj.get("formats").isJsonArray) return result
+        val formats = obj["formats"].asJsonArrayOrNull() ?: return result
 
-        for (el in obj.getAsJsonArray("formats")) {
-            if (!el.isJsonObject) continue
-            val f = el.asJsonObject
+        for (el in formats) {
+            val f = el.asJsonObjectOrNull() ?: continue
 
             val url = f.optString("url")
             if (url.isNullOrEmpty()) continue

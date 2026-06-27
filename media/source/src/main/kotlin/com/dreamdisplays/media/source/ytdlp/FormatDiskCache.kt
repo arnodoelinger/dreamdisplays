@@ -1,14 +1,13 @@
 package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.util.DreamCoroutines
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonObject
-import com.google.gson.JsonParser
-import com.google.gson.reflect.TypeToken
+import com.dreamdisplays.util.json.DreamJson
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
@@ -26,8 +25,6 @@ import java.util.*
 object FormatDiskCache {
     private val logger = LoggerFactory.getLogger("DreamDisplays/FormatDiskCache")
     private val CACHE_DIR: Path = Path.of("config", "dreamdisplays", "yt-cache")
-    private val GSON: Gson = GsonBuilder().create()
-    private val STREAM_LIST_TYPE = object : TypeToken<List<YtStream>>() {}.type
 
     /** Shared 5h format-cache TTL: the on-disk default and [YtDlp]'s in-memory format TTL. */
     const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
@@ -50,19 +47,16 @@ object FormatDiskCache {
             return null
         }
         return try {
-            val obj = JsonParser.parseString(json).asJsonObject
-            val version = if (obj.has("v")) obj.get("v").asInt else 0
-            if (version != SCHEMA_VERSION) {
+            val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
+            if (entry.v != SCHEMA_VERSION) {
                 f.delete()
                 return null
             }
-            val ts = if (obj.has("ts")) obj.get("ts").asLong else 0L
-            if (System.currentTimeMillis() - ts > maxAgeMs) {
+            if (System.currentTimeMillis() - entry.ts > maxAgeMs) {
                 f.delete()
                 return null
             }
-            val streams: List<YtStream>? = GSON.fromJson(obj.get("streams"), STREAM_LIST_TYPE)
-            if (streams.isNullOrEmpty()) null else streams
+            entry.streams.takeIf { it.isNotEmpty() }
         } catch (e: Exception) {
             logger.debug("Cache parse failed for {}, dropping entry: {}.", f.name, e.message)
             runCatching { f.delete() }
@@ -82,13 +76,8 @@ object FormatDiskCache {
             Files.createDirectories(CACHE_DIR)
             val target = fileFor(videoUrl)
             val tmp = File(target.parentFile, target.name + ".tmp")
-            val root = JsonObject().apply {
-                addProperty("v", SCHEMA_VERSION)
-                addProperty("ts", System.currentTimeMillis())
-                addProperty("url", videoUrl)
-                add("streams", GSON.toJsonTree(streams, STREAM_LIST_TYPE))
-            }
-            Files.writeString(tmp.toPath(), GSON.toJson(root), StandardCharsets.UTF_8)
+            val root = CacheEntry(SCHEMA_VERSION, System.currentTimeMillis(), videoUrl, streams)
+            Files.writeString(tmp.toPath(), DreamJson.compact.encodeToString(root), StandardCharsets.UTF_8)
             Files.move(
                 tmp.toPath(), target.toPath(),
                 StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE
@@ -114,9 +103,8 @@ object FormatDiskCache {
                 stream.filter { it.toString().endsWith(".json") }.forEach { p ->
                     try {
                         val json = Files.readString(p, StandardCharsets.UTF_8)
-                        val obj = JsonParser.parseString(json).asJsonObject
-                        val ts = if (obj.has("ts")) obj.get("ts").asLong else 0L
-                        if (now - ts > maxAgeMs) Files.deleteIfExists(p)
+                        val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
+                        if (entry.v != SCHEMA_VERSION || now - entry.ts > maxAgeMs) Files.deleteIfExists(p)
                     } catch (_: Exception) {
                         runCatching { Files.deleteIfExists(p) }
                     }
@@ -136,4 +124,12 @@ object FormatDiskCache {
     } catch (_: NoSuchAlgorithmException) {
         Integer.toHexString(s.hashCode())
     }
+
+    @Serializable
+    private data class CacheEntry(
+        val v: Int,
+        val ts: Long,
+        val url: String,
+        val streams: List<YtStream> = emptyList(),
+    )
 }

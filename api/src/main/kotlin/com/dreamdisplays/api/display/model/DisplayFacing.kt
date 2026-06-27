@@ -1,6 +1,7 @@
 package com.dreamdisplays.api.display.model
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import kotlinx.serialization.Serializable
 
 /**
  * The facing direction of a display. [byte] is the stable wire encoding (see [fromByte]); it is
@@ -11,6 +12,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * @since 1.0.0
  */
 @DreamDisplaysUnstableApi
+@Serializable
 enum class DisplayFacing(val byte: Byte) {
     /** Facing north (−Z). */
     NORTH(0),

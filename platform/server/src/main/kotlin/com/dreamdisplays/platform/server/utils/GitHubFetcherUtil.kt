@@ -3,9 +3,10 @@ package com.dreamdisplays.platform.server.utils
 import io.github.arsmotorin.ofrat.PaperOnly
 
 import com.dreamdisplays.util.net.DreamHttpClient
-import com.google.gson.Gson
-import com.google.gson.annotations.SerializedName
-import com.google.gson.reflect.TypeToken
+import com.dreamdisplays.util.json.DreamJson
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
 
@@ -16,7 +17,6 @@ import org.slf4j.LoggerFactory
 @NullMarked
 object GitHubFetcherUtil {
     private val logger = LoggerFactory.getLogger("DreamDisplays/GitHubFetcher")
-    private val gson = Gson()
 
     /**
      * Fetches the releases of `owner/repo` from GitHub. Returns an empty list on non-200
@@ -55,16 +55,15 @@ object GitHubFetcherUtil {
             return emptyList()
         }
 
-        return gson.fromJson(
-            response.bodyString(),
-            object : TypeToken<List<Release>>() {}.type
-        ) ?: emptyList()
+        return DreamJson.compact.decodeFromString<List<Release>>(response.bodyString())
+            .filter { it.tagName.isNotBlank() }
     }
 
+    @Serializable
     data class Release(
-        @field:SerializedName("tag_name") val tagName: String,
-        @field:SerializedName("name") val name: String,
-        @field:SerializedName("html_url") val htmlUrl: String,
-        @field:SerializedName("published_at") val publishedAt: String,
+        @SerialName("tag_name") val tagName: String = "",
+        val name: String = "",
+        @SerialName("html_url") val htmlUrl: String = "",
+        @SerialName("published_at") val publishedAt: String = "",
     )
 }

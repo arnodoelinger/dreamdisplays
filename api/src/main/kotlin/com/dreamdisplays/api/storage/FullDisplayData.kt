@@ -3,6 +3,7 @@ package com.dreamdisplays.api.storage
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.playback.PlaybackMode
+import kotlinx.serialization.Serializable
 import java.util.UUID
 
 /**
@@ -16,7 +17,9 @@ import java.util.UUID
  * @since 1.8.4
  */
 @DreamDisplaysUnstableApi
+@Serializable
 class FullDisplayData(
+    @Serializable(with = UuidStringSerializer::class)
     var uuid: UUID,
     var x: Int,
     var y: Int,
@@ -31,6 +34,7 @@ class FullDisplayData(
     var brightness: Float,
     var muted: Boolean,
     var mode: PlaybackMode?,
+    @Serializable(with = UuidStringSerializer::class)
     var ownerUuid: UUID,
     var renderDistance: Int = 96,
     var currentTimeNanos: Long = 0,

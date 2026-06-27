@@ -1,6 +1,7 @@
 package com.dreamdisplays.api.playback
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import kotlinx.serialization.Serializable
 
 /**
  * How a display drives its playback timeline. This protocol-v2 enum travels on the wire as its
@@ -9,6 +10,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * @since 1.8.0
  */
 @DreamDisplaysUnstableApi
+@Serializable
 enum class PlaybackMode {
     /** No synchronization: every client plays independently from its own saved position. */
     LOCAL,

@@ -1,6 +1,7 @@
 package com.dreamdisplays.api.storage
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import kotlinx.serialization.Serializable
 
 /**
  * Client-local preferences.
@@ -11,6 +12,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  * @since 1.8.4
  */
 @DreamDisplaysUnstableApi
+@Serializable
 class ClientDisplaySettings {
     /** Volume in the range [0.0, 1.0]. */
     var volume: Float = DEFAULT_VOLUME

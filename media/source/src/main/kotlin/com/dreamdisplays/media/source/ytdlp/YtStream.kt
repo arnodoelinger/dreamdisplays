@@ -2,11 +2,13 @@ package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
+import kotlinx.serialization.Serializable
 
 /**
  * YouTube stream information, as returned by `yt-dlp`. It includes methods to check if the stream has video / audio and
  * if it's muxed (because it can be a stream or première or etc.)
  */
+@Serializable
 class YtStream(
     val url: String,
     private val mimeType: String,

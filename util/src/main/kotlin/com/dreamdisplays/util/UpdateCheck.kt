@@ -1,7 +1,7 @@
 package com.dreamdisplays.util
 
 import com.dreamdisplays.util.net.DreamHttpClient
-import com.google.gson.JsonParser
+import com.dreamdisplays.util.json.DreamJson
 import kotlinx.coroutines.launch
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
@@ -60,16 +60,16 @@ object UpdateCheck {
                     readTimeoutMs = 8_000,
                 ),
             )
-            val root = JsonParser.parseString(body)
+            val root = DreamJson.compact.parseToJsonElement(body)
             val rawTag: String = when {
-                root.isJsonObject -> {
-                    val obj = root.asJsonObject
+                root.asJsonObjectOrNull() != null -> {
+                    val obj = root.asJsonObjectOrNull()!!
                     obj.optString("tag_name") ?: obj.optString("name")
                 }
 
-                root.isJsonArray -> {
-                    val arr = root.asJsonArray
-                    if (!arr.isEmpty && arr[0].isJsonObject) arr[0].asJsonObject.optString("tag_name") else null
+                root.asJsonArrayOrNull() != null -> {
+                    val arr = root.asJsonArrayOrNull()!!
+                    arr.firstOrNull().asJsonObjectOrNull()?.optString("tag_name")
                 }
 
                 else -> null

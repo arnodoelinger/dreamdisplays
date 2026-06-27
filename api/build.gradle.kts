@@ -1,5 +1,6 @@
 plugins {
     id("dreamdisplays.kotlin-conventions")
+    id("dreamdisplays.serialization-conventions")
 }
 
 repositories {
@@ -7,6 +8,7 @@ repositories {
 }
 
 dependencies {
+    api(libs.kotlinxSerializationCore)
     compileOnly(libs.kotlinStdlib)
     testImplementation(libs.kotlinStdlib)
     testImplementation(kotlin("test"))
