@@ -2,6 +2,7 @@ package com.dreamdisplays.util
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.async
@@ -62,6 +63,7 @@ class AsyncMemo<K : Any, V : Any>(
      * is cached on success; the in-flight slot is cleared when the load settles. Use for prefetching.
      */
     fun load(key: K, loader: suspend (K) -> V): Deferred<V> {
+        peekFresh(key)?.let { return CompletableDeferred(it) }
         val deferred = inFlight.computeIfAbsent(key) { k ->
             scope.async {
                 val value = loader(k)

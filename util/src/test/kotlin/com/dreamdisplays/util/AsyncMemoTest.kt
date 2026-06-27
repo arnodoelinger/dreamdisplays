@@ -54,6 +54,26 @@ class AsyncMemoTest {
     }
 
     @Test
+    fun loadReturnsFreshCachedValueWithoutStartingLoader() = runBlocking {
+        val scope = testScope()
+        try {
+            val memo = AsyncMemo<String, String>(maxSize = 10, ttlMs = 60_000, scope = scope, tag = "test")
+            var loads = 0
+
+            memo.put("video", "cached")
+            val deferred = memo.load("video") {
+                loads++
+                "loaded"
+            }
+
+            assertEquals("cached", deferred.await())
+            assertEquals(0, loads)
+        } finally {
+            scope.cancel()
+        }
+    }
+
+    @Test
     fun disabledCacheDoesNotRetainCompletedValues() {
         val scope = testScope()
         try {
