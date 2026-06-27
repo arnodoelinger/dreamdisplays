@@ -21,6 +21,7 @@ object ClientSettingsStore : ClientSettingsStorage {
 
     /** File name for the JSON settings file. */
     private const val FILE_NAME = "client-display-settings.json"
+    private const val SCHEMA_VERSION = 1
 
     private val jsonFiles = JsonFileStore()
     private val settingsSerializer = MapSerializer(String.serializer(), ClientDisplaySettings.serializer())
@@ -31,7 +32,7 @@ object ClientSettingsStore : ClientSettingsStorage {
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */
     override fun load() {
         val loaded: Map<String, ClientDisplaySettings> =
-            jsonFiles.read(jsonFiles.file(FILE_NAME), settingsSerializer, logger) ?: return
+            jsonFiles.readVersioned(jsonFiles.file(FILE_NAME), settingsSerializer, SCHEMA_VERSION, logger) ?: return
         settings.clear()
         loaded.forEach { (key, value) ->
             runCatching { settings[UUID.fromString(key)] = value }
@@ -43,7 +44,7 @@ object ClientSettingsStore : ClientSettingsStorage {
     override fun save() {
         if (!jsonFiles.ensureDir(logger)) return
         val toSave = settings.entries.associate { (k, v) -> k.toString() to v }
-        jsonFiles.write(jsonFiles.file(FILE_NAME), settingsSerializer, toSave, logger)
+        jsonFiles.writeVersioned(jsonFiles.file(FILE_NAME), settingsSerializer, toSave, SCHEMA_VERSION, logger)
     }
 
     /** Returns the settings for [displayUuid], creating a default entry if absent. */
@@ -52,9 +53,7 @@ object ClientSettingsStore : ClientSettingsStorage {
         defaultVolume: Float,
     ): ClientDisplaySettings =
         settings.getOrPut(displayUuid) {
-            ClientDisplaySettings().apply {
-                volume = defaultVolume.coerceIn(0f, 1f)
-            }
+            ClientDisplaySettings(volume = defaultVolume.coerceIn(0f, 1f))
         }
 
     /** Updates all playback settings for [displayUuid] and immediately persists them to disk. */

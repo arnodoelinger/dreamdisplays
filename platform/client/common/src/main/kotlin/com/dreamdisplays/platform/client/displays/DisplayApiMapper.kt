@@ -47,7 +47,23 @@ internal fun DisplayScreen.toRuntimeState(): DisplayRuntimeState = when {
 
 /** Captures the full persistable snapshot of this screen for the server display registry. */
 internal fun DisplayScreen.toFullDisplayData(): FullDisplayData = FullDisplayData(
-    uuid, pos.x, pos.y, pos.z, facing, width, height,
-    videoUrl ?: "", lang ?: "", volume, quality.serialize(), brightness,
-    muted, mode, ownerUuid, renderDistance, currentTimeNanos, rotation.quarterTurns, qualityCap,
+    uuid = uuid,
+    x = pos.x,
+    y = pos.y,
+    z = pos.z,
+    facing = facing,
+    width = width,
+    height = height,
+    videoUrl = videoUrl ?: "",
+    lang = lang ?: "",
+    volume = volume,
+    quality = quality.serialize(),
+    brightness = brightness,
+    muted = muted,
+    mode = mode,
+    ownerUuid = ownerUuid,
+    renderDistance = renderDistance,
+    currentTimeNanos = currentTimeNanos,
+    rotation = rotation.quarterTurns,
+    qualityCap = qualityCap,
 )

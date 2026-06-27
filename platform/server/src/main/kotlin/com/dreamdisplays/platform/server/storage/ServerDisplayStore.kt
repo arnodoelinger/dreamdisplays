@@ -20,13 +20,14 @@ import java.util.UUID
 object ServerDisplayStore {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ServerDisplayStore")
+    private const val SCHEMA_VERSION = 1
     private val jsonFiles = JsonFileStore()
     private val displayMapSerializer = MapSerializer(String.serializer(), FullDisplayData.serializer())
 
     /** Loads the display registry for [serverId] from disk and marks it as the current server. */
     fun load(serverId: String) {
         val loaded: Map<String, FullDisplayData>? =
-            jsonFiles.read(readableServerFile(serverId), displayMapSerializer, logger)
+            jsonFiles.readVersioned(readableServerFile(serverId), displayMapSerializer, SCHEMA_VERSION, logger)
         val displays = HashMap<UUID, FullDisplayData>()
         loaded?.forEach { (key, value) ->
             runCatching { displays[UUID.fromString(key)] = value }
@@ -41,7 +42,7 @@ object ServerDisplayStore {
         if (!jsonFiles.ensureDir(logger)) return
         val displays = DisplayStorage.snapshot(serverId)
         val toSave = displays.entries.associate { (k, v) -> k.toString() to v }
-        jsonFiles.write(safeServerFile(serverId), displayMapSerializer, toSave, logger)
+        jsonFiles.writeVersioned(safeServerFile(serverId), displayMapSerializer, toSave, SCHEMA_VERSION, logger)
     }
 
     /** Returns the cached [FullDisplayData] for [displayUuid] on the current server, or null if absent. */

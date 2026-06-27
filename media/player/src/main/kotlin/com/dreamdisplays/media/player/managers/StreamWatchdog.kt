@@ -1,9 +1,14 @@
 package com.dreamdisplays.media.player.managers
 
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
 
 /**
  * Watches whether frames are arriving. If no frame arrives within [stallThresholdMs],
@@ -19,23 +24,29 @@ internal class StreamWatchdog(
 ) {
     private val logger = LoggerFactory.getLogger("DreamDisplays/StreamWatchdog")
 
+    /** Watchdog task. */
     @Volatile
-    private var executor: ScheduledExecutorService? = null
+    private var job: Job? = null
+
+    /** Coroutine scope for the watchdog task. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("MediaPlayer-watchdog"))
 
     /** Start watchdog. */
     fun start() {
         stop()
-        executor = Executors.newSingleThreadScheduledExecutor {
-            Thread(it, "MediaPlayer-watchdog").apply { isDaemon = true }
-        }.also {
-            it.scheduleAtFixedRate(::check, checkIntervalMs, checkIntervalMs, TimeUnit.MILLISECONDS)
+        job = scope.launch {
+            delay(checkIntervalMs)
+            while (isActive) {
+                check()
+                delay(checkIntervalMs)
+            }
         }
     }
 
     /** Stop watchdog. */
     fun stop() {
-        executor?.shutdownNow()
-        executor = null
+        job?.cancel()
+        job = null
     }
 
     /** Main checker for [stallThresholdMs]. */

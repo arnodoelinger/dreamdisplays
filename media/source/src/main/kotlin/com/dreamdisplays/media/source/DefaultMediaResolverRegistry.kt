@@ -6,8 +6,11 @@ import com.dreamdisplays.api.media.source.MediaResolver
 import com.dreamdisplays.api.media.source.MediaResolverRegistry
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
+import com.dreamdisplays.util.DreamCoroutines
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.Executors
 
 /**
  * Default [MediaResolverRegistry]: tries registered [MediaResolver]s highest-[MediaResolver.priority]
@@ -24,12 +27,10 @@ class DefaultMediaResolverRegistry : MediaResolverRegistry {
 
     /**
      * Prefetch is a best-effort hint that opens with a blocking DNS lookup (the SSRF guard), so it
-     * must never run on the caller's thread — [prefetch] is invoked from the client / render thread on
-     * every URL change. A single daemon worker serializes the hints off that path.
+     * must never run on the caller's thread - [prefetch] is invoked from the client / render thread on
+     * every URL change. A coroutine permit serializes the hints off that path.
      */
-    private val prefetchExecutor = Executors.newSingleThreadExecutor { r ->
-        Thread(r, "DreamDisplays-prefetch").apply { isDaemon = true }
-    }
+    private val prefetchPermit = Semaphore(1)
 
     override val resolvers: List<MediaResolver>
         get() = backing.sortedByDescending { it.priority }
@@ -46,13 +47,15 @@ class DefaultMediaResolverRegistry : MediaResolverRegistry {
 
     /**
      * Calls [MediaResolver.prefetch] on every capable resolver for [source]. The SSRF host check and
-     * the dispatch run on [prefetchExecutor] so the blocking DNS lookup never stalls the caller.
+     * the dispatch run on [DreamCoroutines.clientIo] so the blocking DNS lookup never stalls the caller.
      */
     override fun prefetch(source: MediaSource) {
-        prefetchExecutor.execute {
-            if (isBlockedHost(source)) return@execute
-            for (resolver in resolvers) {
-                if (resolver.canResolve(source)) runCatching { resolver.prefetch(source) }
+        DreamCoroutines.clientIo.launch {
+            prefetchPermit.withPermit {
+                if (isBlockedHost(source)) return@withPermit
+                for (resolver in resolvers) {
+                    if (resolver.canResolve(source)) runCatching { resolver.prefetch(source) }
+                }
             }
         }
     }

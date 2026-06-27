@@ -18,24 +18,24 @@ import java.util.UUID
  */
 @DreamDisplaysUnstableApi
 @Serializable
-class FullDisplayData(
+data class FullDisplayData(
     @Serializable(with = UuidStringSerializer::class)
-    var uuid: UUID,
-    var x: Int,
-    var y: Int,
-    var z: Int,
-    var facing: DisplayFacing,
-    var width: Int,
-    var height: Int,
-    var videoUrl: String,
-    var lang: String,
-    var volume: Float,
-    var quality: String,
-    var brightness: Float,
-    var muted: Boolean,
-    var mode: PlaybackMode?,
+    var uuid: UUID = UUID(0L, 0L),
+    var x: Int = 0,
+    var y: Int = 0,
+    var z: Int = 0,
+    var facing: DisplayFacing = DisplayFacing.NORTH,
+    var width: Int = 1,
+    var height: Int = 1,
+    var videoUrl: String = "",
+    var lang: String = "",
+    var volume: Float = 0.5f,
+    var quality: String = "720",
+    var brightness: Float = 1.0f,
+    var muted: Boolean = false,
+    var mode: PlaybackMode? = PlaybackMode.LOCAL,
     @Serializable(with = UuidStringSerializer::class)
-    var ownerUuid: UUID,
+    var ownerUuid: UUID = uuid,
     var renderDistance: Int = 96,
     var currentTimeNanos: Long = 0,
     var rotation: Int = 0,

@@ -1,10 +1,14 @@
 package com.dreamdisplays.media.player.managers
 
-import com.dreamdisplays.media.player.util.daemon
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.TimeUnit
 
 /**
  * Diagnostic service that periodically logs decoded FPS, GPU-upload FPS, dropped frames,
@@ -19,25 +23,35 @@ internal class StatsReporter(
     private val getPositionMs: () -> Long,
     private val isLive: () -> Boolean,
 ) {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/StatsReporter")
 
     /** Raw counter values sampled at one reporting interval. */
     data class Snapshot(val samplesIn: Long, val framesToGpu: Long, val framesDropped: Long)
 
+    /** Periodic reporting task. */
     @Volatile
-    private var executor: ScheduledExecutorService? = null
+    private var job: Job? = null
+
+    /** Coroutine scope for the reporting task. */
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default + CoroutineName("MediaPlayer-stats"))
 
     /** Starts the periodic reporting task. No-op if already running. */
     fun start() {
-        if (executor != null) return
-        executor = Executors.newSingleThreadScheduledExecutor { daemon(it, "MediaPlayer-stats") }.also { exec ->
-            exec.scheduleAtFixedRate(::report, intervalMs, intervalMs, TimeUnit.MILLISECONDS)
+        if (job?.isActive == true) return
+        job = scope.launch {
+            delay(intervalMs)
+            while (isActive) {
+                report()
+                delay(intervalMs)
+            }
         }
     }
 
     /** Stops the reporting task. */
     fun stop() {
-        executor?.shutdownNow(); executor = null
+        job?.cancel()
+        job = null
     }
 
     /** Samples the current frame counters, formats a one-line stats string, and logs it. */

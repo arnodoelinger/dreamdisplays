@@ -13,27 +13,28 @@ import kotlinx.serialization.Serializable
  */
 @DreamDisplaysUnstableApi
 @Serializable
-class ClientDisplaySettings {
+data class ClientDisplaySettings(
     /** Volume in the range [0.0, 1.0]. */
-    var volume: Float = DEFAULT_VOLUME
+    var volume: Float = DEFAULT_VOLUME,
 
     /** Video quality, e.g. "720" or "1080". */
-    var quality: String = "720"
+    var quality: String = "720",
 
     /** Brightness in the range [0.0, 2.0]. */
-    var brightness: Float = 1.0f
+    var brightness: Float = 1.0f,
 
     /** Whether the display is muted. */
-    var muted: Boolean = false
+    var muted: Boolean = false,
 
     /** Whether the display is paused. */
-    var paused: Boolean = true
+    var paused: Boolean = true,
 
     /** URL override for the video, or null if not overridden. */
-    var urlOverride: String? = null
+    var urlOverride: String? = null,
 
     /** Language override for the video, or null if not overridden. */
-    var langOverride: String? = null
+    var langOverride: String? = null,
+) {
 
     companion object {
         /** Default volume for local displays. The UI presents this as 100%. */

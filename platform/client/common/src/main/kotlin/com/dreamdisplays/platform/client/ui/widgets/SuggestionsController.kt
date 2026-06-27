@@ -6,15 +6,16 @@ import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.platform.client.render.Thumbnails
+import com.dreamdisplays.util.DreamCoroutines
+import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
-import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.math.min
 
 /**
  * Async state machine behind the suggestions panel: runs searches and related-video lookups on a
- * background executor, publishes results back on the client thread, and drops stale responses via a
+ * background coroutine, publishes results back on the client thread, and drops stale responses via a
  * request sequence number. Holds no rendering state, so the panel widget stays a pure view.
  */
 class SuggestionsController {
@@ -22,12 +23,10 @@ class SuggestionsController {
     val cards = ArrayList<MediaSearchResult>()
 
     /** Translation key of the current status line (loading/empty/error), or null when results are shown. */
-    var statusKey: String? = null
-        private set
+    var statusKey: String? = null; private set
 
     /** Wall-clock start of the in-flight load, for the elapsed-seconds suffix on the loading message. */
-    var loadStartedAtMs: Long = 0L
-        private set
+    var loadStartedAtMs: Long = 0L; private set
 
     private val requestSeq = AtomicInteger()
     private var currentVideoId: String? = null
@@ -66,7 +65,7 @@ class SuggestionsController {
         if (maybeId != null) {
             startLoad()
             val seq = requestSeq.incrementAndGet()
-            EXECUTOR.submit {
+            launchLoad {
                 try {
                     val meta = svc.metadata(maybeId)
                     publish(seq, listOf(meta ?: fallbackResult(maybeId)), null)
@@ -79,7 +78,7 @@ class SuggestionsController {
         }
         startLoad()
         val seq = requestSeq.incrementAndGet()
-        EXECUTOR.submit {
+        launchLoad {
             try {
                 publish(seq, svc.search(q, RESULT_LIMIT), null)
             } catch (e: Exception) {
@@ -93,7 +92,7 @@ class SuggestionsController {
     private fun loadRelated(videoId: String) {
         startLoad()
         val seq = requestSeq.incrementAndGet()
-        EXECUTOR.submit {
+        launchLoad {
             try {
                 publish(seq, DreamServices.registry.get(MediaServices.SEARCH).related(videoId, RESULT_LIMIT), null)
             } catch (e: Exception) {
@@ -101,6 +100,11 @@ class SuggestionsController {
                 publish(seq, null, KEY_ERROR)
             }
         }
+    }
+
+    /** Launch load. */
+    private fun launchLoad(block: () -> Unit) {
+        DreamCoroutines.clientIo.launch { block() }
     }
 
     /** Switches the panel into the loading state and clears stale results. */
@@ -136,14 +140,19 @@ class SuggestionsController {
         MediaSearchResult(videoId, YouTubeUrls.watchUrl(videoId), null, null, null)
 
     companion object {
+        /** Maximum number of results to show in the panel. */
         const val RESULT_LIMIT = 72
+
+        /** Translation kes for the status line. */
         private const val KEY_LOADING = "dreamdisplays.suggestions.loading"
+
+        /** Translation key for the error status line. */
         private const val KEY_ERROR = "dreamdisplays.suggestions.error"
+
+        /** Translation key for the empty status line. */
         private const val KEY_EMPTY = "dreamdisplays.suggestions.empty"
 
+        /** Logger. */
         private val logger = LoggerFactory.getLogger("DreamDisplays/Suggestions")
-        private val EXECUTOR = Executors.newFixedThreadPool(2) { r ->
-            Thread(r, "DD-Suggestions").apply { isDaemon = true }
-        }
     }
 }
