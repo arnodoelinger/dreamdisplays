@@ -1,3 +1,45 @@
+# Version 1.8.4
+
+## Client
+
+### Improvements
+
+- Improved experimental API
+- Readded 26.2 version to `Paper` building system
+- Improved media playback smoothness, especially around frame pacing and short playback stalls
+- Improved pause and resume behavior, including warm resume for supported sessions
+- Improved video loading, thumbnails, search suggestions, and replay caches for faster repeated loads
+- Improved media links, network requests, and JSON handling for more consistent video resolving
+- Improved local display settings saving so settings survive crashes and future updates better
+- Reduced extra background threads in media tasks
+- Synced and broadcast displays now default to 50% volume instead of 100%
+- Improved Dream Displays security
+
+### Fixes
+
+- Fixed incompatibilities with high-quality shaders ([#108](https://github.com/arsmotorin/dreamdisplays/issues/108))
+- Fixed unnecessary sync corrections while media is paused or parked
+- Fixed a rare internal service lookup issue that could affect features with multiple service implementations
+
+## Server
+
+### Improvements
+
+- Improved experimental API
+- Improved report cooldown handling under repeated report attempts
+- Improved media links, network requests, and JSON handling for server-side media features
+- Improved saved display storage so display data is safer across restarts and crashes
+- The mod update notification is now shown once per server session
+- Improved Dream Displays security
+
+### Fixes
+
+- Fixed several report cooldown edge cases
+- Fixed the mod update notification formatting on `Fabric` servers
+- Fixed several packet protocol v2 validation edge cases during connection and packet decoding
+- Fixed audio-language validation before saving and rebroadcasting it
+- Fixed a rare internal service lookup issue that could affect features with multiple service implementations
+
 # Version 1.8.3
 
 ## Client
