@@ -1,18 +1,24 @@
-package com.dreamdisplays.platform.client.render
+package com.dreamdisplays.api.render
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOf
 
-/** Render backend reported by the active Minecraft render device. */
+/**
+ * Render backend.
+ *
+ * @since 1.8.4
+ */
+@DreamDisplaysUnstableApi
 enum class RenderBackend(override val wire: String) : WireEnum {
-    /** OpenGL renderer. Legacy renderer. */
+    /** OpenGL renderer. */
     OPENGL("opengl"),
 
-    /** Vulkan renderer. New renderer. */
+    /** Vulkan renderer. */
     VULKAN("vulkan"),
 
     /**
-     * Vulkan renderer, but as a mod.
+     * Vulkan renderer replacement provided by VulkanMod.
      *
      * @see <a href="https://modrinth.com/mod/vulkanmod">VulkanMod</a>
      */
