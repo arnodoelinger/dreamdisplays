@@ -1,10 +1,15 @@
-package com.dreamdisplays.core.playback
+package com.dreamdisplays.api.playback
+
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 
 /**
- * An authoritative playback clock. [positionMs] is the playback position *as of* [serverTimeMs];
+ * An authoritative playback clock. [positionMs] is the playback position as of [serverTimeMs];
  * a running timeline advances in real time from that anchor. Pure value type shared by the server
- * (which owns it) and the client (which follows it via [DisplaySync]).
+ * (which owns it) and the client (which follows it via the wire sync packet).
+ *
+ * @since 1.8.4
  */
+@DreamDisplaysUnstableApi
 data class Timeline(
     val positionMs: Long,
     val serverTimeMs: Long,
