@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.media.FramePixelFormat
+import com.dreamdisplays.api.media.FramePixelFormat
 import com.mojang.blaze3d.platform.NativeImage
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL30

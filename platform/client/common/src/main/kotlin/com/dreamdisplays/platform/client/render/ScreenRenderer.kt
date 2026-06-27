@@ -4,7 +4,7 @@ import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.api.render.RenderContext
@@ -71,8 +71,8 @@ object ScreenRenderer : ClientRenderService {
             stack.popPose()
         }
 
-        // The registered RenderHook extends the world pass after the mod's own screens
-        // (by default it dispatches API-registered surfaces, see DreamServices.bootstrap).
+        // The registered RenderHook extends the world pass after the mod's own screens.
+        // ClientRenderModule installs the default hook for API-registered surfaces.
         // The world render hooks do not surface a partial tick, hence the 0f tickDelta.
         DreamServices.registry.getOrNull<RenderHook>()
             ?.onRender(MinecraftRenderContext(stack, camera, 0f))

@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.capabilities
 
+import com.dreamdisplays.api.capability.ServerFeature
 import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.ServerHello
-import com.dreamdisplays.core.protocol.ServerFeature
 
 /**
  * Service responsible for negotiating capabilities between the client and server. Detects the client's abilities,

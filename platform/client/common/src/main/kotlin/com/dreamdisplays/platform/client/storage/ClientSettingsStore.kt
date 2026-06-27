@@ -1,6 +1,8 @@
 package com.dreamdisplays.platform.client.storage
 
-import com.dreamdisplays.media.VideoQuality
+import com.dreamdisplays.api.storage.ClientDisplaySettings
+import com.dreamdisplays.api.storage.ClientSettingsStorage
+import com.dreamdisplays.api.media.VideoQuality
 import com.google.gson.reflect.TypeToken
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -11,7 +13,7 @@ import java.util.UUID
  * Backed by `client-display-settings.json`. Every mutator persists immediately so the file always
  * reflects the latest viewer preferences.
  */
-object ClientSettingsStore {
+object ClientSettingsStore : ClientSettingsStorage {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/ClientSettingsStore")
 
@@ -22,7 +24,7 @@ object ClientSettingsStore {
     private val settings = HashMap<UUID, ClientDisplaySettings>()
 
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */
-    fun load() {
+    override fun load() {
         if (!JsonFileStore.ensureDir(logger)) return
         val type = object : TypeToken<Map<String, ClientDisplaySettings>>() {}.type
         val loaded: Map<String, ClientDisplaySettings> =
@@ -35,16 +37,16 @@ object ClientSettingsStore {
     }
 
     /** Persists the in-memory settings map to disk. */
-    fun save() {
+    override fun save() {
         if (!JsonFileStore.ensureDir(logger)) return
         val toSave = settings.entries.associate { (k, v) -> k.toString() to v }
         JsonFileStore.write(JsonFileStore.file(FILE_NAME), toSave, logger)
     }
 
     /** Returns the settings for [displayUuid], creating a default entry if absent. */
-    fun getSettings(
+    override fun getSettings(
         displayUuid: UUID,
-        defaultVolume: Float = ClientDisplaySettings.DEFAULT_VOLUME,
+        defaultVolume: Float,
     ): ClientDisplaySettings =
         settings.getOrPut(displayUuid) {
             ClientDisplaySettings().apply {
@@ -53,7 +55,7 @@ object ClientSettingsStore {
         }
 
     /** Updates all playback settings for [displayUuid] and immediately persists them to disk. */
-    fun updateSettings(
+    override fun updateSettings(
         displayUuid: UUID,
         volume: Float,
         quality: VideoQuality,
@@ -71,7 +73,7 @@ object ClientSettingsStore {
     }
 
     /** Sets the client-side URL and language override for [displayUuid] and saves. */
-    fun setUrlOverride(displayUuid: UUID, url: String?, lang: String?) {
+    override fun setUrlOverride(displayUuid: UUID, url: String?, lang: String?) {
         val s = getSettings(displayUuid)
         s.urlOverride = url
         s.langOverride = lang
@@ -79,7 +81,7 @@ object ClientSettingsStore {
     }
 
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
-    fun remove(displayUuid: UUID): Boolean {
+    override fun remove(displayUuid: UUID): Boolean {
         val removed = settings.remove(displayUuid) != null
         if (removed) save()
         return removed

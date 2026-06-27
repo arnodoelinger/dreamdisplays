@@ -5,14 +5,14 @@ import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.core.storage.FullDisplayData
-import com.dreamdisplays.media.VideoQuality
+import com.dreamdisplays.api.storage.FullDisplayData
+import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.api.media.source.MediaResolverRegistry
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.source.MediaSource
 import net.minecraft.client.Minecraft
 import net.minecraft.core.BlockPos
@@ -58,7 +58,7 @@ object DisplayLifecycleManager {
             if (dist > renderDistance) return
         }
 
-        DreamServices.registry.getOrNull<MediaResolverRegistry>()?.prefetch(MediaSource.from(packet.url))
+        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(packet.url))
         DisplayRegistry.unloadedScreens.remove(packet.id)
 
         val mode = if (packet.mode == PlaybackMode.LOCAL.wire && packet.isSync) {

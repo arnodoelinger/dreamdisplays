@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.client.managers
 
+import com.dreamdisplays.api.runtime.DreamDisplaysModule
 import com.dreamdisplays.platform.client.Config
 import com.dreamdisplays.platform.client.Focuser
 import com.dreamdisplays.platform.client.Initializer
@@ -7,10 +8,17 @@ import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.DefaultClientApplication
 import com.dreamdisplays.platform.client.core.DefaultClientContext
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.platform.client.core.register
+import com.dreamdisplays.platform.client.core.modules.ClientCapabilityModule
+import com.dreamdisplays.platform.client.core.modules.ClientInputModule
+import com.dreamdisplays.platform.client.core.modules.ClientOverlayModule
+import com.dreamdisplays.platform.client.core.modules.ClientRenderModule
+import com.dreamdisplays.platform.client.core.modules.ClientStorageModule
+import com.dreamdisplays.platform.client.core.modules.CoreDisplayModule
+import com.dreamdisplays.platform.client.core.modules.CorePlaybackModule
+import com.dreamdisplays.platform.client.core.modules.MediaResolverModule
+import com.dreamdisplays.api.runtime.register
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.api.platform.Platform
+import com.dreamdisplays.api.platform.PlatformServices
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
@@ -49,21 +57,28 @@ object ClientStartupManager {
      */
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /** The default module set installed into every [ClientApplication] built by [start]. */
+    private val defaultModules: List<DreamDisplaysModule> = listOf(
+        ClientStorageModule,
+        CoreDisplayModule,
+        CorePlaybackModule,
+        MediaResolverModule,
+        ClientOverlayModule,
+        ClientInputModule,
+        ClientRenderModule,
+        ClientCapabilityModule,
+    )
+
     /** Loads config, wires services, hosts the application, prewarms backends, and launches maintenance loops. */
     fun start() {
         config.reload()
         ClientSettingsStore.load()
 
-        // Wire the contract-typed service graph (media resolver chain, ...) before any
-        // background prewarm touches it.
-        DreamServices.bootstrap()
-
-        // If the loader entrypoint registered a Platform, host the module system on top of it
-        DreamServices.registry.getOrNull<Platform>()?.let { platform ->
-            val application = DefaultClientApplication(DefaultClientContext(platform))
-            DreamServices.registry.register<ClientApplication>(application)
-            application.start()
-        }
+        val platform = DreamServices.registry.get(PlatformServices.PLATFORM)
+        val application = DefaultClientApplication(DefaultClientContext(platform))
+        DreamServices.registry.register<ClientApplication>(application)
+        defaultModules.forEach(application::registerModule)
+        application.start()
 
         YtDlp.prewarmAsync()
         FFmpegBinary.prewarmAsync()

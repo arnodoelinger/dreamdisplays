@@ -5,7 +5,7 @@ import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationServi
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.input.DisplayInteraction
 import com.dreamdisplays.platform.client.input.DisplayInteractionService
 import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler

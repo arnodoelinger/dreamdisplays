@@ -1,13 +1,13 @@
 package com.dreamdisplays.platform.client.ui
 
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.playback.PlaybackService
-import com.dreamdisplays.api.watchparty.WatchPartyService
-import com.dreamdisplays.api.display.service.DisplayService
+import com.dreamdisplays.api.playback.PlaybackServices
+import com.dreamdisplays.api.watchparty.WatchPartyServices
+import com.dreamdisplays.api.display.service.DisplayServices
 import com.dreamdisplays.platform.client.popout.PopoutManager
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.get
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.get
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
@@ -26,9 +26,9 @@ import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.ClientStateManager
+import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
-import com.dreamdisplays.api.media.search.MediaSearchService
-import com.dreamdisplays.media.VideoQuality
+import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
@@ -80,9 +80,9 @@ class DisplayMenu private constructor(
         // Playback controls drive the display through the core PlaybackService instead of mutating
         // the DisplayScreen directly, so the UI no longer reaches into the live screen for these actions.
         val displayId = DisplayId(ds.uuid)
-        val playback = DreamServices.registry.get<PlaybackService>()
-        val watchParty = DreamServices.registry.get<WatchPartyService>()
-        val displays = DreamServices.registry.get<DisplayService>()
+        val playback = DreamServices.registry.get(PlaybackServices.PLAYBACK)
+        val watchParty = DreamServices.registry.get(WatchPartyServices.WATCH_PARTY)
+        val displays = DreamServices.registry.get(DisplayServices.DISPLAY)
         val videoReady = { ds.isVideoStarted && !ds.errored }
         val notErrored = { !ds.errored }
 
@@ -404,7 +404,7 @@ class DisplayMenu private constructor(
     private fun onPickSuggested(info: MediaSearchResult) {
         val ds = displayScreen
         if (!ds.canSetVideoHere) return
-        DreamServices.registry.get<DisplayService>().setUrl(DisplayId(ds.uuid), info.getWatchUrl(), ds.lang)
+        DreamServices.registry.get(DisplayServices.DISPLAY).setUrl(DisplayId(ds.uuid), info.getWatchUrl(), ds.lang)
         VideoTitleCache.put(info.id, info.title)
         VideoMetadataCache.put(info.id, info)
         lastSuggestedVideoId = info.id
@@ -473,7 +473,7 @@ class DisplayMenu private constructor(
     /** Points the suggestions panel at the currently playing video when it changes. */
     private fun refreshRelatedVideos() {
         val ds = displayScreen
-        val currentId = DreamServices.registry.getOrNull<MediaSearchService>()?.extractVideoId(ds.videoUrl ?: "")
+        val currentId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(ds.videoUrl ?: "")
         if (currentId != null && currentId != lastSuggestedVideoId) {
             lastSuggestedVideoId = currentId
             suggestions.setRelatedTo(currentId)

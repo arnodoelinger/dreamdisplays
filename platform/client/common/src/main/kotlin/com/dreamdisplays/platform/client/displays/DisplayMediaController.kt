@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.displays
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
-import com.dreamdisplays.api.media.source.MediaResolverRegistry
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
@@ -37,7 +37,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
     fun load(videoUrl: String, lang: String, preservePausedState: Boolean) {
         if (videoUrl == "") return
 
-        DreamServices.registry.getOrNull<MediaResolverRegistry>()?.prefetch(MediaSource.from(videoUrl))
+        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(videoUrl))
 
         val expected = generation.incrementAndGet()
         val oldPlayer = player
@@ -87,7 +87,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         // A replay-bootstrap player already resumes at the saved position; restoreSavedTime()'s
         // corrective seek would cold-restart the session and destroy the seamless replay -> live bridge.
         if (!mp.isResumingFromReplay()) screen.restoreSavedTime()
-        // No bootstrap needed for sync since 1.8.0.
+        // No bootstrap needed for sync since 1.8.0
         DisplayRegistry.recordScreen(screen)
     }
 

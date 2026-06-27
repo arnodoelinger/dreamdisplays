@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutManager
 import com.dreamdisplays.platform.client.ui.PipCorner

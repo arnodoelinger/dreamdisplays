@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.ui.menu
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
@@ -13,8 +13,8 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.YouTubeUrls
-import com.dreamdisplays.api.media.search.MediaSearchService
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
@@ -143,7 +143,7 @@ class PreviewSection(
     /** Draws the dark strip with the video title (+NEW tag) and channel/views/likes/date metadata. */
     private fun drawTitleOverlay(g: GuiGraphicsCompat, x: Int, y: Int, w: Int) {
         val font = Minecraft.getInstance().font
-        val videoId = DreamServices.registry.getOrNull<MediaSearchService>()?.extractVideoId(ds.videoUrl ?: "")
+        val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(ds.videoUrl ?: "")
         val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
         if (videoId != null && meta == null) VideoMetadataCache.requestAsync(videoId)
 
@@ -200,7 +200,7 @@ class PreviewSection(
     /** Returns the cached thumbnail for the current video, requesting it asynchronously if absent. */
     private fun currentThumbnail(): Identifier? {
         val url = ds.videoUrl ?: return null
-        val id = DreamServices.registry.getOrNull<MediaSearchService>()?.extractVideoId(url) ?: return null
+        val id = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(url) ?: return null
         Thumbnails.get(id)?.let { return it }
         Thumbnails.request(id, YouTubeUrls.thumbnailUrl(id))
         return null

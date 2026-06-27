@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.input
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import net.minecraft.client.Minecraft

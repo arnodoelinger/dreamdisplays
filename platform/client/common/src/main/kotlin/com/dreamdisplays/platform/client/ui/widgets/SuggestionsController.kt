@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.get
+import com.dreamdisplays.api.runtime.get
+import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
-import com.dreamdisplays.api.media.search.MediaSearchService
 import com.dreamdisplays.platform.client.render.Thumbnails
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
@@ -60,7 +60,7 @@ class SuggestionsController {
             currentVideoId?.let { loadRelated(it) }
             return
         }
-        val svc = DreamServices.registry.get<MediaSearchService>()
+        val svc = DreamServices.registry.get(MediaServices.SEARCH)
         val maybeId = if (q.startsWith("http") || "youtube.com" in q || "youtu.be" in q)
             svc.extractVideoId(q) else null
         if (maybeId != null) {
@@ -95,7 +95,7 @@ class SuggestionsController {
         val seq = requestSeq.incrementAndGet()
         EXECUTOR.submit {
             try {
-                publish(seq, DreamServices.registry.get<MediaSearchService>().related(videoId, RESULT_LIMIT), null)
+                publish(seq, DreamServices.registry.get(MediaServices.SEARCH).related(videoId, RESULT_LIMIT), null)
             } catch (e: Exception) {
                 logger.warn("Related failed $videoId: ${e.message}")
                 publish(seq, null, KEY_ERROR)

@@ -1,8 +1,9 @@
 package com.dreamdisplays.platform.client.displays
 
 import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.api.capability.ServerFeature
 import com.dreamdisplays.api.display.model.DisplayFacing
-import com.dreamdisplays.platform.client.storage.ClientDisplaySettings
+import com.dreamdisplays.api.storage.ClientDisplaySettings
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.ui.PipCorner
@@ -20,11 +21,10 @@ import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.DisplaySync
 import com.dreamdisplays.api.playback.PlaybackAction
 import com.dreamdisplays.core.protocol.PlaybackCommand
-import com.dreamdisplays.core.playback.PlaybackContext
+import com.dreamdisplays.api.playback.PlaybackContext
 import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.core.playback.PlaybackPermissions
+import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.core.protocol.RequestSync
-import com.dreamdisplays.core.protocol.ServerFeature
 import com.dreamdisplays.core.protocol.SetMode
 import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
@@ -34,8 +34,8 @@ import com.dreamdisplays.core.protocol.WatchPartyState
 import com.dreamdisplays.core.protocol.hasFeature
 import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
-import com.dreamdisplays.media.DreamMediaException
-import com.dreamdisplays.media.VideoQuality
+import com.dreamdisplays.api.media.DreamMediaException
+import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.rendertype.RenderType

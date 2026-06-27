@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.mixins
 
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.core.getOrNull
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import net.minecraft.client.Minecraft
