@@ -328,3 +328,109 @@ jobs:
           github-draft: false
           files: build/libs/dreamdisplays-*.jar
           changelog-file: changelog.md
+
+  discord-announce:
+    name: Announce release on Discord
+    runs-on: ubuntu-latest
+    needs: [build, publish]
+    if: needs.build.outputs.is_release == 'true' && needs.build.outputs.is_marketplace_publishable == 'true'
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 1
+
+      - name: Send Discord announcement
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          python3 - <<'EOF'
+          import json
+          import os
+          import re
+          import sys
+          import urllib.request
+
+          webhook = os.environ.get("DISCORD_WEBHOOK", "").strip()
+          if not webhook:
+              sys.exit("DISCORD_WEBHOOK secret is not set.")
+
+          version = os.environ["VERSION"]
+
+          with open("CHANGELOG.md") as f:
+              content = f.read()
+
+          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
+          if not match:
+              sys.exit(f"Version {version} not found in CHANGELOG.md.")
+
+          block = match.group(1)
+
+          highlights = []
+          hl = re.search(r"^## Highlights\s*\n(.*?)(?=\n## |\Z)", block, re.DOTALL | re.MULTILINE)
+          if hl:
+              for line in hl.group(1).splitlines():
+                  line = line.strip()
+                  if line.startswith("- "):
+                      highlights.append(line)
+
+          if highlights:
+              highlights_text = "\n".join(highlights)
+          else:
+              highlights_text = "- See the full changelog below for all changes." # Should never happen
+
+          description = (
+              f"## Dream Displays {version}\n"
+              "A new version of Dream Displays is now available!\n"
+              "### Highlights\n"
+              f"{highlights_text}\n\n"
+              "Read the full changelog below for a complete list of changes and download the latest version!"
+          )
+
+          payload = {
+              "content": "<@&1457091442957877472>",
+              "embeds": [
+                  {
+                      "description": description,
+                      "footer": {"text": "@arsmotorin"},
+                      "thumbnail": {"url": "https://i.imgur.com/p5bOhsj.png"},
+                  }
+              ],
+              "components": [
+                  {
+                      "type": 1,
+                      "components": [
+                          {
+                              "type": 2,
+                              "style": 5,
+                              "label": "Download from Modrinth",
+                              "emoji": {"id": "1520861544680783872", "name": "modrinth", "animated": False},
+                              "url": "https://modrinth.com/plugin/dreamdisplays/versions",
+                          },
+                          {
+                              "type": 2,
+                              "style": 5,
+                              "label": "Read full changelog",
+                              "emoji": {"name": "\U0001F4DC"},
+                              "url": f"https://github.com/{os.environ.get('GITHUB_REPOSITORY', 'arsmotorin/dreamdisplays')}/releases/tag/v{version}",
+                          },
+                      ],
+                  }
+              ],
+          }
+
+          url = webhook + ("&" if "?" in webhook else "?") + "with_components=true&wait=true"
+          data = json.dumps(payload).encode("utf-8")
+          req = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  print(f"Discord responded with {resp.status}")
+          except urllib.error.HTTPError as e:
+              sys.exit(f"Discord webhook failed: {e.code} {e.reason}\n{e.read().decode('utf-8', 'replace')}.")
+          EOF
