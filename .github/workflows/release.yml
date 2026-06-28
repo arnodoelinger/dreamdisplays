@@ -333,7 +333,7 @@ jobs:
     name: Announce release on Discord
     runs-on: ubuntu-latest
     needs: [build, publish]
-    if: needs.build.outputs.is_release == 'true' && needs.build.outputs.is_marketplace_publishable == 'true'
+    if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true') && needs.build.outputs.is_marketplace_publishable == 'true'
     permissions:
       contents: read
 
@@ -347,6 +347,7 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           VERSION: ${{ needs.build.outputs.version }}
+          IS_SNAPSHOT: ${{ needs.build.outputs.is_snapshot }}
         run: |
           python3 - <<'EOF'
           import json
@@ -360,6 +361,7 @@ jobs:
               sys.exit("DISCORD_WEBHOOK secret is not set.")
 
           version = os.environ["VERSION"]
+          is_snapshot = os.environ.get("IS_SNAPSHOT", "") == "true"
 
           with open("CHANGELOG.md") as f:
               content = f.read()
@@ -384,9 +386,18 @@ jobs:
           else:
               highlights_text = "- See the full changelog below for all changes." # Should never happen
 
+          if is_snapshot:
+              intro = (
+                  "### Warning\n"
+                  "**This is an experimental snapshot and may be unstable.** "
+                  "It may contain bugs, incomplete features, or breaking changes.\n"
+              )
+          else:
+              intro = "A new version of Dream Displays is now available!\n"
+
           description = (
               f"## Dream Displays {version}\n"
-              "A new version of Dream Displays is now available!\n"
+              f"{intro}"
               "### Highlights\n"
               f"{highlights_text}\n\n"
               "Read the full changelog below for a complete list of changes and download the latest version!"
@@ -397,6 +408,7 @@ jobs:
               "embeds": [
                   {
                       "description": description,
+                      "color": 4088314,
                       "footer": {"text": "@arsmotorin"},
                       "thumbnail": {"url": "https://i.imgur.com/p5bOhsj.png"},
                   }
