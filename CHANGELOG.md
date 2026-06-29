@@ -3,33 +3,46 @@
 ## Highlights
 
 - 1.21.1 support
-- Improve versionizing
-- Codebase improvements
+- All displays now default to 50% volume
+- Fix critical crash on `Fabric`
+- Some fixes and codebase improvements
 
 ## Client
 
 ### Features
 
-- Support 1.21.1
+- Added support for Minecraft 1.21.1
 
 ### Improvements
 
+- All displays now default to 50% volume
 - Previews have replaced snapshots
 - Now versions have pretty style format
-- Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
 - Discord publisher integration
+- Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
+- Enhanced safety comments in unsafe blocks in Rust natives
+
+### Fixes
+
+- Fixed Picture-in-Picture playing ahead of the in-world display; it now stays in sync
+- Fixed critical crash when trying to delete an invalid display in single-player on `Fabric`
 
 ## Server
 
 ### Features
 
-- Support 1.21.1
+- Added support for Minecraft 1.21.1
+- Added `default_volume` option in `config.toml`, so server owners can now set the default volume for all players
 
 ### Improvements
 
 - Previews have replaced snapshots
 - Now versions have pretty style format
 - Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
+
+### Fixes
+
+- Fixed critical crash when trying to delete an invalid display on `Fabric` servers
 
 # 1.8.4 Release
 
