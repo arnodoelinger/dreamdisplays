@@ -61,6 +61,17 @@ abstract class UiWidget(message: Component) : AbstractWidget(0, 0, 0, 0, message
     /*final override fun renderWidget(g: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float) =
         draw(g, mouseX, mouseY, partialTick)
 
+    //? if >=1.21.11 {
+    // Draws [text] centered over the widget with vanilla scrolling-on-overflow behavior.
+    protected fun drawScrollingLabel(g: GuiGraphicsCompat, text: Component, padding: Int) =
+        renderScrollingStringOverContents(
+            g.textRendererForWidget(this, GuiGraphics.HoveredTextEffects.TOOLTIP_AND_CURSOR),
+            text,
+            padding,
+        )
+    //?}
+
+    //? if <1.21.11 {
     // Draws [text] centered over the widget with vanilla scrolling-on-overflow behavior.
     protected fun drawScrollingLabel(g: GuiGraphicsCompat, text: Component, padding: Int) =
         renderScrollingString(
@@ -72,7 +83,8 @@ abstract class UiWidget(message: Component) : AbstractWidget(0, 0, 0, 0, message
             x + width - padding,
             y + height,
             ((alpha * 255).toInt().coerceIn(0, 255) shl 24) or 0xFFFFFF,
-        )*/
+        )
+    //?}*/
 
     override fun updateWidgetNarration(builder: NarrationElementOutput) {}
 }

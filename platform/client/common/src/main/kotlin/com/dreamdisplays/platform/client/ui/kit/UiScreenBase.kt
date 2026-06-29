@@ -81,7 +81,7 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
         height = (realH / s).toInt()
 
         val matrices = g.pose()
-        //? if >=26 {
+        //? if >=1.21.11 {
         matrices.pushMatrix()
         matrices.scale(s.toFloat(), s.toFloat())
         drawScreen(g, (mouseX / s).toInt(), (mouseY / s).toInt(), delta)

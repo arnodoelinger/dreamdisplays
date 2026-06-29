@@ -254,13 +254,17 @@ object ScreenRenderer : ClientRenderService {
             draw262(stack, type, appendVertices)
             //?} else
             /*run {
+                //? if <1.21.11 {
                 RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+                //?}
                 try {
                     val builder = Tesselator.getInstance().begin(type.mode(), type.format())
                     appendVertices(stack.last(), builder)
                     type.draw(builder.buildOrThrow())
                 } finally {
+                    //? if <1.21.11 {
                     RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+                    //?}
                 }
             }*/
         }

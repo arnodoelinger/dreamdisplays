@@ -280,7 +280,7 @@ class PipOverlay(
         val alpha = animProgress
 
         val matrices = g.pose()
-        //? if >=26 {
+        //? if >=1.21.11 {
         matrices.pushMatrix()
         matrices.translate(cx + pipW / 2f, cy + pipH / 2f)
         matrices.scale(scale, scale)
@@ -320,7 +320,7 @@ class PipOverlay(
             renderResizeHandle(g, handleX, handleY, alpha)
         }
 
-        //? if >=26 {
+        //? if >=1.21.11 {
         matrices.popMatrix()
         //?} else
         /*matrices.popPose()*/

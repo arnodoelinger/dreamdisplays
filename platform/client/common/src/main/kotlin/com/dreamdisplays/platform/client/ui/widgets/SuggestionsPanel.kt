@@ -10,7 +10,7 @@ import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.renderChild
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.platform.client.render.Thumbnails
-//? if >=26 {
+//? if >=1.21.11 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes
 //?}
 import net.minecraft.client.Minecraft
@@ -212,7 +212,7 @@ class SuggestionsPanel(
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
         g.disableScissor()
-        //? if >=26 {
+        //? if >=1.21.11 {
         if (hoveredCard in cards.indices) g.requestCursor(CursorTypes.POINTING_HAND)
         //?}
 
