@@ -11,6 +11,9 @@ import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.mojang.blaze3d.platform.NativeImage
+//? if >=1.21.11 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -292,6 +295,9 @@ class PipOverlay(
         matrices.translate((-pipW / 2f).toDouble(), (-pipH / 2f).toDouble(), 0.0)*/
 
         // Video content only. The main display texture is padded to fit the in-world display.
+        // On 1.21.1 the legacy blit draws with the POSITION_TEX shader (alpha comes from the shader
+        // color) but does not enable blending, so the fade alpha is invisible without enableBlend.
+        // 1.21.11+ uses a render pipeline that already blends, and bakes alpha into the blit color.
         //? if >=1.21.11 {
         g.blit(
             RenderPipelines.GUI_TEXTURED,
@@ -309,7 +315,7 @@ class PipOverlay(
             blendColor(0xFFFFFFFF.toInt(), alpha),
         )
         //?} else
-        /*g.setColor(1f, 1f, 1f, alpha); g.blit(id, 0, 0, pipW, pipH, content.x.toFloat(), content.y.toFloat(), content.w, content.h, fw, fh); g.setColor(1f, 1f, 1f, 1f)*/
+        /*RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc(); g.setColor(1f, 1f, 1f, alpha); g.blit(id, 0, 0, pipW, pipH, content.x.toFloat(), content.y.toFloat(), content.w, content.h, fw, fh); g.setColor(1f, 1f, 1f, 1f)*/
 
         // Border
         val active = hovering || dragging || resizing

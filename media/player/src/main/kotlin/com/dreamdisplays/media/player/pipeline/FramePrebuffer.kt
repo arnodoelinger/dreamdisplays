@@ -53,6 +53,15 @@ internal class FramePrebuffer(
     private val firstFramePresented = AtomicBoolean(false)
     private var consumer: Thread? = null
 
+    /**
+     * Invoked on the consumer thread for each frame right after it passes pacing and before it is
+     * presented, with the ready buffer (position 0, limit = frame size). Used to feed paced copies
+     * such as the PiP / popout sink so they stay in sync with the in-world display instead of being
+     * fed at the faster decode rate. The callback must leave the buffer ready for presentation.
+     */
+    @Volatile
+    var onPresent: ((ByteBuffer) -> Unit)? = null
+
     /** Starts the consumer thread. Call once, before the first [submit]. */
     fun start() {
         consumer = daemon(::consume, "MediaPlayer-prebuffer-$debugLabel").also { it.start() }
@@ -117,6 +126,7 @@ internal class FramePrebuffer(
                     surface.recycleFrameBuffer(tf.buf)
                     continue
                 }
+                onPresent?.invoke(tf.buf)
                 surface.present(tf.buf)
                 if (firstFramePresented.compareAndSet(false, true)) {
                     onFirstFrame()

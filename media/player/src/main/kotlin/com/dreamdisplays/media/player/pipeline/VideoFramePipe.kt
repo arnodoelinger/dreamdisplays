@@ -110,6 +110,11 @@ internal class VideoFramePipe(
         val prebuffer = FramePrebuffer.createIfEnabled(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
+        // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
+        // in-world display; feeding at decode time would run the popout ahead by the buffer depth.
+        prebuffer?.onPresent = { buf ->
+            popoutFrameSink?.let { sink -> sink(buf, w, h, FramePixelFormat.RGB24); buf.rewind() }
+        }
         return daemon(
             {
                 read(
@@ -211,9 +216,12 @@ internal class VideoFramePipe(
 
                     if (prebuffer != null) {
                         // Producer path: hand the decoded frame to the jitter buffer; the consumer thread
-                        // paces and presents it (and fires onFirstFrame after the prefill).
-                        popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
+                        // paces and presents it (and feeds the popout via prebuffer.onPresent, and fires
+                        // onFirstFrame after the prefill).
                         if (!MediaPlayer.captureSamples) {
+                            // Benchmark-only path: frames are never submitted / presented, so feed the
+                            // popout here (otherwise it would never receive a frame).
+                            popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
                             videoPts += frameNs; continue
                         }
                         spare = prebuffer.submit(spare, videoPts, requiredFrameSize)

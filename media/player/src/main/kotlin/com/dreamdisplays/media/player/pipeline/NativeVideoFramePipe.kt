@@ -315,6 +315,9 @@ internal class NativeVideoFramePipe(
         val lav = handle == 0L && lavHandle != 0L
         val prerollMarginNs = maxOf(frameNs * 2L, LAV_PREROLL_MARGIN_NS)
         val metrics = NativeReadMetrics(debugLabel, if (lav) "lav" else "process", w, h, frameSize)
+        // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
+        // in-world display instead of running ahead at the decode rate.
+        prebuffer?.onPresent = { buf -> feedPopout(buf, w, h, frameSize, metrics) }
         while (!terminated.get() && !stopFlag.get()) {
             // Parked (display out of render distance): idle without decoding, keeping the native session
             // open so resuming reads the next frame instantly. Refresh the stall timestamp on wake.
@@ -392,7 +395,11 @@ internal class NativeVideoFramePipe(
                 continue
             }
 
-            feedPopout(spare, w, h, frameSize, metrics)
+            // With a prebuffer active, the paced consumer feeds the popout (prebuffer.onPresent);
+            // feed here only on the inline path or the benchmark (no-submit) path.
+            if (prebuffer == null || !MediaPlayer.captureSamples) {
+                feedPopout(spare, w, h, frameSize, metrics)
+            }
 
             if (!MediaPlayer.captureSamples) {
                 if (MediaPlayer.DEBUG) metrics.recordNotPublished()
