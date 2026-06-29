@@ -24,7 +24,7 @@ object UpdateCheck {
 
     /**
      * Returns true if the UI update arrow should be shown.
-     * Suppressed on DEV / SNAPSHOT builds and when the current version is already newer than the latest stable.
+     * Suppressed on dev / preview builds and when the current version is already newer than the latest stable.
      */
     fun shouldShowArrow(): Boolean {
         if (isPreRelease(GeneralUtil.getModVersion())) return false
@@ -33,9 +33,9 @@ object UpdateCheck {
         return compareVersions(latest, GeneralUtil.getModVersion()) > 0
     }
 
-    /** If [version] is a DEV or SNAPSHOT build, returns true. */
+    /** If [version] is a dev or preview build, returns true. */
     fun isPreRelease(version: String): Boolean =
-        version.contains("-DEV", ignoreCase = true) || version.contains("-SNAPSHOT", ignoreCase = true)
+        version.contains("-dev", ignoreCase = true) || version.contains("-preview", ignoreCase = true)
 
     /** Start the background update check exactly once; subsequent calls are no-ops. */
     @Synchronized

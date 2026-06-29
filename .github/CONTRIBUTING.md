@@ -12,11 +12,11 @@ your help makes the project better for everyone.
 
 ### Version policy
 
-| Version example    | GitHub               | Modrinth / CurseForge | Notes                                  |
-|--------------------|----------------------|-----------------------|----------------------------------------|
-| `1.7.0-DEV`        | Build artifacts only | —                     | Work-in-progress; nothing published    |
-| `1.7.0-SNAPSHOT.1` | Pre-release          | Alpha channel         | Numbered snapshots are public previews |
-| `1.7.0`            | Release              | Alpha channel         | Stable release                         |
+| Version example    | Display name       | GitHub               | Modrinth / CurseForge | Notes                                |
+|--------------------|--------------------|----------------------|-----------------------|--------------------------------------|
+| `1.7.0-dev`        | `1.7.0 Developer`  | Build artifacts only | —                     | Work-in-progress; nothing published  |
+| `1.7.0-preview.1`  | `1.7.0 Preview 1`  | Pre-release          | Alpha channel         | Numbered previews are public test builds |
+| `1.7.0`            | `1.7.0 Release`    | Release              | Alpha channel         | Stable release                       |
 
 ### Tips
 
