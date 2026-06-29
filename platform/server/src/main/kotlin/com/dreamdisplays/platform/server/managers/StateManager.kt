@@ -25,6 +25,7 @@ import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.jvm.JvmName
 
 /**
  * Manages server-side playback state for synced displays. Processes sync packets from clients,
@@ -180,6 +181,7 @@ object StateManager {
 
     /** Resets the server-side clock for [displayId] to 0 (called when owner switches video). */
     @FabricOnly
+    @JvmName("resetAndBroadcastFabric")
     fun resetAndBroadcast(displayId: UUID, receivers: List<ServerPlayer>) {
         val state = resetState(displayId) ?: return
         val display = getDisplayData(displayId) as? FabricDisplayData

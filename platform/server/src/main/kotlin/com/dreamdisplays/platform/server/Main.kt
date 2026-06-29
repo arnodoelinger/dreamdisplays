@@ -9,7 +9,6 @@ import com.dreamdisplays.platform.server.listeners.FabricSelectionListener
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.StorageManager
-import com.dreamdisplays.platform.server.meta.FabricUpdater
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.metrics.TelemetryMetrics
@@ -21,7 +20,6 @@ import com.dreamdisplays.platform.server.registrar.ChannelRegistrar
 import com.dreamdisplays.platform.server.registrar.CommandRegistrar
 import com.dreamdisplays.platform.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.platform.server.registrar.ListenerRegistrar
-import com.dreamdisplays.platform.server.registrar.SchedulerRegistrar
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.FabricV2Networking
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
@@ -104,9 +102,16 @@ class Main : JavaPlugin() {
 
         ListenerRegistrar.registerListeners(this)
         ChannelRegistrar.registerChannels(this)
-        SchedulerRegistrar.runRepeatingTasks(this)
+        runRepeatingTasks()
 
         TelemetryMetrics.register(this, Metrics(this, 26488))
+    }
+
+    /** Calls the Paper-only scheduler registrar without requiring its symbol in Fabric compilation. */
+    private fun runRepeatingTasks() {
+        val registrarClass = Class.forName("com.dreamdisplays.platform.server.registrar.SchedulerRegistrar")
+        val registrar = registrarClass.getField("INSTANCE").get(null)
+        registrarClass.getMethod("runRepeatingTasks", Main::class.java).invoke(registrar, this)
     }
 
     /** Persists state and tears down resources. Safe to call from a reload. */
@@ -269,13 +274,21 @@ class Server : ModInitializer {
         if (settings.updatesEnabled) {
             ServerCoroutines.io.launch {
                 delay(1000L.milliseconds)
-                runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                runCatching { checkForUpdates(settings.repoOwner, settings.repoName) }
                 while (!server.isStopped) {
                     delay((60L * 60L * 1000L).milliseconds)
-                    runCatching { FabricUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                    runCatching { checkForUpdates(settings.repoOwner, settings.repoName) }
                 }
             }
         }
+    }
+
+    /** Calls the `Fabric`-only updater without requiring its symbol in `Paper` compilation. */
+    private fun checkForUpdates(repoOwner: String, repoName: String) {
+        val updaterClass = Class.forName("com.dreamdisplays.platform.server.meta.FabricUpdater")
+        val updater = updaterClass.getField("INSTANCE").get(null)
+        updaterClass.getMethod("checkForUpdates", String::class.java, String::class.java)
+            .invoke(updater, repoOwner, repoName)
     }
 
     companion object {

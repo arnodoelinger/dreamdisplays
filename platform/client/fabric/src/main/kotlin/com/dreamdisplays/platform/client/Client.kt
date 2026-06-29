@@ -16,11 +16,18 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
 //? if >=1.21.11 {
 import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
+//?} else
+/*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback*/
+//? if >=26 {
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
-//?} else
-/*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents*/
+//?}
+//? if ==1.21.11 {
+import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents
+//?}
+//? if <1.21.11 {
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents
+//?}
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -66,7 +73,7 @@ class Client : ClientModInitializer, Mod {
             }
         }
 
-        //? if >=1.21.11 {
+        //? if >=26 {
         LevelRenderEvents.BEFORE_GIZMOS.register { context ->
             val mc = Minecraft.getInstance()
             if (mc.level != null && mc.player != null) {
@@ -132,7 +139,7 @@ class Client : ClientModInitializer, Mod {
         ClientPlayNetworking.send(packet)
     }
 
-    //? if >=1.21.11 {
+    //? if >=26 {
     /** Renders the screen using the `submitNodeCollector` API. */
     private fun renderSubmittedScreens(context: LevelRenderContext, mc: Minecraft) {
         val camera = mainCamera(mc)
