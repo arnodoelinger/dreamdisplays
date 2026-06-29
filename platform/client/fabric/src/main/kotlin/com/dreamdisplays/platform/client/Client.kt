@@ -21,13 +21,15 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 //? if >=26 {
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
 import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
-//?}
+//?} else
+/*
 //? if ==1.21.11 {
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents
 //?}
 //? if <1.21.11 {
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents
 //?}
+*/
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
