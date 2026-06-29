@@ -12,10 +12,12 @@ on:
     outputs:
       version:
         value: ${{ jobs.metadata.outputs.version }}
+      pretty_version:
+        value: ${{ jobs.metadata.outputs.pretty_version }}
       is_dev:
         value: ${{ jobs.metadata.outputs.is_dev }}
-      is_snapshot:
-        value: ${{ jobs.metadata.outputs.is_snapshot }}
+      is_preview:
+        value: ${{ jobs.metadata.outputs.is_preview }}
       is_release:
         value: ${{ jobs.metadata.outputs.is_release }}
       is_marketplace_publishable:
@@ -35,8 +37,9 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      pretty_version: ${{ steps.get_version.outputs.pretty_version }}
       is_dev: ${{ steps.get_version.outputs.is_dev }}
-      is_snapshot: ${{ steps.get_version.outputs.is_snapshot }}
+      is_preview: ${{ steps.get_version.outputs.is_preview }}
       is_release: ${{ steps.get_version.outputs.is_release }}
       is_marketplace_publishable: ${{ steps.get_version.outputs.is_marketplace_publishable }}
       stonecutter_versions: ${{ steps.stonecutter_versions.outputs.versions_json }}
@@ -138,26 +141,34 @@ jobs:
           VERSION=$(grep '^version' gradle.properties | cut -d'=' -f2 | tr -d ' ')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          if [[ "$VERSION" == *"-DEV" ]]; then
+          # Version channels and their "pretty" display names:
+          #   1.8.4-dev        -> Developer  (build artifacts only, never published)
+          #   1.9.0-preview.5  -> Preview 5  (public alpha pre-release)
+          #   1.8.4            -> Release    (stable, public release)
+          if [[ "$VERSION" =~ ^([0-9]+(\.[0-9]+)*)-dev$ ]]; then
             echo "is_dev=true" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=false" >> $GITHUB_OUTPUT
-          elif [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*-SNAPSHOT\.[0-9]+$ ]]; then
+            echo "pretty_version=${BASH_REMATCH[1]} Developer" >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" =~ ^([0-9]+(\.[0-9]+)*)-preview\.([0-9]+)$ ]]; then
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "is_preview=true" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=true" >> $GITHUB_OUTPUT
+            echo "pretty_version=${BASH_REMATCH[1]} Preview ${BASH_REMATCH[3]}" >> $GITHUB_OUTPUT
           elif [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=true" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=true" >> $GITHUB_OUTPUT
+            echo "pretty_version=$VERSION Release" >> $GITHUB_OUTPUT
           else
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=false" >> $GITHUB_OUTPUT
+            echo "pretty_version=$VERSION" >> $GITHUB_OUTPUT
           fi
 
   build-natives:

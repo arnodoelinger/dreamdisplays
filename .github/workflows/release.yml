@@ -1,6 +1,7 @@
+# Publishing pipeline. Runs only for explicit release tags or a manual maintainer dispatch.
+
 name: Release
 
-# Publishing pipeline. Runs only for explicit release tags or a manual maintainer dispatch.
 on:
   push:
     tags:
@@ -29,25 +30,25 @@ jobs:
 
     steps:
       - name: No GitHub pre-release needed
-        if: needs.build.outputs.is_dev != 'true' && needs.build.outputs.is_snapshot != 'true'
-        run: echo "Version ${{ needs.build.outputs.version }} is not a dev or snapshot pre-release."
+        if: needs.build.outputs.is_dev != 'true' && needs.build.outputs.is_preview != 'true'
+        run: echo "Version ${{ needs.build.outputs.version }} is not a dev or preview pre-release."
 
       - name: Checkout repository
-        if: needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_snapshot == 'true'
+        if: needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_preview == 'true'
         uses: actions/checkout@v6.0.3
         with:
           fetch-depth: 0
 
       - name: Download all build artifacts
-        if: needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_snapshot == 'true'
+        if: needs.build.outputs.is_dev == 'true' || needs.build.outputs.is_preview == 'true'
         uses: actions/download-artifact@v8.0.1
         with:
           pattern: build-jars-*
           path: build/libs
           merge-multiple: true
 
-      - name: Extract snapshot changelog
-        if: needs.build.outputs.is_snapshot == 'true'
+      - name: Extract preview changelog
+        if: needs.build.outputs.is_preview == 'true'
         run: |
           python3 - <<'EOF'
           import re
@@ -56,8 +57,8 @@ jobs:
           with open("CHANGELOG.md") as f:
               content = f.read()
 
-          version = "${{ needs.build.outputs.version }}"
-          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          pretty_version = "${{ needs.build.outputs.pretty_version }}"
+          pattern = rf"^# {re.escape(pretty_version)}\s*\n(.*?)(?=\n# \S|\Z)"
           match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
 
           if not match:
@@ -92,15 +93,15 @@ jobs:
         run: |
           TAG="v${{ needs.build.outputs.version }}"
           gh release delete "$TAG" --repo "${{ github.repository }}" --yes 2>/dev/null || true
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease --notes "" build/libs/dreamdisplays-*.jar
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.pretty_version }}" --prerelease --notes "" build/libs/dreamdisplays-*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Publish snapshot pre-release
-        if: needs.build.outputs.is_snapshot == 'true'
+      - name: Publish preview pre-release
+        if: needs.build.outputs.is_preview == 'true'
         run: |
           TAG="v${{ needs.build.outputs.version }}"
-          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.version }}" --prerelease --notes-file changelog.md build/libs/dreamdisplays-*.jar \
+          gh release create "$TAG" --repo "${{ github.repository }}" --title "${{ needs.build.outputs.pretty_version }}" --prerelease --notes-file changelog.md build/libs/dreamdisplays-*.jar \
           || gh release upload "$TAG" build/libs/dreamdisplays-*.jar --repo "${{ github.repository }}" --clobber
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -182,7 +183,7 @@ jobs:
           EOF
 
       - name: Extract changelog
-        if: needs.build.outputs.is_marketplace_publishable == 'true' && (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true')
+        if: needs.build.outputs.is_marketplace_publishable == 'true' && (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_preview == 'true')
         run: |
           python3 - <<'EOF'
           import os
@@ -193,13 +194,14 @@ jobs:
               content = f.read()
 
           version = "${{ needs.build.outputs.version }}"
-          is_snapshot = "${{ needs.build.outputs.is_snapshot }}" == "true"
+          pretty_version = "${{ needs.build.outputs.pretty_version }}"
+          is_preview = "${{ needs.build.outputs.is_preview }}" == "true"
 
-          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          pattern = rf"^# {re.escape(pretty_version)}\s*\n(.*?)(?=\n# \S|\Z)"
           match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
 
           if not match:
-              if is_snapshot:
+              if is_preview:
                   with open("changelog.md", "w") as f:
                       f.write("")
                   sys.exit(0)
@@ -232,9 +234,9 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && matrix.task.kind == 'paper'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Paper] Dream Displays ${{ needs.build.outputs.version }}'
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Paper 1.21+'
           version: paper-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-paper-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
@@ -250,9 +252,9 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && matrix.task.kind == 'fabric'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Fabric ${{ steps.versions.outputs.display_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Fabric ${{ matrix.task.mc }}'
           version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
@@ -269,9 +271,9 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && matrix.task.kind == 'fabric' && steps.versions.outputs.curseforge_publishable == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[Fabric ${{ steps.versions.outputs.display_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Fabric ${{ matrix.task.mc }}'
           version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
@@ -287,9 +289,9 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && matrix.task.kind == 'neoforge'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[NeoForge ${{ steps.versions.outputs.display_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — NeoForge ${{ matrix.task.mc }}'
           version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           modrinth-id: dreamdisplays
@@ -302,9 +304,9 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && matrix.task.kind == 'neoforge' && steps.versions.outputs.curseforge_publishable == 'true'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: '[NeoForge ${{ steps.versions.outputs.display_mc }}] Dream Displays ${{ needs.build.outputs.version }}'
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — NeoForge ${{ matrix.task.mc }}'
           version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
-          version-type: ${{ needs.build.outputs.is_snapshot == 'true' && 'alpha' || 'release' }}
+          version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
           curseforge-id: ${{ secrets.CURSEFORGE_PROJECT_ID }}
@@ -324,6 +326,7 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && needs.build.outputs.is_release == 'true' && matrix.task.kind == 'paper'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
+          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }}'
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: v${{ needs.build.outputs.version }}
           github-generate-changelog: false
@@ -335,7 +338,7 @@ jobs:
     name: Announce release on Discord
     runs-on: ubuntu-latest
     needs: [build, publish]
-    if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_snapshot == 'true') && needs.build.outputs.is_marketplace_publishable == 'true'
+    if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_preview == 'true') && needs.build.outputs.is_marketplace_publishable == 'true'
     permissions:
       contents: read
 
@@ -349,7 +352,8 @@ jobs:
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
           VERSION: ${{ needs.build.outputs.version }}
-          IS_SNAPSHOT: ${{ needs.build.outputs.is_snapshot }}
+          PRETTY_VERSION: ${{ needs.build.outputs.pretty_version }}
+          IS_PREVIEW: ${{ needs.build.outputs.is_preview }}
         run: |
           python3 - <<'EOF'
           import json
@@ -363,12 +367,13 @@ jobs:
               sys.exit("DISCORD_WEBHOOK secret is not set.")
 
           version = os.environ["VERSION"]
-          is_snapshot = os.environ.get("IS_SNAPSHOT", "") == "true"
+          pretty_version = os.environ.get("PRETTY_VERSION", version)
+          is_preview = os.environ.get("IS_PREVIEW", "") == "true"
 
           with open("CHANGELOG.md") as f:
               content = f.read()
 
-          pattern = rf"^# Version {re.escape(version)}\s*\n(.*?)(?=\n# Version |\Z)"
+          pattern = rf"^# {re.escape(pretty_version)}\s*\n(.*?)(?=\n# \S|\Z)"
           match = re.search(pattern, content, re.DOTALL | re.MULTILINE)
           if not match:
               sys.exit(f"Version {version} not found in CHANGELOG.md.")
@@ -388,17 +393,17 @@ jobs:
           else:
               highlights_text = "- See the full changelog below for all changes."
 
-          if is_snapshot:
+          if is_preview:
               intro = (
                   "### Warning\n"
-                  "**This is an experimental snapshot and may be unstable.** "
+                  "**This is an experimental preview and may be unstable.** "
                   "It may contain bugs, incomplete features, or breaking changes.\n"
               )
           else:
               intro = "A new version of Dream Displays is now available!\n"
 
           description = (
-              f"## Dream Displays {version}\n"
+              f"## Dream Displays {pretty_version}\n"
               f"{intro}"
               "### Highlights\n"
               f"{highlights_text}\n\n"

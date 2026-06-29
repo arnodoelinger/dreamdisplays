@@ -1,19 +1,37 @@
-# Version 1.8.5
+# 1.8.5 Release
+
+## Highlights
+
+- 1.21.1 support
+- Improve versionizing
+- Codebase improvements
 
 ## Client
 
+### Features
+
+- Support 1.21.1
+
 ### Improvements
 
+- Previews have replaced snapshots
+- Now versions have pretty style format
 - Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
 - Discord publisher integration
 
 ## Server
 
+### Features
+
+- Support 1.21.1
+
 ### Improvements
 
+- Previews have replaced snapshots
+- Now versions have pretty style format
 - Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
 
-# Version 1.8.4
+# 1.8.4 Release
 
 ## Client
 
@@ -55,7 +73,7 @@
 - Fixed audio-language validation before saving and rebroadcasting it
 - Fixed a rare internal service lookup issue that could affect features with multiple service implementations
 
-# Version 1.8.3
+# 1.8.3 Release
 
 ## Client
 
@@ -101,7 +119,7 @@
 - Fixed a race that let concurrent reports slip past the report cooldown
 - Fixed default permissions; (local), synced and broadcast are for all players, no only for OPs
 
-# Version 1.8.2
+# 1.8.2 Release
 
 ## Client
 
@@ -127,7 +145,7 @@
 - Players can no longer spam the report system
 - Improved Dream Displays security
 
-# Version 1.8.1
+# 1.8.1 Release
 
 ## Client
 
@@ -157,7 +175,7 @@
 - Single-player displays are now stored per-world instead of the global database
 - Replaced hardcoded max dimensions with placeholders
 
-# Version 1.8.0
+# 1.8.0 Release
 
 ## Highlights
 
@@ -301,105 +319,7 @@
 - Fixed several `Fabric` server compatibility issues
 - Fixed several small server-side stability issues
 
-# Version 1.8.0-SNAPSHOT.2
-
-## Highlights
-
-- 10-12× faster video downloading
-- Faster DRM-protected videos handling
-- Fix critical crash on the `Fabric` 1.21.11 version
-- Fix incompatibility between the popout window and `Vivecraft` mod
-
-## Client
-
-### Features
-
-- 10-12× faster video downloading
-
-### Improvements
-
-- Enhance the client codebase with managers
-- Faster DRM-protected videos handling
-- Remove Gradle cache configuration
-
-### Fixes
-
-- Fix critical crash on the `Fabric` 1.21.11 version
-- Fix incompatibility between the popout window and `Vivecraft` mod
-- Fix DRM waiting issue
-- Less log spam
-
-## Server
-
-- No changes
-
-# Version 1.8.0-SNAPSHOT.1
-
-## Highlights
-
-- Support 26.2-pre4 version
-- Back 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
-- Use `Stonecutter` for the multiversion system
-- Support `Vulcan` for display rendering (`OpenGL` still supported)
-- Implement 1.21.11 support for `Fabric` servers
-- Critical `Quilt` entry point crash fix
-- `MariaDB` compatibility issue fix ([#88](https://github.com/arsmotorin/dreamdisplays/pull/88))
-- Picture-in-Picture mode displays size calculation fix
-
-## Client
-
-### Features
-
-- Support 26.2-pre4 version
-- Back 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
-- Use `Stonecutter` for the multiversion system
-- Support `Vulcan` for display rendering (`OpenGL` still supported)
-- Use default config implementation instead of `AbstractConfig`
-- Use `LoggerFactory` for logging
-- A bit fresher mod icon
-
-### Improvements
-
-- Reorganize the project structure
-- Video frame pipeline stability and brightness handling
-- Enhance cookie handling and process management
-- Improve `Gradle` configuration
-- Workflow improvements
-- Improve the publishing system
-- Remove INotSleep's utils
-- Update dependencies
-
-### Fixes
-
-- Critical `Quilt` entry point crash
-- Ancient bug between `NeoForge` and IntelliJ IDEA
-- `NeoForge` client shutdown on normal server disconnect
-- `FFmpeg` extraction on Linux ([#93](https://github.com/arsmotorin/dreamdisplays/issues/93))
-- Picture-in-Picture mode displays size calculation
-- Temporary focus mute no longer overwrites the user's mute setting
-- Unsafe server display cache filenames on some systems
-- Invalid display sizes no longer create broken client textures
-
-## Server
-
-### Features
-
-- Support 26.2-pre4 `Fabric` servers
-- Implement 1.21.11 support for `Fabric` servers
-- Back Java 21 support (if you're running on 1.21.11, you can still use Java 21 with this version instead of being forced to update to Java 25, as it was in previous versions)
-
-### Improvements
-
-- Remove the useless report button in single-player
-- Improve `Gradle` configuration
-- Update dependencies
-
-### Fixes
-
-- `MariaDB` compatibility issue ([#88](https://github.com/arsmotorin/dreamdisplays/pull/88))
-- Allow sending display enabled packets to clients
-
-# Version 1.7.1
+# 1.7.1 Release
 
 ## Client
 
@@ -428,7 +348,7 @@
 
 - `FabricDisplayData` error when server shutdowns
 
-# Version 1.7.0
+# 1.7.0 Release
 
 ## Highlights
 
@@ -489,99 +409,7 @@
 - Add dynamic material messages
 - Update dependencies and replace some of them with better alternatives
 
-# Version 1.7.0-SNAPSHOT.4
-
-## Highlights
-
-- Now you can decide whether to lock or unlock a display from modifying by other players in the menu
-- New async texture uploader with a triple-buffered PBO ring
-- Hardware-accelerated `FFmpeg` video decoding
-- Update Paper API to the 65-stable build
-
-## Mod
-
-- Now you can decide whether to lock or unlock a display from modifying by other players in the menu (works only on servers with the new plugin version)
-- New async texture uploader with a triple-buffered PBO ring
-- Hardware-accelerated `FFmpeg` video decoding
-- Reimplement fix of OpenGL `GL_INVALID_VALUE` error in all modes
-- Skip restoring saved time if sync is active
-- Fix cropping at display edges
-- Fix tiled thumbnail rendering in the menu
-- Fix mute logic and allow players to mute displays in sync mode
-- Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
-- Fix a locked quality bug ([#80](https://github.com/arsmotorin/dreamdisplays/issues/80))
-- Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
-- Fix texture race crash in some rare cases
-- Fix seek time overwriting the current playback time
-- Fix hanging `yt-dlp` when cookies are unavailable
-- Fix no display territories translations (you need to use axe, not pickaxe)
-
-## Server
-
-- Follow the client's feature of lock / unlock displays
-- Preserve sync mode when switching videos
-- Broadcast synced display state every 2 seconds
-- Update Paper API to the 65-stable build
-
-# Version 1.7.0-SNAPSHOT.3
-
-## Highlights
-
-- Use RGB format instead of RGBA for Picture-in-Picture mode
-- Fix OpenGL `GL_INVALID_VALUE` error in windowed mode
-- Fix `EXCEPTION_ACCESS_VIOLATION` crash because of `GL_INVALID_VALUE` errors
-
-## Mod
-
-- Use RGB format instead of RGBA for Picture-in-Picture mode
-- Fix OpenGL `GL_INVALID_VALUE` error in windowed mode
-- Fix `EXCEPTION_ACCESS_VIOLATION` crash because of `GL_INVALID_VALUE` errors
-
-## Server
-
-- No changes
-
-# Version 1.7.0-SNAPSHOT.2
-
-## Highlights
-
-- Windowed and Picture-in-Picture mode
-- Enhance YouTube's cache for stability
-- Fix OpenGL `GL_INVALID_VALUE` error
-
-## Mod
-
-- Windowed and Picture-in-Picture mode
-- Enhance YouTube's cache for stability
-- Enhance watchdog logic for low connection networks and stability
-- Fix OpenGL `GL_INVALID_VALUE` error
-
-## Server
-
-- No changes
-
-# Version 1.7.0-SNAPSHOT.1
-
-## Highlights
-
-- Support 26.1.2 version and Java 25
-- Support Fabric servers
-- Switch from RGBA to RGB24 for improved rendering performance
-
-## Mod
-
-- Support 26.1.2 version and Java 25
-- Support Fabric servers
-- Switch from RGBA to RGB24 for improved rendering performance
-- Reduce maximum brightness from 200% to 100%
-- Videos now stop rendering (but still plays) when Minecraft is minimized
-
-## Server
-
-- Some documentation standardization
-
-# Version 1.6.3
+# 1.6.3 Release
 
 ## Mod
 
@@ -600,7 +428,7 @@
 - Standardize logs, warnings and errors
 - Reformat codebase
 
-# Version 1.6.2
+# 1.6.2 Release
 
 ## Mod
 
@@ -629,7 +457,7 @@
 - Batch display info packets on player join to prevent client overload on servers with many displays
 - Validate sync packet time values to reject out-of-range data
 
-# Version 1.6.1
+# 1.6.1 Release
 
 ## Mod
 
@@ -642,7 +470,7 @@
 
 - No changes
 
-# Version 1.6.0
+# 1.6.0 Release
 
 ## Highlights
 
@@ -682,7 +510,7 @@
 - Inform player about a display if they don't have the mod installed when they try to touch it
 - Various optimizations and some small bug fixes
 
-# Version 1.5.0
+# 1.5.0 Release
 
 ## Highlights
 
@@ -704,7 +532,7 @@
 
 - No changes
 
-# Version 1.4.4
+# 1.4.4 Release
 
 ## Mod
 
@@ -720,7 +548,7 @@
 - Add admin target mode for `/display on|off <player>`
 - Improve `/display reload` output with what was reloaded
 
-# Version 1.4.3
+# 1.4.3 Release
 
 ## Mod
 
@@ -743,7 +571,7 @@
 - Player-only `/display` subcommands now return a clear console message instead of failing silently
 - Fixed scheduler timing mismatch between Bukkit and Folia
 
-# Version 1.4.2
+# 1.4.2 Release
 
 ## Mod
 
@@ -759,7 +587,7 @@
 - Handle failed config gracefully
 - Remove unnecessary warnings and logs
 
-# Version 1.4.1
+# 1.4.1 Release
 
 ## Mod
 
@@ -775,7 +603,7 @@
 - Fix releasing snapshots when pull requesting
 - Add Kolyakot33 as a contributor
 
-# Version 1.4.0
+# 1.4.0 Release
 
 ## Highlights
 
@@ -794,7 +622,7 @@
 - Fix display directions not being created properly in some cases
 - Cleanup codebase
 
-# Version 1.3.2
+# 1.3.2 Release
 
 ## Mod
 
@@ -804,7 +632,7 @@
 
 - No changes
 
-# Version 1.3.1
+# 1.3.1 Release
 
 ## Mod
 
@@ -817,7 +645,7 @@
 
 - Detect snapshot versions correctly
 
-# Version 1.3.0
+# 1.3.0 Release
 
 ## Highlights
 
@@ -846,7 +674,7 @@
 - Documentation in codebase of the plugin
 - Improve update logic and fix ignoring mod versions ([#63](https://github.com/arsmotorin/dreamdisplays/issues/63))
 
-# Version 1.2.0
+# 1.2.0 Release
 
 ## Highlights
 
@@ -877,7 +705,7 @@
 - Fix reporting message not showing correctly
 - Fix wrong command usage message logic
 
-# Version 1.1.3
+# 1.1.3 Release
 
 ## Mod
 
@@ -890,7 +718,7 @@
 
 - No changes
 
-# Version 1.1.2
+# 1.1.2 Release
 
 ## Mod
 
@@ -904,7 +732,7 @@
 - Add message when client doesn't have the mod installed
 - Better releases system of mod
 
-# Version 1.1.1
+# 1.1.1 Release
 
 ## Mod
 
@@ -917,7 +745,7 @@
 
 - Fix display desynchronization with server and client
 
-# Version 1.1.0
+# 1.1.0 Release
 
 ## Highlights
 
@@ -957,7 +785,7 @@
 - Removed hourly update notifications from the console
 - bStats
 
-# Version 1.0.8
+# 1.0.8 Release
 
 ## Mod
 
@@ -972,7 +800,7 @@
 - More languages for plugin configuration
 - .toml format for configuration files
 
-# Version 1.0.7
+# 1.0.7 Release
 
 ## Mod
 
@@ -984,7 +812,7 @@
 - Better comments in plugin configuration
 - Discontinue FrogDisplays channel support
 
-# Version 1.0.6
+# 1.0.6 Release
 
 ## Mod
 
@@ -999,7 +827,7 @@
 
 - Bump version
 
-# Version 1.0.5
+# 1.0.5 Release
 
 ## Mod
 
@@ -1009,7 +837,7 @@
 
 - Bump version
 
-# Version 1.0.4
+# 1.0.4 Release
 
 ## Mod
 
@@ -1031,7 +859,7 @@
 - Added support for old mod clients
 - Added plugin information
 
-# Version 1.0.3
+# 1.0.3 Release
 
 ## Mod
 
@@ -1041,7 +869,7 @@
 
 - First public version
 
-# Version 1.0.2
+# 1.0.2 Release
 
 ## Mod
 
@@ -1051,7 +879,7 @@
 
 - Bump version (not public)
 
-# Version 1.0.1
+# 1.0.1 Release
 
 ## Mod
 
@@ -1061,7 +889,7 @@
 
 - Bump version (not public)
 
-# Version 1.0.0
+# 1.0.0 Release
 
 ## Highlights
 
