@@ -289,7 +289,12 @@ object ServerPacketHandler {
 
     /** Checks if [player] has operator level 2 permissions, which is the threshold for privileged actions. */
     fun isOpLevel2(player: ServerPlayer): Boolean {
-        return player.server.playerList.isOp(
+        val server =
+            //? if >=1.21.11 {
+            player.level().server
+            //?} else
+            /*player.serverLevel().server*/
+        return server.playerList.isOp(
             //? if >=1.21.11 {
             NameAndId(player.gameProfile)
             //?} else
