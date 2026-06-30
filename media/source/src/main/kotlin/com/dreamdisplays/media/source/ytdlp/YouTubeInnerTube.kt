@@ -1,11 +1,15 @@
 package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.search.MediaSearchResult
-import com.dreamdisplays.media.source.ytdlp.YouTubeInnerTube.runsText
-import com.dreamdisplays.util.*
+import com.dreamdisplays.util.array
+import com.dreamdisplays.util.asJsonArrayOrNull
+import com.dreamdisplays.util.asJsonObjectOrNull
+import com.dreamdisplays.util.obj
+import com.dreamdisplays.util.optString
 import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory

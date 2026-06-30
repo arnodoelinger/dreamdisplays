@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import java.util.*
+import java.util.Locale
 
 /**
  * Browsers `yt-dlp` can export cookies from via `--cookies-from-browser`, plus [NONE] for the

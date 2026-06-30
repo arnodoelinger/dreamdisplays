@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.utils.net
 
 import com.dreamdisplays.core.protocol.ClientHello
-import java.util.*
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**

@@ -1,17 +1,16 @@
 package com.dreamdisplays.platform.client.ui.menu
 
-import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.api.media.MediaFailureKind
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawPanel
-import com.dreamdisplays.platform.client.ui.menu.ErrorPanel.Companion.MAX_DETAIL_LINES
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
+import com.dreamdisplays.api.media.DreamMediaException
+import com.dreamdisplays.api.media.MediaFailureKind
 import net.minecraft.ChatFormatting
-import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
+import net.minecraft.client.Minecraft
 import net.minecraft.network.chat.Component
 import kotlin.math.min
 

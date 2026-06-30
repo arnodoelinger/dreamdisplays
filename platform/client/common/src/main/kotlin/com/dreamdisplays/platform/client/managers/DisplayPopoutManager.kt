@@ -1,16 +1,16 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutManager
-import com.dreamdisplays.platform.client.render.toUploadFormat
 import com.dreamdisplays.platform.client.ui.PipCorner
 import com.dreamdisplays.platform.client.ui.PipOverlay
 import com.dreamdisplays.platform.client.ui.PipOverlayManager
 import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.platform.client.render.toUploadFormat
 import org.slf4j.LoggerFactory
 
 /**

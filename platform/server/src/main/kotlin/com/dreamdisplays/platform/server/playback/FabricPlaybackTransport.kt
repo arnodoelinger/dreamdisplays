@@ -9,7 +9,7 @@ import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import io.github.arsmotorin.ofrat.FabricOnly
 import net.minecraft.server.MinecraftServer
-import java.util.*
+import java.util.UUID
 
 /** `Fabric` implementation of [PlaybackTransport]: v2 envelopes via [FabricV2Networking]. */
 @FabricOnly

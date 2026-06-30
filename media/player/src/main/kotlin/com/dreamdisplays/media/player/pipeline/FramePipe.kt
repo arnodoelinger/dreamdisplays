@@ -3,8 +3,8 @@ package com.dreamdisplays.media.player.pipeline
 import com.dreamdisplays.api.media.FramePixelFormat
 import com.dreamdisplays.api.media.player.GpuTextureRef
 import java.nio.ByteBuffer
-import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.locks.LockSupport
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * Render-facing contract shared by the JVM ([VideoFramePipe]) and native

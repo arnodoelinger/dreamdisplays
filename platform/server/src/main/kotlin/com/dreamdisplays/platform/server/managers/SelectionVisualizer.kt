@@ -1,12 +1,13 @@
 package com.dreamdisplays.platform.server.managers
 
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.Main.Companion.config
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.SelectionManager.selectionPoints
 import com.dreamdisplays.platform.server.utils.OutlinerUtil.showOutline
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
-import io.github.arsmotorin.ofrat.PaperOnly
 import org.bukkit.Bukkit
 
 /**

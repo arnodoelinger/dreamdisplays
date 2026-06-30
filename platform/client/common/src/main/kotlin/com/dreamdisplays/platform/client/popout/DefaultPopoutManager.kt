@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.popout
 
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.media.sink.VideoFrameSink
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.api.media.sink.VideoFrameSink
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**

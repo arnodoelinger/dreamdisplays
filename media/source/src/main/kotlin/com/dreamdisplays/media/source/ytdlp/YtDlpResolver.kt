@@ -4,7 +4,6 @@ import com.dreamdisplays.api.media.source.MediaMetadata
 import com.dreamdisplays.api.media.source.MediaResolver
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
-import com.dreamdisplays.media.source.ytdlp.YtDlpResolver.priority
 import kotlin.time.Duration.Companion.nanoseconds
 
 /**

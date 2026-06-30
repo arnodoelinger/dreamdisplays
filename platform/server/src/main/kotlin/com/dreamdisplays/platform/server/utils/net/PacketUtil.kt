@@ -1,20 +1,20 @@
 package com.dreamdisplays.platform.server.utils.net
 
+import io.github.arsmotorin.ofrat.FabricOnly
+import io.github.arsmotorin.ofrat.PaperOnly
+
+import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.api.display.model.ContentRotation
-import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.ClearCache
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
-import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
 import com.dreamdisplays.platform.server.datatypes.SyncData
 import com.dreamdisplays.platform.server.managers.PlayerManager
-import com.dreamdisplays.platform.server.utils.net.PacketUtil.writeUUID
 import com.dreamdisplays.util.FacingUtil
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer

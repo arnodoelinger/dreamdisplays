@@ -1,41 +1,42 @@
 package com.dreamdisplays.platform.server.utils
 
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
-//? if >=26 {
-//?} else
-/*import net.minecraft.world.item.ItemStack*/
+import io.github.arsmotorin.ofrat.FabricOnly
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.util.toJsonString
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
 import net.kyori.adventure.key.Key
 import net.kyori.adventure.text.Component
 import net.kyori.adventure.text.event.HoverEvent
+//? if >=1.21.11 {
 import net.kyori.adventure.text.`object`.ObjectContents
+//?}
+import net.minecraft.core.registries.BuiltInRegistries
+//? if >=1.21.11 {
+import net.minecraft.data.AtlasIds
+//?}
+import net.minecraft.network.chat.Component as NmsComponent
+import net.minecraft.network.chat.MutableComponent
 import net.kyori.adventure.text.serializer.json.JSONComponentSerializer
 import net.kyori.adventure.text.serializer.legacy.LegacyComponentSerializer
-import net.minecraft.core.registries.BuiltInRegistries
-import net.minecraft.data.AtlasIds
-import net.minecraft.network.chat.MutableComponent
+//? if >=1.21.11 {
+import net.minecraft.network.chat.contents.ObjectContents as NmsObjectContents
 import net.minecraft.network.chat.contents.objects.AtlasSprite
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.server.level.ServerPlayer
+//? if >=26 {
 import net.minecraft.world.item.ItemStackTemplate
+//?} else
+/*import net.minecraft.world.item.ItemStack*/
 import org.bukkit.Material
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 import java.net.URI
-import java.util.*
-import net.minecraft.network.chat.Component as NmsComponent
-import net.minecraft.network.chat.contents.ObjectContents as NmsObjectContents
+import java.util.Optional
 
 /**
  * Message utilities. Provides methods for sending localized and formatted messages to players and command senders,

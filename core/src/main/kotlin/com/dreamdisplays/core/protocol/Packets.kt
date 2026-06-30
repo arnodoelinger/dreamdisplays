@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoIntegerType
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlinx.serialization.protobuf.ProtoType
-import java.util.*
+import java.util.UUID
 
 /*
  * Protocol-v2 wire packets. These classes are the schema: the committed .proto artifact is

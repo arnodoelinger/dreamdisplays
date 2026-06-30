@@ -1,10 +1,10 @@
 package com.dreamdisplays.media.player.pipeline
 
 import com.dreamdisplays.api.media.FramePixelFormat
+import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.api.media.player.FrameUploader
 import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import com.dreamdisplays.api.media.player.GpuTextureRef
-import com.dreamdisplays.media.player.MediaPlayer
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

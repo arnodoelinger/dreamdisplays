@@ -37,7 +37,7 @@ data class ClientDisplaySettings(
 ) {
 
     companion object {
-        /** Default volume for all displays. The UI presents this as 50% (slider range is [0, 1] -> [0%, 200%]). */
+        /** Default volume for all displays. The UI presents this as 50% (slider range is [0, 1] → [0%, 200%]). */
         const val DEFAULT_VOLUME = 0.25f
     }
 }

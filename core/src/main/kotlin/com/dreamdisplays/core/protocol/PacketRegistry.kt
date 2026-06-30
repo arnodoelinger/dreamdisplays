@@ -3,7 +3,6 @@
 package com.dreamdisplays.core.protocol
 
 import com.dreamdisplays.api.protocol.PacketDirection
-import com.dreamdisplays.core.protocol.PacketRegistry.decode
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.Serializable

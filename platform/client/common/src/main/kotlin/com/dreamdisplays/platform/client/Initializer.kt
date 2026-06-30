@@ -1,22 +1,27 @@
 package com.dreamdisplays.platform.client
 
-//? if >=26 {
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.client.managers.*
-import com.dreamdisplays.platform.client.net.LegacyAdapter
-import com.dreamdisplays.platform.client.net.ProtocolRouter
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
+import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.managers.ClientPacketManager
+import com.dreamdisplays.platform.client.managers.ClientStateManager
+import com.dreamdisplays.platform.client.managers.ClientShutdownManager
+import com.dreamdisplays.platform.client.managers.ClientStartupManager
+import com.dreamdisplays.platform.client.managers.ClientTickManager
+import com.dreamdisplays.platform.client.managers.DisplayLifecycleManager
+import com.dreamdisplays.platform.client.net.LegacyAdapter
+import com.dreamdisplays.platform.client.net.ProtocolRouter
+import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 

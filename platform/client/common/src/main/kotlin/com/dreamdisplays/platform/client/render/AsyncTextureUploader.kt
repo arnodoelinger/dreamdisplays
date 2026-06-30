@@ -1,13 +1,12 @@
 package com.dreamdisplays.platform.client.render
 
-//? if >=1.21.11 {
-//?} else
-/*import com.mojang.blaze3d.platform.GlStateManager*/
 import com.dreamdisplays.api.media.sink.DecodedVideoFrame
 import com.dreamdisplays.api.render.TextureHandle
 import com.dreamdisplays.api.render.TextureUploader
-import com.dreamdisplays.platform.client.render.AsyncTextureUploader.Companion.PBO_COUNT
+//? if >=1.21.11 {
 import com.mojang.blaze3d.opengl.GlStateManager
+//?} else
+/*import com.mojang.blaze3d.platform.GlStateManager*/
 import org.lwjgl.opengl.GL11
 import org.lwjgl.opengl.GL15
 import org.lwjgl.opengl.GL21
@@ -59,7 +58,7 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploader {
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
         }
-        val w = frame.width
+        val w = frame.width;
         val h = frame.height
         val buf = ByteBuffer.wrap(frame.data)
         if (w != managedTexW || h != managedTexH) {

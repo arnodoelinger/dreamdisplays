@@ -1,12 +1,13 @@
 package com.dreamdisplays.platform.server.registrar
 
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
-import io.github.arsmotorin.ofrat.PaperOnly
 import java.util.concurrent.TimeUnit
 
 /**

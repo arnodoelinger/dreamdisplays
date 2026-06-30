@@ -10,8 +10,8 @@ import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
-import com.dreamdisplays.platform.server.utils.net.ServerScheduler
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.ServerScheduler
 import io.github.arsmotorin.ofrat.FabricOnly
 import io.github.arsmotorin.ofrat.PaperOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents

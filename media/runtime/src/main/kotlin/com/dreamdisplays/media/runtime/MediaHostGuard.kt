@@ -1,7 +1,5 @@
 package com.dreamdisplays.media.runtime
 
-import com.dreamdisplays.media.runtime.MediaHostGuard.isAllowed
-import com.dreamdisplays.media.runtime.MediaHostGuard.requireAllowed
 import com.dreamdisplays.util.net.DreamHttpClient
 import org.slf4j.LoggerFactory
 import java.io.IOException

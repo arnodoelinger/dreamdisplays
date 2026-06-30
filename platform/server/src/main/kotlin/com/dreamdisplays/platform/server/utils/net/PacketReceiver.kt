@@ -3,8 +3,8 @@ package com.dreamdisplays.platform.server.utils.net
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.datatypes.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager
+import com.dreamdisplays.platform.server.managers.PlayerManager
 import io.github.arsmotorin.ofrat.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener

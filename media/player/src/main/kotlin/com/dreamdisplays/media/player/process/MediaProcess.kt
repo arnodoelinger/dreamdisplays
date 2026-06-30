@@ -1,6 +1,5 @@
 package com.dreamdisplays.media.player.process
 
-import com.dreamdisplays.media.player.process.MediaProcess.buildVideo
 import com.dreamdisplays.media.runtime.MediaHostGuard
 import java.io.IOException
 import java.util.*

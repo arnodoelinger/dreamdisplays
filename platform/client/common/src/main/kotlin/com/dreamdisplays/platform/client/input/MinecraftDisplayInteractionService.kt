@@ -3,7 +3,6 @@ package com.dreamdisplays.platform.client.input
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.client.input.MinecraftDisplayInteractionService.raycast
 import com.dreamdisplays.platform.client.utils.RayCastingUtil
 import net.minecraft.client.Minecraft
 import net.minecraft.core.Direction

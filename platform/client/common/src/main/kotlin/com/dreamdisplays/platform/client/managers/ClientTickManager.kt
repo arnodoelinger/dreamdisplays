@@ -1,21 +1,26 @@
 package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.platform.client.input.DisplayInteraction
+import com.dreamdisplays.platform.client.input.DisplayInteractionService
+import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler
+import com.dreamdisplays.platform.client.input.InputAction
+import com.dreamdisplays.platform.client.input.InputHandler
+import com.dreamdisplays.platform.client.input.KeyBindingRegistry
+import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.platform.client.input.*
-import com.dreamdisplays.platform.client.overlay.OverlayManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.world.effect.MobEffectInstance
 import net.minecraft.world.effect.MobEffects
 import org.lwjgl.glfw.GLFW
-import java.util.*
+import java.util.UUID
 
 /**
  * Handles per-tick client display state: level changes, hover, unloading, shortcuts, and focus mode.

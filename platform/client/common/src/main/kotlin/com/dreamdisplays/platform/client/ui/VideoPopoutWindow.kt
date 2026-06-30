@@ -1,15 +1,20 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.api.media.sink.VideoFrameSink
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutWindow
 import com.dreamdisplays.platform.client.popout.WindowBackend
 import com.dreamdisplays.platform.client.popout.WindowConfig
+import com.dreamdisplays.api.media.sink.VideoFrameSink
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.opengl.*
+import org.lwjgl.opengl.GL
+import org.lwjgl.opengl.GL11
+import org.lwjgl.opengl.GL15
+import org.lwjgl.opengl.GL20
+import org.lwjgl.opengl.GL30
+import org.lwjgl.opengl.GLCapabilities
 import org.slf4j.LoggerFactory
 import java.awt.Color
 import java.awt.Graphics
@@ -140,9 +145,9 @@ class VideoPopoutWindow(
         @Volatile
         private var fullscreen = false
 
-        private var savedX = 0
+        private var savedX = 0;
         private var savedY = 0
-        private var savedW = 0
+        private var savedW = 0;
         private var savedH = 0
 
         override val isOpen: Boolean get() = windowHandle != 0L
@@ -156,7 +161,7 @@ class VideoPopoutWindow(
             var back = backBuf
             if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
             back.clear()
-            val savedLimit = buf.limit()
+            val savedLimit = buf.limit();
             val savedPos = buf.position()
             buf.limit(savedPos + size)
             back.put(buf)
@@ -175,11 +180,11 @@ class VideoPopoutWindow(
         override fun renderFrame() {
             val handle = windowHandle
             if (handle == 0L) return
-            val fw = frameW
-            val fh = frameH
+            val fw = frameW;
+            val fh = frameH;
             val buf = frontBuf
             val format = frameFormat
-            val vw = winW.get()
+            val vw = winW.get();
             val vh = winH.get()
             if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
 
@@ -251,7 +256,7 @@ class VideoPopoutWindow(
                 }
             }
             GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.set(fw); winH.set(fh) }
-            val wa = IntArray(1)
+            val wa = IntArray(1);
             val ha = IntArray(1)
             GLFW.glfwGetFramebufferSize(handle, wa, ha)
             if (wa[0] > 0 && ha[0] > 0) {
@@ -282,7 +287,7 @@ class VideoPopoutWindow(
                 val monitor = GLFW.glfwGetPrimaryMonitor()
                 if (monitor == 0L) return
                 val mode = GLFW.glfwGetVideoMode(monitor) ?: return
-                val xa = IntArray(1)
+                val xa = IntArray(1);
                 val ya = IntArray(1)
                 GLFW.glfwGetWindowPos(handle, xa, ya)
                 savedX = xa[0]; savedY = ya[0]; savedW = winW.get(); savedH = winH.get()
@@ -417,12 +422,12 @@ class VideoPopoutWindow(
                 super.paintComponent(g)
                 val img = currentImage ?: return
                 val aspect = contentAspect
-                val vw = width
+                val vw = width;
                 val vh = height
                 if (vw <= 0 || vh <= 0) return
-                val drawW: Int
-                val drawH: Int
-                val ox: Int
+                val drawW: Int;
+                val drawH: Int;
+                val ox: Int;
                 val oy: Int
                 if (aspect > 0.0 && aspect.isFinite()) {
                     val panelAspect = vw.toDouble() / vh
@@ -472,7 +477,7 @@ private class QuadRenderer {
     private val vbo = GL15.glGenBuffers()
     private val program = buildProgram()
     private val uploader = AsyncTextureUploader(stateCache = false)
-    private var texW = 0
+    private var texW = 0;
     private var texH = 0
 
     init {
@@ -503,7 +508,7 @@ private class QuadRenderer {
         if (texW != w || texH != h) {
             GL11.glBindTexture(GL11.GL_TEXTURE_2D, texId)
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, format.unpackAlignment)
-            val sp = buf.position()
+            val sp = buf.position();
             val sl = buf.limit()
             buf.limit(sp + w * h * format.bytesPerPixel)
             GL11.glTexImage2D(
@@ -521,9 +526,9 @@ private class QuadRenderer {
 
     fun draw(vw: Int, vh: Int, content: ContentRect, fw: Int, fh: Int) {
         val scale = minOf(vw.toFloat() / content.w, vh.toFloat() / content.h)
-        val dw = (content.w * scale).toInt()
+        val dw = (content.w * scale).toInt();
         val dh = (content.h * scale).toInt()
-        val ox = (vw - dw) / 2
+        val ox = (vw - dw) / 2;
         val oy = (vh - dh) / 2
         GL11.glClearColor(0f, 0f, 0f, 1f)
         GL11.glViewport(0, 0, vw, vh); GL11.glClear(GL11.GL_COLOR_BUFFER_BIT)

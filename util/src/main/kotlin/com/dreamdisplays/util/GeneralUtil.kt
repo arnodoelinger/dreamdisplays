@@ -1,6 +1,5 @@
 package com.dreamdisplays.util
 
-import com.dreamdisplays.util.GeneralUtil.getModVersion
 import java.io.IOException
 
 /** General utility functions for the mod. */

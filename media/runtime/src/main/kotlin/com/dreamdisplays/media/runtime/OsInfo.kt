@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.runtime
 
-import java.util.*
+import java.util.Locale
 
 /**
  * Single source of truth for OS / architecture detection.

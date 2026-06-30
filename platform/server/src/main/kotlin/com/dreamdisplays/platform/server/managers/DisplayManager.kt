@@ -1,32 +1,39 @@
 package com.dreamdisplays.platform.server.managers
 
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Expiry
+import io.github.arsmotorin.ofrat.FabricOnly
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.Main.Companion.config
 import com.dreamdisplays.platform.server.Main.Companion.getInstance
 import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.*
+import com.dreamdisplays.platform.server.datatypes.DisplayData
+import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
+import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
+import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.SyncData
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.Scheduler.runSync
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
+import kotlinx.coroutines.launch
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil.calculateRegion
+import com.dreamdisplays.platform.server.utils.ReporterUtil
 import com.dreamdisplays.platform.server.utils.ReporterUtil.sendReport
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil.sendDelete
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Expiry
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
-import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
@@ -502,7 +509,7 @@ object DisplayManager {
 
         ServerCoroutines.io.launch {
             runCatching {
-                sendReport(
+                ReporterUtil.sendReport(
                     locationStr,
                     displayData.url,
                     displayData.id,

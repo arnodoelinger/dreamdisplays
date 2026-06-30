@@ -3,7 +3,7 @@ package com.dreamdisplays.platform.server.playback
 import com.dreamdisplays.api.playback.PlaybackContext
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.platform.server.datatypes.DisplayData
-import java.util.*
+import java.util.UUID
 
 /**
  * Builds the [PlaybackContext] the shared [com.dreamdisplays.api.playback.PlaybackPermissions] rules

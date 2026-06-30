@@ -1,7 +1,7 @@
 package com.dreamdisplays.api.security
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import java.util.*
+import java.util.Locale
 
 /**
  * A client-supplied language tag after trust-boundary cleanup.

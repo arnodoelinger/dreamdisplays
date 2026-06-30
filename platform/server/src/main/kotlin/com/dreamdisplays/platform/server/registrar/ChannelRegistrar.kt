@@ -1,10 +1,11 @@
 package com.dreamdisplays.platform.server.registrar
 
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.utils.net.PacketReceiver
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
-import io.github.arsmotorin.ofrat.PaperOnly
 
 /**
  * Manages the registration of plugin channels for incoming and outgoing messages.

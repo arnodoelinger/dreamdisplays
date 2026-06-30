@@ -1,7 +1,7 @@
 package com.dreamdisplays.util
 
-import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
+import com.dreamdisplays.util.json.DreamJson
 import kotlinx.coroutines.launch
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory

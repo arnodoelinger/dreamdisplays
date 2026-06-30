@@ -3,7 +3,13 @@ package com.dreamdisplays.platform.client.core.modules
 import com.dreamdisplays.api.runtime.DreamDisplaysModule
 import com.dreamdisplays.api.runtime.ModuleContext
 import com.dreamdisplays.api.runtime.register
-import com.dreamdisplays.platform.client.input.*
+import com.dreamdisplays.platform.client.input.CompositeInputHandler
+import com.dreamdisplays.platform.client.input.DefaultKeyBindingRegistry
+import com.dreamdisplays.platform.client.input.DisplayInteractionService
+import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler
+import com.dreamdisplays.platform.client.input.InputHandler
+import com.dreamdisplays.platform.client.input.KeyBindingRegistry
+import com.dreamdisplays.platform.client.input.MinecraftDisplayInteractionService
 
 /** Installs display interaction, key binding, and input dispatch services. */
 object ClientInputModule : DreamDisplaysModule {

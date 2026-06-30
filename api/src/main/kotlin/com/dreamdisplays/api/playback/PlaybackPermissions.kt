@@ -1,7 +1,10 @@
 package com.dreamdisplays.api.playback
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import com.dreamdisplays.api.playback.PlaybackMode.*
+import com.dreamdisplays.api.playback.PlaybackMode.BROADCAST
+import com.dreamdisplays.api.playback.PlaybackMode.LOCAL
+import com.dreamdisplays.api.playback.PlaybackMode.SYNCED
+import com.dreamdisplays.api.playback.PlaybackMode.WATCH_PARTY
 
 /**
  * Inputs the permission rules need.

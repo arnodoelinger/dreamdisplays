@@ -6,7 +6,7 @@ import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
 import com.dreamdisplays.platform.client.render.GpuTextureHandle
 import net.minecraft.client.renderer.texture.AbstractTexture
 import org.slf4j.LoggerFactory
-import java.util.*
+import java.util.UUID
 
 /**
  * Render-thread bridge that pushes the media player's decoded frames into a display's GPU textures.

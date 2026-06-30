@@ -1,7 +1,8 @@
 package com.dreamdisplays.platform.server.scheduler
 
-import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
 import io.github.arsmotorin.ofrat.PaperOnly
+
+import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
 import org.jspecify.annotations.NullMarked
 
 /**

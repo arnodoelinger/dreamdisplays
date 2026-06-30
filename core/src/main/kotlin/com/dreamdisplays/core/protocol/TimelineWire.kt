@@ -3,7 +3,7 @@ package com.dreamdisplays.core.protocol
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.Timeline
 import kotlinx.serialization.Serializable
-import java.util.*
+import java.util.UUID
 
 /** Builds the wire [DisplaySync] for [id] in [mode], stamped with the current [nowMs] anchor. */
 fun Timeline.toSync(id: @Serializable(UuidSerializer::class) UUID, mode: PlaybackMode, nowMs: Long): DisplaySync {

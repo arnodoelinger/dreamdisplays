@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.Focuser
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.util.DreamCoroutines
 

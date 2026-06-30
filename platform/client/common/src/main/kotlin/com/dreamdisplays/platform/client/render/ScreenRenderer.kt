@@ -1,27 +1,23 @@
 package com.dreamdisplays.platform.client.render
 
-//? if >=26 {
-//?} else
-/*import com.mojang.blaze3d.systems.RenderSystem*/
-//? if >=1.21.11 {
-//?} else
-/*import net.minecraft.client.renderer.RenderType*/
 import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.render.RenderContext
-import com.dreamdisplays.api.render.TextureHandle
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.platform.client.render.ScreenRenderer.drawLayer
-import com.dreamdisplays.platform.client.render.ScreenRenderer.render
-import com.mojang.blaze3d.vertex.PoseStack
-import com.mojang.blaze3d.vertex.VertexConsumer
-import com.mojang.blaze3d.vertex.VertexFormat
+import com.dreamdisplays.api.render.RenderContext
+import com.dreamdisplays.api.render.TextureHandle
+//? if >=26 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
+import com.mojang.blaze3d.vertex.*
 import net.minecraft.client.Camera
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sin
 

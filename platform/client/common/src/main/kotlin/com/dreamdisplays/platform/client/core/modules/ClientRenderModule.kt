@@ -3,8 +3,13 @@ package com.dreamdisplays.platform.client.core.modules
 import com.dreamdisplays.api.render.RenderServices
 import com.dreamdisplays.api.runtime.DreamDisplaysModule
 import com.dreamdisplays.api.runtime.ModuleContext
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.api.runtime.register
-import com.dreamdisplays.platform.client.render.*
+import com.dreamdisplays.platform.client.render.ClientRenderService
+import com.dreamdisplays.platform.client.render.DefaultRendererProvider
+import com.dreamdisplays.platform.client.render.DefaultTextureUploaderProvider
+import com.dreamdisplays.platform.client.render.RenderHook
+import com.dreamdisplays.platform.client.render.ScreenRenderer
 
 /** Installs client render services, API surface renderer, and texture uploader factory. */
 object ClientRenderModule : DreamDisplaysModule {

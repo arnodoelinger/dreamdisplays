@@ -1,16 +1,16 @@
 package com.dreamdisplays.platform.client.capabilities
 
+import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
+import com.dreamdisplays.platform.client.managers.WarmParkPolicy
 import com.dreamdisplays.api.media.stream.SupportedCodec
 import com.dreamdisplays.api.render.RenderBackend
 import com.dreamdisplays.api.render.ShaderBackend
 import com.dreamdisplays.api.render.TextureUploadPath
-import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.process.HwAccelBackend
-import com.dreamdisplays.platform.client.managers.WarmParkPolicy
+import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.platform.client.render.RenderBackendCompat
 import com.dreamdisplays.platform.client.render.ShaderPackCompat
-import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
 
 /**
  * Probes the running client for [ClientHello] capabilities. Popout support comes from the `GLFW`

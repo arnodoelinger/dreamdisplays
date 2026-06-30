@@ -1,13 +1,11 @@
 package com.dreamdisplays.platform.client
 
-//? if >=1.21.11 {
-//?}
-import com.dreamdisplays.api.platform.PlatformServices
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.client.net.V2Payload
 import com.dreamdisplays.platform.client.platform.NeoForgePlatformIntegrationProvider
+import com.dreamdisplays.api.platform.PlatformServices
 import com.dreamdisplays.platform.client.render.ScreenRenderer
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Camera
@@ -21,7 +19,9 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent
+//? if >=1.21.11 {
 import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent
+//?}
 import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 

@@ -1,10 +1,11 @@
 package com.dreamdisplays.platform.server.registrar
 
+import io.github.arsmotorin.ofrat.PaperOnly
+
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.listeners.PlayerListener
 import com.dreamdisplays.platform.server.listeners.ProtectionListener
 import com.dreamdisplays.platform.server.listeners.SelectionListener
-import io.github.arsmotorin.ofrat.PaperOnly
 import org.bukkit.Bukkit
 
 /**

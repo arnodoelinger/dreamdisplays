@@ -1,35 +1,35 @@
 package com.dreamdisplays.platform.client.ui
 
-//? if >=1.21.11 {
-//?} else
-/*import com.mojang.blaze3d.systems.RenderSystem*/
-//? if >=26 {
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
-import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.overlay.Overlay
 import com.dreamdisplays.platform.client.overlay.OverlayBounds
 import com.dreamdisplays.platform.client.overlay.OverlayEvent
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
+import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.mojang.blaze3d.platform.NativeImage
+//? if >=1.21.11 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.client.renderer.texture.DynamicTexture
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.*
+import java.util.UUID
 
 /**
  * In-game Picture-in-Picture overlay for one display screen.
@@ -66,7 +66,7 @@ class PipOverlay(
 
     private var dynamicTexture: DynamicTexture? = null
     private var textureId: Identifier? = null
-    private var texW = 0
+    private var texW = 0;
     private var texH = 0
     private var uploader: AsyncTextureUploader? = null
     private var rgbaUploadBuffer: ByteBuffer? = null
@@ -177,7 +177,7 @@ class PipOverlay(
     }
 
     fun uploadFrame() {
-        val fw = frameW
+        val fw = frameW;
         val fh = frameH
         val v = frameVersion
         if (v == uploadedVersion) return
@@ -242,7 +242,7 @@ class PipOverlay(
 
         val sw = mc.window.guiScaledWidth
         val sh = mc.window.guiScaledHeight
-        val fw = texW
+        val fw = texW;
         val fh = texH
         val content = contentRect(fw, fh, contentAspect)
         val contentAspect = if (content.w > 0 && content.h > 0) content.w / content.h.toDouble() else 16.0 / 9.0
@@ -268,7 +268,7 @@ class PipOverlay(
             targetX = posX; targetY = posY
         }
 
-        val cx = posX.toInt()
+        val cx = posX.toInt();
         val cy = posY.toInt()
         lastPipX = cx; lastPipY = cy; lastPipW = pipW; lastPipH = pipH
 
@@ -337,7 +337,7 @@ class PipOverlay(
         mx: Int, my: Int, leftPressed: Boolean,
         sw: Int, sh: Int, pipW: Int, pipH: Int,
     ) {
-        val cx = posX.toInt()
+        val cx = posX.toInt();
         val cy = posY.toInt()
         val pressJustDown = leftPressed && !wasLeftPressed
         val pressJustUp = !leftPressed && wasLeftPressed

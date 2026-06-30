@@ -45,7 +45,7 @@ object OutlinerUtil {
 
     /** Emits dust particles along the 12 edges of [box] visible only to [player]. */
     private fun drawOutlineBox(player: Player, box: BoundingBox, world: org.bukkit.World) {
-        val color = Color.fromRGB(0, 255, 255)
+        val color = org.bukkit.Color.fromRGB(0, 255, 255)
 
         // Bottom rectangle
         drawLine(

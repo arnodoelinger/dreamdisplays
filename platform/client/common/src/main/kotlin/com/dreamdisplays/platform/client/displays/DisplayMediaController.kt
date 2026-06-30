@@ -1,9 +1,10 @@
 package com.dreamdisplays.platform.client.displays
 
+import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.player.MediaPlayer
-import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment
 import net.minecraft.client.Minecraft

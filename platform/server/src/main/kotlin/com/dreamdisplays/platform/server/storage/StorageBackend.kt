@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.storage
 
-import java.util.*
+import java.util.Locale
 
 /** Supported SQL storage backends from the `storage.type` config value. */
 enum class StorageBackend {

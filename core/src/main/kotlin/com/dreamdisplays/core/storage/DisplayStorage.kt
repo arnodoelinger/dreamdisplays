@@ -1,8 +1,8 @@
 package com.dreamdisplays.core.storage
 
 import com.dreamdisplays.api.storage.FullDisplayData
-import java.util.*
 import com.dreamdisplays.api.storage.DisplayStorage as DisplayStorageContract
+import java.util.UUID
 
 /**
  * In-memory registry for server-authoritative display snapshots.

@@ -1,26 +1,23 @@
 package com.dreamdisplays.platform.client.render
 
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?} else
-/*import net.minecraft.client.renderer.RenderType*/
-//? if >=1.21.11 {
-import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
+//? if >=1.21.11 {
 import com.mojang.blaze3d.pipeline.RenderPipeline
+//?}
 import com.mojang.blaze3d.platform.NativeImage
-import com.mojang.blaze3d.textures.AddressMode
-import com.mojang.blaze3d.textures.FilterMode
-import com.mojang.blaze3d.textures.GpuSampler
+//? if >=1.21.11 {
+import com.mojang.blaze3d.textures.*
+//?}
 import net.minecraft.client.Minecraft
+//? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
 import net.minecraft.client.renderer.texture.DynamicTexture
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 

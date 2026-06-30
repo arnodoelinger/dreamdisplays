@@ -1,7 +1,17 @@
 package com.dreamdisplays.platform.client.net
 
-import com.dreamdisplays.core.protocol.*
 import com.dreamdisplays.platform.client.managers.ClientPacketManager
+import com.dreamdisplays.core.protocol.ClearCache
+import com.dreamdisplays.core.protocol.ClientHello
+import com.dreamdisplays.core.protocol.DisplayDelete
+import com.dreamdisplays.core.protocol.DisplayInfo
+import com.dreamdisplays.core.protocol.DisplaySync
+import com.dreamdisplays.core.protocol.DreamPacket
+import com.dreamdisplays.core.protocol.ReportDisplay
+import com.dreamdisplays.core.protocol.RequestSync
+import com.dreamdisplays.core.protocol.SetDisplaysEnabled
+import com.dreamdisplays.core.protocol.SetLocked
+import com.dreamdisplays.core.protocol.SetVideo
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 
 /**

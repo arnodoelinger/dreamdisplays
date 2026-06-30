@@ -1,9 +1,8 @@
 package com.dreamdisplays.api.security
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import com.dreamdisplays.api.security.MediaHttpUrl.Companion.parse
 import java.net.URI
-import java.util.*
+import java.util.Locale
 
 /**
  * A validated absolute HTTP(S) media URL.

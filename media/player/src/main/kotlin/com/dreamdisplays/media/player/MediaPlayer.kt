@@ -1,15 +1,7 @@
 package com.dreamdisplays.media.player
 
-import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.api.media.FramePixelFormat
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.media.player.GpuTextureRef
-import com.dreamdisplays.api.media.player.PlaybackEnvironment
 import com.dreamdisplays.api.media.player.PlaybackHost
-import com.dreamdisplays.api.media.stream.MediaStream
-import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.media.player.MediaPlayer.Companion.INIT_EXECUTOR
-import com.dreamdisplays.media.player.MediaPlayer.Companion.REPLAY_LEAD_NS
+import com.dreamdisplays.api.media.player.PlaybackEnvironment
 import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.managers.PlaybackSessionManager
 import com.dreamdisplays.media.player.managers.StatsReporter
@@ -17,18 +9,22 @@ import com.dreamdisplays.media.player.managers.StreamWatchdog
 import com.dreamdisplays.media.player.pipeline.AudioSink
 import com.dreamdisplays.media.player.pipeline.PlaybackClock
 import com.dreamdisplays.media.player.policy.RetryPolicy
+import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.preparation.MediaPreparationService
 import com.dreamdisplays.media.player.preparation.PreparedMedia
-import com.dreamdisplays.media.player.process.HwAccelBackend
-import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.stream.MediaStreamSelector
+import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.player.util.daemon
+import com.dreamdisplays.api.media.DreamMediaException
+import com.dreamdisplays.api.media.stream.MediaStream
+import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.api.media.FramePixelFormat
+import com.dreamdisplays.api.media.player.GpuTextureRef
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
+import java.util.concurrent.*
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
@@ -199,7 +195,7 @@ class MediaPlayer(
      */
     fun park() = safeExecute {
         watchdog.stop()
-        if (!sessionManager.suspend()) watchdog.start() // Not parkable after all -> keep playing normally
+        if (!sessionManager.suspend()) watchdog.start() // not parkable after all → keep playing normally
     }
 
     /** Resumes a [park]ed player from its frozen position. */

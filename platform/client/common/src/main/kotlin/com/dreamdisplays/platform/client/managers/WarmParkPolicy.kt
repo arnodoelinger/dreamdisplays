@@ -2,8 +2,6 @@ package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.platform.client.capabilities.ClientMemoryProbe
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.platform.client.managers.WarmParkPolicy.MAX_AUTO_WARM_LIMIT
-import com.dreamdisplays.platform.client.managers.WarmParkPolicy.replayOnly
 import kotlin.math.max
 
 /** Adaptive budget for displays kept fully warm versus compressed into replay snapshots. */
