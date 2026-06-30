@@ -235,7 +235,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Paper 1.21+'
-          version: paper-${{ needs.build.outputs.version }}
+          version: ${{ needs.build.outputs.version }}
           version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-paper-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
@@ -253,7 +253,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Fabric ${{ matrix.task.mc }}'
-          version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version: ${{ needs.build.outputs.version }}
           version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
@@ -272,7 +272,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — Fabric ${{ matrix.task.mc }}'
-          version: fabric-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version: ${{ needs.build.outputs.version }}
           version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-fabric-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
@@ -290,7 +290,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — NeoForge ${{ matrix.task.mc }}'
-          version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version: ${{ needs.build.outputs.version }}
           version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
@@ -305,7 +305,7 @@ jobs:
         uses: Kir-Antipov/mc-publish@v3.3
         with:
           name: 'Dream Displays ${{ needs.build.outputs.pretty_version }} — NeoForge ${{ matrix.task.mc }}'
-          version: neoforge-${{ steps.versions.outputs.publish_mc }}-${{ needs.build.outputs.version }}
+          version: ${{ needs.build.outputs.version }}
           version-type: ${{ needs.build.outputs.is_preview == 'true' && 'alpha' || 'release' }}
           files: build/libs/dreamdisplays-neoforge-${{ matrix.task.mc }}-${{ needs.build.outputs.version }}.jar
           changelog-file: changelog.md
@@ -326,7 +326,7 @@ jobs:
         if: needs.build.outputs.is_marketplace_publishable == 'true' && needs.build.outputs.is_release == 'true' && matrix.task.kind == 'paper'
         uses: Kir-Antipov/mc-publish@v3.3
         with:
-          name: 'Dream Displays ${{ needs.build.outputs.pretty_version }}'
+          name: ${{ needs.build.outputs.pretty_version }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           github-tag: v${{ needs.build.outputs.version }}
           github-generate-changelog: false
