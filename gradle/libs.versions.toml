@@ -1,6 +1,6 @@
 [versions]
 jspecify = "1.0.0"
-platformweaver = "1.2.0"
+platformweaver = "1.2.1"
 commonsCompress = "1.28.0"
 tukaaniXz = "1.12"
 tomlj = "1.1.1"
@@ -23,7 +23,6 @@ slf4j = "2.0.18"
 [libraries]
 jspecify = { module = "org.jspecify:jspecify", version.ref = "jspecify" }
 platformweaverAnnotations = { module = "io.github.arnodoelinger:platformweaver-annotations", version.ref = "platformweaver" }
-platformweaverPlugin = { module = "io.github.arnodoelinger:platformweaver-plugin", version.ref = "platformweaver" }
 kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlin" }
 kotlinxSerializationProtobuf = { module = "org.jetbrains.kotlinx:kotlinx-serialization-protobuf", version.ref = "kotlinxSerialization" }
 kotlinxSerializationCore = { module = "org.jetbrains.kotlinx:kotlinx-serialization-core", version.ref = "kotlinxSerialization" }

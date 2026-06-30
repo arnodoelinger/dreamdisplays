@@ -5,6 +5,7 @@ plugins {
     id("dreamdisplays.serialization-conventions")
     id("dreamdisplays.shadow-conventions")
     id("io.papermc.paperweight.userdev") version libs.versions.paperweight
+    id("io.github.arnodoelinger.platformweaver") version libs.versions.platformweaver
 }
 
 val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
@@ -32,15 +33,13 @@ repositories {
     maven("https://jitpack.io")
 }
 
-dependencies {
-    compileOnly(libs.platformweaverAnnotations)
-    "kotlinCompilerPluginClasspath"(libs.platformweaverPlugin)
+platformweaver {
+    target = "paper"
+    chameleonsDir = null
 }
 
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:io.github.arnodoelinger.platformweaver:platform=paper"
-    )
+dependencies {
+    compileOnly(libs.platformweaverAnnotations)
 }
 
 dependencies {

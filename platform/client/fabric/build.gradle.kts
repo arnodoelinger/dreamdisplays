@@ -7,6 +7,7 @@ plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.native-resources")
     id("dreamdisplays.shadow-conventions")
+    id("io.github.arnodoelinger.platformweaver") version libs.versions.platformweaver
 }
 
 // Loom plugin id depends on whether the target Minecraft is obfuscated.
@@ -55,6 +56,11 @@ sourceSets.main {
     kotlin.srcDir(project(":platform:server").layout.buildDirectory.dir("generated/chisel/main/kotlin"))
 }
 
+platformweaver {
+    target = "fabric"
+    chameleonsDir = null
+}
+
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
     dependsOn(":platform:server:chiselSource")
 }
@@ -86,7 +92,6 @@ configurations.register("mappedFabricApiElements") {
 
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
-    "kotlinCompilerPluginClasspath"(libs.platformweaverPlugin)
     compileOnly("io.papermc.paper:paper-api:${scVersion("paper.api.version")}")
     implementation(libs.bstats)
     implementation(libs.tomlj)
@@ -162,12 +167,6 @@ tasks.processResources {
 
 java {
     withSourcesJar()
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:io.github.arnodoelinger.platformweaver:platform=fabric"
-    )
 }
 
 // Hack: it's a bug in Loom alpha where the validation task expects a named namespace but the classtweaker correctly uses
