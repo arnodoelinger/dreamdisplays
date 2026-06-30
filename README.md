@@ -9,7 +9,7 @@ If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arn
 [![Discord](http://img.shields.io/discord/1456716690879676501?label=Discord&style=flat&logo=discord)](https://discord.gg/uwMMZ2KWk6)
 
 <div align="center">
-  <img src="https://i.imgur.com/EquheHU.png" alt="Dream Displays"> 
+  <img src="https://i.imgur.com/HM4JUdj.png" alt="Dream Displays"> 
   <div>
     <a href="https://modrinth.com/plugin/dreamdisplays">Download from Modrinth</a>
     <span> | </span>
