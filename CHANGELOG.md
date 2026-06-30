@@ -1,3 +1,23 @@
+# 1.8.6 Release
+
+## Highlights
+
+- Hotfix for `Fabric` 1.21.11 & 26.1.2
+
+## Client
+
+### Improvements
+
+- Enhanced versionizing for Modrinth and GitHub releases
+
+### Fixes
+
+- Fix critical crash for `Fabric` 1.21.11 & 26.1.2 ([#118](https://github.com/arnodoelinger/dreamdisplays/issues/118))
+
+## Server
+
+No changes.
+
 # 1.8.5 Release
 
 ## Highlights
