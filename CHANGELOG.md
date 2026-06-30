@@ -21,6 +21,8 @@
 - Discord publisher integration
 - Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
 - Enhanced safety comments in unsafe blocks in Rust natives
+- Changed author's name arsmotorin to arnodoelinger
+- Some dependecies updates
 
 ### Fixes
 
