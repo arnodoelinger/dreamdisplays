@@ -69,6 +69,12 @@ class MediaPlayer(
         private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
 
         /**
+         * A second stall within this window of the previous one means a plain restart isn't helping (most likely
+         * a stale / throttled resolved URL rather than a transient hiccup), so escalate to a fresh re-resolve.
+         */
+        private const val REPEATED_STALL_WINDOW_NS = 90_000_000_000L
+
+        /**
          * On reappearance, cached replay resumes this far before the saved position. Default 0 =
          * zero rewind: the saved frame is held (no backward jump) while the live source warms up, then live
          * continues forward from the saved position. A non-zero lead trades a short re-watch of cached
@@ -122,17 +128,17 @@ class MediaPlayer(
         isLive = { liveStream },
     )
 
+    /** Timestamp of the last stall recovery (watchdog or audio failure), 0 = none yet. Used to detect a second
+     *  stall shortly after the first, which means the plain restart isn't fixing anything. */
+    @Volatile
+    private var lastStallNanos = 0L
+
     // Watchdog is created before sessionManager but its lambdas reference sessionManager lazily
     private val watchdog = StreamWatchdog(
         debugLabel = debugLabel,
         isActive = { sessionManager.isPlaying && !sessionManager.isParked() && !terminated.get() },
         getLastFrameNanos = { sessionManager.lastFrameNanos.get() },
-        onStall = {
-            val ss = streams
-            if (ss != null) {
-                safeExecute { startStreams(ss, if (liveStream) 0L else clock.currentTime()) }
-            }
-        },
+        onStall = { handleSessionStall("no frames") },
     )
     private val sessionManager = PlaybackSessionManager(
         debugLabel = debugLabel,
@@ -143,6 +149,7 @@ class MediaPlayer(
         getBrightness = { brightness },
         onStreamEnd = ::handleStreamEnd,
         onQualitySwitchAborted = { host.cancelQualityHandoff() },
+        onAudioFailure = { stderr -> handleSessionStall("audio ended: ${MediaUtil.truncate(stderr)}") },
         renderExecutor = env.renderExecutor,
         uploaderFactory = env.uploaderFactory,
         gpuYuvActive = env.config.gpuYuvActive,
@@ -632,6 +639,31 @@ class MediaPlayer(
         INIT_EXECUTOR.submit {
             runCatching { Thread.sleep(delayMs) }.onFailure { Thread.currentThread().interrupt(); return@submit }
             if (!terminated.get()) initialize()
+        }
+    }
+
+    /**
+     * Recovers from a session that stopped delivering (video watchdog stall, or the audio process dying on
+     * its own while video kept going). A single stall just restarts the same resolved streams — usually a
+     * transient hiccup. A second stall shortly after means the restart didn't help, most likely because the
+     * resolved URL itself is bad (e.g. throttled without cookies), so this escalates to a fresh re-resolve,
+     * priming the current position first so it doesn't jump back to the start.
+     */
+    private fun handleSessionStall(reason: String) {
+        if (terminated.get()) return
+        val ss = streams ?: return
+        val now = System.nanoTime()
+        val repeated = lastStallNanos != 0L && now - lastStallNanos < REPEATED_STALL_WINDOW_NS
+        lastStallNanos = now
+        if (repeated) {
+            logger.warn("$debugLabel Repeated stall ($reason); invalidating cached URLs and re-resolving.")
+            env.cacheInvalidator.invalidate(youtubeUrl)
+            primedStartPositionNanos.set(if (liveStream) 0L else clock.currentTime())
+            state.set(PlaybackState.RESTARTING)
+            safeExecute { if (!terminated.get()) initialize() }
+        } else {
+            logger.warn("$debugLabel Stream stalled ($reason); restarting.")
+            safeExecute { startStreams(ss, if (liveStream) 0L else clock.currentTime()) }
         }
     }
 

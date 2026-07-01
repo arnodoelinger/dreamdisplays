@@ -58,6 +58,13 @@ internal class PlaybackSessionManager(
     /** Invoked when an in-flight quality switch fails before promotion, so the caller can drop the staged texture. */
     private val onQualitySwitchAborted: () -> Unit = {},
 
+    /**
+     * nvoked when the live audio process ends on its own (crash / broken pipe) instead of via a
+     * deliberate [stop]. Unlike video, an audio failure alone doesn't stop frames from arriving, so
+     * nothing else would ever notice the session went silent. Called on the audio reader thread.
+     */
+    private val onAudioFailure: (stderr: String) -> Unit = {},
+
     /** Runs render-thread (GL) cleanup work. */
     private val renderExecutor: RenderThreadExecutor,
 
@@ -288,7 +295,7 @@ internal class PlaybackSessionManager(
     fun start(streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend) {
         stop()
         if (terminated.get()) return
-        bridgeCeilingNanos = Long.MAX_VALUE // a full start is not a bridge
+        bridgeCeilingNanos = Long.MAX_VALUE // A full start is not a bridge
 
         val ffmpeg = FFmpegBinary.getPath() ?: run {
             logger.error("$debugLabel FFmpeg binary not available.")
@@ -313,7 +320,7 @@ internal class PlaybackSessionManager(
                 channel.teardownProcess()
                 throw e
             }
-            val at = audio.start(ap, terminated, aStop, startGate = firstVideoFrame)
+            val at = audio.start(ap, terminated, aStop, startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure)
             active = channel
             audioHalf = AudioHalf(ap, at, aStop)
             updateRawFrameSink()
@@ -363,7 +370,7 @@ internal class PlaybackSessionManager(
         // attached to this very line ([attachLiveAfterReplay]) so the cached -> live seam is continuous.
         if (audioPcm != null && audioPcm.size >= AudioSink.BYTES_PER_FRAME) {
             val aStop = AtomicBoolean()
-            val at = audio.startBridge(audioPcm, terminated, aStop)
+            val at = audio.startBridge(audioPcm, terminated, aStop, onUnexpectedEnd = onAudioFailure)
             bridgeAudio = AudioHalf(null, at, aStop)
         }
         updateRawFrameSink()
@@ -449,7 +456,7 @@ internal class PlaybackSessionManager(
             } else {
                 // No cached prelude: live audio joins at the edge, gated on the first live frame (as in start()).
                 val aStop = AtomicBoolean()
-                val at = audio.start(ap, terminated, aStop, startGate = firstLiveFrame)
+                val at = audio.start(ap, terminated, aStop, startGate = firstLiveFrame, onUnexpectedEnd = onAudioFailure)
                 audioHalf = AudioHalf(ap, at, aStop)
             }
 

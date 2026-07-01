@@ -76,6 +76,12 @@ internal class AudioSink(private val debugLabel: String) {
     @Volatile
     private var parked: AtomicBoolean? = null
 
+    /**
+     * Accumulated stderr of the currently-attached ffmpeg audio process, reset per [drainStderr] call and
+     * read once the pump loop ends, so an unexpected end can report why.
+     */
+    private val stderrBuf = StringBuilder()
+
     /** Installs the session park flag (see [parked]); set once by the owning session manager. */
     fun setParkFlag(flag: AtomicBoolean?) {
         parked = flag
@@ -133,18 +139,23 @@ internal class AudioSink(private val debugLabel: String) {
         }
     }
 
-    /** Starts the audio reading / writing loop. */
+    /**
+     * Starts the audio reading / writing loop.
+     * @param onUnexpectedEnd called with the accumulated ffmpeg stderr if the audio process ends on its
+     *   own (crash, broken pipe, EOF) rather than via [stop] — never called for a deliberate teardown.
+     */
     fun start(
         proc: Process,
         terminated: AtomicBoolean,
         stopFlag: AtomicBoolean,
         startGate: CountDownLatch? = null,
+        onUnexpectedEnd: (String) -> Unit = {},
     ): Thread {
         preludeFrames = 0L
         liveGate = null
         exposeLiveClock = true
         drainStderr(proc)
-        return daemon({ run(proc, terminated, stopFlag, startGate) }, "MediaPlayer-audio").also { it.start() }
+        return daemon({ run(proc, terminated, stopFlag, startGate, onUnexpectedEnd) }, "MediaPlayer-audio").also { it.start() }
     }
 
     /**
@@ -152,13 +163,19 @@ internal class AudioSink(private val debugLabel: String) {
      * same [SourceDataLine], with no flush and no second line — continues with the live PCM once
      * [provideLiveInput] supplies its process. The seam is therefore sample-continuous. [framePosition]
      * stays -1 until the line crosses out of the prelude, so video pacing is unaffected while it plays.
+     * @param onUnexpectedEnd see [start].
      */
-    fun startBridge(prelude: ByteArray, terminated: AtomicBoolean, stopFlag: AtomicBoolean): Thread {
+    fun startBridge(
+        prelude: ByteArray,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean,
+        onUnexpectedEnd: (String) -> Unit = {},
+    ): Thread {
         preludeFrames = (prelude.size / BYTES_PER_FRAME).toLong()
         liveProc = null
         liveGate = CountDownLatch(1)
         exposeLiveClock = false
-        return daemon({ runBridge(prelude, terminated, stopFlag) }, "MediaPlayer-audio-bridge").also { it.start() }
+        return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
     }
 
     /** Supplies the live `FFmpeg` audio process to an in-flight bridge session (see [startBridge]). */
@@ -199,9 +216,14 @@ internal class AudioSink(private val debugLabel: String) {
 
     /**
      * Runs the audio reading / writing loop until the process ends or [terminated] / [stopFlag] is set.
+     * Fires [onUnexpectedEnd] once the pump loop is reached and then ends on its own (neither flag set).
      */
-    private fun run(proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean, startGate: CountDownLatch?) {
+    private fun run(
+        proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean, startGate: CountDownLatch?,
+        onUnexpectedEnd: (String) -> Unit,
+    ) {
         var ln: SourceDataLine? = null
+        var pumped = false
         try {
             proc.inputStream.use { input ->
                 val fmt = pcmFormat()
@@ -224,6 +246,7 @@ internal class AudioSink(private val debugLabel: String) {
                 line = ln
                 logger.debug("$debugLabel [audio] start gate passed, line started — audio is now playing.")
                 pumpLive(input, ln, terminated, stopFlag)
+                pumped = true
             }
         } catch (e: IOException) {
             if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
@@ -241,15 +264,23 @@ internal class AudioSink(private val debugLabel: String) {
                 runCatching { it.close() }
             }
         }
+        if (pumped && !terminated.get() && !stopFlag.get()) {
+            onUnexpectedEnd(stderrSnapshot())
+        }
     }
 
     /**
      * Runs a reappearance bridge on one line (see [startBridge]): opens the line, plays the cached
      * [prelude], then continues with the live PCM on the same line once it is attached. The prelude is
-     * not ring-cached (it is already-played audio); only the live PCM feeds the rolling ring.
+     * not ring-cached (it is already-played audio); only the live PCM feeds the rolling ring. Fires
+     * [onUnexpectedEnd] once the live PCM pump is reached and then ends on its own (see [run]).
      */
-    private fun runBridge(prelude: ByteArray, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
+    private fun runBridge(
+        prelude: ByteArray, terminated: AtomicBoolean, stopFlag: AtomicBoolean,
+        onUnexpectedEnd: (String) -> Unit,
+    ) {
         var ln: SourceDataLine? = null
+        var pumped = false
         try {
             val fmt = pcmFormat()
             val info = DataLine.Info(SourceDataLine::class.java, fmt)
@@ -275,6 +306,7 @@ internal class AudioSink(private val debugLabel: String) {
             }
             logger.debug("$debugLabel [audio] bridge handing off cached -> live on one line.")
             proc.inputStream.use { input -> pumpLive(input, ln, terminated, stopFlag) }
+            pumped = true
         } catch (e: Exception) {
             if (!terminated.get() && !stopFlag.get()) {
                 logger.warn("$debugLabel Bridge pipeline: ${e.message}.")
@@ -286,6 +318,9 @@ internal class AudioSink(private val debugLabel: String) {
                 runCatching { it.stop() }
                 runCatching { it.close() }
             }
+        }
+        if (pumped && !terminated.get() && !stopFlag.get()) {
+            onUnexpectedEnd(stderrSnapshot())
         }
     }
 
@@ -429,13 +464,23 @@ internal class AudioSink(private val debugLabel: String) {
         return null
     }
 
-    /** Drains the audio process's stderr and logs each line FFmpeg emits as it arrives (it runs at -loglevel error). */
-    private fun drainStderr(proc: Process) = daemon({
-        try {
-            proc.errorStream.bufferedReader().forEachLine { line ->
-                if (line.isNotBlank()) logger.warn("$debugLabel [audio] FFmpeg stderr: ${line.trim()}.")
+    /** Drains the audio process's stderr, logs each line FFmpeg emits as it arrives (it runs at -loglevel
+     *  error), and accumulates it into [stderrBuf] for [stderrSnapshot]. */
+    private fun drainStderr(proc: Process) {
+        synchronized(stderrBuf) { stderrBuf.setLength(0) }
+        daemon({
+            try {
+                proc.errorStream.bufferedReader().forEachLine { line ->
+                    if (line.isNotBlank()) {
+                        logger.warn("$debugLabel [audio] FFmpeg stderr: ${line.trim()}.")
+                        synchronized(stderrBuf) { stderrBuf.append(line).append('\n') }
+                    }
+                }
+            } catch (_: IOException) {
             }
-        } catch (_: IOException) {
-        }
-    }, "MediaPlayer-astderr").start()
+        }, "MediaPlayer-astderr").start()
+    }
+
+    /** Snapshot of the current process's accumulated stderr (see [drainStderr]). */
+    private fun stderrSnapshot(): String = synchronized(stderrBuf) { stderrBuf.toString() }
 }
