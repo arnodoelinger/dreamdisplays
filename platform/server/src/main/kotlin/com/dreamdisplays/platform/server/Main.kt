@@ -83,8 +83,6 @@ class Main : JavaPlugin() {
     /** Initializes scheduler, storage, listeners, channels, and metrics. Safe to call from a reload. */
     fun doEnable() {
         @Suppress("DEPRECATION")
-        logger.info("Enabling Dream Displays ${description.version}...")
-
         Scheduler.init(this)
 
         val s = Companion.config.storage
@@ -116,7 +114,6 @@ class Main : JavaPlugin() {
 
     /** Persists state and tears down resources. Safe to call from a reload. */
     fun doDisable() {
-        logger.info("Disabling Dream Displays ${pluginMeta.version}...")
         if (::storage.isInitialized) {
             DisplayManager.save { data: PaperDisplayData -> storage.saveDisplay(data) }
             ServerCoroutines.shutdown()
@@ -324,6 +321,8 @@ class Server : ModInitializer {
         val storage: StorageManager?; get() = storageInstance
 
         /** Copies the pre-1.8.1 global `SQLite DB` into [worldDataDir] on first startup for this world. */
+        @Deprecated("Will be removed in 1.9.0")
+        // TODO: remove
         private fun migrateGlobalDb(worldDataDir: File) {
             val oldDb = FabricLoader.getInstance().configDir
                 .resolve("dreamdisplays").resolve("dreamdisplays.db").toFile()
