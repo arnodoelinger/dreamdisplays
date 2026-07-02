@@ -114,8 +114,10 @@ internal class AudioSink(private val debugLabel: String) {
         if (maxBytes <= 0) return ByteArray(0)
         val unplayed = line?.let { (it.bufferSize - it.available()).coerceAtLeast(0) } ?: 0
         synchronized(pcmRing) {
-            val end = (pcmRingBytes - unplayed).coerceAtLeast(0)
-            val take = end.coerceAtMost(maxBytes)
+            // Round both bounds down to a whole stereo 16-bit frame so the slice never starts mid-sample
+            // (unplayed comes from the line's byte counters and need not be frame-aligned).
+            val end = ((pcmRingBytes - unplayed).coerceAtLeast(0) / BYTES_PER_FRAME) * BYTES_PER_FRAME
+            val take = (end.coerceAtMost(maxBytes) / BYTES_PER_FRAME) * BYTES_PER_FRAME
             if (take <= 0) return ByteArray(0)
             val start = end - take
             val out = ByteArray(take)
