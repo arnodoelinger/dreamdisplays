@@ -6,6 +6,7 @@ import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.media.runtime.Processes
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
@@ -205,7 +206,17 @@ object YtDlp {
             ytdlp.cancel()
         }
 
-        val viaNewPipe = NewPipeResolver.fetch(videoUrl)
+        // A NewPipe crash must not leak the parallel yt-dlp branch: treat it as an empty fast path
+        // and let the yt-dlp result decide, aborting the race only on cancellation.
+        val viaNewPipe = try {
+            NewPipeResolver.fetch(videoUrl)
+        } catch (e: CancellationException) {
+            abandonYtDlp()
+            throw e
+        } catch (e: Exception) {
+            logger.debug("NewPipe resolve failed for {}: {}.", videoUrl, e.message?.take(200))
+            emptyList()
+        }
         if (YtStreams.offersQualityLadder(viaNewPipe)) {
             abandonYtDlp()
             return viaNewPipe
