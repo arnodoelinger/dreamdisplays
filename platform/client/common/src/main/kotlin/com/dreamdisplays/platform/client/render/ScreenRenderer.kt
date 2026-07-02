@@ -270,24 +270,32 @@ object ScreenRenderer : ClientRenderService {
         }
 
         //? if >=26 {
+        /** Staged-buffer class and constructor for the 26.x draw path, resolved once. */
+        private val stagedClass: Class<*> by lazy { Class.forName("net.minecraft.client.renderer.StagedVertexBuffer") }
+        private val stagedCtor by lazy {
+            stagedClass.getConstructor(java.util.function.Supplier::class.java, Int::class.javaPrimitiveType)
+        }
+
+        /** Per-class method cache so the staged draw resolves each method once, not per quad per frame. */
+        private val methodCache = java.util.concurrent.ConcurrentHashMap<String, java.lang.reflect.Method>()
+
+        /** Looks up a public method on [owner] through the cache. */
+        private fun method(owner: Class<*>, name: String, vararg params: Class<*>): java.lang.reflect.Method =
+            methodCache.computeIfAbsent("${owner.name}#$name") { owner.getMethod(name, *params) }
+
         private fun draw262(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-            val stagedClass = Class.forName("net.minecraft.client.renderer.StagedVertexBuffer")
-            val staged = stagedClass
-                .getConstructor(java.util.function.Supplier::class.java, Int::class.javaPrimitiveType)
-                .newInstance(java.util.function.Supplier { "dream-displays-immediate" }, 1536)
+            val staged = stagedCtor.newInstance(java.util.function.Supplier { "dream-displays-immediate" }, 1536)
             try {
-                val primitiveTopology = type.javaClass.getMethod("primitiveTopology").invoke(type)
-                val draw = stagedClass
-                    .getMethod("appendDraw", VertexFormat::class.java, primitiveTopology.javaClass)
+                val primitiveTopology = method(type.javaClass, "primitiveTopology").invoke(type)
+                val draw = method(stagedClass, "appendDraw", VertexFormat::class.java, primitiveTopology.javaClass)
                     .invoke(staged, type.format(), primitiveTopology)
-                val builder = stagedClass
-                    .getMethod("getVertexBuilder", draw.javaClass)
+                val builder = method(stagedClass, "getVertexBuilder", draw.javaClass)
                     .invoke(staged, draw) as VertexConsumer
                 appendVertices(stack.last(), builder)
-                stagedClass.getMethod("upload").invoke(staged)
-                val executeInfo = stagedClass.getMethod("getExecuteInfo", draw.javaClass).invoke(staged, draw) ?: return
-                val prepared = type.javaClass.getMethod("prepare").invoke(type)
-                prepared.javaClass.getMethod("drawFromBuffer", executeInfo.javaClass).invoke(prepared, executeInfo)
+                method(stagedClass, "upload").invoke(staged)
+                val executeInfo = method(stagedClass, "getExecuteInfo", draw.javaClass).invoke(staged, draw) ?: return
+                val prepared = method(type.javaClass, "prepare").invoke(type)
+                method(prepared.javaClass, "drawFromBuffer", executeInfo.javaClass).invoke(prepared, executeInfo)
             } finally {
                 (staged as AutoCloseable).close()
             }
