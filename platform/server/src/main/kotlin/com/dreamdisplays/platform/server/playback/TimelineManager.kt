@@ -21,6 +21,9 @@ object TimelineManager {
     private val logger = LoggerFactory.getLogger("DreamDisplays/TimelineManager")
     private const val PERIODIC_BROADCAST_MS = 2_000L
 
+    /** Ceiling for client seeks when no duration is known, matching the v1 24h sanity limit. */
+    internal const val MAX_SEEK_MS = 24L * 60 * 60 * 1_000
+
     private lateinit var transport: PlaybackTransport
     private val timelines = ConcurrentHashMap<UUID, Timeline>()
     private val lastBroadcast = ConcurrentHashMap<UUID, Long>()
@@ -48,7 +51,7 @@ object TimelineManager {
         val updated = when (action) {
             PlaybackAction.PLAY -> current.withPaused(false, now)
             PlaybackAction.PAUSE -> current.withPaused(true, now)
-            PlaybackAction.SEEK -> current.seekedTo(positionMs, now)
+            PlaybackAction.SEEK -> current.seekedTo(clampSeek(positionMs, display), now)
             PlaybackAction.RESTART -> Timeline.start(now)
         }
         timelines[display.id] = updated
@@ -100,6 +103,15 @@ object TimelineManager {
             val display = DisplayManager.getDisplayData(displayId) ?: continue
             broadcast(display, timeline)
         }
+    }
+
+    /**
+     * Clamps a client seek to the known media duration when the server has one (stored in ns),
+     * otherwise to [MAX_SEEK_MS], so a hostile seek can't run the shared clock off to infinity.
+     */
+    internal fun clampSeek(positionMs: Long, display: DisplayData): Long {
+        val durationMs = display.duration?.let { it / 1_000_000L } ?: 0L
+        return positionMs.coerceIn(0, if (durationMs > 0) durationMs else MAX_SEEK_MS)
     }
 
     /** Creates a running (`SYNCED`) or looping (`BROADCAST`) timeline if one is due, else clears it. */

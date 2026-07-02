@@ -132,7 +132,7 @@ object WatchPartyManager {
             }
 
             WatchPartyAction.SEEK -> if (session.state == PLAYING || session.state == PAUSED) {
-                session.timeline = session.timeline.seekedTo(positionMs, now)
+                session.timeline = session.timeline.seekedTo(TimelineManager.clampSeek(positionMs, display), now)
             }
 
             WatchPartyAction.END -> {
