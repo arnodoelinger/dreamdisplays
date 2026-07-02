@@ -106,6 +106,7 @@ internal class VideoFramePipe(
         proc: Process, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, parkFlag: AtomicBoolean? = null,
+        presentPreview: Boolean = true,
     ): Thread {
         clear()
         expectedW = w
@@ -114,7 +115,7 @@ internal class VideoFramePipe(
         lastFrameReceivedNanos.set(System.nanoTime())
         val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
         val prebuffer = FramePrebuffer.createIfEnabled(
-            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel, presentPreview,
         ).also { activePrebuffer = it }
         // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
         // in-world display; feeding at decode time would run the popout ahead by the buffer depth.

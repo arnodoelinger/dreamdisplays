@@ -29,10 +29,14 @@ internal class FramePrebuffer(
     private val capacityFrames: Int,
     private val prefillFrames: Int,
     private val getAudioClock: () -> Long,
-    private val onFirstFrame: () -> Unit,
+    @Volatile private var onFirstFrame: () -> Unit,
     private val terminated: AtomicBoolean,
     private val stopFlag: AtomicBoolean,
     private val debugLabel: String,
+    /** When false, the pre-prime preview frame is suppressed: nothing is presented until pacing lets a
+     *  frame through. Off for the quality-switch incoming channel, where presenting the (stale) first
+     *  decoded frame would promote a rewound picture that then holds until decode catches the clock. */
+    private val presentPreview: Boolean,
 ) {
     private val logger = LoggerFactory.getLogger("DreamDisplays/FramePrebuffer")
 
@@ -101,6 +105,16 @@ internal class FramePrebuffer(
         primed = true
     }
 
+    /** Drops queued frames and re-primes the same consumer for an in-place decoder seek. */
+    fun resetForSeek(onFirstFrame: () -> Unit) {
+        drainAndRecycle()
+        inputClosed = false
+        primed = false
+        previewPresented = false
+        firstFramePresented.set(false)
+        this.onFirstFrame = onFirstFrame
+    }
+
     /** Hard teardown: stops the consumer immediately, recycles queued frames, and joins the thread. */
     fun abort() {
         aborted = true
@@ -124,7 +138,7 @@ internal class FramePrebuffer(
                     // Show the very first decoded frame immediately instead of sitting on a black /
                     // stale picture for the whole prefill: the viewer gets instant visual feedback on
                     // start and seek, while the clock (and audio) still wait for the full cushion.
-                    if (!previewPresented) {
+                    if (presentPreview && !previewPresented) {
                         val tf = queue.poll()
                         if (tf != null) {
                             previewPresented = true
@@ -189,6 +203,7 @@ internal class FramePrebuffer(
             surface: FrameSurface, frameNs: Long,
             getAudioClock: () -> Long, onFirstFrame: () -> Unit,
             terminated: AtomicBoolean, stopFlag: AtomicBoolean, debugLabel: String,
+            presentPreview: Boolean = true,
         ): FramePrebuffer? {
             if (!enabled || frameNs <= 0) return null
             val prefill = ((prebufferMs * 1_000_000L) / frameNs).toInt().coerceIn(2, 240)
@@ -206,7 +221,8 @@ internal class FramePrebuffer(
                 onFirstFrame,
                 terminated,
                 stopFlag,
-                debugLabel
+                debugLabel,
+                presentPreview,
             )
                 .also { it.start() }
         }

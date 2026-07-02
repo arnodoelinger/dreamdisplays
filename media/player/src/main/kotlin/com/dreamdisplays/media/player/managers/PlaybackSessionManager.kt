@@ -121,6 +121,7 @@ internal class PlaybackSessionManager(
             ffmpeg: String, streamSet: ActiveStreams, w: Int, h: Int, offsetNanos: Long,
             hwAccel: HwAccelBackend, onFirstFrame: () -> Unit, onEos: (String, Boolean) -> Unit,
             getAudioClock: () -> Long = ::pacingClockNanos, parkFlag: AtomicBoolean? = null,
+            presentPreview: Boolean = true,
         ) {
             // SSRF guard for the in-process libav path, which bypasses MediaProcess.baseCommand
             val safeUrl = MediaHostGuard.resolveSafeUrl(streamSet.currentVideo.url)
@@ -131,6 +132,7 @@ internal class PlaybackSessionManager(
                     sourceFps = fps, hwAccel = hwAccel, stopFlag = stop, terminated = terminated,
                     getAudioClock = getAudioClock, onFirstFrame = onFirstFrame,
                     getBrightness = getBrightness, onEos = onEos, parkFlag = parkFlag,
+                    presentPreview = presentPreview,
                 )
             } else null
             if (lavThread != null) {
@@ -145,7 +147,7 @@ internal class PlaybackSessionManager(
                     args = args, w = w, h = h, nv12 = nv12, seekOffsetNanos = offsetNanos, sourceFps = fps,
                     stopFlag = stop, terminated = terminated, getAudioClock = getAudioClock,
                     onFirstFrame = onFirstFrame, getBrightness = getBrightness, onEos = onEos,
-                    parkFlag = parkFlag,
+                    parkFlag = parkFlag, presentPreview = presentPreview,
                 ) ?: throw IOException("Native FFmpeg session failed to start")
                 process = null; thread = vt; return
             }
@@ -154,13 +156,17 @@ internal class PlaybackSessionManager(
                 proc = vp, w = w, h = h, seekOffsetNanos = offsetNanos, sourceFps = fps,
                 stopFlag = stop, terminated = terminated, getAudioClock = getAudioClock,
                 onFirstFrame = onFirstFrame, getBrightness = getBrightness, onEos = onEos,
-                parkFlag = parkFlag,
+                parkFlag = parkFlag, presentPreview = presentPreview,
             )
             process = vp; thread = vt
         }
 
         /** Captures this channel's live LAV packet-ring snapshot, when one exists. */
         fun snapshotCache(positionNanos: Long): ByteArray? = nativePipe?.lavCacheSnapshot(positionNanos)
+
+        /** Seeks the in-process LAV decoder without replacing this channel. */
+        fun seekInProcess(offsetNanos: Long, onFirstFrame: () -> Unit): Boolean =
+            inProcess && nativePipe?.seekInProcess(offsetNanos, onFirstFrame) == true
 
         /** Stops the decode and joins the reader thread (blocking). Must not run on the render thread. */
         fun teardownProcess() {
@@ -348,6 +354,37 @@ internal class PlaybackSessionManager(
         synchronized(switchLock) { if (incoming != null) return false }
         val old = active ?: return false
         val ffmpeg = FFmpegBinary.getPath() ?: return false
+        val (w, h) = targetDims(streamSet, lastQuality)
+
+        if (old.inProcess && old.nativePipe?.expectedW == w && old.nativePipe.expectedH == h) {
+            val firstVideoFrame = CountDownLatch(1)
+            val ap = try {
+                MediaProcess.buildAudio(ffmpeg, streamSet.currentAudio.url, offsetNanos, AudioSink.SAMPLE_RATE)
+            } catch (e: IOException) {
+                logger.error("$debugLabel Failed to start seek audio session.", e)
+                return false
+            }
+            val oldAudio = audioHalf
+            audioHalf = null
+            oldAudio?.stop?.set(true)
+            audio.stop()
+            clock.reset(offsetNanos)
+
+            val seeked = old.seekInProcess(offsetNanos) {
+                clock.markFirstFrame()
+                firstVideoFrame.countDown()
+            }
+            if (seeked) {
+                val aStop = AtomicBoolean()
+                val at = audio.start(ap, terminated, aStop, startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure)
+                audioHalf = AudioHalf(ap, at, aStop)
+                updateRawFrameSink()
+                discardHalvesAsync(null, oldAudio)
+                return true
+            }
+            MediaProcess.gracefulDestroy(ap)
+            discardHalvesAsync(null, oldAudio)
+        }
 
         // Freeze the picture and cut the sound right away: the old consumer stops presenting within one
         // poll (the GPU texture keeps the last frame on screen), and the clock parks at the target so the
@@ -359,7 +396,6 @@ internal class PlaybackSessionManager(
         audio.stop()
         clock.reset(offsetNanos)
 
-        val (w, h) = targetDims(streamSet, lastQuality)
         val channel = VideoChannel()
         try {
             val firstVideoFrame = CountDownLatch(1)
@@ -723,7 +759,11 @@ internal class PlaybackSessionManager(
                         "eos=$normalEos stderr=${MediaUtil.truncate(stderr)}."
                     )
                 },
-                parkFlag = parkFlag
+                parkFlag = parkFlag,
+                // No pre-prime preview: the incoming channel's first decoded frame is stale by the
+                // session-open time, and presenting it would promote a rewound picture that then holds
+                // until decode catches the clock. Promote on the first *paced* frame instead.
+                presentPreview = false,
             )
             val shouldDiscard = synchronized(switchLock) {
                 if (!terminated.get() && active != null && incoming === channel && incomingGeneration == generation) {

@@ -13,17 +13,17 @@ use std::sync::{Arc, Mutex, Once};
 use std::{mem, ptr};
 
 use ffmpeg::ffi;
-use ffmpeg::format::context::Input;
 use ffmpeg::format::Pixel;
+use ffmpeg::format::context::Input;
 use ffmpeg::media::Type;
 use ffmpeg::software::scaling;
 use ffmpeg::util::frame::video::Video as VideoFrame;
 use ffmpeg::util::log::Level;
-use ffmpeg::{codec, Dictionary};
+use ffmpeg::{Dictionary, codec};
 use ffmpeg_next as ffmpeg;
 
-use crate::cache::{packets_from_position, CachedPacket, CodecParams, PacketRing};
-use crate::surface::{LavSurfaceDesc, LavSurfaceFrame, LavSurfaceTable, ERR_UNSUPPORTED};
+use crate::cache::{CachedPacket, CodecParams, PacketRing, packets_from_position};
+use crate::surface::{ERR_UNSUPPORTED, LavSurfaceDesc, LavSurfaceFrame, LavSurfaceTable};
 
 /// Read result codes shared with the JVM bridge (mirror the main library).
 pub const READ_OK: i32 = 0;
@@ -35,6 +35,8 @@ pub const NO_PTS_NANOS: i64 = i64::MIN;
 
 const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
                           (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+const SEEK_PREROLL_TOLERANCE_NANOS: i64 = 50_000_000;
 
 /// Limited-range black for the padding borders.
 const BLACK_Y: u8 = 16;
@@ -53,11 +55,7 @@ unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
         // open_live; null is rejected above and the Arc outlives the format context.
         &*(opaque as *const AtomicBool)
     };
-    if flag.load(Ordering::Relaxed) {
-        1
-    } else {
-        0
-    }
+    if flag.load(Ordering::Relaxed) { 1 } else { 0 }
 }
 
 fn init_ffmpeg() -> Result<(), ffmpeg::Error> {
@@ -137,11 +135,17 @@ const HW_CUDA: HwBackend = HwBackend {
 };
 
 #[cfg(target_os = "macos")]
-fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VIDEOTOOLBOX] }
+fn auto_hw_candidates() -> &'static [HwBackend] {
+    &[HW_VIDEOTOOLBOX]
+}
 #[cfg(target_os = "windows")]
-fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_D3D11VA, HW_DXVA2, HW_CUDA] }
+fn auto_hw_candidates() -> &'static [HwBackend] {
+    &[HW_D3D11VA, HW_DXVA2, HW_CUDA]
+}
 #[cfg(all(unix, not(target_os = "macos")))]
-fn auto_hw_candidates() -> &'static [HwBackend] { &[HW_VAAPI, HW_CUDA] }
+fn auto_hw_candidates() -> &'static [HwBackend] {
+    &[HW_VAAPI, HW_CUDA]
+}
 
 #[cfg(not(any(
     target_os = "macos",
@@ -194,6 +198,9 @@ struct ReadState {
     /// Scaled YUV420P output frame.
     scaled: VideoFrame,
     draining: bool,
+    /// Live seek target in normalized nanoseconds. Frames substantially before this target are
+    /// decoded only as pre-roll and are not returned to the JVM.
+    seek_target_nanos: Option<i64>,
     source: PacketSource,
 }
 
@@ -206,7 +213,9 @@ impl ReadState {
     /// Returns the live stream start timestamp; replay packets are already normalized.
     fn stream_start_time(&self) -> Option<i64> {
         match &self.source {
-            PacketSource::Live { stream_start_time, .. } => *stream_start_time,
+            PacketSource::Live {
+                stream_start_time, ..
+            } => *stream_start_time,
             PacketSource::Replay { .. } => None,
         }
     }
@@ -214,8 +223,9 @@ impl ReadState {
     /// True when a replay frame is keyframe pre-roll before the requested resume point.
     fn should_drop_replay_preroll(&self, pts_nanos: i64) -> bool {
         match &self.source {
-            PacketSource::Replay { resume_nanos, .. } =>
-                pts_nanos != NO_PTS_NANOS && pts_nanos < *resume_nanos,
+            PacketSource::Replay { resume_nanos, .. } => {
+                pts_nanos != NO_PTS_NANOS && pts_nanos < *resume_nanos
+            }
             PacketSource::Live { .. } => false,
         }
     }
@@ -269,13 +279,17 @@ impl LavSessions {
 
     /// Opens the stream and registers a session. Returns the new handle, or 0 on failure.
     pub fn open(&self, url: &str, w: usize, h: usize, start_micros: i64, hw_accel: u32) -> i64 {
-        let Ok(session) = LavSession::open(url, w, h, start_micros, hw_accel) else { return 0; };
+        let Ok(session) = LavSession::open(url, w, h, start_micros, hw_accel) else {
+            return 0;
+        };
         self.insert(session)
     }
 
     /// Opens a replay session from a serialized packet-ring snapshot.
     pub fn open_replay(&self, blob: &[u8], w: usize, h: usize, resume_nanos: i64) -> i64 {
-        let Ok(session) = LavSession::open_replay(blob, w, h, resume_nanos) else { return 0; };
+        let Ok(session) = LavSession::open_replay(blob, w, h, resume_nanos) else {
+            return 0;
+        };
         self.insert(session)
     }
 
@@ -292,19 +306,41 @@ impl LavSessions {
 
     /// Blocking decode of the next frame into `dst` as I420. See `dd_lav_read_frame_i420`.
     pub fn read_frame(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         session.read_frame(dst)
     }
 
     /// Blocking decode of the next frame into `dst` as I420 and returns normalized frame PTS.
     pub fn read_frame_with_pts(&self, handle: i64, dst: &mut [u8], pts_nanos: &mut i64) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         session.read_frame_with_pts(dst, pts_nanos)
+    }
+
+    /// Seeks a live session in place and flushes decoder state.
+    pub fn seek(&self, handle: i64, target_micros: i64) -> i32 {
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        match session.seek(target_micros.max(0)) {
+            Ok(()) => READ_OK,
+            Err(e) => {
+                if let Ok(mut err) = session.error.lock() {
+                    *err = e.to_string();
+                }
+                ERR_IO
+            }
+        }
     }
 
     /// Blocking decode of the next hardware frame and registers it as a retained GPU-importable surface.
     pub fn read_surface(&self, handle: i64, desc: &mut LavSurfaceDesc) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         match session.read_surface() {
             Ok(Some(surface)) => self.surfaces.insert(surface, desc),
             Ok(None) => READ_EOF,
@@ -333,8 +369,12 @@ impl LavSessions {
 
     /// Copies the last error description into `dst`, returning the number of bytes written.
     pub fn error(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
-        let Ok(err) = session.error.lock() else { return ERR_IO; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        let Ok(err) = session.error.lock() else {
+            return ERR_IO;
+        };
         let bytes = err.as_bytes();
         let n = bytes.len().min(dst.len());
         dst[..n].copy_from_slice(&bytes[..n]);
@@ -343,7 +383,9 @@ impl LavSessions {
 
     /// Enables / resizes the rolling packet cache on `handle`. See [`LavSession::enable_cache`].
     pub fn enable_cache(&self, handle: i64, window_nanos: i64, max_bytes: usize) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         session.enable_cache(window_nanos, max_bytes);
         READ_OK
     }
@@ -365,7 +407,13 @@ impl LavSessions {
 
     /// Copies a position-aware cache snapshot for `handle`, topping up the live demuxer before
     /// serialization so replay has packets after the resume point.
-    pub fn snapshot_at(&self, handle: i64, position_nanos: i64, dst: &mut [u8], top_up: bool) -> i32 {
+    pub fn snapshot_at(
+        &self,
+        handle: i64,
+        position_nanos: i64,
+        dst: &mut [u8],
+        top_up: bool,
+    ) -> i32 {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
         };
@@ -405,8 +453,10 @@ impl LavSession {
         opts.set("user_agent", USER_AGENT);
         opts.set("headers", "Referer: https://www.youtube.com/\r\n");
 
-        #[cfg(not(test))] opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http");
-        #[cfg(test)] opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http,file");
+        #[cfg(not(test))]
+        opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http");
+        #[cfg(test)]
+        opts.set("protocol_whitelist", "https,tls,tcp,crypto,data,http,file");
 
         opts.set("reconnect", "1");
         opts.set("reconnect_streamed", "1");
@@ -414,6 +464,13 @@ impl LavSession {
         opts.set("reconnect_on_network_error", "1");
         opts.set("reconnect_on_http_error", "5xx");
         opts.set("rw_timeout", "15000000");
+
+        // Single-video HTTP sources don't need the default ~5 MB / 5 s stream probe; the same
+        // tightened window as the external ffmpeg path (`-probesize 1M -analyzeduration 1000000
+        // -fflags nobuffer`) shaves most of the blocking open time.
+        opts.set("probesize", "1048576");
+        opts.set("analyzeduration", "1000000");
+        opts.set("fflags", "nobuffer");
 
         let mut ictx = ffmpeg::format::input_with_dictionary(&url, opts)?;
 
@@ -444,11 +501,8 @@ impl LavSession {
 
         let parameters = input.parameters();
         let codec_params = unsafe { codec_params_from(&parameters, time_base) };
-        let (decoder, hw_selection) = open_video_decoder(
-            &parameters,
-            time_base,
-            HwAccelRequest::from_code(hw_accel),
-        )?;
+        let (decoder, hw_selection) =
+            open_video_decoder(&parameters, time_base, HwAccelRequest::from_code(hw_accel))?;
 
         Ok(LavSession {
             w,
@@ -461,6 +515,7 @@ impl LavSession {
                 sw_frame: VideoFrame::empty(),
                 scaled: VideoFrame::empty(),
                 draining: false,
+                seek_target_nanos: start_micros.checked_mul(1_000).filter(|_| start_micros > 0),
                 source: PacketSource::Live {
                     ictx,
                     stream_index,
@@ -489,13 +544,11 @@ impl LavSession {
             return Err(ffmpeg::Error::InvalidData);
         }
 
-        let time_base = ffmpeg::Rational::new(codec_params.time_base_num, codec_params.time_base_den);
+        let time_base =
+            ffmpeg::Rational::new(codec_params.time_base_num, codec_params.time_base_den);
         let parameters = unsafe { parameters_from_codec_params(&codec_params)? };
-        let (decoder, hw_selection) = open_video_decoder(
-            &parameters,
-            time_base,
-            HwAccelRequest::None,
-        )?;
+        let (decoder, hw_selection) =
+            open_video_decoder(&parameters, time_base, HwAccelRequest::None)?;
 
         Ok(LavSession {
             w,
@@ -508,6 +561,7 @@ impl LavSession {
                 sw_frame: VideoFrame::empty(),
                 scaled: VideoFrame::empty(),
                 draining: false,
+                seek_target_nanos: None,
                 source: PacketSource::Replay {
                     packets,
                     next_packet: 0,
@@ -578,7 +632,9 @@ impl LavSession {
         if dst.len() < self.w * self.h + 2 * c {
             return ERR_BAD_ARGS;
         }
-        let Ok(mut state) = self.read.lock() else { return ERR_IO; };
+        let Ok(mut state) = self.read.lock() else {
+            return ERR_IO;
+        };
         match self.next_frame(&mut state, dst) {
             Ok(Some(pts)) => {
                 *pts_nanos = pts;
@@ -591,6 +647,32 @@ impl LavSession {
                 }
                 ERR_IO
             }
+        }
+    }
+
+    fn seek(&self, target_micros: i64) -> Result<(), ffmpeg::Error> {
+        self.interrupted.store(false, Ordering::Relaxed);
+        let mut state = self.read.lock().map_err(|_| ffmpeg::Error::Bug)?;
+        match &mut state.source {
+            PacketSource::Live { ictx, .. } => {
+                // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
+                ictx.seek(target_micros, ..target_micros)?;
+                let _ = ictx.play();
+                unsafe {
+                    ffi::avcodec_flush_buffers(state.decoder.as_mut_ptr());
+                    ffi::av_frame_unref(state.sw_frame.as_mut_ptr());
+                    ffi::av_frame_unref(state.scaled.as_mut_ptr());
+                }
+                state.seek_target_nanos = target_micros.checked_mul(1_000);
+                state.draining = false;
+                if let Ok(mut ring) = self.ring.lock() {
+                    if let Some(ring) = ring.as_mut() {
+                        ring.clear();
+                    }
+                }
+                Ok(())
+            }
+            PacketSource::Replay { .. } => Err(ffmpeg::Error::InvalidData),
         }
     }
 
@@ -624,6 +706,12 @@ impl LavSession {
             if state.should_drop_replay_preroll(pts_nanos) {
                 continue;
             }
+            if let Some(target) = state.seek_target_nanos {
+                if pts_nanos != NO_PTS_NANOS && pts_nanos + SEEK_PREROLL_TOLERANCE_NANOS < target {
+                    continue;
+                }
+                state.seek_target_nanos = None;
+            }
             self.write_i420(state, &decoded, dst)?;
             return Ok(Some(pts_nanos));
         }
@@ -646,7 +734,11 @@ impl LavSession {
 
             let time_base = state.time_base;
             match &mut state.source {
-                PacketSource::Live { ictx, stream_index, stream_start_time } => {
+                PacketSource::Live {
+                    ictx,
+                    stream_index,
+                    stream_start_time,
+                } => {
                     let mut packet = ffmpeg::Packet::empty();
                     match packet.read(ictx) {
                         Ok(()) => {
@@ -659,11 +751,16 @@ impl LavSession {
                             state.decoder.send_eof()?;
                             state.draining = true;
                         }
-                        Err(ffmpeg::Error::Other { errno }) if errno == ffmpeg::util::error::EAGAIN => {}
+                        Err(ffmpeg::Error::Other { errno })
+                            if errno == ffmpeg::util::error::EAGAIN => {}
                         Err(e) => return Err(e),
                     }
                 }
-                PacketSource::Replay { packets, next_packet, .. } => {
+                PacketSource::Replay {
+                    packets,
+                    next_packet,
+                    ..
+                } => {
                     if *next_packet >= packets.len() {
                         state.decoder.send_eof()?;
                         state.draining = true;
@@ -834,7 +931,9 @@ fn capture_packet_into_ring(
 }
 
 /// Reconstructs the subset of `AVCodecParameters` needed to open a software replay decoder.
-unsafe fn parameters_from_codec_params(params: &CodecParams) -> Result<codec::Parameters, ffmpeg::Error> {
+unsafe fn parameters_from_codec_params(
+    params: &CodecParams,
+) -> Result<codec::Parameters, ffmpeg::Error> {
     if params.codec_id <= 0 || params.width <= 0 || params.height <= 0 {
         return Err(ffmpeg::Error::InvalidData);
     }
@@ -870,7 +969,11 @@ unsafe fn parameters_from_codec_params(params: &CodecParams) -> Result<codec::Pa
 }
 
 /// Normalizes an optional packet timestamp (stream ticks) to nanoseconds, or `NO_PTS_NANOS`.
-fn packet_ts_nanos(ts: Option<i64>, time_base: ffmpeg::Rational, stream_start_time: Option<i64>) -> i64 {
+fn packet_ts_nanos(
+    ts: Option<i64>,
+    time_base: ffmpeg::Rational,
+    stream_start_time: Option<i64>,
+) -> i64 {
     let Some(raw) = ts else {
         return NO_PTS_NANOS;
     };
@@ -883,7 +986,10 @@ fn packet_ts_nanos(ts: Option<i64>, time_base: ffmpeg::Rational, stream_start_ti
 /// Reads the [`CodecParams`] needed to rebuild a decoder for replay from `parameters`.
 ///
 /// Safety: `parameters` must wrap a valid `AVCodecParameters`.
-unsafe fn codec_params_from(parameters: &codec::Parameters, time_base: ffmpeg::Rational) -> CodecParams {
+unsafe fn codec_params_from(
+    parameters: &codec::Parameters,
+    time_base: ffmpeg::Rational,
+) -> CodecParams {
     let p = unsafe {
         // Safety: parameters wraps an AVCodecParameters owned by ffmpeg-next
         parameters.as_ptr()
@@ -1178,8 +1284,16 @@ mod tests {
         let clip = dir.join("clip.mp4");
         let status = std::process::Command::new(&ffmpeg_bin)
             .args([
-                "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=2",
-                "-pix_fmt", "yuv420p", "-g", "15", clip.to_str().unwrap(),
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=320x180:rate=30:duration=2",
+                "-pix_fmt",
+                "yuv420p",
+                "-g",
+                "15",
+                clip.to_str().unwrap(),
             ])
             .status();
         let Ok(status) = status else { return };
@@ -1191,7 +1305,10 @@ mod tests {
         let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
         assert_ne!(handle, 0, "open failed.");
         // Keep the whole clip so the assertions are deterministic
-        assert_eq!(sessions.enable_cache(handle, i64::MAX / 4, 64 * 1024 * 1024), READ_OK);
+        assert_eq!(
+            sessions.enable_cache(handle, i64::MAX / 4, 64 * 1024 * 1024),
+            READ_OK
+        );
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         loop {
@@ -1206,18 +1323,32 @@ mod tests {
         let len = sessions.snapshot(handle, &mut []);
         assert!(len > 0, "Snapshot should be non-empty after capture.");
         let mut blob = vec![0u8; len as usize];
-        assert_eq!(sessions.snapshot(handle, &mut blob), len, "Second call should write the whole blob.");
+        assert_eq!(
+            sessions.snapshot(handle, &mut blob),
+            len,
+            "Second call should write the whole blob."
+        );
 
         let (params, packets) =
             crate::cache::deserialize_snapshot(&blob).expect("Snapshot must be a valid blob.");
         assert!(!packets.is_empty(), "Should have captured packets.");
         assert!(packets[0].keyframe, "Cache must start at a keyframe.");
-        assert!(params.width > 0 && params.height > 0, "Codec params dimensions.");
+        assert!(
+            params.width > 0 && params.height > 0,
+            "Codec params dimensions."
+        );
         assert_ne!(params.codec_id, 0, "Codec id should be captured.");
-        assert!(!params.extradata.is_empty(), "H.264 in MP4 carries extradata.");
+        assert!(
+            !params.extradata.is_empty(),
+            "H.264 in MP4 carries extradata."
+        );
         // PTS should be monotonic and normalized (>= 0 from the start)
         let first_pts = packets.iter().find_map(|p| {
-            if p.pts_nanos != crate::cache::NO_PTS { Some(p.pts_nanos) } else { None }
+            if p.pts_nanos != crate::cache::NO_PTS {
+                Some(p.pts_nanos)
+            } else {
+                None
+            }
         });
         if let Some(first) = first_pts {
             assert!(first >= 0, "Normalized PTS should start at / after zero.");
@@ -1235,8 +1366,16 @@ mod tests {
         let clip = dir.join("clip.mp4");
         let status = std::process::Command::new(&ffmpeg_bin)
             .args([
-                "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=3",
-                "-pix_fmt", "yuv420p", "-g", "15", clip.to_str().unwrap(),
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=320x180:rate=30:duration=3",
+                "-pix_fmt",
+                "yuv420p",
+                "-g",
+                "15",
+                clip.to_str().unwrap(),
             ])
             .status();
         let Ok(status) = status else { return };
@@ -1247,7 +1386,10 @@ mod tests {
         let sessions = LavSessions::new();
         let live = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
         assert_ne!(live, 0, "Live open failed.");
-        assert_eq!(sessions.enable_cache(live, i64::MAX / 4, 64 * 1024 * 1024), READ_OK);
+        assert_eq!(
+            sessions.enable_cache(live, i64::MAX / 4, 64 * 1024 * 1024),
+            READ_OK
+        );
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         while sessions.read_frame(live, &mut dst) == READ_OK {}
@@ -1282,5 +1424,79 @@ mod tests {
         }
         assert!(frames > 0, "Replay should produce frames after resume.");
         sessions.close(replay);
+    }
+
+    /// Seeks an already-open live demuxer and verifies that decode resumes near the target instead
+    /// of returning the old keyframe pre-roll as the first presentable frame.
+    /// Requires the FFmpeg CLI to generate the input (skipped when unavailable).
+    #[test]
+    fn live_seek_discards_preroll_and_continues() {
+        let ffmpeg_bin = std::env::var("DD_TEST_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
+        let dir = std::env::temp_dir().join("dd-lav-seek-test");
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("clip.mp4");
+        let status = std::process::Command::new(&ffmpeg_bin)
+            .args([
+                "-y",
+                "-f",
+                "lavfi",
+                "-i",
+                "testsrc2=size=320x180:rate=30:duration=4",
+                "-pix_fmt",
+                "yuv420p",
+                "-g",
+                "30",
+                clip.to_str().unwrap(),
+            ])
+            .status();
+        let Ok(status) = status else { return };
+        if !status.success() {
+            return;
+        }
+
+        let sessions = LavSessions::new();
+        let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(handle, 0, "Open failed.");
+
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        for _ in 0..10 {
+            assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+        }
+
+        let target_nanos = 2_100_000_000_i64;
+        assert_eq!(sessions.seek(handle, target_nanos / 1_000), READ_OK);
+
+        let mut first_pts = NO_PTS_NANOS;
+        assert_eq!(
+            sessions.read_frame_with_pts(handle, &mut dst, &mut first_pts),
+            READ_OK,
+            "First read after seek should produce a frame.",
+        );
+        assert_ne!(
+            first_pts, NO_PTS_NANOS,
+            "Seek test clip should expose frame PTS."
+        );
+        assert!(
+            first_pts + SEEK_PREROLL_TOLERANCE_NANOS >= target_nanos,
+            "First post-seek frame should be near target, got {first_pts} for target {target_nanos}.",
+        );
+
+        let mut frames = 1;
+        while frames < 8 {
+            let mut pts = NO_PTS_NANOS;
+            match sessions.read_frame_with_pts(handle, &mut dst, &mut pts) {
+                READ_OK => {
+                    assert!(pts >= first_pts, "Post-seek PTS should be monotonic.");
+                    frames += 1;
+                }
+                READ_EOF => break,
+                e => panic!("Read after seek failed with {e}."),
+            }
+        }
+        assert!(
+            frames >= 4,
+            "Seek should resume decode, got only {frames} frames."
+        );
+        sessions.close(handle);
     }
 }

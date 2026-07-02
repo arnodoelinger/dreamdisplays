@@ -39,7 +39,7 @@ object NativeMedia {
     private const val LAV_BASE_NAME = "dreamdisplays_lav"
 
     /** Must match `LAV_ABI_VERSION` in `native/lav/src/lib.rs`. */
-    private const val LAV_ABI_VERSION = 4
+    private const val LAV_ABI_VERSION = 5
     private const val LAV_SURFACE_ABI_VERSION = 1
     private const val LAV_SURFACE_DESC_BYTES = 80L
     private const val CACHE_ROOT = "./dreamdisplays/native"
@@ -64,6 +64,7 @@ object NativeMedia {
     private var lavOpenReplayHandle: MethodHandle? = null
     private var lavReadFrameHandle: MethodHandle? = null
     private var lavReadFramePtsHandle: MethodHandle? = null
+    private var lavSeekHandle: MethodHandle? = null
     private var lavErrorHandle: MethodHandle? = null
     private var lavKillHandle: MethodHandle? = null
     private var lavCloseHandle: MethodHandle? = null
@@ -284,6 +285,12 @@ object NativeMedia {
         }
     }
 
+    /** Seeks a live in-process libav session in place. */
+    fun lavSeek(handle: Long, targetMicros: Long): Boolean {
+        val seek = lavSeekHandle ?: return false
+        return (seek.invoke(handle, targetMicros.coerceAtLeast(0L)) as Int) == READ_OK
+    }
+
     /**
      * Blocking in-process decode of the next frame as a retained hardware surface.
      *
@@ -470,6 +477,7 @@ object NativeMedia {
             lavReadFrameHandle = bind("dd_lav_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
             lavReadFramePtsHandle =
                 bindOptional("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(int, long, addr, long, addr))
+            lavSeekHandle = bind("dd_lav_seek", FunctionDescriptor.of(int, long, long))
             lavErrorHandle = bind("dd_lav_error", FunctionDescriptor.of(int, long, addr, long))
             lavKillHandle = bind("dd_lav_kill", FunctionDescriptor.ofVoid(long))
             lavCloseHandle = bind("dd_lav_close", FunctionDescriptor.ofVoid(long))

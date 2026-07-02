@@ -3,7 +3,7 @@ members = ["lav"]
 
 [package]
 name = "dreamdisplays-native"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2024"
 authors = ["arnodoelinger"]
 description = "Native media pipeline kernels for Dream Displays."

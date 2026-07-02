@@ -21,13 +21,13 @@ pub mod cache;
 pub mod session;
 pub mod surface;
 
-use session::{LavSessions, ERR_BAD_ARGS, ERR_IO, NO_PTS_NANOS};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use session::{ERR_BAD_ARGS, ERR_IO, LavSessions, NO_PTS_NANOS};
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::OnceLock;
 use surface::{LavSurfaceDesc, SURFACE_ABI_VERSION};
 
 /// Bumped on any breaking change of this ABI.
-pub const LAV_ABI_VERSION: u32 = 4;
+pub const LAV_ABI_VERSION: u32 = 5;
 
 /// Global state, one per process.
 static SESSIONS: OnceLock<LavSessions> = OnceLock::new();
@@ -79,7 +79,7 @@ pub unsafe extern "C" fn dd_lav_open(
         let url = String::from_utf8_lossy(bytes).into_owned();
         sessions().open(&url, w as usize, h as usize, start_micros, hw_accel)
     }))
-        .unwrap_or(0)
+    .unwrap_or(0)
 }
 
 /// Opens a replay decode session from a serialized packet-ring snapshot.
@@ -109,7 +109,7 @@ pub unsafe extern "C" fn dd_lav_open_replay(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().open_replay(bytes, w as usize, h as usize, resume_nanos)
     }))
-        .unwrap_or(0)
+    .unwrap_or(0)
 }
 
 /// Blocking decode of the next frame into `dst` as tightly packed I420 (Y, then U, then V),
@@ -174,7 +174,15 @@ pub unsafe extern "C" fn dd_lav_read_frame_i420_pts(
         }
         rc
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or(ERR_IO)
+}
+
+/// Seeks a live in-process decode session to `target_micros` (AV_TIME_BASE / microseconds),
+/// flushes decoder buffers, and resumes future reads from the requested position. Returns 0 on
+/// success or a negative error code. Replay sessions are not seekable.
+#[unsafe(no_mangle)]
+pub extern "C" fn dd_lav_seek(handle: i64, target_micros: i64) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| sessions().seek(handle, target_micros))).unwrap_or(ERR_IO)
 }
 
 /// Blocking decode of the next hardware frame as a retained GPU-importable surface.
@@ -194,8 +202,7 @@ pub unsafe extern "C" fn dd_lav_read_surface(handle: i64, desc: *mut LavSurfaceD
         // LavSurfaceDesc; null is rejected above.
         &mut *desc
     };
-    catch_unwind(AssertUnwindSafe(|| sessions().read_surface(handle, desc)))
-        .unwrap_or(ERR_IO)
+    catch_unwind(AssertUnwindSafe(|| sessions().read_surface(handle, desc))).unwrap_or(ERR_IO)
 }
 
 /// Imports one retained surface plane into an existing OpenGL texture object.
@@ -212,7 +219,7 @@ pub extern "C" fn dd_lav_bind_surface_plane_gl(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().bind_surface_plane_gl(surface_handle, plane, texture_id)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or(ERR_IO)
 }
 
 /// Releases a surface returned by [`dd_lav_read_surface`]. Safe to call with 0 or stale handles.
@@ -254,7 +261,7 @@ pub extern "C" fn dd_lav_enable_cache(handle: i64, window_ms: u32, max_bytes: u6
     catch_unwind(AssertUnwindSafe(|| {
         sessions().enable_cache(handle, window_nanos, max_bytes)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or(ERR_IO)
 }
 
 /// Copies the cache snapshot for `handle` into `dst` and returns the total blob length. When the
@@ -304,7 +311,7 @@ pub unsafe extern "C" fn dd_lav_ring_snapshot_at(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().snapshot_at(handle, position_nanos, dst_slice, top_up)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or(ERR_IO)
 }
 
 /// Interrupts the session's network/decode loop, unblocking any reader stuck in
