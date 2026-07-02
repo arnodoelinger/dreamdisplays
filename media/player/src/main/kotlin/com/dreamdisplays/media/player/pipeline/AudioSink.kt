@@ -260,7 +260,8 @@ internal class AudioSink(private val debugLabel: String) {
             }
         } finally {
             ln?.let {
-                line = null
+                // A newer session may already own the field (overlapped restart): only clear our own line.
+                if (line === it) line = null
                 runCatching { it.flush() }
                 runCatching { it.stop() }
                 runCatching { it.close() }
@@ -315,7 +316,8 @@ internal class AudioSink(private val debugLabel: String) {
             }
         } finally {
             ln?.let {
-                line = null
+                // A newer session may already own the field (overlapped restart): only clear our own line.
+                if (line === it) line = null
                 runCatching { it.flush() }
                 runCatching { it.stop() }
                 runCatching { it.close() }
