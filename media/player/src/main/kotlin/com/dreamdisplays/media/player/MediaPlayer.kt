@@ -111,6 +111,10 @@ class MediaPlayer(
         private val INIT_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(
             Runtime.getRuntime().availableProcessors().coerceIn(2, 4),
         ) { r -> daemon(r, "MediaPlayer-init-${INIT_THREAD_COUNTER.incrementAndGet()}") }
+
+        /** Shared timer for retry back-off delays, so waiting never occupies an [INIT_EXECUTOR] thread. */
+        private val RETRY_SCHEDULER: ScheduledExecutorService =
+            Executors.newSingleThreadScheduledExecutor { r -> daemon(r, "MediaPlayer-retry") }
     }
 
     private val debugLabel = "${host.uuid}/${Integer.toHexString(System.identityHashCode(this))}"
@@ -666,10 +670,9 @@ class MediaPlayer(
         logger.warn("$debugLabel ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs} ms.")
         if (invalidateCache) env.cacheInvalidator.invalidate(youtubeUrl)
         state.set(PlaybackState.RESTARTING)
-        INIT_EXECUTOR.submit {
-            runCatching { Thread.sleep(delayMs) }.onFailure { Thread.currentThread().interrupt(); return@submit }
-            if (!terminated.get()) initialize()
-        }
+        RETRY_SCHEDULER.schedule({
+            if (!terminated.get()) INIT_EXECUTOR.submit { if (!terminated.get()) initialize() }
+        }, delayMs, TimeUnit.MILLISECONDS)
     }
 
     /**
