@@ -18,6 +18,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * presents them into the same ready slot. A stall now blocks only the producer; the consumer keeps
  * presenting from the queue, so playback stays smooth until the cushion drains. The audio master clock
  * ([onFirstFrame]) is started only once the queue has pre-filled, so playback begins with a head start.
+ * The very first decoded frame is presented immediately as a preview (before the prefill completes),
+ * so starts and seeks show the target picture as soon as one frame exists.
  *
  * Enabled by default ([prefillFrames] is derived from `dreamdisplays.playback.prebufferMs`, default 400 ms);
  * set the property to 0 to keep the original inline pace-and-publish path.
@@ -49,6 +51,10 @@ internal class FramePrebuffer(
     /** True once enough frames are queued (or input closed) to begin playout. */
     @Volatile
     private var primed = false
+
+    /** True once the pre-prime preview frame has been shown (see [consume]). */
+    @Volatile
+    private var previewPresented = false
 
     private val firstFramePresented = AtomicBoolean(false)
     private var consumer: Thread? = null
@@ -115,6 +121,18 @@ internal class FramePrebuffer(
         try {
             while (alive()) {
                 if (!primed) {
+                    // Show the very first decoded frame immediately instead of sitting on a black /
+                    // stale picture for the whole prefill: the viewer gets instant visual feedback on
+                    // start and seek, while the clock (and audio) still wait for the full cushion.
+                    if (!previewPresented) {
+                        val tf = queue.poll()
+                        if (tf != null) {
+                            previewPresented = true
+                            onPresent?.invoke(tf.buf)
+                            surface.present(tf.buf)
+                            continue
+                        }
+                    }
                     Thread.sleep(2); continue
                 }
                 val tf = queue.poll(POLL_MS, TimeUnit.MILLISECONDS)
