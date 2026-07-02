@@ -70,16 +70,18 @@ object DisplayUnlitRenderTypes {
             .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
             .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
             .createCompositeState(false)
-        return RenderType::class.java.getDeclaredMethod(
-            "create",
-            String::class.java,
-            VertexFormat::class.java,
-            VertexFormat.Mode::class.java,
-            Int::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType,
-            Boolean::class.javaPrimitiveType,
-            state.javaClass,
-        ).apply { isAccessible = true }.invoke(
+        val method = RenderType::class.java.declaredMethods.first { m ->
+            m.parameterCount == 7 && m.parameterTypes.let { p ->
+                p[0] == String::class.java &&
+                    p[1] == VertexFormat::class.java &&
+                    p[2] == VertexFormat.Mode::class.java &&
+                    p[3] == Int::class.javaPrimitiveType &&
+                    p[4] == Boolean::class.javaPrimitiveType &&
+                    p[5] == Boolean::class.javaPrimitiveType &&
+                    p[6].isAssignableFrom(state.javaClass)
+            }
+        }
+        return method.apply { isAccessible = true }.invoke(
             null,
             name,
             DefaultVertexFormat.POSITION_TEX_COLOR,
