@@ -156,7 +156,7 @@ internal class AudioSink(private val debugLabel: String) {
         preludeFrames = 0L
         liveGate = null
         exposeLiveClock = true
-        drainStderr(proc)
+        drainStderr(proc, stopFlag)
         return daemon({ run(proc, terminated, stopFlag, startGate, onUnexpectedEnd) }, "MediaPlayer-audio").also { it.start() }
     }
 
@@ -181,8 +181,8 @@ internal class AudioSink(private val debugLabel: String) {
     }
 
     /** Supplies the live `FFmpeg` audio process to an in-flight bridge session (see [startBridge]). */
-    fun provideLiveInput(proc: Process) {
-        drainStderr(proc)
+    fun provideLiveInput(proc: Process, stopFlag: AtomicBoolean) {
+        drainStderr(proc, stopFlag)
         liveProc = proc
         liveGate?.countDown()
     }
@@ -468,15 +468,22 @@ internal class AudioSink(private val debugLabel: String) {
         return null
     }
 
-    /** Drains the audio process's stderr, logs each line FFmpeg emits as it arrives (it runs at -loglevel
-     *  error), and accumulates it into [stderrBuf] for [stderrSnapshot]. */
-    private fun drainStderr(proc: Process) {
+    /**
+     * Drains the audio process's stderr, logs interesting lines FFmpeg emits as they arrive (it runs at
+     *  -loglevel error), and accumulates stderr into [stderrBuf] for [stderrSnapshot].
+     */
+    private fun drainStderr(proc: Process, stopFlag: AtomicBoolean) {
         synchronized(stderrBuf) { stderrBuf.setLength(0) }
         daemon({
             try {
                 proc.errorStream.bufferedReader().forEachLine { line ->
                     if (line.isNotBlank()) {
-                        logger.warn("$debugLabel [audio] FFmpeg stderr: ${line.trim()}.")
+                        val trimmed = line.trim()
+                        if (stopFlag.get()) {
+                            logger.debug("$debugLabel [audio] FFmpeg stderr during teardown: $trimmed.")
+                        } else if (MediaUtil.isInterestingStderr(trimmed)) {
+                            logger.warn("$debugLabel [audio] FFmpeg stderr: $trimmed.")
+                        }
                         synchronized(stderrBuf) { stderrBuf.append(line).append('\n') }
                     }
                 }

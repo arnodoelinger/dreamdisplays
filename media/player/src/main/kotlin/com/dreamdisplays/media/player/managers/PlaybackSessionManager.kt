@@ -524,7 +524,7 @@ internal class PlaybackSessionManager(
             if (bridge != null) {
                 // Cached prelude is playing on the bridge line: feed the live PCM to that same line, so it
                 // continues sample-continuously off the prelude (no gate, no flush, no second line).
-                audio.provideLiveInput(ap)
+                audio.provideLiveInput(ap, bridge.stop)
                 audioHalf = AudioHalf(ap, bridge.thread, bridge.stop)
                 bridgeAudio = null
             } else {
