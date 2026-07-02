@@ -70,7 +70,7 @@ object DisplayUnlitRenderTypes {
             .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
             .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
             .createCompositeState(false)
-        return RenderType::class.java.getDeclaredMethod(
+        return RenderType::class.java.getMethod(
             "create",
             String::class.java,
             VertexFormat::class.java,
@@ -79,7 +79,7 @@ object DisplayUnlitRenderTypes {
             Boolean::class.javaPrimitiveType,
             Boolean::class.javaPrimitiveType,
             state.javaClass,
-        ).apply { isAccessible = true }.invoke(
+        ).invoke(
             null,
             name,
             DefaultVertexFormat.POSITION_TEX_COLOR,
