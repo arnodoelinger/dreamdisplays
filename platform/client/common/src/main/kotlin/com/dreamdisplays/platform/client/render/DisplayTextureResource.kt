@@ -78,6 +78,7 @@ class DisplayTextureResource(private val uuid: UUID) {
     }
 
     /** Allocated GPU resources, or null if none are allocated. */
+    @Volatile
     private var current: Allocation? = null
 
     /**
@@ -271,18 +272,20 @@ class DisplayTextureResource(private val uuid: UUID) {
         current = null
     }
 
-    /** Releases the GPU textures asynchronously on the render thread; safe to call during teardown. */
+    /**
+     * Releases the GPU textures asynchronously on the render thread; safe to call during teardown.
+     * Clears [current] / [pending] immediately so [hasTexture] and the getters stop handing out
+     * textures that are about to be freed.
+     */
     fun releaseAsync() {
-        val ids = (current?.allIds.orEmpty()) + (pending?.allIds.orEmpty())
-        if (ids.isEmpty()) return
-        val mc = Minecraft.getInstance()
-        mc.execute {
-            for (id in ids) {
-                try {
-                    mc.textureManager.release(id)
-                } catch (_: Exception) {
-                }
-            }
+        val c = current
+        val p = pending
+        current = null
+        pending = null
+        if (c == null && p == null) return
+        Minecraft.getInstance().execute {
+            c?.release()
+            p?.release()
         }
     }
 
