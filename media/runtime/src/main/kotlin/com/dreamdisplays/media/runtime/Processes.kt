@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
-import java.util.Comparator
 import java.util.concurrent.TimeUnit
 
 /**
@@ -23,9 +22,20 @@ object Processes {
      */
     fun destroyTree(process: Process) {
         runCatching {
-            process.toHandle().descendants()
-                .sorted(Comparator.comparingLong<ProcessHandle> { it.pid() }.reversed())
-                .forEach { it.destroyForcibly() }
+            val tree = process.toHandle().descendants().toList()
+            // Order by depth in the captured tree, deepest first: descending PID is not a reliable
+            // proxy for "children before parents" because PIDs recycle and wrap.
+            val pids = tree.mapTo(HashSet()) { it.pid() }
+            fun depth(handle: ProcessHandle): Int {
+                var d = 0
+                var p = handle.parent().orElse(null)
+                while (p != null && p.pid() in pids) {
+                    d++
+                    p = p.parent().orElse(null)
+                }
+                return d
+            }
+            tree.sortedByDescending(::depth).forEach { it.destroyForcibly() }
         }
         process.destroyForcibly()
     }
