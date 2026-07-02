@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.display.model.ContentRotation
+import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.platform.server.datatypes.*
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.zaxxer.hikari.HikariConfig
@@ -34,7 +35,8 @@ import java.util.*
 class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     val id = binary("id", 16)
     val ownerId = binary("ownerId", 16)
-    val videoCode = varchar("videoCode", 255).default("")
+    // Sized to MediaUrlPolicy.MAX_URL_LENGTH so accepted URLs always fit the column.
+    val videoCode = varchar("videoCode", MediaUrlPolicy.MAX_URL_LENGTH).default("")
     val world = varchar("world", 255)
     val pos1 = long("pos1")
     val pos2 = long("pos2")
@@ -86,7 +88,7 @@ class StorageManager(
     private val db = Database.connect(dataSource)
 
     /**
-     * Creates the displays table if missing, applies in-place column migrations (`lang`, `isLocked`),
+     * Creates the displays table if missing, applies in-place column migrations (`lang`, `isLocked`, `videoCode` widening),
      * and loads previously stored displays into the runtime registry.
      */
     fun createSchema() {
