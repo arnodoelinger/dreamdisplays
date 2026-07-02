@@ -183,6 +183,10 @@ class MediaPlayer(
     private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
     private val initCallbacks = CopyOnWriteArrayList<() -> Unit>()
 
+    /** Set once [initialize] has completed successfully; from then on [whenInitialized] runs callbacks
+     *  immediately instead of queueing them (the queue is only drained at the end of [initialize]). */
+    private val initDrained = AtomicBoolean(false)
+
     @Volatile
     private var streams: ActiveStreams? = null
     @Volatile
@@ -305,11 +309,12 @@ class MediaPlayer(
      * initialization completes. The callback is called on the init thread.
      */
     fun whenInitialized(callback: () -> Unit) {
-        if (isReady) {
+        if (initDrained.get() || isReady) {
             callback(); return
         }
         initCallbacks.add(callback)
-        if (isReady && initCallbacks.remove(callback)) callback()
+        // initialize() may have drained between the check and the add; claim our own callback if so.
+        if ((initDrained.get() || isReady) && initCallbacks.remove(callback)) callback()
     }
 
     /**
@@ -819,10 +824,17 @@ class MediaPlayer(
     }
 
     /**
-     * Atomically drains [initCallbacks] and invokes each callback when [run] is true.
+     * Drains [initCallbacks] and invokes each callback when [run] is true. Marks the drain done
+     * first, so a callback registered concurrently either lands in the list before it empties or
+     * runs immediately in [whenInitialized] — never both, never neither.
      */
     private fun drainInitCallbacks(run: Boolean) {
-        initCallbacks.toList().also { initCallbacks.clear() }.takeIf { run }?.forEach { it() }
+        if (run) initDrained.set(true)
+        // Remove one at a time by identity so a callback added mid-drain is never wiped without running.
+        while (true) {
+            val cb = initCallbacks.firstOrNull() ?: break
+            if (initCallbacks.remove(cb) && run) cb()
+        }
     }
 
     /** Submits [action] to the control executor if the player is not terminated. */
