@@ -11,4 +11,7 @@ name = "dreamdisplays_lav"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+anyhow = "1.0.103"
+dreamdisplays-logging = { path = "../logging" }
 ffmpeg-next = { version = "8.1.0", default-features = false, features = ["codec", "format", "software-scaling", "software-resampling"] }
+log = "0.4.33"

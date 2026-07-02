@@ -6,6 +6,8 @@
 //! native library. The output contract matches `dd_video_read_frame_i420`: Y plane, then
 //! deinterleaved U and V quarter planes, aspect-fitted into the target size on black.
 
+use anyhow::{Context as AnyhowContext, Result, anyhow, bail};
+use log::{debug, error, info, warn};
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -51,19 +53,32 @@ unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
         return 0;
     }
     let flag = unsafe {
-        // Safety: libav calls this with the interrupted AtomicBool pointer installed in
-        // open_live; null is rejected above and the Arc outlives the format context.
         &*(opaque as *const AtomicBool)
     };
     if flag.load(Ordering::Relaxed) { 1 } else { 0 }
 }
 
-fn init_ffmpeg() -> Result<(), ffmpeg::Error> {
-    ffmpeg::init()?;
+fn init_ffmpeg() -> Result<()> {
+    ffmpeg::init().context("initialize libav")?;
     FFMPEG_LOG_INIT.call_once(|| {
-        ffmpeg::util::log::set_level(Level::Error);
+        let level = if log::log_enabled!(log::Level::Debug) {
+            Level::Warning
+        } else {
+            Level::Error
+        };
+        ffmpeg::util::log::set_level(level);
     });
     Ok(())
+}
+
+/// Strips the query string (stream URLs carry expiring tokens) and caps the length, keeping log
+/// lines readable and free of secrets.
+fn url_for_log(url: &str) -> &str {
+    let base = url.split('?').next().unwrap_or(url);
+    match base.char_indices().nth(120) {
+        Some((i, _)) => &base[..i],
+        None => base,
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -102,16 +117,19 @@ impl HwAccelRequest {
 
 #[derive(Clone, Copy)]
 struct HwBackend {
+    name: &'static str,
     device_type: ffi::AVHWDeviceType,
     pix_fmts: &'static [ffi::AVPixelFormat],
 }
 
 const HW_VIDEOTOOLBOX: HwBackend = HwBackend {
+    name: "VideoToolbox",
     device_type: ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VIDEOTOOLBOX,
     pix_fmts: &[ffi::AVPixelFormat::AV_PIX_FMT_VIDEOTOOLBOX],
 };
 
 const HW_D3D11VA: HwBackend = HwBackend {
+    name: "D3D11VA",
     device_type: ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_D3D11VA,
     pix_fmts: &[
         ffi::AVPixelFormat::AV_PIX_FMT_D3D11,
@@ -120,16 +138,19 @@ const HW_D3D11VA: HwBackend = HwBackend {
 };
 
 const HW_DXVA2: HwBackend = HwBackend {
+    name: "DXVA2",
     device_type: ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_DXVA2,
     pix_fmts: &[ffi::AVPixelFormat::AV_PIX_FMT_DXVA2_VLD],
 };
 
 const HW_VAAPI: HwBackend = HwBackend {
+    name: "VAAPI",
     device_type: ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_VAAPI,
     pix_fmts: &[ffi::AVPixelFormat::AV_PIX_FMT_VAAPI],
 };
 
 const HW_CUDA: HwBackend = HwBackend {
+    name: "CUDA",
     device_type: ffi::AVHWDeviceType::AV_HWDEVICE_TYPE_CUDA,
     pix_fmts: &[ffi::AVPixelFormat::AV_PIX_FMT_CUDA],
 };
@@ -277,20 +298,46 @@ impl LavSessions {
         self.map.lock().ok()?.get(&handle).cloned()
     }
 
-    /// Opens the stream and registers a session. Returns the new handle, or 0 on failure.
+    /// Opens the stream and registers a session. Returns the new handle, or 0 on failure
+    /// (the cause is logged).
     pub fn open(&self, url: &str, w: usize, h: usize, start_micros: i64, hw_accel: u32) -> i64 {
-        let Ok(session) = LavSession::open(url, w, h, start_micros, hw_accel) else {
-            return 0;
-        };
-        self.insert(session)
+        match LavSession::open(url, w, h, start_micros, hw_accel) {
+            Ok(session) => {
+                let handle = self.insert(session);
+                info!(
+                    "Opened LAV session #{handle}: {} ({w}x{h}, start {} ms).",
+                    url_for_log(url),
+                    start_micros / 1_000,
+                );
+                handle
+            }
+            Err(e) => {
+                error!("Failed to open LAV session for {}: {e:#}.", url_for_log(url));
+                0
+            }
+        }
     }
 
     /// Opens a replay session from a serialized packet-ring snapshot.
     pub fn open_replay(&self, blob: &[u8], w: usize, h: usize, resume_nanos: i64) -> i64 {
-        let Ok(session) = LavSession::open_replay(blob, w, h, resume_nanos) else {
-            return 0;
-        };
-        self.insert(session)
+        match LavSession::open_replay(blob, w, h, resume_nanos) {
+            Ok(session) => {
+                let handle = self.insert(session);
+                info!(
+                    "Opened LAV replay session #{handle} from a {} byte snapshot (resume at {} ms).",
+                    blob.len(),
+                    resume_nanos / 1_000_000,
+                );
+                handle
+            }
+            Err(e) => {
+                error!(
+                    "Failed to open LAV replay session from a {} byte snapshot: {e:#}.",
+                    blob.len()
+                );
+                0
+            }
+        }
     }
 
     /// Registers a newly opened session and returns its opaque handle.
@@ -326,10 +373,20 @@ impl LavSessions {
             return ERR_BAD_HANDLE;
         };
         match session.seek(target_micros.max(0)) {
-            Ok(()) => READ_OK,
+            Ok(()) => {
+                debug!(
+                    "LAV session #{handle} sought to {} ms.",
+                    target_micros / 1_000
+                );
+                READ_OK
+            }
             Err(e) => {
+                warn!(
+                    "LAV session #{handle} seek to {} ms failed: {e:#}.",
+                    target_micros / 1_000
+                );
                 if let Ok(mut err) = session.error.lock() {
-                    *err = e.to_string();
+                    *err = format!("{e:#}.");
                 }
                 ERR_IO
             }
@@ -345,6 +402,7 @@ impl LavSessions {
             Ok(Some(surface)) => self.surfaces.insert(surface, desc),
             Ok(None) => READ_EOF,
             Err(e) => {
+                warn!("LAV session #{handle} surface read failed: {}.", e.message());
                 if let Ok(mut err) = session.error.lock() {
                     *err = e.message().to_string();
                 }
@@ -386,6 +444,11 @@ impl LavSessions {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
         };
+        debug!(
+            "LAV session #{handle}: packet cache enabled ({} ms window, {} KiB cap).",
+            window_nanos / 1_000_000,
+            max_bytes / 1024,
+        );
         session.enable_cache(window_nanos, max_bytes);
         READ_OK
     }
@@ -427,26 +490,23 @@ impl LavSessions {
     /// Flags the session as interrupted; the reader loop exits between packets.
     pub fn kill(&self, handle: i64) {
         if let Some(session) = self.get(handle) {
+            debug!("Interrupting LAV session #{handle}");
             session.interrupted.store(true, Ordering::Relaxed);
         }
     }
 
     /// Removes the session from the table, dropping all libav state.
     pub fn close(&self, handle: i64) {
-        if let Ok(mut map) = self.map.lock() {
-            map.remove(&handle);
+        if let Ok(mut map) = self.map.lock()
+            && map.remove(&handle).is_some()
+        {
+            debug!("Closed LAV session #{handle}.");
         }
     }
 }
 
 impl LavSession {
-    fn open(
-        url: &str,
-        w: usize,
-        h: usize,
-        start_micros: i64,
-        hw_accel: u32,
-    ) -> Result<LavSession, ffmpeg::Error> {
+    fn open(url: &str, w: usize, h: usize, start_micros: i64, hw_accel: u32) -> Result<LavSession> {
         init_ffmpeg()?;
 
         let mut opts = Dictionary::new();
@@ -472,7 +532,8 @@ impl LavSession {
         opts.set("analyzeduration", "1000000");
         opts.set("fflags", "nobuffer");
 
-        let mut ictx = ffmpeg::format::input_with_dictionary(&url, opts)?;
+        let mut ictx =
+            ffmpeg::format::input_with_dictionary(&url, opts).context("open input stream")?;
 
         // Route blocked network I/O through an interrupt callback so a kill() / teardown aborts the
         // current read promptly instead of waiting out the 15 s rw_timeout.
@@ -485,13 +546,14 @@ impl LavSession {
 
         if start_micros > 0 {
             // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
-            ictx.seek(start_micros, ..start_micros)?;
+            ictx.seek(start_micros, ..start_micros)
+                .with_context(|| format!("initial seek to {} ms", start_micros / 1_000))?;
         }
 
         let input = ictx
             .streams()
             .best(Type::Video)
-            .ok_or(ffmpeg::Error::StreamNotFound)?;
+            .context("no video stream found in input")?;
         let stream_index = input.index();
         let time_base = input.time_base();
         let stream_start_time = match input.start_time() {
@@ -502,7 +564,8 @@ impl LavSession {
         let parameters = input.parameters();
         let codec_params = unsafe { codec_params_from(&parameters, time_base) };
         let (decoder, hw_selection) =
-            open_video_decoder(&parameters, time_base, HwAccelRequest::from_code(hw_accel))?;
+            open_video_decoder(&parameters, time_base, HwAccelRequest::from_code(hw_accel))
+                .context("open video decoder")?;
 
         Ok(LavSession {
             w,
@@ -529,26 +592,32 @@ impl LavSession {
         })
     }
 
-    fn open_replay(
-        blob: &[u8],
-        w: usize,
-        h: usize,
-        resume_nanos: i64,
-    ) -> Result<LavSession, ffmpeg::Error> {
+    fn open_replay(blob: &[u8], w: usize, h: usize, resume_nanos: i64) -> Result<LavSession> {
         init_ffmpeg()?;
 
-        let (codec_params, snapshot_packets) =
-            crate::cache::deserialize_snapshot(blob).ok_or(ffmpeg::Error::InvalidData)?;
+        let (codec_params, snapshot_packets) = crate::cache::deserialize_snapshot(blob)
+            .context("bad magic or truncated blob.")?;
+        if codec_params.time_base_den == 0 {
+            bail!("snapshot carries an invalid time base (den is 0).");
+        }
         let packets = packets_from_position(&snapshot_packets, resume_nanos);
-        if packets.is_empty() || codec_params.time_base_den == 0 {
-            return Err(ffmpeg::Error::InvalidData);
+        if packets.is_empty() {
+            bail!(
+                "no keyframe-aligned packets at or before the resume position ({} ms; {} packets cached).",
+                resume_nanos / 1_000_000,
+                snapshot_packets.len(),
+            );
         }
 
         let time_base =
             ffmpeg::Rational::new(codec_params.time_base_num, codec_params.time_base_den);
-        let parameters = unsafe { parameters_from_codec_params(&codec_params)? };
+        let parameters = unsafe {
+            parameters_from_codec_params(&codec_params)
+                .context("rebuild codec parameters from snapshot.")?
+        };
         let (decoder, hw_selection) =
-            open_video_decoder(&parameters, time_base, HwAccelRequest::None)?;
+            open_video_decoder(&parameters, time_base, HwAccelRequest::None)
+                .context("open replay video decoder.")?;
 
         Ok(LavSession {
             w,
@@ -642,21 +711,26 @@ impl LavSession {
             }
             Ok(None) => READ_EOF,
             Err(e) => {
+                warn!("LAV frame decode failed: {e:#}");
                 if let Ok(mut err) = self.error.lock() {
-                    *err = e.to_string();
+                    *err = format!("{e:#}");
                 }
                 ERR_IO
             }
         }
     }
 
-    fn seek(&self, target_micros: i64) -> Result<(), ffmpeg::Error> {
+    fn seek(&self, target_micros: i64) -> Result<()> {
         self.interrupted.store(false, Ordering::Relaxed);
-        let mut state = self.read.lock().map_err(|_| ffmpeg::Error::Bug)?;
+        let mut state = self
+            .read
+            .lock()
+            .map_err(|_| anyhow!("LAV reader lock poisoned."))?;
         match &mut state.source {
             PacketSource::Live { ictx, .. } => {
                 // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
-                ictx.seek(target_micros, ..target_micros)?;
+                ictx.seek(target_micros, ..target_micros)
+                    .with_context(|| format!("demuxer seek to {} ms.", target_micros / 1_000))?;
                 let _ = ictx.play();
                 unsafe {
                     ffi::avcodec_flush_buffers(state.decoder.as_mut_ptr());
@@ -672,7 +746,7 @@ impl LavSession {
                 }
                 Ok(())
             }
-            PacketSource::Replay { .. } => Err(ffmpeg::Error::InvalidData),
+            PacketSource::Replay { .. } => bail!("replay sessions are not seekable."),
         }
     }
 
@@ -680,10 +754,10 @@ impl LavSession {
         let mut state = self
             .read
             .lock()
-            .map_err(|_| SurfaceReadError::Io("LAV reader lock poisoned".to_string()))?;
+            .map_err(|_| SurfaceReadError::Io("LAV reader lock poisoned.".to_string()))?;
         match self
             .receive_frame(&mut state)
-            .map_err(|e| SurfaceReadError::Io(e.to_string()))?
+            .map_err(|e| SurfaceReadError::Io(format!("{e:#}.")))?
         {
             Some(frame) => LavSurfaceFrame::from_video_frame(&frame)
                 .map(Some)
@@ -693,11 +767,7 @@ impl LavSession {
     }
 
     /// Pulls packets until one frame is decoded and written to `dst`. Returns Ok(false) on EOF.
-    fn next_frame(
-        &self,
-        state: &mut ReadState,
-        dst: &mut [u8],
-    ) -> Result<Option<i64>, ffmpeg::Error> {
+    fn next_frame(&self, state: &mut ReadState, dst: &mut [u8]) -> Result<Option<i64>> {
         loop {
             let Some(decoded) = self.receive_frame(state)? else {
                 return Ok(None);
@@ -718,7 +788,7 @@ impl LavSession {
     }
 
     /// Pulls packets until one decoded frame is available. Returns Ok(None) on EOF or interruption.
-    fn receive_frame(&self, state: &mut ReadState) -> Result<Option<VideoFrame>, ffmpeg::Error> {
+    fn receive_frame(&self, state: &mut ReadState) -> Result<Option<VideoFrame>> {
         let mut decoded = VideoFrame::empty();
         loop {
             if self.interrupted.load(Ordering::Relaxed) {
@@ -744,16 +814,19 @@ impl LavSession {
                         Ok(()) => {
                             if packet.stream() == *stream_index {
                                 self.capture_packet(time_base, *stream_start_time, &packet);
-                                state.decoder.send_packet(&packet)?;
+                                state
+                                    .decoder
+                                    .send_packet(&packet)
+                                    .context("send demuxed packet to decoder.")?;
                             }
                         }
                         Err(ffmpeg::Error::Eof) => {
-                            state.decoder.send_eof()?;
+                            state.decoder.send_eof().context("send EOF to decoder.")?;
                             state.draining = true;
                         }
                         Err(ffmpeg::Error::Other { errno })
                             if errno == ffmpeg::util::error::EAGAIN => {}
-                        Err(e) => return Err(e),
+                        Err(e) => return Err(e).context("read packet from input."),
                     }
                 }
                 PacketSource::Replay {
@@ -762,12 +835,15 @@ impl LavSession {
                     ..
                 } => {
                     if *next_packet >= packets.len() {
-                        state.decoder.send_eof()?;
+                        state.decoder.send_eof().context("send EOF to decoder.")?;
                         state.draining = true;
                     } else {
                         let packet = packet_from_cached(&packets[*next_packet], state.time_base);
                         *next_packet += 1;
-                        state.decoder.send_packet(&packet)?;
+                        state
+                            .decoder
+                            .send_packet(&packet)
+                            .context("send cached packet to replay decoder.")?;
                     }
                 }
             }
@@ -775,12 +851,7 @@ impl LavSession {
     }
 
     /// Downloads (if hardware), scales to fit, and writes `frame` into `dst` as padded I420.
-    fn write_i420(
-        &self,
-        state: &mut ReadState,
-        frame: &VideoFrame,
-        dst: &mut [u8],
-    ) -> Result<(), ffmpeg::Error> {
+    fn write_i420(&self, state: &mut ReadState, frame: &VideoFrame, dst: &mut [u8]) -> Result<()> {
         // Hardware frames live outside normal CPU memory; pull them down to the best software
         // format FFmpeg can provide before scaling to the target I420 frame.
         let src: &VideoFrame = if is_hardware_frame(frame.format()) {
@@ -789,7 +860,8 @@ impl LavSession {
                 let rc =
                     ffi::av_hwframe_transfer_data(state.sw_frame.as_mut_ptr(), frame.as_ptr(), 0);
                 if rc < 0 {
-                    return Err(ffmpeg::Error::from(rc));
+                    return Err(ffmpeg::Error::from(rc))
+                        .context("transfer hardware frame to system memory.");
                 }
             }
             &state.sw_frame
@@ -799,7 +871,7 @@ impl LavSession {
 
         let (sw, sh) = (src.width(), src.height());
         if sw == 0 || sh == 0 {
-            return Err(ffmpeg::Error::InvalidData);
+            bail!("decoded frame has zero dimensions ({sw} x {sh}).");
         }
 
         // Aspect-fit into the target, even dimensions for clean 4:2:0 chroma.
@@ -827,11 +899,12 @@ impl LavSession {
                 fw,
                 fh,
                 scaling::Flags::FAST_BILINEAR,
-            )?;
+            )
+            .with_context(|| format!("create swscale context {format:?} {sw} x {sh} -> {fw} x {fh}."))?;
             state.scaler = Some((format, sw, sh, ctx));
         }
         let scaler = &mut state.scaler.as_mut().unwrap().3;
-        scaler.run(src, &mut state.scaled)?;
+        scaler.run(src, &mut state.scaled).context("scale frame")?;
 
         // Compose into the caller's buffer: black background, fitted frame centered
         let (tw, th) = (self.w, self.h);
@@ -893,7 +966,7 @@ fn packet_from_cached(cached: &CachedPacket, time_base: ffmpeg::Rational) -> ffm
     packet
 }
 
-/// Converts normalized nanosecond PTS/DTS back into stream time-base ticks.
+/// Converts normalized nanosecond PTS / DTS back into stream time-base ticks.
 fn nanos_to_ticks(nanos: i64, time_base: ffmpeg::Rational) -> Option<i64> {
     if nanos == NO_PTS_NANOS {
         return None;
@@ -931,11 +1004,14 @@ fn capture_packet_into_ring(
 }
 
 /// Reconstructs the subset of `AVCodecParameters` needed to open a software replay decoder.
-unsafe fn parameters_from_codec_params(
-    params: &CodecParams,
-) -> Result<codec::Parameters, ffmpeg::Error> {
+unsafe fn parameters_from_codec_params(params: &CodecParams) -> Result<codec::Parameters> {
     if params.codec_id <= 0 || params.width <= 0 || params.height <= 0 {
-        return Err(ffmpeg::Error::InvalidData);
+        bail!(
+            "incomplete codec parameters (codec_id {}, {}x{}).",
+            params.codec_id,
+            params.width,
+            params.height,
+        );
     }
     let mut parameters = codec::Parameters::new();
     let p = unsafe {
@@ -943,7 +1019,7 @@ unsafe fn parameters_from_codec_params(
         parameters.as_mut_ptr()
     };
     if p.is_null() {
-        return Err(ffmpeg::Error::Bug);
+        bail!("avcodec_parameters_alloc returned null.");
     }
     unsafe {
         // Safety: p is the valid mutable AVCodecParameters pointer owned by parameters
@@ -955,10 +1031,10 @@ unsafe fn parameters_from_codec_params(
             let len = params.extradata.len();
             let padded = len
                 .checked_add(ffi::AV_INPUT_BUFFER_PADDING_SIZE as usize)
-                .ok_or(ffmpeg::Error::InvalidData)?;
+                .with_context(|| format!("extradata length {len} overflows with padding."))?;
             let dst = ffi::av_mallocz(padded).cast::<u8>();
             if dst.is_null() {
-                return Err(ffmpeg::Error::Bug);
+                bail!("av_mallocz({padded}) returned null for extradata");
             }
             ptr::copy_nonoverlapping(params.extradata.as_ptr(), dst, len);
             (*p).extradata = dst;
@@ -1084,8 +1160,9 @@ fn open_video_decoder(
     parameters: &codec::Parameters,
     packet_time_base: ffmpeg::Rational,
     request: HwAccelRequest,
-) -> Result<(codec::decoder::Video, Option<Box<HwSelection>>), ffmpeg::Error> {
-    let codec = codec::decoder::find(parameters.id()).ok_or(ffmpeg::Error::DecoderNotFound)?;
+) -> Result<(codec::decoder::Video, Option<Box<HwSelection>>)> {
+    let codec = codec::decoder::find(parameters.id())
+        .with_context(|| format!("no decoder available for codec {:?}", parameters.id()))?;
 
     if request != HwAccelRequest::None {
         for backend in request.candidates() {
@@ -1100,14 +1177,27 @@ fn open_video_decoder(
                         (*context.as_mut_ptr()).hw_device_ctx = ctx_device;
                         let mut decoder = context.decoder();
                         decoder.set_packet_time_base(packet_time_base);
-                        if let Ok(decoder) =
-                            decoder.open_as(codec).and_then(|opened| opened.video())
-                        {
-                            return Ok((decoder, Some(selection)));
+                        match decoder.open_as(codec).and_then(|opened| opened.video()) {
+                            Ok(decoder) => {
+                                info!(
+                                    "LAV decoder opened with {} hardware acceleration.",
+                                    backend.name
+                                );
+                                return Ok((decoder, Some(selection)));
+                            }
+                            Err(e) => debug!(
+                                "{} decoder open failed, trying the next backend: {e}.",
+                                backend.name
+                            ),
                         }
                     }
                 }
+            } else {
+                debug!("{} device is unavailable for this codec.", backend.name);
             }
+        }
+        if !request.candidates().is_empty() {
+            warn!("No {request:?} hardware backend engaged; falling back to software decode.");
         }
     }
 
@@ -1118,6 +1208,7 @@ fn open_video_decoder(
         .open_as(codec)
         .and_then(|opened| opened.video())
         .map(|decoder| (decoder, None))
+        .context("open software decoder")
 }
 
 fn new_decoder_context(

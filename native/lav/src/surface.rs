@@ -1,6 +1,6 @@
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicI64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicI64, Ordering};
 
 use ffmpeg::ffi;
 use ffmpeg::format::Pixel;
@@ -85,8 +85,12 @@ impl LavSurfaceTable {
         if texture_id == 0 {
             return ERR_BAD_ARGS;
         }
-        let Ok(map) = self.map.lock() else { return ERR_IO; };
-        let Some(surface) = map.get(&handle) else { return ERR_BAD_HANDLE; };
+        let Ok(map) = self.map.lock() else {
+            return ERR_IO;
+        };
+        let Some(surface) = map.get(&handle) else {
+            return ERR_BAD_HANDLE;
+        };
         surface.bind_plane_gl(plane, texture_id)
     }
 }
@@ -188,7 +192,7 @@ mod macos {
     use ffmpeg_next as ffmpeg;
 
     use super::{
-        LavSurfaceDesc, GL_TEXTURE_RECTANGLE, SURFACE_FORMAT_NV12_8, SURFACE_FORMAT_P010_10,
+        GL_TEXTURE_RECTANGLE, LavSurfaceDesc, SURFACE_FORMAT_NV12_8, SURFACE_FORMAT_P010_10,
         SURFACE_PLATFORM_MACOS_IOSURFACE,
     };
     use crate::surface::{ERR_BAD_ARGS, ERR_IO, ERR_UNSUPPORTED};
@@ -279,7 +283,7 @@ mod macos {
             other => {
                 return Err(format!(
                     "Unsupported CVPixelBuffer pixel format 0x{other:08x}."
-                ))
+                ));
             }
         };
 
@@ -372,11 +376,7 @@ mod macos {
                 plane,
             )
         };
-        if rc == 0 {
-            0
-        } else {
-            ERR_IO
-        }
+        if rc == 0 { 0 } else { ERR_IO }
     }
 
     unsafe fn pixel_buffer(frame: *mut ffi::AVFrame) -> Result<CVPixelBufferRef, String> {

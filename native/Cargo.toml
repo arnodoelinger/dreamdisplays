@@ -1,5 +1,5 @@
 [workspace]
-members = ["lav"]
+members = ["lav", "logging"]
 
 [package]
 name = "dreamdisplays-native"
@@ -14,7 +14,10 @@ name = "dreamdisplays_native"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
+anyhow = "1.0.103"
+dreamdisplays-logging = { path = "logging" }
 kanal = "0.1.1"
+log = "0.4.33"
 rayon = "1.12.0"
 
 [profile.release]

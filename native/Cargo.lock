@@ -12,6 +12,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "anyhow"
+version = "1.0.103"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a4385e2e34eb35d6b3efe798b9eb88096925d87726c0798709bf56d9ed84af3"
+
+[[package]]
 name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -100,14 +106,27 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 name = "dreamdisplays-lav"
 version = "1.0.3"
 dependencies = [
+ "anyhow",
+ "dreamdisplays-logging",
  "ffmpeg-next",
+ "log",
+]
+
+[[package]]
+name = "dreamdisplays-logging"
+version = "1.0.3"
+dependencies = [
+ "log",
 ]
 
 [[package]]
 name = "dreamdisplays-native"
 version = "1.0.3"
 dependencies = [
+ "anyhow",
+ "dreamdisplays-logging",
  "kanal",
+ "log",
  "rayon",
 ]
 
@@ -209,6 +228,12 @@ checksum = "224399e74b87b5f3557511d98dff8b14089b3dadafcab6bb93eab67d3aace965"
 dependencies = [
  "scopeguard",
 ]
+
+[[package]]
+name = "log"
+version = "0.4.33"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 
 [[package]]
 name = "memchr"

@@ -12,7 +12,9 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::convert;
+use anyhow::{Context, Result, anyhow, bail};
 use kanal::{Receiver, Sender};
+use log::{debug, error, info, warn};
 
 /// Max bytes of `FFmpeg` stderr retained per session (the JVM parses it for retry decisions).
 const STDERR_CAP: usize = 128 * 1024;
@@ -44,6 +46,14 @@ impl PixFmt {
         match self {
             PixFmt::Rgb24 => w * h * 3,
             PixFmt::Nv12 => convert::nv12_frame_size(w, h),
+        }
+    }
+
+    /// Human-readable name for log lines.
+    fn name(self) -> &'static str {
+        match self {
+            PixFmt::Rgb24 => "rgb24",
+            PixFmt::Nv12 => "nv12",
         }
     }
 }
@@ -140,10 +150,31 @@ impl Sessions {
     }
 
     /// Spawns FFmpeg with `args` (args[0] is the binary path) and registers a session.
-    /// Returns the new handle, or 0 if the spawn failed.
+    /// Returns the new handle, or 0 if the spawn failed (the cause is logged).
     pub fn open(&self, args: &[String], w: u32, h: u32, pix: PixFmt) -> i64 {
-        if args.is_empty() || w == 0 || h == 0 {
-            return 0;
+        match self.try_open(args, w, h, pix) {
+            Ok(handle) => {
+                info!(
+                    "Opened FFmpeg session #{handle}: {} ({w} x {h}, {}).",
+                    args.first().map(String::as_str).unwrap_or("?"),
+                    pix.name(),
+                );
+                handle
+            }
+            Err(e) => {
+                error!("Failed to open FFmpeg session: {e:#}.");
+                0
+            }
+        }
+    }
+
+    /// Fallible body of [`Sessions::open`]; every failure carries context for the log.
+    fn try_open(&self, args: &[String], w: u32, h: u32, pix: PixFmt) -> Result<i64> {
+        if args.is_empty() {
+            bail!("empty argv.");
+        }
+        if w == 0 || h == 0 {
+            bail!("bad target size {w} x {h}.");
         }
         let (w, h) = (w as usize, h as usize);
 
@@ -159,10 +190,12 @@ impl Sessions {
             cmd.creation_flags(CREATE_NO_WINDOW);
         }
 
-        let Ok(mut child) = cmd.spawn() else { return 0; };
+        let mut child = cmd
+            .spawn()
+            .with_context(|| format!("spawn FFmpeg process `{}`.", args[0]))?;
         let Some(stdout) = child.stdout.take() else {
             let _ = child.kill();
-            return 0;
+            bail!("FFmpeg child has no stdout pipe.");
         };
 
         let stderr_buf = Arc::new(Mutex::new(Vec::new()));
@@ -195,7 +228,7 @@ impl Sessions {
         };
         if pix == PixFmt::Nv12 && prefetch.is_none() {
             let _ = child.kill();
-            return 0;
+            bail!("failed to start the NV12 prefetch thread.");
         }
         let raw = Vec::new();
 
@@ -215,22 +248,26 @@ impl Sessions {
         });
 
         let handle = self.next.fetch_add(1, Ordering::Relaxed);
-        if let Ok(mut map) = self.map.lock() {
-            map.insert(handle, session);
-            handle
-        } else {
-            0
-        }
+        let mut map = self
+            .map
+            .lock()
+            .map_err(|_| anyhow!("session table lock poisoned."))?;
+        map.insert(handle, session);
+        Ok(handle)
     }
 
     /// Blocking read of the next frame, converted to RGB24 with brightness applied.
     /// `dst` must hold at least `w * h * 3` bytes.
     pub fn read_frame(&self, handle: i64, dst: &mut [u8], brightness_milli: u32) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         if dst.len() < session.w * session.h * 3 {
             return ERR_BAD_ARGS;
         }
-        let Ok(mut guard) = session.read.lock() else { return ERR_IO; };
+        let Ok(mut guard) = session.read.lock() else {
+            return ERR_IO;
+        };
         let state = &mut *guard;
 
         if state.lut_milli != brightness_milli {
@@ -271,7 +308,9 @@ impl Sessions {
             }
             PixFmt::Rgb24 => {
                 let n = session.w * session.h * 3;
-                let Some(stdout) = state.stdout.as_mut() else { return ERR_IO; };
+                let Some(stdout) = state.stdout.as_mut() else {
+                    return ERR_IO;
+                };
                 match read_exact_eof(stdout, &mut dst[..n]) {
                     ReadOutcome::Frame => {}
                     ReadOutcome::Eof => return READ_EOF,
@@ -289,12 +328,16 @@ impl Sessions {
     /// color conversion or brightness applied — both happen in the fragment shader.
     /// Only valid for NV12 sessions. `dst` must hold at least [`convert::nv12_frame_size`] bytes.
     pub fn read_frame_i420(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         if session.pix != PixFmt::Nv12 || dst.len() < convert::nv12_frame_size(session.w, session.h)
         {
             return ERR_BAD_ARGS;
         }
-        let Ok(mut guard) = session.read.lock() else { return ERR_IO; };
+        let Ok(mut guard) = session.read.lock() else {
+            return ERR_IO;
+        };
         let state = &mut *guard;
 
         if let Some(prefetch) = &state.prefetch {
@@ -323,13 +366,17 @@ impl Sessions {
     /// Blocking read of the next frame, converted to RGBA32 with brightness applied.
     /// `dst` must hold at least `w * h * 4` bytes.
     pub fn read_frame_rgba(&self, handle: i64, dst: &mut [u8], brightness_milli: u32) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
         let rgb_len = session.w * session.h * 3;
         let rgba_len = session.w * session.h * 4;
         if dst.len() < rgba_len {
             return ERR_BAD_ARGS;
         }
-        let Ok(mut guard) = session.read.lock() else { return ERR_IO; };
+        let Ok(mut guard) = session.read.lock() else {
+            return ERR_IO;
+        };
         let state = &mut *guard;
 
         if state.lut_milli != brightness_milli {
@@ -372,7 +419,9 @@ impl Sessions {
                 if state.raw.len() < rgb_len {
                     state.raw.resize(rgb_len, 0);
                 }
-                let Some(stdout) = state.stdout.as_mut() else { return ERR_IO; };
+                let Some(stdout) = state.stdout.as_mut() else {
+                    return ERR_IO;
+                };
                 match read_exact_eof(stdout, &mut state.raw[..rgb_len]) {
                     ReadOutcome::Frame => {}
                     ReadOutcome::Eof => return READ_EOF,
@@ -394,8 +443,12 @@ impl Sessions {
 
     /// Copies captured stderr into `dst`, returning the number of bytes written.
     pub fn stderr(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
-        let Ok(buf) = session.stderr.lock() else { return ERR_IO; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        let Ok(buf) = session.stderr.lock() else {
+            return ERR_IO;
+        };
         let n = buf.len().min(dst.len());
         dst[..n].copy_from_slice(&buf[..n]);
         n as i32
@@ -405,20 +458,34 @@ impl Sessions {
     /// it had to be killed / the code is unavailable. Mirrors the JVM-side
     /// `waitFor(500ms) -> exitValue / destroyForcibly` sequence.
     pub fn exit_code(&self, handle: i64, wait_millis: u32) -> i32 {
-        let Some(session) = self.get(handle) else { return ERR_BAD_HANDLE; };
-        let Ok(mut child) = session.child.lock() else { return -1; };
+        let Some(session) = self.get(handle) else {
+            return ERR_BAD_HANDLE;
+        };
+        let Ok(mut child) = session.child.lock() else {
+            return -1;
+        };
         let deadline = Instant::now() + Duration::from_millis(wait_millis as u64);
         loop {
             match child.try_wait() {
-                Ok(Some(status)) => return status.code().unwrap_or(-1),
+                Ok(Some(status)) => {
+                    let code = status.code().unwrap_or(-1);
+                    debug!("FFmpeg session #{handle} exited with code {code}.");
+                    return code;
+                }
                 Ok(None) => {
                     if Instant::now() >= deadline {
+                        warn!(
+                            "FFmpeg session #{handle} still running after {wait_millis} ms; killing it."
+                        );
                         let _ = child.kill();
                         return -1;
                     }
                     std::thread::sleep(Duration::from_millis(10));
                 }
-                Err(_) => return -1,
+                Err(e) => {
+                    warn!("Failed to poll FFmpeg session #{handle} exit status: {e}.");
+                    return -1;
+                }
             }
         }
     }
@@ -427,6 +494,7 @@ impl Sessions {
     /// The session stays registered until [`Sessions::close`].
     pub fn kill(&self, handle: i64) {
         if let Some(session) = self.get(handle) {
+            debug!("Killing FFmpeg session #{handle}.");
             if let Ok(mut child) = session.child.lock() {
                 let _ = child.kill();
             }
@@ -435,8 +503,10 @@ impl Sessions {
 
     /// Removes the session from the table; the process is killed on drop if still running.
     pub fn close(&self, handle: i64) {
-        if let Ok(mut map) = self.map.lock() {
-            map.remove(&handle);
+        if let Ok(mut map) = self.map.lock()
+            && map.remove(&handle).is_some()
+        {
+            debug!("Closed FFmpeg session #{handle}.");
         }
     }
 }
@@ -453,6 +523,9 @@ fn read_exact_eof(stdout: &mut ChildStdout, buf: &mut [u8]) -> ReadOutcome {
     match stdout.read_exact(buf) {
         Ok(()) => ReadOutcome::Frame,
         Err(e) if e.kind() == ErrorKind::UnexpectedEof => ReadOutcome::Eof,
-        Err(_) => ReadOutcome::Error,
+        Err(e) => {
+            warn!("FFmpeg frame pipe read failed: {e}.");
+            ReadOutcome::Error
+        }
     }
 }

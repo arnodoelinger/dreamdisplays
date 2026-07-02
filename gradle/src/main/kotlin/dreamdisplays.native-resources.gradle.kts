@@ -1,3 +1,4 @@
+/** Native platform keys, e.g. linux-x64, macos-x64, windows-x64, */
 private val nativePlatformKeys = listOf(
     "linux-x64",
     "linux-aarch64",
@@ -7,17 +8,20 @@ private val nativePlatformKeys = listOf(
     "windows-aarch64",
 )
 
+/** Native library base names. */
 private val nativeLibraryBaseNames = listOf(
     "dreamdisplays_native",
     "dreamdisplays_lav",
 )
 
+/** Set the native library name based on the platform key. */
 private fun nativeLibraryName(platformKey: String, baseName: String): String = when {
     platformKey.startsWith("windows-") -> "$baseName.dll"
     platformKey.startsWith("macos-") -> "lib$baseName.dylib"
     else -> "lib$baseName.so"
 }
 
+/** Host native key based on the current OS and architecture. */
 private fun hostNativeKey(): String {
     val os = System.getProperty("os.name").lowercase()
     val arch = System.getProperty("os.arch").lowercase()
@@ -28,13 +32,16 @@ private fun hostNativeKey(): String {
     }
 }
 
+/** Convert a string to a strict boolean. */
 private fun String.toStrictBoolean(): Boolean = equals("true", ignoreCase = true)
 
+/** Convert a string to a list of platform keys. */
 private fun String.toPlatformList(): List<String> =
     split(',', ' ', '\n', '\t')
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
+/** Adds the native libraries to the process resources. */
 tasks.withType<ProcessResources>().configureEach {
     val nativeBundleDir = rootProject.file("native/build/ci-bundle/dreamdisplays-natives")
     val requireNatives = providers.gradleProperty("dreamdisplays.requireNatives")
@@ -93,7 +100,7 @@ tasks.withType<ProcessResources>().configureEach {
                 buildString {
                     appendLine("Native bundle is incomplete.")
                     if (missingNativeLibraries.isNotEmpty()) {
-                        appendLine("Missing required DreamDisplays libraries:")
+                        appendLine("Missing required Dream Displays libraries:")
                         missingNativeLibraries.forEach { appendLine(" - ${it.relativeTo(rootProject.projectDir)}") }
                     }
                     if (missingLicenseFiles.isNotEmpty()) {

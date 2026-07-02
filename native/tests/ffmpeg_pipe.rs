@@ -4,7 +4,7 @@
 //! Skips (passes trivially) when no FFmpeg binary is available. Point `DD_TEST_FFMPEG`
 //! at a binary explicitly, otherwise a few well-known locations are probed.
 
-use dreamdisplays_native::session::{PixFmt, Sessions, READ_EOF, READ_OK};
+use dreamdisplays_native::session::{PixFmt, READ_EOF, READ_OK, Sessions};
 
 fn find_ffmpeg() -> Option<String> {
     if let Ok(p) = std::env::var("DD_TEST_FFMPEG") {
@@ -45,9 +45,9 @@ fn run_pipe(pix: PixFmt, vf: &str, frames: u32) {
         "rawvideo",
         "-",
     ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     let sessions = Sessions::new();
     let handle = sessions.open(&args, w, h, pix);
@@ -96,9 +96,9 @@ fn run_pipe_rgba(pix: PixFmt, vf: &str, frames: u32) {
         "rawvideo",
         "-",
     ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     let sessions = Sessions::new();
     let handle = sessions.open(&args, w, h, pix);
@@ -178,9 +178,9 @@ fn kill_unblocks_reader() {
         "rawvideo",
         "-",
     ]
-        .iter()
-        .map(|s| s.to_string())
-        .collect();
+    .iter()
+    .map(|s| s.to_string())
+    .collect();
 
     let sessions = std::sync::Arc::new(Sessions::new());
     let handle = sessions.open(&args, w, h, PixFmt::Nv12);
