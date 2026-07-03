@@ -231,7 +231,13 @@ class PreviewSection(
             Thumbnails.request(id)
             return UiTheme.AMBIENT_DEFAULT
         }
-        return darkenRgb(avg, 0.30f)
+        // Slowly drift the tint over time...
+        // TODO: enhance in 1.9.0
+        val base = darkenRgb(avg, 0.30f)
+        val t = System.currentTimeMillis() / 1000.0
+        fun drift(shift: Int, phase: Double): Int =
+            (((base ushr shift) and 0xFF) * (1.0 + 0.15 * kotlin.math.sin(t * 0.38 + phase))).toInt().coerceIn(0, 255)
+        return (0xFF shl 24) or (drift(16, 0.0) shl 16) or (drift(8, 2.1) shl 8) or drift(0, 4.2)
     }
 
     /** Returns the cached thumbnail for the current video, requesting it asynchronously if absent. */
