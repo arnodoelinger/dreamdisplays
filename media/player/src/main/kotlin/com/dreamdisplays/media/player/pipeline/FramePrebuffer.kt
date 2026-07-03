@@ -6,6 +6,7 @@ import java.nio.ByteBuffer
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * Optional jitter buffer that decouples decoding from playout, eliminating the cold-start / network-stall
@@ -40,7 +41,11 @@ internal class FramePrebuffer(
 ) {
     private val logger = LoggerFactory.getLogger("DreamDisplays/FramePrebuffer")
 
-    private class Timed(@JvmField val buf: ByteBuffer, @JvmField val pts: Long)
+    private class Timed(
+        @JvmField val buf: ByteBuffer,
+        @JvmField val pts: Long,
+        @JvmField val generation: Int,
+    )
 
     private val queue = ArrayBlockingQueue<Timed>(capacityFrames.coerceAtLeast(1))
 
@@ -62,6 +67,16 @@ internal class FramePrebuffer(
 
     @Volatile
     private var flushRequested = false
+
+    /**
+     * Monotonic seek counter. Every [resetForSeek] bumps it; frames are tagged with the current
+     * value at submit time. A queued frame whose tag lags the current generation belongs to a
+     * superseded timeline and must be recycled without pacing — this is the definitive stale
+     * signal, independent of the transient [flushRequested] flag (which is cleared before the
+     * new-timeline frames replace the old ones, leaving a small window where a tail queue entry
+     * would otherwise slip through against the new audio clock).
+     */
+    private val generation = AtomicInteger(0)
 
     private val firstFramePresented = AtomicBoolean(false)
     private var consumer: Thread? = null
@@ -87,9 +102,10 @@ internal class FramePrebuffer(
      */
     fun submit(frame: ByteBuffer, pts: Long, nextSize: Int): ByteBuffer {
         var blockedSinceNs = 0L
+        val gen = generation.get()
         try {
             while (alive() && !flushRequested) {
-                if (queue.offer(Timed(frame, pts), POLL_MS, TimeUnit.MILLISECONDS)) {
+                if (queue.offer(Timed(frame, pts, gen), POLL_MS, TimeUnit.MILLISECONDS)) {
                     if (!primed && queue.size >= prefillFrames) primed = true
                     logSlowSubmit(blockedSinceNs)
                     return surface.takeOrAllocate(nextSize)

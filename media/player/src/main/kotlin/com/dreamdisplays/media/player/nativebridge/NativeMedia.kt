@@ -33,6 +33,12 @@ object NativeMedia {
     const val READ_OK = 0
     const val READ_EOF = 1
     const val READ_INTERRUPTED = 2
+
+    /**
+     * The frame is the post-seek keyframe delivered ahead of the pre-roll: show it immediately
+     * as a preview, but never start the playback clock from it (its PTS is before the target).
+     */
+    const val READ_PREVIEW = 3
     const val READ_UNSUPPORTED = -4
     const val LAV_NO_PTS_NANOS = Long.MIN_VALUE
 

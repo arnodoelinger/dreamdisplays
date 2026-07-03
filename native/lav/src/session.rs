@@ -8,7 +8,7 @@
 
 use anyhow::{Context as AnyhowContext, Result, anyhow, bail};
 use log::{LevelFilter, debug, error, info, warn};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::{Arc, Mutex, Once};
@@ -31,6 +31,7 @@ use crate::surface::{ERR_UNSUPPORTED, LavSurfaceDesc, LavSurfaceFrame, LavSurfac
 pub const READ_OK: i32 = 0;
 pub const READ_EOF: i32 = 1;
 pub const READ_INTERRUPTED: i32 = 2;
+pub const READ_PREVIEW: i32 = 3;
 pub const ERR_BAD_HANDLE: i32 = -1;
 pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
@@ -232,6 +233,10 @@ struct ReadState {
     /// True while the decoder runs in the aggressive pre-roll discard mode (see
     /// [set_preroll_discard]); cleared [PREROLL_FAST_CUTOFF_NANOS] before the seek target.
     preroll_fast: bool,
+    /// Cached packets scheduled ahead of the live demuxer: a cache-served seek replays these
+    /// (network-free) and then continues with live reads — the demuxer position was never moved,
+    /// so the stream stays contiguous after the replayed span.
+    pending_replay: VecDeque<CachedPacket>,
     source: PacketSource,
 }
 
@@ -262,6 +267,8 @@ struct SeekDebug {
     landed_pts_nanos: Option<i64>,
     /// Frames decoded and discarded before the target was reached.
     dropped: u64,
+    /// Compressed bytes demuxed during the pre-roll.
+    bytes: u64,
 }
 
 impl SeekDebug {
@@ -270,6 +277,7 @@ impl SeekDebug {
             started: std::time::Instant::now(),
             landed_pts_nanos: None,
             dropped: 0,
+            bytes: 0,
         }
     }
 }
@@ -653,6 +661,7 @@ impl LavSession {
                 seek_target_nanos: start_micros.checked_mul(1_000).filter(|_| start_micros > 0),
                 seek_debug: (start_micros > 0).then(SeekDebug::begin),
                 preroll_fast,
+                pending_replay: VecDeque::new(),
                 source: PacketSource::Live {
                     ictx,
                     stream_index,
@@ -708,6 +717,7 @@ impl LavSession {
                 seek_target_nanos: None,
                 seek_debug: None,
                 preroll_fast: false,
+                pending_replay: VecDeque::new(),
                 source: PacketSource::Replay {
                     packets,
                     next_packet: 0,
@@ -769,7 +779,13 @@ impl LavSession {
 
     fn read_frame(&self, dst: &mut [u8]) -> i32 {
         let mut pts_nanos = NO_PTS_NANOS;
-        self.read_frame_with_pts(dst, &mut pts_nanos)
+        // The PTS-less entry point has no way to flag a preview frame, so skip past it.
+        loop {
+            let rc = self.read_frame_with_pts(dst, &mut pts_nanos);
+            if rc != READ_PREVIEW {
+                return rc;
+            }
+        }
     }
 
     fn read_frame_with_pts(&self, dst: &mut [u8], pts_nanos: &mut i64) -> i32 {
@@ -782,9 +798,9 @@ impl LavSession {
             return ERR_IO;
         };
         match self.next_frame(&mut state, dst) {
-            Ok(Some(pts)) => {
+            Ok(Some((pts, preview))) => {
                 *pts_nanos = pts;
-                READ_OK
+                if preview { READ_PREVIEW } else { READ_OK }
             }
             // An empty result from an active interrupt is a seek abort, not a true EOF
             Ok(None) if self.interrupted.load(Ordering::Relaxed) => READ_INTERRUPTED,
@@ -799,47 +815,84 @@ impl LavSession {
         }
     }
 
+    /// Returns the cached packets serving a seek to `target_nanos`, or `None` when the ring does
+    /// not cover the target (no keyframe at / before it, or the target is past the newest packet).
+    fn cached_packets_for_seek(&self, target_nanos: i64) -> Option<Vec<CachedPacket>> {
+        let ring_guard = self.ring.lock().ok()?;
+        let ring = ring_guard.as_ref()?;
+        let newest = ring.newest_ts();
+        if newest == crate::cache::NO_PTS || target_nanos > newest {
+            return None;
+        }
+        let packets = ring.drain_from(target_nanos);
+        let first_pts = packets.first()?.pts_nanos;
+        if first_pts == NO_PTS_NANOS || first_pts > target_nanos + SEEK_PREROLL_TOLERANCE_NANOS {
+            return None;
+        }
+        Some(packets)
+    }
+
     fn seek(&self, target_micros: i64) -> Result<()> {
         self.interrupted.store(false, Ordering::Relaxed);
         let mut state = self
             .read
             .lock()
             .map_err(|_| anyhow!("LAV reader lock poisoned."))?;
-        match &mut state.source {
-            PacketSource::Live { ictx, .. } => {
-                let demux_started = std::time::Instant::now();
-                let bounded = ictx.seek(target_micros, ..target_micros).is_ok();
-                if !bounded {
-                    ictx.seek(target_micros, ..)
-                        .with_context(|| format!("demuxer seek to {} ms.", target_micros / 1_000))?;
-                }
-                debug!(
-                    "LAV session #{}: demuxer seek to {} ms took {} ms ({}).",
-                    self.id.load(Ordering::Relaxed),
-                    target_micros / 1_000,
-                    demux_started.elapsed().as_millis(),
-                    if bounded { "bounded." } else { "unbounded fallback." },
-                );
-                let _ = ictx.play();
-                unsafe {
-                    ffi::avcodec_flush_buffers(state.decoder.as_mut_ptr());
-                    ffi::av_frame_unref(state.sw_frame.as_mut_ptr());
-                    ffi::av_frame_unref(state.scaled.as_mut_ptr());
-                }
-                state.seek_target_nanos = target_micros.checked_mul(1_000);
-                state.seek_debug = Some(SeekDebug::begin());
-                state.preroll_fast = true;
-                set_preroll_discard(&mut state.decoder, true);
-                state.draining = false;
-                if let Ok(mut ring) = self.ring.lock() {
-                    if let Some(ring) = ring.as_mut() {
-                        ring.clear();
-                    }
-                }
-                Ok(())
-            }
-            PacketSource::Replay { .. } => bail!("replay sessions are not seekable."),
+        if matches!(state.source, PacketSource::Replay { .. }) {
+            bail!("replay sessions are not seekable.");
         }
+        let target_nanos = target_micros.saturating_mul(1_000);
+        // Cache-served seek: when the packet ring still covers the target, replay from it instead
+        // of repositioning the demuxer — no network round-trip, and the ring stays valid (the live
+        // head was never moved), so repeated in-window scrubbing keeps hitting the cache.
+        if let Some(packets) = self.cached_packets_for_seek(target_nanos) {
+            debug!(
+                "LAV session #{}: seek to {} ms served from the packet cache ({} packets from {} ms).",
+                self.id.load(Ordering::Relaxed),
+                target_micros / 1_000,
+                packets.len(),
+                packets[0].pts_nanos / 1_000_000,
+            );
+            state.pending_replay = packets.into();
+        } else {
+            // An unfinished cache replay must not leak into the new position.
+            state.pending_replay.clear();
+            let PacketSource::Live { ictx, .. } = &mut state.source else {
+                unreachable!("replay sources bail out above");
+            };
+            let demux_started = std::time::Instant::now();
+            let bounded = ictx.seek(target_micros, ..target_micros).is_ok();
+            if !bounded {
+                ictx.seek(target_micros, ..)
+                    .with_context(|| format!("demuxer seek to {} ms.", target_micros / 1_000))?;
+            }
+            debug!(
+                "LAV session #{}: demuxer seek to {} ms took {} ms ({}).",
+                self.id.load(Ordering::Relaxed),
+                target_micros / 1_000,
+                demux_started.elapsed().as_millis(),
+                if bounded { "bounded" } else { "unbounded fallback" },
+            );
+            let _ = ictx.play();
+            // The demuxer position jumped: the retained window is no longer contiguous with what
+            // will be read next, so the cache must start over.
+            if let Ok(mut ring) = self.ring.lock() {
+                if let Some(ring) = ring.as_mut() {
+                    ring.clear();
+                }
+            }
+        }
+        unsafe {
+            ffi::avcodec_flush_buffers(state.decoder.as_mut_ptr());
+            ffi::av_frame_unref(state.sw_frame.as_mut_ptr());
+            ffi::av_frame_unref(state.scaled.as_mut_ptr());
+        }
+        state.seek_target_nanos = Some(target_nanos);
+        state.seek_debug = Some(SeekDebug::begin());
+        state.preroll_fast = true;
+        set_preroll_discard(&mut state.decoder, true);
+        state.draining = false;
+        Ok(())
     }
 
     fn read_surface(&self) -> Result<Option<LavSurfaceFrame>, SurfaceReadError> {
@@ -858,8 +911,9 @@ impl LavSession {
         }
     }
 
-    /// Pulls packets until one frame is decoded and written to `dst`. Returns Ok(false) on EOF.
-    fn next_frame(&self, state: &mut ReadState, dst: &mut [u8]) -> Result<Option<i64>> {
+    /// Pulls packets until one frame is decoded and written to `dst`. Returns Ok(None) on EOF.
+    /// The boolean in the result is true for a pre-roll preview frame (see [READ_PREVIEW]).
+    fn next_frame(&self, state: &mut ReadState, dst: &mut [u8]) -> Result<Option<(i64, bool)>> {
         loop {
             let Some(decoded) = self.receive_frame(state)? else {
                 return Ok(None);
@@ -870,13 +924,27 @@ impl LavSession {
             }
             if let Some(target) = state.seek_target_nanos {
                 if pts_nanos != NO_PTS_NANOS && pts_nanos + SEEK_PREROLL_TOLERANCE_NANOS < target {
+                    let preview = state
+                        .seek_debug
+                        .as_ref()
+                        .is_some_and(|d| d.landed_pts_nanos.is_none());
                     if let Some(dbg) = state.seek_debug.as_mut() {
                         dbg.landed_pts_nanos.get_or_insert(pts_nanos);
-                        dbg.dropped += 1;
+                        if !preview {
+                            dbg.dropped += 1;
+                        }
                     }
                     if state.preroll_fast && pts_nanos + PREROLL_FAST_CUTOFF_NANOS >= target {
                         state.preroll_fast = false;
                         set_preroll_discard(&mut state.decoder, false);
+                    }
+                    if preview {
+                        // Deliver the keyframe the demuxer landed on immediately: the pre-roll to
+                        // the exact target is network-bound (seconds on slow CDNs), and showing
+                        // the nearest earlier keyframe right away beats freezing on the old
+                        // picture. The JVM presents it without starting the playback clock.
+                        self.write_i420(state, &decoded, dst)?;
+                        return Ok(Some((pts_nanos, true)));
                     }
                     continue;
                 }
@@ -892,8 +960,9 @@ impl LavSession {
                         .or_else(|| (pts_nanos != NO_PTS_NANOS).then_some(pts_nanos));
                     let landed_ms = landed.unwrap_or(target) / 1_000_000;
                     let msg = format!(
-                        "LAV session #{}: seek pre-roll to {} ms done in {elapsed_ms} ms; landed \
-                         at {landed_ms} ms ({} s short of target), decoded and dropped {} frames.",
+                        "LAV session #{}: seek pre-roll to {} ms done in {elapsed_ms} ms; demuxer \
+                         landed on keyframe at {landed_ms} ms ({} s before target), decoded and \
+                         dropped {} pre-roll frames.",
                         self.id.load(Ordering::Relaxed),
                         target / 1_000_000,
                         (target / 1_000_000 - landed_ms) as f64 / 1_000.0,
@@ -907,7 +976,7 @@ impl LavSession {
                 }
             }
             self.write_i420(state, &decoded, dst)?;
-            return Ok(Some(pts_nanos));
+            return Ok(Some((pts_nanos, false)));
         }
     }
 
@@ -933,6 +1002,17 @@ impl LavSession {
                     stream_index,
                     stream_start_time,
                 } => {
+                    // A cache-served seek scheduled packets ahead of the live head: feed those
+                    // first (network-free); live reads resume exactly where the ring left off.
+                    // They are already in the ring, so they are not re-captured.
+                    if let Some(cached) = state.pending_replay.pop_front() {
+                        let packet = packet_from_cached(&cached, time_base, *stream_start_time);
+                        state
+                            .decoder
+                            .send_packet(&packet)
+                            .context("send cached packet to live decoder.")?;
+                        continue;
+                    }
                     let mut packet = ffmpeg::Packet::empty();
                     let read_started = std::time::Instant::now();
                     let read_result = packet.read(ictx);
@@ -945,6 +1025,9 @@ impl LavSession {
                     }
                     match read_result {
                         Ok(()) => {
+                            if let Some(dbg) = state.seek_debug.as_mut() {
+                                dbg.bytes += packet.size() as u64;
+                            }
                             if packet.stream() == *stream_index {
                                 self.capture_packet(time_base, *stream_start_time, &packet);
                                 state
@@ -971,7 +1054,7 @@ impl LavSession {
                         state.decoder.send_eof().context("send EOF to decoder.")?;
                         state.draining = true;
                     } else {
-                        let packet = packet_from_cached(&packets[*next_packet], state.time_base);
+                        let packet = packet_from_cached(&packets[*next_packet], state.time_base, None);
                         *next_packet += 1;
                         state
                             .decoder
@@ -1087,11 +1170,18 @@ impl LavSession {
     }
 }
 
-/// Rebuilds an encoded packet from cached payload plus normalized timestamps.
-fn packet_from_cached(cached: &CachedPacket, time_base: ffmpeg::Rational) -> ffmpeg::Packet {
+/// Rebuilds an encoded packet from cached payload plus normalized timestamps. When the packet is
+/// fed back into a live session's decoder, `stream_start_time` re-applies the origin offset that
+/// [capture_packet_into_ring] subtracted, so the decoded frames normalize back to the same PTS.
+fn packet_from_cached(
+    cached: &CachedPacket,
+    time_base: ffmpeg::Rational,
+    stream_start_time: Option<i64>,
+) -> ffmpeg::Packet {
+    let start = stream_start_time.unwrap_or(0);
     let mut packet = ffmpeg::Packet::copy(&cached.data);
-    packet.set_pts(nanos_to_ticks(cached.pts_nanos, time_base));
-    packet.set_dts(nanos_to_ticks(cached.dts_nanos, time_base));
+    packet.set_pts(nanos_to_ticks(cached.pts_nanos, time_base).map(|t| t + start));
+    packet.set_dts(nanos_to_ticks(cached.dts_nanos, time_base).map(|t| t + start));
     packet.set_position(-1);
     if cached.keyframe {
         packet.set_flags(ffmpeg::codec::packet::Flags::KEY);
@@ -1444,6 +1534,29 @@ unsafe extern "C" fn prefer_selected_hw_format(
 mod tests {
     use super::*;
 
+    /// Reads the next presentable frame, allowing (and validating) the optional keyframe preview
+    /// delivered ahead of a seek pre-roll.
+    fn read_skipping_preview(
+        sessions: &LavSessions,
+        handle: i64,
+        dst: &mut [u8],
+        target_nanos: i64,
+        pts: &mut i64,
+    ) -> i32 {
+        let rc = sessions.read_frame_with_pts(handle, dst, pts);
+        if rc != READ_PREVIEW {
+            return rc;
+        }
+        assert!(
+            *pts != NO_PTS_NANOS && *pts < target_nanos,
+            "Preview PTS must precede the seek target, got {} for {target_nanos}.",
+            *pts,
+        );
+        let rc = sessions.read_frame_with_pts(handle, dst, pts);
+        assert_ne!(rc, READ_PREVIEW, "At most one preview per seek.");
+        rc
+    }
+
     /// Decodes a locally generated test clip end-to-end and checks frame count and padding.
     /// Requires the FFmpeg CLI to generate the input (skipped when unavailable).
     #[test]
@@ -1692,7 +1805,7 @@ mod tests {
 
         let mut first_pts = NO_PTS_NANOS;
         assert_eq!(
-            sessions.read_frame_with_pts(handle, &mut dst, &mut first_pts),
+            read_skipping_preview(&sessions, handle, &mut dst, target_nanos, &mut first_pts),
             READ_OK,
             "First read after seek should produce a frame.",
         );
@@ -1729,7 +1842,7 @@ mod tests {
         );
         let mut start_pts = NO_PTS_NANOS;
         assert_eq!(
-            sessions.read_frame_with_pts(handle, &mut dst, &mut start_pts),
+            read_skipping_preview(&sessions, handle, &mut dst, 0, &mut start_pts),
             READ_OK,
             "First read after seeking to start should produce a frame.",
         );
@@ -1738,6 +1851,59 @@ mod tests {
             "Post-start-seek frame should be near the beginning, got {start_pts}.",
         );
 
+        sessions.close(handle);
+    }
+
+    /// A backward seek whose target is still inside the rolling packet cache must be served from
+    /// the ring: frames resume near the target with no demuxer reposition, the ring survives the
+    /// seek (a demuxer seek clears it), and decode continues seamlessly into live reads.
+    #[test]
+    fn seek_within_cache_window_replays_from_ring() {
+        let Some(clip) = generate_clip("dd-lav-cache-seek-test", &[]) else {
+            return;
+        };
+        let sessions = LavSessions::new();
+        let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(handle, 0, "Open failed.");
+        assert_eq!(sessions.enable_cache(handle, 60_000_000_000, 64 << 20), READ_OK);
+
+        // Play ~3 s so the ring holds several GOPs.
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        let mut pts = NO_PTS_NANOS;
+        while pts < 3_000_000_000 {
+            assert_eq!(
+                sessions.read_frame_with_pts(handle, &mut dst, &mut pts),
+                READ_OK,
+                "Playback before the cache seek should not end.",
+            );
+        }
+
+        let target_nanos = 1_500_000_000_i64;
+        assert_eq!(sessions.seek(handle, target_nanos / 1_000), READ_OK);
+        let mut first_pts = NO_PTS_NANOS;
+        assert_eq!(
+            read_skipping_preview(&sessions, handle, &mut dst, target_nanos, &mut first_pts),
+            READ_OK,
+            "First read after the cache seek should produce a frame.",
+        );
+        assert!(
+            first_pts != NO_PTS_NANOS
+                && first_pts + SEEK_PREROLL_TOLERANCE_NANOS >= target_nanos
+                && first_pts <= target_nanos + 500_000_000,
+            "Cache-served seek should land near the target, got {first_pts} for {target_nanos}.",
+        );
+
+        let mut probe = [0u8; 0];
+        assert!(
+            sessions.snapshot(handle, &mut probe) > 0,
+            "Ring should survive a cache-served seek.",
+        );
+
+        for _ in 0..30 {
+            let mut p = NO_PTS_NANOS;
+            assert_eq!(sessions.read_frame_with_pts(handle, &mut dst, &mut p), READ_OK);
+            assert!(p >= first_pts, "Post-seek PTS should be monotonic.");
+        }
         sessions.close(handle);
     }
 

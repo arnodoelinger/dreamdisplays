@@ -57,10 +57,42 @@ internal object FramePacing {
     private const val ABORT_POLL_NS = 50L * 1_000_000L
 
     /**
-     * A pacing wait this long means the clock and the frame PTS have diverged (e.g. a backward
-     * seek reset the clock while old frames are still queued) — logged so it's never silent.
+     * A pacing wait this long is anomalous (stalled clock, late audio start after a seek, or a
+     * frame from a stale timeline) — logged (rate-limited) so it's never silent, but the wait
+     * itself continues: the clock usually recovers and the frame becomes due.
      */
     private const val SUSPICIOUS_WAIT_NS = 2_000_000_000L
+
+    /**
+     * Any diff larger than this is not a "waiting for the clock" situation — the frame belongs to
+     * a different timeline than the current audio clock (typical after back-to-back seeks: video
+     * comes back on the new timeline before the previous seek's audio line has been torn down and
+     * replaced, so the queued cushion carries pre-seek PTS while the new line drives the clock).
+     * Waiting for the clock to catch up is pointless because it never will on the frame's timeline;
+     * drop the frame immediately. The bound is tight: normal steady-state diff at the head of the
+     * queue is one frame period (~33 ms), post-seek/cold-start transient tops out near the
+     * prebuffer cushion (400 ms default) while the audio line is warming up, so anything above 1 s
+     * is definitively a different timeline, not a slow start-up.
+     */
+    private const val STALE_TIMELINE_DIFF_NS = 1_000_000_000L
+
+    /**
+     * Give up on a frame after actually waiting this long: either it belongs to a dead timeline
+     * (survived a seek's clock reset) or the clock is stuck — both are watchdog territory, and
+     * holding the consumer any longer would freeze playout behind one frame. Tightened from the
+     * original 8 s because the queue backs up quickly under a stuck head — one blocked head means
+     * every subsequent frame waits behind it, so at 30 fps the producer is stalled within 400 ms.
+     */
+    private const val MAX_PACING_WAIT_NS = 1_500_000_000L
+
+    /**
+     * If the wait budget is exhausted but the frame is still only a little ahead of the frozen
+     * clock, present it anyway instead of dropping.
+     */
+    private const val GIVE_UP_PRESENT_THRESHOLD_NS = DROP_THRESHOLD_NS
+
+    /** Rate limiter for the suspicious-wait warn: at most one line per second across all frames. */
+    private val lastWarnNanos = AtomicLong(0)
 
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/FramePacing")
@@ -71,45 +103,69 @@ internal object FramePacing {
     /**
      * Paces the reader thread against the audio clock: parks/spins until [videoPts] is due, then
      * re-samples the clock so an overslept frame is dropped instead of being presented late.
-     * [audioClock] may return -1 when no audio line is open yet. When [abort] turns true mid-wait
-     * (seek flush, teardown) the wait ends early and the frame is reported as a drop.
+     * [audioClock] may return -1 when no audio line is open yet, and is re-sampled on every park
+     * slice, so a clock reset (seek) or a late-starting clock takes effect immediately instead of
+     * being baked into a one-shot park. When [abort] turns true mid-wait (seek flush, teardown)
+     * the wait ends early and the frame is reported as a drop; a frame still not due after
+     * [MAX_PACING_WAIT_NS] of real waiting is dropped too (stale timeline / dead clock).
      */
     fun pace(videoPts: Long, audioClock: () -> Long, abort: () -> Boolean = { false }): Boolean {
-        val firstClock = audioClock()
-        val diff = videoPts - if (firstClock >= 0) firstClock else videoPts
-        if (diff >= SUSPICIOUS_WAIT_NS) {
-            logger.warn(
-                "Pacing wait of ${diff / 1_000_000} ms (videoPts=${videoPts / 1_000_000} ms, " +
-                        "audioClock=${firstClock / 1_000_000} ms) — frame PTS far ahead of the clock; " +
-                        "dropping the frame."
-            )
-            return true
+        val started = System.nanoTime()
+        while (true) {
+            if (abort()) return true
+            val clock = audioClock()
+            val diff = videoPts - if (clock >= 0) clock else videoPts
+            if (diff <= 0) break
+            if (clock >= 0 && diff >= STALE_TIMELINE_DIFF_NS) {
+                val now = System.nanoTime()
+                val last = lastWarnNanos.get()
+                if (now - last >= 1_000_000_000L && lastWarnNanos.compareAndSet(last, now)) {
+                    logger.debug(
+                        "Dropping stale frame (videoPts=${videoPts / 1_000_000} ms, " +
+                                "audioClock=${clock / 1_000_000} ms, diff=${diff / 1_000_000} ms); " +
+                                "clock belongs to a different timeline than the frame."
+                    )
+                }
+                return true
+            }
+            if (System.nanoTime() - started >= MAX_PACING_WAIT_NS) {
+                if (diff <= GIVE_UP_PRESENT_THRESHOLD_NS) {
+                    logger.warn(
+                        "Pacing wait hit ${MAX_PACING_WAIT_NS / 1_000_000} ms with nearly-due frame " +
+                                "(videoPts=${videoPts / 1_000_000} ms, audioClock=${clock / 1_000_000} ms); " +
+                                "clock appears frozen, presenting instead of dropping."
+                    )
+                    break
+                }
+                logger.warn(
+                    "Gave up pacing after ${MAX_PACING_WAIT_NS / 1_000_000} ms " +
+                            "(videoPts=${videoPts / 1_000_000} ms, audioClock=${clock / 1_000_000} ms); " +
+                            "dropping the frame."
+                )
+                return true
+            }
+            if (diff >= SUSPICIOUS_WAIT_NS) {
+                val now = System.nanoTime()
+                val last = lastWarnNanos.get()
+                if (now - last >= 1_000_000_000L && lastWarnNanos.compareAndSet(last, now)) {
+                    logger.warn(
+                        "Pacing wait of ${diff / 1_000_000} ms (videoPts=${videoPts / 1_000_000} ms, " +
+                                "audioClock=${clock / 1_000_000} ms); clock stalled or far behind; waiting."
+                    )
+                }
+            }
+            if (diff > SPIN_THRESHOLD_NS) {
+                LockSupport.parkNanos(minOf(diff - SPIN_THRESHOLD_NS, ABORT_POLL_NS))
+                if (Thread.interrupted()) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            } else {
+                Thread.onSpinWait()
+            }
         }
-        if (waitUntilDue(diff, abort)) return true
         val latestClock = audioClock()
         val latestDiff = videoPts - if (latestClock >= 0) latestClock else videoPts
         return latestDiff < -DROP_THRESHOLD_NS
-    }
-
-    /** Returns true when the wait was aborted (the caller should drop the frame, not present it). */
-    private fun waitUntilDue(diff: Long, abort: () -> Boolean): Boolean {
-        if (diff > 0) {
-            val target = System.nanoTime() + diff
-            while (true) {
-                val remaining = target - System.nanoTime()
-                if (remaining <= 0) break
-                if (abort()) return true
-                if (remaining > SPIN_THRESHOLD_NS) {
-                    LockSupport.parkNanos(minOf(remaining - SPIN_THRESHOLD_NS, ABORT_POLL_NS))
-                    if (Thread.interrupted()) {
-                        Thread.currentThread().interrupt()
-                        break
-                    }
-                } else {
-                    Thread.onSpinWait()
-                }
-            }
-        }
-        return false
     }
 }
