@@ -26,4 +26,30 @@ internal object YtStreams {
         val heights = distinctHeights(streams)
         return heights.size >= LADDER_MIN_DISTINCT_HEIGHTS || (heights.maxOrNull() ?: 0) >= LADDER_MIN_SINGLE_HEIGHT
     }
+
+    /**
+     * Compact one-line description of the googlevideo URL parameters that govern server-side
+     * throttling, taken from the tallest video stream in [streams] (the closest proxy for what
+     * playback actually uses — the first entry is typically the muxed 360p track): the serving
+     * client (`c`), `itag`, whether the anti-throttling `n` parameter is present, `ratebypass`,
+     * and the full height ladder.
+     *
+     * A missing or un-deobfuscated `n` is the classic cause of
+     * YouTube capping transfers to ~1x playback speed.
+     */
+    fun throttleMarkers(streams: List<YtStream>): String {
+        val tallest = streams.filter { it.hasVideo() }.maxByOrNull { it.height ?: 0 }
+            ?: return "no video stream"
+        val query = tallest.url.substringAfter('?', "")
+        val params = query.split('&').mapNotNull {
+            val k = it.substringBefore('=')
+            val v = it.substringAfter('=', "")
+            if (k.isEmpty()) null else k to v
+        }.toMap()
+        val n = params["n"]
+        return "c=${params["c"] ?: "?"} itag=${params["itag"] ?: "?"} " +
+                "n=${if (n == null) "ABSENT" else "present(len=${n.length})"} " +
+                "ratebypass=${params["ratebypass"] ?: "-"} " +
+                "heights=${distinctHeights(streams).sorted()}"
+    }
 }
