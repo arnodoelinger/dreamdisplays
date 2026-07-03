@@ -93,6 +93,7 @@ internal class NativeVideoFramePipe(
     private var parked: AtomicBoolean? = null
 
     private class LavSeekCommand(val offsetNanos: Long, val onFirstFrame: () -> Unit) {
+        val createdNanos: Long = System.nanoTime()
         @Volatile var applied = false
         @Volatile var failed = false
     }
@@ -308,7 +309,15 @@ internal class NativeVideoFramePipe(
         if (lh == 0L) return false
         val cmd = LavSeekCommand(offsetNanos, onFirstFrame)
         synchronized(lavSeekMonitor) {
-            if (pendingLavSeek != null) return false
+            pendingLavSeek?.let {
+                it.failed = true
+                if (MediaPlayer.DEBUG) {
+                    logger.debug(
+                        "$debugLabel Coalescing in-place seek: ${"%.1f".format(it.offsetNanos / 1e6)}ms " +
+                                "superseded by ${"%.1f".format(offsetNanos / 1e6)}ms."
+                    )
+                }
+            }
             pendingLavSeek = cmd
             // Set the interrupt before publishing the notification; otherwise the reader could apply
             // the seek and clear the flag, then this control thread would set it again and poison the
@@ -316,6 +325,11 @@ internal class NativeVideoFramePipe(
             NativeMedia.lavKill(lh)
             lavSeekMonitor.notifyAll()
         }
+        // Unblock the reader right away: it may be stuck handing a frame to a full prebuffer whose
+        // consumer is pacing pre-seek frames against the already-reset clock. Until it returns from
+        // that hand-off it never reaches pollLavSeek, and the seek silently waits out the stale
+        // cushion.
+        activePrebuffer?.requestFlush()
         return true
     }
 
@@ -345,6 +359,7 @@ internal class NativeVideoFramePipe(
         var currentOnFirstFrame = onFirstFrame
         var lavPtsBiasNanos: Long? = null
         var rc = NativeMedia.READ_OK
+        var passFirstFrameAfterSeek = true
 
         val lav = handle == 0L && lavHandle != 0L
         val prerollMarginNs = maxOf(frameNs * 2L, LAV_PREROLL_MARGIN_NS)
@@ -353,18 +368,34 @@ internal class NativeVideoFramePipe(
         // in-world display instead of running ahead at the decode rate.
         prebuffer?.onPresent = { buf -> feedPopout(buf, w, h, frameSize, metrics) }
         fun applyLavSeek(seek: LavSeekCommand): Boolean {
+            val queuedMs = (System.nanoTime() - seek.createdNanos) / 1_000_000
+            if (queuedMs >= 1_000) {
+                logger.warn(
+                    "$debugLabel In-place seek to ${"%.1f".format(seek.offsetNanos / 1e6)}ms reached the " +
+                            "reader only after ${queuedMs} ms — reader was blocked outside the native read."
+                )
+            } else if (MediaPlayer.DEBUG) {
+                logger.debug("$debugLabel In-place seek applied ${queuedMs} ms after request.")
+            }
             prebuffer?.resetForSeek(seek.onFirstFrame)
             val ok = NativeMedia.lavSeek(lavHandle, seek.offsetNanos / 1_000L)
             synchronized(lavSeekMonitor) {
                 if (ok) seek.applied = true else seek.failed = true
                 lavSeekMonitor.notifyAll()
             }
-            if (!ok) return false
+            if (!ok) {
+                logger.warn(
+                    "$debugLabel In-place LAV seek to ${"%.1f".format(seek.offsetNanos / 1e6)}ms failed: " +
+                            "${NativeMedia.lavError(lavHandle)}."
+                )
+                return false
+            }
             currentSeekOffsetNanos = seek.offsetNanos
             currentOnFirstFrame = seek.onFirstFrame
             videoPts = seek.offsetNanos
             lavPtsBiasNanos = null
             firstFrame = false
+            passFirstFrameAfterSeek = true
             lastFrameReceivedNanos.set(System.nanoTime())
             return true
         }
@@ -372,10 +403,7 @@ internal class NativeVideoFramePipe(
             if (lav) {
                 val seek = pollLavSeek()
                 if (seek != null) {
-                    if (!applyLavSeek(seek)) {
-                        rc = NativeMedia.READ_UNSUPPORTED
-                        break
-                    }
+                    applyLavSeek(seek)
                     continue
                 }
             }
@@ -418,6 +446,10 @@ internal class NativeVideoFramePipe(
                     spare.clear()
                     continue
                 }
+                if (rc == NativeMedia.READ_INTERRUPTED) {
+                    spare.clear()
+                    continue
+                }
             }
             if (rc != NativeMedia.READ_OK) break
             if (parked?.get() == true) {
@@ -452,7 +484,8 @@ internal class NativeVideoFramePipe(
             } else {
                 videoPts
             }
-            if (hasLavPts && framePts + frameNs < currentSeekOffsetNanos - prerollMarginNs) {
+            if (hasLavPts && !passFirstFrameAfterSeek
+                && framePts + frameNs < currentSeekOffsetNanos - prerollMarginNs) {
                 if (MediaPlayer.DEBUG) {
                     MediaPlayer.framesDropped.incrementAndGet()
                     metrics.recordPrerollDrop(currentSeekOffsetNanos - framePts)
@@ -461,6 +494,8 @@ internal class NativeVideoFramePipe(
                 videoPts = framePts + frameNs
                 continue
             }
+            // A frame cleared the pre-roll gate: the next ones must be pruned normally
+            passFirstFrameAfterSeek = false
 
             // With a prebuffer active, the paced consumer feeds the popout (prebuffer.onPresent);
             // feed here only on the inline path or the benchmark (no-submit) path.
@@ -487,7 +522,11 @@ internal class NativeVideoFramePipe(
 
             val audioClock = getAudioClock()
             val avDiffNs = if (audioClock >= 0) framePts - audioClock else 0L
-            if (FramePacing.pace(framePts, getAudioClock)) {
+            // Abort the pacing wait when a seek or teardown is pending: the reader must get back to
+            // its command checks instead of sleeping out a stale frame's due time.
+            if (FramePacing.pace(framePts, getAudioClock, {
+                    pendingLavSeek != null || stopFlag.get() || terminated.get()
+                })) {
                 if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
                 if (MediaPlayer.DEBUG) metrics.recordPacedDrop(avDiffNs)
                 videoPts = framePts + frameNs

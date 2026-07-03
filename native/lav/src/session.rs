@@ -7,7 +7,7 @@
 //! deinterleaved U and V quarter planes, aspect-fitted into the target size on black.
 
 use anyhow::{Context as AnyhowContext, Result, anyhow, bail};
-use log::{debug, error, info, warn};
+use log::{LevelFilter, debug, error, info, warn};
 use std::collections::HashMap;
 use std::ffi::c_void;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
@@ -30,6 +30,7 @@ use crate::surface::{ERR_UNSUPPORTED, LavSurfaceDesc, LavSurfaceFrame, LavSurfac
 /// Read result codes shared with the JVM bridge (mirror the main library).
 pub const READ_OK: i32 = 0;
 pub const READ_EOF: i32 = 1;
+pub const READ_INTERRUPTED: i32 = 2;
 pub const ERR_BAD_HANDLE: i32 = -1;
 pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
@@ -39,6 +40,10 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
                           (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 const SEEK_PREROLL_TOLERANCE_NANOS: i64 = 50_000_000;
+const PREROLL_FAST_CUTOFF_NANOS: i64 = 1_000_000_000;
+const SLOW_SEEK_WARN_MS: u128 = 1_000;
+const SLOW_PREROLL_WARN_MS: u128 = 2_000;
+const SLOW_READ_WARN_MS: u128 = 1_000;
 
 /// Limited-range black for the padding borders.
 const BLACK_Y: u8 = 16;
@@ -61,10 +66,10 @@ unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
 fn init_ffmpeg() -> Result<()> {
     ffmpeg::init().context("initialize libav")?;
     FFMPEG_LOG_INIT.call_once(|| {
-        let level = if log::log_enabled!(log::Level::Debug) {
-            Level::Warning
-        } else {
-            Level::Error
+        let level = match log::max_level() {
+            LevelFilter::Trace => Level::Debug,
+            LevelFilter::Debug => Level::Verbose,
+            _ => Level::Warning,
         };
         ffmpeg::util::log::set_level(level);
     });
@@ -222,7 +227,51 @@ struct ReadState {
     /// Live seek target in normalized nanoseconds. Frames substantially before this target are
     /// decoded only as pre-roll and are not returned to the JVM.
     seek_target_nanos: Option<i64>,
+    /// Diagnostics for the in-flight seek pre-roll; taken and logged when the target is reached.
+    seek_debug: Option<SeekDebug>,
+    /// True while the decoder runs in the aggressive pre-roll discard mode (see
+    /// [set_preroll_discard]); cleared [PREROLL_FAST_CUTOFF_NANOS] before the seek target.
+    preroll_fast: bool,
     source: PacketSource,
+}
+
+/// Applies (or clears) the aggressive pre-roll decode mode: skip non-reference frames and the loop
+/// filter while every decoded frame is thrown away anyway. Roughly halves the decode-through time
+/// from the landing keyframe to the seek target — the dominant share of in-place seek latency.
+fn set_preroll_discard(decoder: &mut codec::decoder::Video, fast: bool) {
+    unsafe {
+        let p = decoder.as_mut_ptr();
+        (*p).skip_frame = if fast {
+            ffi::AVDiscard::AVDISCARD_NONREF
+        } else {
+            ffi::AVDiscard::AVDISCARD_DEFAULT
+        };
+        (*p).skip_loop_filter = if fast {
+            ffi::AVDiscard::AVDISCARD_ALL
+        } else {
+            ffi::AVDiscard::AVDISCARD_DEFAULT
+        };
+    }
+}
+
+/// Where the demuxer landed after a seek and how much pre-roll it cost to reach the target —
+/// the difference between a fast keyframe-adjacent seek and a silent multi-second decode-through.
+struct SeekDebug {
+    started: std::time::Instant,
+    /// PTS of the first decoded frame after the demuxer seek, i.e. the landing keyframe.
+    landed_pts_nanos: Option<i64>,
+    /// Frames decoded and discarded before the target was reached.
+    dropped: u64,
+}
+
+impl SeekDebug {
+    fn begin() -> SeekDebug {
+        SeekDebug {
+            started: std::time::Instant::now(),
+            landed_pts_nanos: None,
+            dropped: 0,
+        }
+    }
 }
 
 // The libav state holds raw pointers that are not Send by default. Access is serialized by
@@ -266,6 +315,8 @@ impl SurfaceReadError {
 }
 
 pub struct LavSession {
+    /// Public handle, assigned at registration (0 until then); only used to tag log lines.
+    id: AtomicI64,
     w: usize,
     h: usize,
     read: Mutex<ReadState>,
@@ -343,6 +394,7 @@ impl LavSessions {
     /// Registers a newly opened session and returns its opaque handle.
     fn insert(&self, session: LavSession) -> i64 {
         let handle = self.next.fetch_add(1, Ordering::Relaxed);
+        session.id.store(handle, Ordering::Relaxed);
         if let Ok(mut map) = self.map.lock() {
             map.insert(handle, Arc::new(session));
             handle
@@ -372,18 +424,30 @@ impl LavSessions {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
         };
+        let started = std::time::Instant::now();
         match session.seek(target_micros.max(0)) {
             Ok(()) => {
-                debug!(
-                    "LAV session #{handle} sought to {} ms.",
-                    target_micros / 1_000
-                );
+                let elapsed_ms = started.elapsed().as_millis();
+                // DD_NATIVE_LOG=debug
+                if elapsed_ms >= SLOW_SEEK_WARN_MS {
+                    warn!(
+                        "LAV session #{handle} sought to {} ms (slow: {elapsed_ms} ms; see libav \
+                         warnings above for cause, likely CDN reconnect/timeout).",
+                        target_micros / 1_000
+                    );
+                } else {
+                    debug!(
+                        "LAV session #{handle} sought to {} ms ({elapsed_ms} ms).",
+                        target_micros / 1_000
+                    );
+                }
                 READ_OK
             }
             Err(e) => {
                 warn!(
-                    "LAV session #{handle} seek to {} ms failed: {e:#}.",
-                    target_micros / 1_000
+                    "LAV session #{handle} seek to {} ms failed after {} ms: {e:#}.",
+                    target_micros / 1_000,
+                    started.elapsed().as_millis(),
                 );
                 if let Ok(mut err) = session.error.lock() {
                     *err = format!("{e:#}.");
@@ -400,6 +464,7 @@ impl LavSessions {
         };
         match session.read_surface() {
             Ok(Some(surface)) => self.surfaces.insert(surface, desc),
+            Ok(None) if session.interrupted.load(Ordering::Relaxed) => READ_INTERRUPTED,
             Ok(None) => READ_EOF,
             Err(e) => {
                 warn!("LAV session #{handle} surface read failed: {}.", e.message());
@@ -525,12 +590,11 @@ impl LavSession {
         opts.set("reconnect_on_http_error", "5xx");
         opts.set("rw_timeout", "15000000");
 
-        // Single-video HTTP sources don't need the default ~5 MB / 5 s stream probe; the same
-        // tightened window as the external ffmpeg path (`-probesize 1M -analyzeduration 1000000
-        // -fflags nobuffer`) shaves most of the blocking open time.
+        // Single-video HTTP sources don't need the default ~5 MB / 5 s stream probe; a tightened
+        // probe window (mirroring the external ffmpeg path's -probesize 1M -analyzeduration
+        // 1000000) shaves most of the blocking open time.
         opts.set("probesize", "1048576");
         opts.set("analyzeduration", "1000000");
-        opts.set("fflags", "nobuffer");
 
         let mut ictx =
             ffmpeg::format::input_with_dictionary(&url, opts).context("open input stream")?;
@@ -545,9 +609,12 @@ impl LavSession {
         }
 
         if start_micros > 0 {
-            // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
-            ictx.seek(start_micros, ..start_micros)
-                .with_context(|| format!("initial seek to {} ms", start_micros / 1_000))?;
+            // AV_TIME_BASE units; keyframe at or before the target. Retry unbounded when the bounded
+            // lookup can't be satisfied.
+            if ictx.seek(start_micros, ..start_micros).is_err() {
+                ictx.seek(start_micros, ..)
+                    .with_context(|| format!("initial seek to {} ms.", start_micros / 1_000))?;
+            }
         }
 
         let input = ictx
@@ -563,11 +630,16 @@ impl LavSession {
 
         let parameters = input.parameters();
         let codec_params = unsafe { codec_params_from(&parameters, time_base) };
-        let (decoder, hw_selection) =
+        let (mut decoder, hw_selection) =
             open_video_decoder(&parameters, time_base, HwAccelRequest::from_code(hw_accel))
                 .context("open video decoder")?;
+        let preroll_fast = start_micros > 0;
+        if preroll_fast {
+            set_preroll_discard(&mut decoder, true);
+        }
 
         Ok(LavSession {
+            id: AtomicI64::new(0),
             w,
             h,
             read: Mutex::new(ReadState {
@@ -579,6 +651,8 @@ impl LavSession {
                 scaled: VideoFrame::empty(),
                 draining: false,
                 seek_target_nanos: start_micros.checked_mul(1_000).filter(|_| start_micros > 0),
+                seek_debug: (start_micros > 0).then(SeekDebug::begin),
+                preroll_fast,
                 source: PacketSource::Live {
                     ictx,
                     stream_index,
@@ -620,6 +694,7 @@ impl LavSession {
                 .context("open replay video decoder.")?;
 
         Ok(LavSession {
+            id: AtomicI64::new(0),
             w,
             h,
             read: Mutex::new(ReadState {
@@ -631,6 +706,8 @@ impl LavSession {
                 scaled: VideoFrame::empty(),
                 draining: false,
                 seek_target_nanos: None,
+                seek_debug: None,
+                preroll_fast: false,
                 source: PacketSource::Replay {
                     packets,
                     next_packet: 0,
@@ -709,6 +786,8 @@ impl LavSession {
                 *pts_nanos = pts;
                 READ_OK
             }
+            // An empty result from an active interrupt is a seek abort, not a true EOF
+            Ok(None) if self.interrupted.load(Ordering::Relaxed) => READ_INTERRUPTED,
             Ok(None) => READ_EOF,
             Err(e) => {
                 warn!("LAV frame decode failed: {e:#}");
@@ -728,9 +807,19 @@ impl LavSession {
             .map_err(|_| anyhow!("LAV reader lock poisoned."))?;
         match &mut state.source {
             PacketSource::Live { ictx, .. } => {
-                // AV_TIME_BASE units; backward flag picks the keyframe at or before the target
-                ictx.seek(target_micros, ..target_micros)
-                    .with_context(|| format!("demuxer seek to {} ms.", target_micros / 1_000))?;
+                let demux_started = std::time::Instant::now();
+                let bounded = ictx.seek(target_micros, ..target_micros).is_ok();
+                if !bounded {
+                    ictx.seek(target_micros, ..)
+                        .with_context(|| format!("demuxer seek to {} ms.", target_micros / 1_000))?;
+                }
+                debug!(
+                    "LAV session #{}: demuxer seek to {} ms took {} ms ({}).",
+                    self.id.load(Ordering::Relaxed),
+                    target_micros / 1_000,
+                    demux_started.elapsed().as_millis(),
+                    if bounded { "bounded." } else { "unbounded fallback." },
+                );
                 let _ = ictx.play();
                 unsafe {
                     ffi::avcodec_flush_buffers(state.decoder.as_mut_ptr());
@@ -738,6 +827,9 @@ impl LavSession {
                     ffi::av_frame_unref(state.scaled.as_mut_ptr());
                 }
                 state.seek_target_nanos = target_micros.checked_mul(1_000);
+                state.seek_debug = Some(SeekDebug::begin());
+                state.preroll_fast = true;
+                set_preroll_discard(&mut state.decoder, true);
                 state.draining = false;
                 if let Ok(mut ring) = self.ring.lock() {
                     if let Some(ring) = ring.as_mut() {
@@ -778,9 +870,41 @@ impl LavSession {
             }
             if let Some(target) = state.seek_target_nanos {
                 if pts_nanos != NO_PTS_NANOS && pts_nanos + SEEK_PREROLL_TOLERANCE_NANOS < target {
+                    if let Some(dbg) = state.seek_debug.as_mut() {
+                        dbg.landed_pts_nanos.get_or_insert(pts_nanos);
+                        dbg.dropped += 1;
+                    }
+                    if state.preroll_fast && pts_nanos + PREROLL_FAST_CUTOFF_NANOS >= target {
+                        state.preroll_fast = false;
+                        set_preroll_discard(&mut state.decoder, false);
+                    }
                     continue;
                 }
                 state.seek_target_nanos = None;
+                if state.preroll_fast {
+                    state.preroll_fast = false;
+                    set_preroll_discard(&mut state.decoder, false);
+                }
+                if let Some(dbg) = state.seek_debug.take() {
+                    let elapsed_ms = dbg.started.elapsed().as_millis();
+                    let landed = dbg
+                        .landed_pts_nanos
+                        .or_else(|| (pts_nanos != NO_PTS_NANOS).then_some(pts_nanos));
+                    let landed_ms = landed.unwrap_or(target) / 1_000_000;
+                    let msg = format!(
+                        "LAV session #{}: seek pre-roll to {} ms done in {elapsed_ms} ms; landed \
+                         at {landed_ms} ms ({} s short of target), decoded and dropped {} frames.",
+                        self.id.load(Ordering::Relaxed),
+                        target / 1_000_000,
+                        (target / 1_000_000 - landed_ms) as f64 / 1_000.0,
+                        dbg.dropped,
+                    );
+                    if elapsed_ms >= SLOW_PREROLL_WARN_MS {
+                        warn!("{msg}");
+                    } else {
+                        debug!("{msg}");
+                    }
+                }
             }
             self.write_i420(state, &decoded, dst)?;
             return Ok(Some(pts_nanos));
@@ -810,7 +934,16 @@ impl LavSession {
                     stream_start_time,
                 } => {
                     let mut packet = ffmpeg::Packet::empty();
-                    match packet.read(ictx) {
+                    let read_started = std::time::Instant::now();
+                    let read_result = packet.read(ictx);
+                    let read_ms = read_started.elapsed().as_millis();
+                    if read_ms >= SLOW_READ_WARN_MS {
+                        warn!(
+                            "LAV session #{}: demuxer read blocked for {read_ms} ms (network stall).",
+                            self.id.load(Ordering::Relaxed),
+                        );
+                    }
+                    match read_result {
                         Ok(()) => {
                             if packet.stream() == *stream_index {
                                 self.capture_packet(time_base, *stream_start_time, &packet);
@@ -1588,6 +1721,111 @@ mod tests {
             frames >= 4,
             "Seek should resume decode, got only {frames} frames."
         );
+
+        assert_eq!(
+            sessions.seek(handle, 0),
+            READ_OK,
+            "Seek to the very start should succeed.",
+        );
+        let mut start_pts = NO_PTS_NANOS;
+        assert_eq!(
+            sessions.read_frame_with_pts(handle, &mut dst, &mut start_pts),
+            READ_OK,
+            "First read after seeking to start should produce a frame.",
+        );
+        assert!(
+            start_pts != NO_PTS_NANOS && start_pts < target_nanos,
+            "Post-start-seek frame should be near the beginning, got {start_pts}.",
+        );
+
+        sessions.close(handle);
+    }
+
+    /// Generates a clip via the `FFmpeg` (skipped when unavailable). Returns None on failure.
+    fn generate_clip(dir_name: &str, extra_args: &[&str]) -> Option<std::path::PathBuf> {
+        let ffmpeg_bin = std::env::var("DD_TEST_FFMPEG").unwrap_or_else(|_| "ffmpeg".into());
+        let dir = std::env::temp_dir().join(dir_name);
+        std::fs::create_dir_all(&dir).unwrap();
+        let clip = dir.join("clip.mp4");
+        let mut args = vec![
+            "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=4",
+            "-pix_fmt", "yuv420p", "-g", "30",
+        ];
+        args.extend_from_slice(extra_args);
+        let clip_str = clip.to_str().unwrap().to_owned();
+        args.push(&clip_str);
+        let status = std::process::Command::new(&ffmpeg_bin).args(&args).status().ok()?;
+        status.success().then_some(clip)
+    }
+
+    /// Seeking to the very start of a stream whose timestamps begin above zero and whose container is
+    /// fragmented (the streamed DASH shape) must succeed via the unbounded-range retry instead of
+    /// failing the bounded "keyframe at or before 0" lookup — that failure used to kill the reader and
+    /// cascade into a full re-resolve restart from 0.
+    #[test]
+    fn seek_to_start_with_shifted_timestamps() {
+        let Some(clip) = generate_clip(
+            "dd-lav-shifted-ts-test",
+            &["-output_ts_offset", "10", "-movflags", "frag_keyframe+empty_moov"],
+        ) else {
+            return;
+        };
+
+        let sessions = LavSessions::new();
+        let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(handle, 0, "Open failed.");
+
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        for _ in 0..5 {
+            assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+        }
+
+        assert_eq!(
+            sessions.seek(handle, 0),
+            READ_OK,
+            "Seek to 0 on a shifted-timestamp fragmented stream must succeed.",
+        );
+        assert_eq!(
+            sessions.read_frame(handle, &mut dst),
+            READ_OK,
+            "Decode should resume after seeking to the start.",
+        );
+
+        sessions.close(handle);
+    }
+
+    /// A read aborted by `kill()` (as a live seek does) must report [READ_INTERRUPTED], distinct from
+    /// a real [READ_EOF], and decode must resume afterwards — so the JVM reader never terminates on
+    /// the transient interrupt that repeated seeks trigger.
+    #[test]
+    fn interrupted_read_is_distinct_from_eof() {
+        let Some(clip) = generate_clip("dd-lav-interrupt-test", &[]) else {
+            return;
+        };
+
+        let sessions = LavSessions::new();
+        let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
+        assert_ne!(handle, 0, "Open failed.");
+
+        let mut dst = vec![0u8; 640 * 360 * 3 / 2];
+        assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+
+        // Interrupt (mirrors a live seek's kill()): the next read aborts as INTERRUPTED, not EOF
+        sessions.kill(handle);
+        assert_eq!(
+            sessions.read_frame(handle, &mut dst),
+            READ_INTERRUPTED,
+            "A killed read must be INTERRUPTED, not EOF.",
+        );
+
+        // Seeking clears the interrupt; decode resumes normally
+        assert_eq!(sessions.seek(handle, 0), READ_OK);
+        assert_eq!(
+            sessions.read_frame(handle, &mut dst),
+            READ_OK,
+            "Decode should resume after the interrupt is cleared by a seek.",
+        );
+
         sessions.close(handle);
     }
 }

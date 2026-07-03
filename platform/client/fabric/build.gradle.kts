@@ -84,6 +84,11 @@ run {
 val loomExt = the<net.fabricmc.loom.api.LoomGradleExtensionAPI>()
 loomExt.accessWidenerPath.set(generatedClassTweaker)
 
+// Dev runs get native-library debug logging by default
+loomExt.runs.configureEach {
+    environmentVariable("DD_NATIVE_LOG", System.getenv("DD_NATIVE_LOG") ?: "debug")
+}
+
 configurations.register("mappedFabricApiElements") {
     isCanBeConsumed = true
     isCanBeResolved = false

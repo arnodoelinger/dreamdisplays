@@ -47,6 +47,8 @@ neoForge {
     runs {
         register("neoClient") {
             client()
+            // Dev runs get native-library debug logging by default
+            environment("DD_NATIVE_LOG", System.getenv("DD_NATIVE_LOG") ?: "debug")
         }
     }
 }

@@ -60,6 +60,9 @@ internal class FramePrebuffer(
     @Volatile
     private var previewPresented = false
 
+    @Volatile
+    private var flushRequested = false
+
     private val firstFramePresented = AtomicBoolean(false)
     private var consumer: Thread? = null
 
@@ -83,26 +86,50 @@ internal class FramePrebuffer(
      * for the reader to fill next. On teardown the frame is recycled and a spare returned without blocking.
      */
     fun submit(frame: ByteBuffer, pts: Long, nextSize: Int): ByteBuffer {
-        while (!alive()) { /* Fall through to recycle... */ break
-        }
+        var blockedSinceNs = 0L
         try {
-            while (alive()) {
+            while (alive() && !flushRequested) {
                 if (queue.offer(Timed(frame, pts), POLL_MS, TimeUnit.MILLISECONDS)) {
                     if (!primed && queue.size >= prefillFrames) primed = true
+                    logSlowSubmit(blockedSinceNs)
                     return surface.takeOrAllocate(nextSize)
                 }
+                if (blockedSinceNs == 0L) blockedSinceNs = System.nanoTime()
             }
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
         }
+        logSlowSubmit(blockedSinceNs)
         surface.recycleFrameBuffer(frame)
         return surface.takeOrAllocate(nextSize)
+    }
+
+    private fun logSlowSubmit(blockedSinceNs: Long) {
+        if (blockedSinceNs == 0L) return
+        val blockedMs = (System.nanoTime() - blockedSinceNs) / 1_000_000
+        if (blockedMs >= 1_000) {
+            logger.warn(
+                "$debugLabel Producer blocked ${blockedMs} ms in submit " +
+                        "(queue=${queue.size}/$capacityFrames, primed=$primed, flush=$flushRequested)."
+            )
+        }
     }
 
     /** Marks the producer finished (normal EOS); the consumer drains the remaining tail, then exits. */
     fun finish() {
         inputClosed = true
         primed = true
+    }
+
+    /**
+     * Called from the control thread the moment a seek is requested: drops queued pre-seek frames and
+     * unblocks both a producer stuck in [submit] and the consumer parked in pacing, so the reader
+     * thread reaches its seek check immediately instead of finishing playout of the stale cushion
+     * first (which turned every backward seek into a multi-second freeze).
+     */
+    fun requestFlush() {
+        flushRequested = true
+        drainAndRecycle()
     }
 
     /** Drops queued frames and re-primes the same consumer for an in-place decoder seek. */
@@ -113,6 +140,7 @@ internal class FramePrebuffer(
         previewPresented = false
         firstFramePresented.set(false)
         this.onFirstFrame = onFirstFrame
+        flushRequested = false
     }
 
     /** Hard teardown: stops the consumer immediately, recycles queued frames, and joins the thread. */
@@ -138,7 +166,7 @@ internal class FramePrebuffer(
                     // Show the very first decoded frame immediately instead of sitting on a black /
                     // stale picture for the whole prefill: the viewer gets instant visual feedback on
                     // start and seek, while the clock (and audio) still wait for the full cushion.
-                    if (presentPreview && !previewPresented) {
+                    if (presentPreview && !previewPresented && !flushRequested) {
                         val tf = queue.poll()
                         if (tf != null) {
                             previewPresented = true
@@ -154,7 +182,9 @@ internal class FramePrebuffer(
                     if (inputClosed) break // Tail drained
                     continue
                 }
-                if (FramePacing.pace(tf.pts, getAudioClock)) {
+                // Bail out of the pacing wait as soon as a seek flush or teardown is requested;
+                // a pre-seek frame must be dropped, never presented late against the new clock.
+                if (FramePacing.pace(tf.pts, getAudioClock, { flushRequested || !alive() }) || flushRequested) {
                     surface.recycleFrameBuffer(tf.buf)
                     continue
                 }

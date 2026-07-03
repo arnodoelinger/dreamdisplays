@@ -35,6 +35,15 @@ private fun hostNativeKey(): String {
 /** Convert a string to a strict boolean. */
 private fun String.toStrictBoolean(): Boolean = equals("true", ignoreCase = true)
 
+/** True when a cargo executable is available (default rustup location, or anywhere on PATH). */
+private fun cargoAvailable(): Boolean {
+    if (File(System.getProperty("user.home"), ".cargo/bin/cargo").canExecute()) return true
+    val path = System.getenv("PATH") ?: return false
+    return path.split(File.pathSeparator).any {
+        File(it, "cargo").canExecute() || File(it, "cargo.exe").canExecute()
+    }
+}
+
 /** Convert a string to a list of platform keys. */
 private fun String.toPlatformList(): List<String> =
     split(',', ' ', '\n', '\t')
@@ -70,6 +79,10 @@ tasks.withType<ProcessResources>().configureEach {
         val hostReleaseNatives = nativeLibraryBaseNames.map { libBaseName ->
             rootProject.file("native/target/release/" + System.mapLibraryName(libBaseName))
         }
+        val autoBuild = providers.gradleProperty("dreamdisplays.autoBuildNatives")
+            .map { it.toStrictBoolean() }
+            .getOrElse(cargoAvailable())
+        if (autoBuild) dependsOn(":native:buildHostNatives")
         inputs.files(hostReleaseNatives).optional()
         from({ hostReleaseNatives.filter { it.isFile } }) {
             into("dreamdisplays-natives/$nativeKey")

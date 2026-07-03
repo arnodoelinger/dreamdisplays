@@ -776,7 +776,10 @@ class MediaPlayer(
         clock.seekOffsetNanos = nanos
         val ss = streams ?: return
         if (sessionManager.isPlaying && !sessionManager.isParked()) {
-            if (!sessionManager.beginSeek(ss, nanos, lastQuality, currentHwAccel())) startStreams(ss, nanos)
+            if (!sessionManager.beginSeek(ss, nanos, lastQuality, currentHwAccel())) {
+                logger.warn("$debugLabel Seek to ${nanos / 1_000_000} ms fell back to a full stream restart.")
+                startStreams(ss, nanos)
+            }
         }
         if (fire) events.onSeek()
     }

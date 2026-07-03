@@ -19,9 +19,15 @@ Optional Rust native layer for hot media paths.
 ## Build
 
 ```sh
-cd native
-cargo build --release
-cargo test
+./gradlew :native:buildHostNatives   # cargo build --release -> native/target/release
+./gradlew :native:testHostNatives    # cargo test
 ```
 
-Gradle bundles local or CI-built native artifacts into mod jars under `dreamdisplays-natives/<os>-<arch>/`.
+The auto-build needs a Rust toolchain (`cargo` on `PATH`, or `~/.cargo/bin/cargo`). Machines without
+Rust — or CI using the `native/build/ci-bundle/` artifacts — skip it automatically; force-disable with
+`-Pdreamdisplays.autoBuildNatives=false`.
+
+> [WARNING]
+> `cargo test` builds a separate debug test binary — it does **not** refresh the release
+> `.dylib` / `.so` / `.dll` the game loads. The client build uses the release build, so just run the
+> client to verify a change in-game.

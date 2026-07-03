@@ -56,7 +56,7 @@ object YtDlpBinary {
 
     private val updateChecked = AtomicBoolean(false)
 
-    /** Cached full launch prefix (e.g. `[python3, …/yt-dlp.pyz]` or `[binaryPath]`); see [resolveCommand]. */
+    /** Cached full launch prefix (e.g. `[python3, .../yt-dlp.pyz]` or `[binaryPath]`); see [resolveCommand]. */
     @Volatile
     private var resolvedCommand: List<String>? = null
 
@@ -102,7 +102,7 @@ object YtDlpBinary {
     }
 
     /**
-     * Returns the command prefix used to launch yt-dlp — `[python3, …/yt-dlp.pyz]` for the fast
+     * Returns the command prefix used to launch yt-dlp — `[python3, .../yt-dlp.pyz]` for the fast
      * zipapp path, or a single-element `[binaryPath]` for the PyInstaller binary. Callers append the
      * `yt-dlp` arguments to this list.
      */

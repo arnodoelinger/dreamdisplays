@@ -26,6 +26,12 @@ import java.util.UUID
  * Handles per-tick client display state: level changes, hover, unloading, shortcuts, and focus mode.
  */
 object ClientTickManager {
+    /**
+     * Deadband around a display's renderDistance so a player lingering near the boundary doesn't
+     * flip park / wake every tick (block-quantized position drift across a single threshold).
+     */
+    private const val DORMANT_HYSTERESIS_BLOCKS = 4
+
     /** Edge-detect state for the menu-open button. */
     private var wasPressed = false
 
@@ -99,7 +105,13 @@ object ClientTickManager {
         }
 
         for (displayScreen in DisplayRegistry.getScreens()) {
-            val outOfRange = displayScreen.renderDistance < displayScreen.getDistanceToScreen(playerPos)
+            // Hysteresis
+            val threshold = if (displayScreen.isDormant) {
+                displayScreen.renderDistance - DORMANT_HYSTERESIS_BLOCKS
+            } else {
+                displayScreen.renderDistance + DORMANT_HYSTERESIS_BLOCKS
+            }
+            val outOfRange = threshold < displayScreen.getDistanceToScreen(playerPos)
             val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) && !displayScreen.isPopoutActive
 
             // Already parked warm: wake it when back in range, or tear it down once it has been dormant

@@ -382,8 +382,15 @@ internal class PlaybackSessionManager(
                 discardHalvesAsync(null, oldAudio)
                 return true
             }
+            logger.warn("$debugLabel In-place seek rejected by the pipe; falling back to a channel reopen.")
             MediaProcess.gracefulDestroy(ap)
             discardHalvesAsync(null, oldAudio)
+        } else {
+            logger.warn(
+                "$debugLabel Seek can't go in place (inProcess=${old.inProcess}, " +
+                        "pipe=${old.nativePipe?.expectedW}x${old.nativePipe?.expectedH}, target=${w} x $h); " +
+                        "reopening the channel."
+            )
         }
 
         // Freeze the picture and cut the sound right away: the old consumer stops presenting within one

@@ -87,7 +87,7 @@ class ErrorPanel(
         }
         if (line.isNotEmpty()) lines.add(line)
         if (lines.size <= MAX_DETAIL_LINES) return lines
-        return lines.take(MAX_DETAIL_LINES).toMutableList().also { it[it.lastIndex] = it.last() + " …" }
+        return lines.take(MAX_DETAIL_LINES).toMutableList().also { it[it.lastIndex] = it.last() + " ..." }
     }
 
     companion object {

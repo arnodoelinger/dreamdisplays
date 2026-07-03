@@ -32,6 +32,7 @@ object NativeMedia {
     /** Result codes of [videoReadFrame]; mirror `native/src/session.rs`. */
     const val READ_OK = 0
     const val READ_EOF = 1
+    const val READ_INTERRUPTED = 2
     const val READ_UNSUPPORTED = -4
     const val LAV_NO_PTS_NANOS = Long.MIN_VALUE
 
