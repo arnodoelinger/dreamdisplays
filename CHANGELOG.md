@@ -1,3 +1,54 @@
+# 1.8.8 Release
+
+## Highlights
+
+- UI improvements like gradient fill, shimmer effects, and more place for suggestions
+- Enhanced media player stability and performance; now seeks are smoother and faster
+- Enhanced native logging and error handling
+- Fix `Fabric` 1.21.1 display rendering
+- Fixed some minor issues and edge cases
+
+## Client
+
+### Features
+
+- Added gradient fill and shimmer effects for thumbnails and loading states
+
+### Improvements
+
+- Pausing now keeps the decoder warm on every pipeline, so resume is instant instead of restarting the stream
+- Seeking no longer tears the whole session down before reconnecting: the picture holds its last frame while the target position warms up in the background, then jumps — including the loop wrap-around in synced / broadcast modes
+- The first decoded frame is now shown immediately on start and seek instead of waiting for the playback cushion to fill
+- Stream startup got faster: `FFmpeg` no longer probes the container with its default 5 MB / 5 s window
+- Stall recovery now reconnects in the background while the picture holds its last frame instead of blanking
+- Reduced render overhead on 26.x versions
+- Removed unreachable frame-resize handling from the video reader loop
+- Updated the in-process YouTube resolver `NewPipeExtractor`
+- Enhanced `LAV` decoder with cached packets
+- Enhanced natives logging and error handling
+- Enhanced thumbnail's quality
+
+### Fixes
+
+- Fixed `Fabric` 1.21.1 display rendering 
+- Fixed two different videos sharing the same thumbnail when their IDs differed only by letter case
+- Fixed a failed thumbnail registration being able to crash the game
+- Fixed a rare race during quality switches that could destroy the live display textures and leave the screen rendering
+  through dead handles
+- Fixed display teardown leaving already-freed textures reachable, which could lead to rendering through dead handles
+- Fixed player initialization callbacks getting lost when registered right as initialization finished
+- Fixed the reappearance audio bridge potentially starting mid-sample, which could produce noise
+- Fixed several retrying displays being able to block every other display's initialization
+- Fixed leaked `yt-dlp` subprocesses when the fast in-process resolver crashed mid-race
+
+## Server
+
+### Fixes
+
+- Fixed displays with long URLs on `MySQL`
+- Fixed display deletion logic and enhanced `Multiverse`-like projects compatibility
+- Fixed legacy sync packets being able to store an arbitrarily large video duration on the server
+
 # 1.8.7 Release
 
 ## Highlights
