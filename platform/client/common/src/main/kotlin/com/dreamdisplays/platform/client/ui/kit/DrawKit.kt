@@ -23,6 +23,76 @@ fun GuiGraphicsCompat.drawOutline(r: UiRect, color: Int) {
     fill(r.right - 1, r.y, r.right, r.bottom, color)
 }
 
+/**
+ * Fills the rect [x1,y1)-[x2,y2) with a top-to-bottom gradient from [top] to [bottom] (both ARGB).
+ * Drawn as 1px horizontal strips so it only relies on plain [fill] and works on every render backend.
+ */
+fun GuiGraphicsCompat.fillVGradient(x1: Int, y1: Int, x2: Int, y2: Int, top: Int, bottom: Int) {
+    val h = y2 - y1
+    if (h <= 0 || x2 <= x1) return
+    for (i in 0 until h) {
+        val t = if (h == 1) 0f else i / (h - 1f)
+        fill(x1, y1 + i, x2, y1 + i + 1, lerpArgb(top, bottom, t))
+    }
+}
+
+/**
+ * Draws an animated loading shimmer inside [x1,y1)-[x2,y2): a flat [base] fill with a soft [highlight]
+ * band sweeping left-to-right. Time-driven, so it animates on its own each frame with no state to keep.
+ */
+fun GuiGraphicsCompat.drawShimmer(x1: Int, y1: Int, x2: Int, y2: Int, base: Int, highlight: Int) {
+    fill(x1, y1, x2, y2, base)
+    val w = x2 - x1
+    if (w <= 0 || y2 <= y1) return
+    val period = 1400L
+    val phase = (System.currentTimeMillis() % period) / period.toFloat()
+    // Sweep the band centre from just off the left edge to just off the right edge.
+    val centre = x1 - w * 0.4f + (w * 1.8f) * phase
+    val half = (w * 0.22f).coerceAtLeast(4f)
+    for (i in 0 until w) {
+        val d = kotlin.math.abs((x1 + i) + 0.5f - centre)
+        if (d >= half) continue
+        val a = 1f - d / half
+        fill(x1 + i, y1, x1 + i + 1, y2, scaleAlpha(highlight, a))
+    }
+}
+
+/** Linear ARGB interpolation between [a] and [b] at [t] in 0..1. */
+fun lerpArgb(a: Int, b: Int, t: Float): Int {
+    val ct = t.coerceIn(0f, 1f)
+    fun ch(shift: Int): Int {
+        val ca = (a ushr shift) and 0xFF
+        val cb = (b ushr shift) and 0xFF
+        return (ca + (cb - ca) * ct).toInt() and 0xFF
+    }
+    return (ch(24) shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+}
+
+/** Returns [color] with its alpha channel multiplied by [factor] (0..1). */
+fun scaleAlpha(color: Int, factor: Float): Int {
+    val a = (((color ushr 24) and 0xFF) * factor.coerceIn(0f, 1f)).toInt() and 0xFF
+    return (a shl 24) or (color and 0x00FFFFFF)
+}
+
+/** Returns [color] with its RGB channels scaled by [factor] (alpha preserved); used for dimming. */
+fun darkenRgb(color: Int, factor: Float): Int {
+    val f = factor.coerceIn(0f, 1f)
+    val r = (((color ushr 16) and 0xFF) * f).toInt() and 0xFF
+    val g = (((color ushr 8) and 0xFF) * f).toInt() and 0xFF
+    val b = ((color and 0xFF) * f).toInt() and 0xFF
+    return (color and 0xFF000000.toInt()) or (r shl 16) or (g shl 8) or b
+}
+
+/** Returns [color] mixed toward white by [factor] (0..1), forced fully opaque; used for accent tints. */
+fun lightenRgb(color: Int, factor: Float): Int {
+    val f = factor.coerceIn(0f, 1f)
+    fun ch(shift: Int): Int {
+        val c = (color ushr shift) and 0xFF
+        return (c + (0xFF - c) * f).toInt() and 0xFF
+    }
+    return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+}
+
 /** Fills [r] with [bg], outlines it with [border], and draws [title] in the top-left padding corner. */
 fun GuiGraphicsCompat.drawPanel(
     font: Font, r: UiRect, title: String,

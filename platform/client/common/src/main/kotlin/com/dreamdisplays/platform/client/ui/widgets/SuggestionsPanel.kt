@@ -6,7 +6,11 @@ import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
+import com.dreamdisplays.platform.client.ui.kit.darkenRgb
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.drawShimmer
+import com.dreamdisplays.platform.client.ui.kit.fillVGradient
+import com.dreamdisplays.platform.client.ui.kit.lightenRgb
 import com.dreamdisplays.platform.client.ui.kit.renderChild
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.platform.client.render.Thumbnails
@@ -247,7 +251,12 @@ class SuggestionsPanel(
         g: GuiGraphicsCompat, f: Font, info: MediaSearchResult,
         x: Int, y: Int, w: Int, thumbH: Int, cardH: Int, hover: Boolean,
     ) {
-        g.fill(x, y, x + w, y + cardH, if (hover) UiTheme.CARD_BG_HOVER else UiTheme.CARD_BG)
+        // On hover, tint the card to the video's own dominant color (ambient), falling back to the
+        // neutral grey highlight until the thumbnail (and thus its average color) has decoded.
+        val ambient = if (hover) Thumbnails.averageColor(info.id) else null
+        val hoverBg = ambient?.let { (0xC0 shl 24) or (darkenRgb(it, 0.45f) and 0x00FFFFFF) } ?: UiTheme.CARD_BG_HOVER
+        val hoverBorder = ambient?.let { lightenRgb(it, 0.40f) } ?: UiTheme.CARD_BORDER_HOVER
+        g.fill(x, y, x + w, y + cardH, if (hover) hoverBg else UiTheme.CARD_BG)
 
         // Full-bleed thumbnail across the whole card width (no side inset): it's the largest the
         // card can hold and the width/THUMB_H ratio matches 16:9, so the image stays crisp and
@@ -259,7 +268,11 @@ class SuggestionsPanel(
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
         } else {
-            g.fill(thumbX, thumbY, thumbX + thumbW, thumbY + thumbH, 0xFF000000.toInt())
+            // Animated shimmer while the thumbnail is still downloading, instead of a dead black box.
+            g.drawShimmer(
+                thumbX, thumbY, thumbX + thumbW, thumbY + thumbH,
+                UiTheme.PLACEHOLDER_BG, UiTheme.PLACEHOLDER_SHIMMER,
+            )
         }
 
         if (info.isRecent(7)) {
@@ -272,17 +285,21 @@ class SuggestionsPanel(
 
         val dur = info.formatDuration()
         if (dur.isNotEmpty()) {
-            val dw = f.width(dur) + 6
-            val dh = f.lineHeight + 4
-            val dx = thumbX + thumbW - dw - 2
-            val dy = thumbY + thumbH - dh - 2
-            g.fill(dx, dy, dx + dw, dy + dh, UiTheme.OVERLAY_SCRIM)
-            g.drawText(f, dur, dx + 3, dy + 2, UiTheme.TEXT_PRIMARY, true)
+            // Soft bottom-up gradient across the thumbnail (YouTube-style) instead of a hard black
+            // box, so the duration reads on any frame without an ugly rectangle.
+            val scrimH = (thumbH * 2) / 5
+            g.fillVGradient(
+                thumbX, thumbY + thumbH - scrimH, thumbX + thumbW, thumbY + thumbH,
+                0x00000000, 0xB0000000.toInt(),
+            )
+            val dx = thumbX + thumbW - f.width(dur) - 4
+            val dy = thumbY + thumbH - f.lineHeight - 3
+            g.drawText(f, dur, dx, dy, UiTheme.TEXT_PRIMARY, true)
         }
 
         // Draw the hover frame over the full card (including the full-bleed thumbnail's edges) so the
         // selection reads as one crisp outline instead of an animated flicker.
-        if (hover) g.drawOutline(UiRect(x, y, w, cardH), UiTheme.CARD_BORDER_HOVER)
+        if (hover) g.drawOutline(UiRect(x, y, w, cardH), hoverBorder)
 
         if (compactCards) return
 

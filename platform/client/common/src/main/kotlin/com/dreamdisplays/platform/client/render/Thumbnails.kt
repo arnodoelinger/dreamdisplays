@@ -47,6 +47,12 @@ object Thumbnails {
         .expireAfterAccess(6, TimeUnit.HOURS)
         .build()
 
+    /** Average ARGB color of each decoded thumbnail, used as the preview's "ambient" letterbox tint. */
+    private val AVG_COLOR: Cache<String, Int> = Caffeine.newBuilder()
+        .maximumSize(1_024)
+        .expireAfterAccess(6, TimeUnit.HOURS)
+        .build()
+
     /** Tracks which video IDs are currently in flight (downloading or decoding). */
     private val IN_FLIGHT: Cache<String, Boolean> = Caffeine.newBuilder()
         .maximumSize(512)
@@ -85,6 +91,9 @@ object Thumbnails {
 
     /** Returns the registered Minecraft texture [Identifier] for [videoId], or null if not yet loaded. */
     fun get(videoId: String): Identifier? = READY.getIfPresent(videoId)
+
+    /** Returns the average ARGB color of [videoId]'s thumbnail, or null until it has been decoded. */
+    fun averageColor(videoId: String): Int? = AVG_COLOR.getIfPresent(videoId)
 
     /** Schedules a background download of the thumbnail at [url] for [videoId] if not already in flight or ready. */
     fun request(videoId: String, url: String) {
@@ -168,12 +177,16 @@ object Thumbnails {
         Integer.toHexString(s.hashCode())
     }
 
+    /** A decoded thumbnail: the GPU-ready image plus its average color for the ambient preview tint. */
+    private class Decoded(val image: NativeImage, val avgColor: Int)
+
     /** Decodes [bytes] into a [NativeImage], registers it with Minecraft's texture manager, and marks the entry ready. */
     private fun register(videoId: String, bytes: ByteArray) {
         var image: NativeImage? = null
         var tex: DynamicTexture? = null
         try {
-            image = decode(bytes)
+            val decoded = decode(bytes)
+            image = decoded.image
             //? if >=1.21.11 {
             tex = DynamicTexture({ "yt-thumb-$videoId" }, image)
             //?} else
@@ -181,6 +194,7 @@ object Thumbnails {
             val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/${hash(videoId)}")
             Minecraft.getInstance().textureManager.register(id, tex)
             TextureUploadUtil.applyBilinearFilter(tex)
+            AVG_COLOR.put(videoId, decoded.avgColor)
             READY.put(videoId, id)
         } catch (e: Exception) {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.
@@ -194,9 +208,9 @@ object Thumbnails {
         }
     }
 
-    /** Decodes [bytes] as a JPEG / PNG image and converts it to an RGBA [NativeImage] suitable for OpenGL upload. */
+    /** Decodes [bytes] as a JPEG / PNG image into a GPU-ready RGBA [NativeImage] plus its average color. */
     @Throws(IOException::class)
-    private fun decode(bytes: ByteArray): NativeImage = ByteArrayInputStream(bytes).use { input ->
+    private fun decode(bytes: ByteArray): Decoded = ByteArrayInputStream(bytes).use { input ->
         val src: BufferedImage = ImageIO.read(input) ?: run {
             val head = if (bytes.size >= 4)
                 String.format(
@@ -211,8 +225,14 @@ object Thumbnails {
         val h = src.height
         val image = NativeImage(NativeImage.Format.RGBA, w, h, false)
         val pixels = src.getRGB(0, 0, w, h, null, 0, w)
+        var rSum = 0L
+        var gSum = 0L
+        var bSum = 0L
         for (i in pixels.indices) {
             val argb = pixels[i]
+            rSum += (argb ushr 16) and 0xFF
+            gSum += (argb ushr 8) and 0xFF
+            bSum += argb and 0xFF
             val abgr = (argb and 0xFF00FF00.toInt()) or
                     ((argb shl 16) and 0x00FF0000) or
                     ((argb shr 16) and 0xFF)
@@ -222,8 +242,10 @@ object Thumbnails {
             image.setPixelABGR(x, y, abgr)
             //?} else
             /*image.setPixelRGBA(x, y, abgr)*/
-        } // TODO: !!
-        image
+        }
+        val n = pixels.size.coerceAtLeast(1)
+        val avg = (0xFF shl 24) or (((rSum / n).toInt()) shl 16) or (((gSum / n).toInt()) shl 8) or (bSum / n).toInt()
+        Decoded(image, avg)
     }
 
     /** Downloads raw image bytes from [url]; returns null on any HTTP or network error. */

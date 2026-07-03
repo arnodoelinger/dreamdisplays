@@ -33,6 +33,16 @@ object UiTheme {
     /** 1px accent outline drawn around a hovered card; neutral light to match the panel borders. */
     const val CARD_BORDER_HOVER = 0xFFE8E8E8.toInt()
 
+    // Loading placeholder / ambient
+    /** Base fill of a still-loading thumbnail (a neutral dark grey, not a black hole). */
+    const val PLACEHOLDER_BG = 0xFF1C1C1C.toInt()
+
+    /** Soft white shimmer band swept across a loading placeholder. */
+    const val PLACEHOLDER_SHIMMER = 0x24FFFFFF
+
+    /** Fallback ambient letterbox tint for the preview before a thumbnail color is known. */
+    const val AMBIENT_DEFAULT = 0xFF121212.toInt()
+
     // Common text colors
     const val TEXT_PRIMARY = 0xFFFFFFFF.toInt()
     const val TEXT_SECONDARY = 0xFFAAAAAA.toInt()
