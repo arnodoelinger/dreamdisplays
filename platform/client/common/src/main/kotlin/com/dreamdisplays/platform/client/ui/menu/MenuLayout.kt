@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.ui.menu
 
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.widgets.SuggestionsPanel
 import kotlin.math.max
 import kotlin.math.min
 
@@ -54,16 +55,21 @@ class MenuLayout private constructor(
                 )
             }
 
-            val minSuggestionsH = 120
-            // Same reasoning as the wide layout's previewSlice: favor the video's height budget over
-            // a flat 60/40 split, falling back to it only when there isn't enough slack.
-            var topRowH = max(220, (totalH * 8) / 10)
-            var suggestionsH = totalH - topRowH - gap
-            if (suggestionsH < minSuggestionsH) {
-                suggestionsH = minSuggestionsH
-                topRowH = totalH - suggestionsH - gap
-            }
-            val showSuggestions = topRowH >= 160
+            // The horizontal suggestions strip is a fixed-height band, not a fraction of the screen:
+            // it must fit its own header + search row (STRIP_CHROME_H) plus a full result card
+            // (16:9 thumbnail + two title lines + meta = FULL_CARD_VIEWPORT_H). Reserve that comfortable
+            // height so cards are never clipped, then hand everything else to the preview/settings row
+            // (which the user wants as large as possible). On short screens it shrinks toward a floor
+            // that still shows an un-clipped, if smaller, card; below that it's dropped entirely.
+            val idealSuggestionsH = SuggestionsPanel.STRIP_CHROME_H + SuggestionsPanel.FULL_CARD_VIEWPORT_H
+            val minSuggestionsH = SuggestionsPanel.STRIP_CHROME_H + SuggestionsPanel.MIN_CARD_VIEWPORT_H
+            val topRowFloor = 200
+            var suggestionsH = idealSuggestionsH
+                .coerceAtMost(max(minSuggestionsH, totalH - topRowFloor - gap))
+                .coerceAtLeast(minSuggestionsH)
+            var topRowH = totalH - suggestionsH - gap
+            val showSuggestions = topRowH >= 150 && suggestionsH >= minSuggestionsH
+            if (!showSuggestions) topRowH = totalH
 
             val preview: UiRect
             val settings: UiRect

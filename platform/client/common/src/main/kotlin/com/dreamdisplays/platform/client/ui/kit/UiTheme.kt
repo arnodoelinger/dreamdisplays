@@ -27,6 +27,12 @@ object UiTheme {
     const val SUGGESTIONS_BORDER = 0xFF7A7A7A.toInt()
     const val CARD_BG = 0x602A2A2A
 
+    /** Card background when hovered: a static, slightly lifted grey (no animation). */
+    const val CARD_BG_HOVER = 0xC0484848.toInt()
+
+    /** 1px accent outline drawn around a hovered card; neutral light to match the panel borders. */
+    const val CARD_BORDER_HOVER = 0xFFE8E8E8.toInt()
+
     // Common text colors
     const val TEXT_PRIMARY = 0xFFFFFFFF.toInt()
     const val TEXT_SECONDARY = 0xFFAAAAAA.toInt()

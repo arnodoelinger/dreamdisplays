@@ -30,7 +30,6 @@ import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.sin
 
 /**
  * Scrollable search / related-videos panel: a search row (edit box + clear + search buttons) above a
@@ -248,16 +247,14 @@ class SuggestionsPanel(
         g: GuiGraphicsCompat, f: Font, info: MediaSearchResult,
         x: Int, y: Int, w: Int, thumbH: Int, cardH: Int, hover: Boolean,
     ) {
-        val bg = if (hover) {
-            val pulse = (sin(System.currentTimeMillis() / 400.0 * Math.PI) * 0.5 + 0.5).toFloat()
-            val alpha = (0x60 + pulse * 0x30).toInt()
-            (alpha shl 24) or 0x707070
-        } else UiTheme.CARD_BG
-        g.fill(x, y, x + w, y + cardH, bg)
+        g.fill(x, y, x + w, y + cardH, if (hover) UiTheme.CARD_BG_HOVER else UiTheme.CARD_BG)
 
-        val thumbX = x + 2
-        val thumbY = y + 2
-        val thumbW = w - 4
+        // Full-bleed thumbnail across the whole card width (no side inset): it's the largest the
+        // card can hold and the width/THUMB_H ratio matches 16:9, so the image stays crisp and
+        // un-stretched instead of being shrunk into a bordered box.
+        val thumbX = x
+        val thumbY = y
+        val thumbW = w
         val thumb = Thumbnails.get(info.id)
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
@@ -267,32 +264,37 @@ class SuggestionsPanel(
 
         if (info.isRecent(7)) {
             val tag = Component.translatable("dreamdisplays.ui.new").string
-            val tw = f.width(tag) + 4
-            val tagH = f.lineHeight + 2
+            val tw = f.width(tag) + 6
+            val tagH = f.lineHeight + 4
             g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, UiTheme.ACCENT_NEW_TAG)
-            g.drawText(f, tag, thumbX + 4, thumbY + 3, UiTheme.TEXT_PRIMARY, false)
+            g.drawText(f, tag, thumbX + 5, thumbY + 4, UiTheme.TEXT_PRIMARY, true)
         }
 
         val dur = info.formatDuration()
         if (dur.isNotEmpty()) {
-            val dw = f.width(dur) + 4
-            val dh = f.lineHeight + 2
+            val dw = f.width(dur) + 6
+            val dh = f.lineHeight + 4
             val dx = thumbX + thumbW - dw - 2
             val dy = thumbY + thumbH - dh - 2
             g.fill(dx, dy, dx + dw, dy + dh, UiTheme.OVERLAY_SCRIM)
-            g.drawText(f, dur, dx + 2, dy + 2, UiTheme.TEXT_PRIMARY, false)
+            g.drawText(f, dur, dx + 3, dy + 2, UiTheme.TEXT_PRIMARY, true)
         }
+
+        // Draw the hover frame over the full card (including the full-bleed thumbnail's edges) so the
+        // selection reads as one crisp outline instead of an animated flicker.
+        if (hover) g.drawOutline(UiRect(x, y, w, cardH), UiTheme.CARD_BORDER_HOVER)
 
         if (compactCards) return
 
         val textX = x + 4
         val textW = w - 8
-        var textY = thumbY + thumbH + 3
+        var textY = thumbY + thumbH + 4
         for (line in UiText.wrap(f, info.title, textW, 2)) {
-            g.drawText(f, line, textX, textY, UiTheme.TEXT_PRIMARY, false)
+            g.drawText(f, line, textX, textY, UiTheme.TEXT_PRIMARY, true)
             textY += f.lineHeight + 1
         }
 
+        textY += 1
         var meta = info.uploader ?: ""
         val views = info.formatViews()
         if (views.isNotEmpty()) {
@@ -300,7 +302,7 @@ class SuggestionsPanel(
             else UiText.trim(f, meta, max(20, textW - f.width(" • $views"))) + " • " + views
         }
         if (meta.isNotEmpty()) {
-            g.drawText(f, UiText.trim(f, meta, textW), textX, textY, UiTheme.TEXT_META, false)
+            g.drawText(f, UiText.trim(f, meta, textW), textX, textY, UiTheme.TEXT_META, true)
         }
     }
 
@@ -441,5 +443,20 @@ class SuggestionsPanel(
         private const val SEARCH_H = 22
         private const val ACTION_W = SEARCH_H
         private const val ACTION_GAP = 4
+
+        /** Internal vertical paddings a card adds around its thumbnail + text (see [dynThumbH]/[dynCardH]). */
+        private const val CARD_INNER_PAD = 2 + 3 + 2
+
+        /**
+         * Vertical space the panel spends on its title + search row before the card strip begins,
+         * plus the bottom padding below it. Keep in sync with [stripTop]/[stripBottom].
+         */
+        const val STRIP_CHROME_H = 10 + HEADER_H + 6 + SEARCH_H + 8 + 10
+
+        /** Strip viewport height at which horizontal cards reach their full [THUMB_H] thumbnails. */
+        const val FULL_CARD_VIEWPORT_H = CARD_H + CARD_INNER_PAD
+
+        /** Smallest strip viewport that still shows a card (min 30px thumbnail) without clipping it. */
+        const val MIN_CARD_VIEWPORT_H = 30 + CARD_TEXT_H + CARD_INNER_PAD
     }
 }
