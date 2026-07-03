@@ -23,15 +23,13 @@ If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arn
 
 ## Available for Fabric, NeoForge, Quilt, and popular server forks
 
-Dream Displays also supports Fabric servers! No Paper or hybrid server software required.
+**Dream Displays** fully supports multiplayer! For the mod to work, players must install the client-side mod (available for
+**Fabric**, **NeoForge**, and **Quilt**).
 
-Create interactive in-game displays that stream YouTube videos in real time, with smooth playback, configurable
-resolution, and even with synchronization mode for all players on the server.
+On the server side, admins can install one of the following options depending on their server software:
 
-For this mod to work, players install the client mod, while server admins can install either:
-
-- Server plugin on Paper / Folia / Purpur or other fork
-- Fabric server mod on Fabric servers
+- Server plugin (Paper / Purpur / Folia / etc.): Drop the plugin .jar into your `/plugins` folder
+- Server mod (Fabric / NeoForge / Quilt): Drop the mod .jar into your `/mods` folder
 
 ![img](https://i.imgur.com/lOKNx6g.png)
 

@@ -19,11 +19,11 @@ modId = "neoforge"
 type = "required"
 versionRange = "${neoforgeLoaderRange}"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"
 
 [[dependencies.dreamdisplays]]
 modId = "minecraft"
 type = "required"
 versionRange = "${minecraftRange}"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"

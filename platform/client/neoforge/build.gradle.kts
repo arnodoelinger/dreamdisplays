@@ -6,6 +6,7 @@ plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.native-resources")
     id("dreamdisplays.shadow-conventions")
+    id("io.github.arnodoelinger.platformweaver") version libs.versions.platformweaver
 }
 
 repositories {
@@ -13,8 +14,32 @@ repositories {
     maven("https://jitpack.io")
 }
 
+sourceSets.main {
+    kotlin.srcDir(project(":platform:server").layout.buildDirectory.dir("generated/chisel/main/kotlin"))
+}
+
+platformweaver {
+    target = "neoforge"
+    chameleonsDir = null
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    dependsOn(":platform:server:chiselSource")
+}
+tasks.matching { it.name == "sourcesJar" }.configureEach {
+    dependsOn(":platform:server:chiselSource")
+}
+
 dependencies {
+    compileOnly(libs.platformweaverAnnotations)
     implementation(project(":platform:client:common"))
+    implementation(libs.tomlj)
+    implementation(libs.semver4j)
+    implementation(libs.exposedCore)
+    implementation(libs.exposedJdbc)
+    implementation(libs.exposedMigrationJdbc)
+    implementation(libs.hikari)
+    runtimeOnly(libs.sqliteJdbc)
     shadow(project(":core"))
     shadow(project(":api"))
     shadow(project(":util"))
@@ -25,9 +50,16 @@ dependencies {
     shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinxSerializationJson)
     shadow(libs.kotlinStdlib)
+    shadow(libs.tomlj)
+    shadow(libs.semver4j)
     shadow(libs.caffeine)
     shadow(libs.okhttp)
     shadow(libs.okio)
+    shadow(libs.sqliteJdbc)
+    shadow(libs.exposedCore)
+    shadow(libs.exposedJdbc)
+    shadow(libs.exposedMigrationJdbc)
+    shadow(libs.hikari)
     shadow(libs.newpipeExtractor)
 }
 
@@ -48,6 +80,10 @@ neoForge {
         register("neoClient") {
             client()
             // Dev runs get native-library debug logging by default
+            environment("DD_NATIVE_LOG", System.getenv("DD_NATIVE_LOG") ?: "debug")
+        }
+        register("neoServer") {
+            server()
             environment("DD_NATIVE_LOG", System.getenv("DD_NATIVE_LOG") ?: "debug")
         }
     }
@@ -119,6 +155,14 @@ tasks.shadowJar {
         include(dependency("com.google.protobuf:protobuf-javalite"))
         include(dependency("org.mozilla:rhino"))
         include(dependency("org.mozilla:rhino-engine"))
+        include(dependency("org.tomlj:tomlj"))
+        include(dependency("org.antlr:antlr4-runtime"))
+        include(dependency("org.xerial:sqlite-jdbc"))
+        include(dependency("org.jetbrains.exposed:exposed-core"))
+        include(dependency("org.jetbrains.exposed:exposed-jdbc"))
+        include(dependency("org.jetbrains.exposed:exposed-migration-core"))
+        include(dependency("org.jetbrains.exposed:exposed-migration-jdbc"))
+        include(dependency("com.zaxxer:HikariCP"))
     }
     val prefix = "com.dreamdisplays.libs"
     listOf(
@@ -138,9 +182,24 @@ tasks.shadowJar {
         "com.google.protobuf",
         "org.mozilla.javascript",
         "org.mozilla.classfile",
+        "org.tomlj",
+        "org.antlr",
+        "org.jetbrains.exposed",
+        "com.zaxxer.hikari",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
+    exclude("org/sqlite/native/Linux-Android/**")
+    exclude("org/sqlite/native/Linux-Musl/x86/**")
+    exclude("org/sqlite/native/FreeBSD/**")
+    exclude("org/sqlite/native/Linux/ppc64/**")
+    exclude("org/sqlite/native/Linux/riscv64/**")
+    exclude("org/sqlite/native/Linux/arm/**")
+    exclude("org/sqlite/native/Linux/armv6/**")
+    exclude("org/sqlite/native/Linux/armv7/**")
+    exclude("org/sqlite/native/Linux/x86/**")
+    exclude("org/sqlite/native/Windows/x86/**")
+    exclude("org/sqlite/native/Windows/armv7/**")
 }
 
 tasks.withType<AbstractArchiveTask>().configureEach {
