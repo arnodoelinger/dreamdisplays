@@ -61,9 +61,23 @@ internal class NativeVideoFramePipe(
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     override val lastFrameReceivedNanos = AtomicLong(0)
 
-    /** Set by the popout window to receive raw frames. Called on the reader thread. */
     @Volatile
-    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    private var rawPopoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+
+    private val lastFrame = LastFrameCache()
+
+    /**
+     * Set by the popout window to receive raw frames. Called on the reader thread.
+     * Replays the last cached frame into a freshly attached sink immediately, so it doesn't sit on
+     * a blank/waiting placeholder until the next frame decodes (which may not happen for a while
+     * if playback is currently paused or parked).
+     */
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?
+        get() = rawPopoutFrameSink
+        set(value) {
+            rawPopoutFrameSink = value
+            if (value != null) lastFrame.replay(value)
+        }
 
     @Volatile
     var expectedW = 0; private set
@@ -604,10 +618,12 @@ internal class NativeVideoFramePipe(
             rgba.clear()
             if (NativeMedia.i420ToRgba(spare, frameSize, rgba, w, h) == 0) {
                 rgba.limit(rgbaSize).position(0)
+                lastFrame.store(rgba, w, h, rgbaSize, FramePixelFormat.RGBA32)
                 sink(rgba, w, h, FramePixelFormat.RGBA32)
             }
             spare.rewind()
         } else {
+            lastFrame.store(spare, w, h, frameSize, outputFormat)
             sink(spare, w, h, outputFormat); spare.rewind()
         }
         if (MediaPlayer.DEBUG) metrics.recordPopout(System.nanoTime() - popoutStartNs)

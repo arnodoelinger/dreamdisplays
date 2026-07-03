@@ -7,6 +7,7 @@ import com.mojang.blaze3d.textures.GpuTexture
 //?}
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
+import org.lwjgl.opengl.GL11
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.nio.ByteBuffer
@@ -14,6 +15,24 @@ import java.nio.ByteOrder
 
 /** Uploads raw video frames to Minecraft textures on `OpenGL` and backend-neutral renderers. */
 object TextureUploadUtil {
+    /**
+     * Switches [tex] from Minecraft's default nearest-neighbor sampling to bilinear. Video frames
+     * and thumbnails are almost always scaled to fit their on-screen box, so without this they
+     * look blocky rather than smooth. No-op on backends where the raw GL texture id isn't
+     * reachable (e.g. VulkanMod).
+     */
+    fun applyBilinearFilter(tex: DynamicTexture) {
+        if (!RenderBackendCompat.canUseDirectOpenGl()) return
+        //? if >=1.21.11 {
+        val glId = (tex.getTexture() as? GlTexture)?.glId() ?: return
+        //?} else
+        /*val glId = tex.getId()*/
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, glId)
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+    }
+
     /** Uploads raw pixels into a [DynamicTexture] across both legacy GL-id and new GpuTexture APIs. */
     fun uploadDynamicTexture(
         texture: DynamicTexture,

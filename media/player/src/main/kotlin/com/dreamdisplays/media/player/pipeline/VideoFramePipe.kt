@@ -37,9 +37,23 @@ internal class VideoFramePipe(
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     override val lastFrameReceivedNanos = AtomicLong(0)
 
-    /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
     @Volatile
-    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    private var rawPopoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+
+    private val lastFrame = LastFrameCache()
+
+    /**
+     * Set by the popout window to receive raw RGB frames. Called on the reader thread.
+     * Replays the last cached frame into a freshly attached sink immediately, so it doesn't sit on
+     * a blank/waiting placeholder until the next frame decodes (which may not happen for a while
+     * if playback is currently paused or parked).
+     */
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?
+        get() = rawPopoutFrameSink
+        set(value) {
+            rawPopoutFrameSink = value
+            if (value != null) lastFrame.replay(value)
+        }
 
     @Volatile
     var expectedW = 0; private set
@@ -119,9 +133,7 @@ internal class VideoFramePipe(
         ).also { activePrebuffer = it }
         // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
         // in-world display; feeding at decode time would run the popout ahead by the buffer depth.
-        prebuffer?.onPresent = { buf ->
-            popoutFrameSink?.let { sink -> sink(buf, w, h, FramePixelFormat.RGB24); buf.rewind() }
-        }
+        prebuffer?.onPresent = { buf -> feedSink(buf, w, h) }
         return daemon(
             {
                 read(
@@ -229,7 +241,7 @@ internal class VideoFramePipe(
                         if (!MediaPlayer.captureSamples) {
                             // Benchmark-only path: frames are never submitted / presented, so feed the
                             // popout here (otherwise it would never receive a frame).
-                            popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
+                            feedSink(spare, w, h)
                             videoPts += frameNs; continue
                         }
                         spare = prebuffer.submit(spare, videoPts, frameSize)
@@ -244,7 +256,7 @@ internal class VideoFramePipe(
                         continue
                     }
 
-                    popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
+                    feedSink(spare, w, h)
 
                     if (!MediaPlayer.captureSamples) {
                         videoPts += frameNs; continue
@@ -295,6 +307,14 @@ internal class VideoFramePipe(
             val stderr = synchronized(stderrBuf) { stderrBuf.toString() }
             onEos(stderr, exitCode == 0)
         }
+    }
+
+    /** Feeds [buf] (position 0, [w] x [h] RGB24) to the popout sink, if any, caching a copy for [lastFrame]. */
+    private fun feedSink(buf: ByteBuffer, w: Int, h: Int) {
+        val sink = popoutFrameSink ?: return
+        lastFrame.store(buf, w, h, w * h * 3, FramePixelFormat.RGB24)
+        sink(buf, w, h, FramePixelFormat.RGB24)
+        buf.rewind()
     }
 
     /** Scans [input] forward until the PPM magic `P6` is consumed (followed by whitespace). Returns false on EOF. */

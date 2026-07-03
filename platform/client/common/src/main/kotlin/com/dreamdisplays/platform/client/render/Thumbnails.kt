@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.render
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
+import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
@@ -66,6 +67,13 @@ object Thumbnails {
     /** TTL for cached thumbnails, in milliseconds. */
     private const val THUMB_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1_000L
 
+    /**
+     * A missing max-res thumbnail comes back as `HTTP 200` with a tiny grey placeholder rather than
+     * a `404`, so it's told apart from a real one by size; real thumbnails (even hqdefault) are
+     * always well above this.
+     */
+    private const val MAXRES_PLACEHOLDER_MAX_BYTES = 4_096
+
     /** Initializes the thumbnail manager and scans for image plugins. */
     init {
         try {
@@ -90,11 +98,18 @@ object Thumbnails {
         BYTES.load(videoId) { loadBytes(it, url) }
 
     /** Fetches the thumbnail bytes for [videoId] from memory, disk, or network. */
-    private fun loadBytes(videoId: String, url: String): ByteArray {
+    private fun loadBytes(videoId: String, fallbackUrl: String): ByteArray {
         readDiskCache(videoId)?.let { return it }
-        val bytes = fetch(url) ?: throw IOException("thumbnail HTTP fetch failed")
+        val bytes = fetchBestAvailable(videoId, fallbackUrl) ?: throw IOException("thumbnail HTTP fetch failed")
         writeDiskCacheAsync(videoId, bytes)
         return bytes
+    }
+
+    /** Tries the sharper max-res thumbnail first, falling back to [fallbackUrl] (hqdefault) when it's unavailable. */
+    private fun fetchBestAvailable(videoId: String, fallbackUrl: String): ByteArray? {
+        val maxRes = fetch(YouTubeUrls.maxResThumbnailUrl(videoId))
+        if (maxRes != null && maxRes.size > MAXRES_PLACEHOLDER_MAX_BYTES) return maxRes
+        return fetch(fallbackUrl)
     }
 
     /** Awaits the thumbnail bytes and registers them on the render thread. */
@@ -165,6 +180,7 @@ object Thumbnails {
             /*tex = DynamicTexture(image)*/
             val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/${hash(videoId)}")
             Minecraft.getInstance().textureManager.register(id, tex)
+            TextureUploadUtil.applyBilinearFilter(tex)
             READY.put(videoId, id)
         } catch (e: Exception) {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.

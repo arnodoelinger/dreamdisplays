@@ -37,7 +37,15 @@ class MenuLayout private constructor(
             if (wide) {
                 val rightColW = max(200, min(280, totalW * 3 / 10))
                 val leftColW = totalW - rightColW - gap
-                val previewSlice = totalH * 6 / 10
+                // The video is letterboxed to the screen's own aspect ratio, so height (not width)
+                // is almost always its limiting dimension here; give it as much as the settings
+                // panel below can spare instead of a flat 60/40 split, so it isn't left tiny inside
+                // a much wider column.
+                val settingsMinH = 190
+                var previewSlice = (totalH * 8) / 10
+                if (totalH - previewSlice - gap < settingsMinH) {
+                    previewSlice = totalH - settingsMinH - gap
+                }
                 return MenuLayout(
                     preview = UiRect(leftX, contentTop, leftColW, previewSlice),
                     settings = UiRect(leftX, contentTop + previewSlice + gap, leftColW, totalH - previewSlice - gap),
@@ -47,7 +55,9 @@ class MenuLayout private constructor(
             }
 
             val minSuggestionsH = 120
-            var topRowH = max(220, (totalH * 6) / 10)
+            // Same reasoning as the wide layout's previewSlice: favor the video's height budget over
+            // a flat 60/40 split, falling back to it only when there isn't enough slack.
+            var topRowH = max(220, (totalH * 8) / 10)
             var suggestionsH = totalH - topRowH - gap
             if (suggestionsH < minSuggestionsH) {
                 suggestionsH = minSuggestionsH

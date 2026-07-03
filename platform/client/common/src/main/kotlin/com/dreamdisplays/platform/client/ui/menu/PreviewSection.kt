@@ -51,6 +51,11 @@ class PreviewSection(
 ) {
     private val yuvPreview = PreviewFrameTexture(ds)
 
+    companion object {
+        /** Aspect ratio of a YouTube thumbnail image, independent of the screen's own block shape. */
+        private const val THUMBNAIL_RATIO = 16f / 9f
+    }
+
     /** Draws the panel content into [panel] and lays out the controls row along its bottom edge. */
     fun render(g: GuiGraphicsCompat, panel: UiRect) {
         val font = Minecraft.getInstance().font
@@ -84,16 +89,12 @@ class PreviewSection(
         val font = Minecraft.getInstance().font
         g.fill(x, y, x + w, y + h, 0xFF000000.toInt())
 
-        val ratio = ds.width / max(1f, ds.height.toFloat())
-        val videoW: Int
-        val videoH: Int
-        if (w / h.toFloat() > ratio) {
-            videoH = h; videoW = (videoH * ratio).toInt()
-        } else {
-            videoW = w; videoH = (videoW / ratio).toInt()
-        }
-        val videoX = x + (w - videoW) / 2
-        val videoY = y + (h - videoH) / 2
+        val area = UiRect(x, y, w, h)
+        // The decoded video frame is already server-side letterboxed to the screen's own block
+        // shape, so it's fit to that ratio here too. The idle thumbnail is a raw 16:9 YouTube
+        // image and gets its own fit box in drawWaiting() below instead.
+        val screenRatio = ds.width / max(1f, ds.height.toFloat())
+        val video = fitRatio(area, screenRatio)
 
         if (ds.isVideoStarted && ds.texture != null && ds.textureId != null) {
             yuvPreview.detach()
@@ -103,44 +104,47 @@ class PreviewSection(
             // just-freed texture (otherwise: "Missing resource" + GL_INVALID_OPERATION).
             val texId = ds.textureId
             if (texId != null) {
-                blitTexture(g, texId, videoX, videoY, videoW, videoH)
+                blitTexture(g, texId, video.x, video.y, video.w, video.h)
             }
         } else if (ds.isVideoStarted && ds.isYuvTexture) {
             yuvPreview.attach()
             yuvPreview.uploadFrame()
             val previewId = yuvPreview.textureId
             if (previewId != null) {
-                blitTexture(g, previewId, videoX, videoY, videoW, videoH)
+                blitTexture(g, previewId, video.x, video.y, video.w, video.h)
             } else {
-                drawWaiting(g, font, x, y, w, h, videoX, videoY, videoW, videoH)
+                drawWaiting(g, font, area)
             }
         } else {
             yuvPreview.detach()
-            drawWaiting(g, font, x, y, w, h, videoX, videoY, videoW, videoH)
+            drawWaiting(g, font, area)
         }
     }
 
-    private fun drawWaiting(
-        g: GuiGraphicsCompat,
-        font: net.minecraft.client.gui.Font,
-        x: Int,
-        y: Int,
-        w: Int,
-        h: Int,
-        videoX: Int,
-        videoY: Int,
-        videoW: Int,
-        videoH: Int,
-    ) {
+    /** Returns the largest box with aspect ratio [ratio] that fits inside [area], centered. */
+    private fun fitRatio(area: UiRect, ratio: Float): UiRect {
+        val w: Int
+        val h: Int
+        if (area.w / area.h.toFloat() > ratio) {
+            h = area.h; w = (h * ratio).toInt()
+        } else {
+            w = area.w; h = (w / ratio).toInt()
+        }
+        return area.centered(w, h)
+    }
+
+    private fun drawWaiting(g: GuiGraphicsCompat, font: net.minecraft.client.gui.Font, area: UiRect) {
         currentThumbnail()?.let { thumb ->
-            blitTexture(g, thumb, videoX, videoY, videoW, videoH)
-            g.fill(videoX, videoY, videoX + videoW, videoY + videoH, 0x80000000.toInt())
+            // YouTube thumbnails are always 16:9, regardless of the screen's own block shape
+            val box = fitRatio(area, THUMBNAIL_RATIO)
+            blitTexture(g, thumb, box.x, box.y, box.w, box.h)
+            g.fill(box.x, box.y, box.right, box.bottom, 0x80000000.toInt())
         }
         val waiting = Component.translatable("dreamdisplays.ui.waiting").string
         g.drawText(
             font, waiting,
-            x + w / 2 - font.width(waiting) / 2,
-            y + h / 2 - font.lineHeight / 2,
+            area.centerX - font.width(waiting) / 2,
+            area.centerY - font.lineHeight / 2,
             UiTheme.TEXT_DIM, true,
         )
     }
@@ -252,6 +256,7 @@ class PreviewSection(
         private var rgbaUploadBuffer: ByteBuffer? = null
 
         fun attach() {
+            if (attached) return
             attached = true
             ds.setPreviewFrameSink(::updateFrame)
         }
@@ -313,6 +318,7 @@ class PreviewSection(
                     "preview/${ds.uuid}-${UUID.randomUUID()}",
                 )
                 mc.textureManager.register(textureId!!, tex)
+                TextureUploadUtil.applyBilinearFilter(tex)
                 dynamicTexture = tex
                 texW = fw
                 texH = fh

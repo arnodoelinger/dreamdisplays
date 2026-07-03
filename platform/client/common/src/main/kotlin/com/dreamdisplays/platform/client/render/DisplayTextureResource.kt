@@ -226,6 +226,7 @@ class DisplayTextureResource(private val uuid: UUID) {
             "screen-main-texture-$uuid-${UUID.randomUUID()}",
         )
         Minecraft.getInstance().textureManager.register(newId, newTexture)
+        TextureUploadUtil.applyBilinearFilter(newTexture)
         val rt = createRenderType(newId)
         return Allocation(
             width = w, height = h, texture = newTexture, textureId = newId,

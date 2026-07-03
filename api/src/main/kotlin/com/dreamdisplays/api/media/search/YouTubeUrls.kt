@@ -21,11 +21,22 @@ object YouTubeUrls {
     /** Returns the watch-page URL for [videoId]. */
     fun watchUrl(videoId: String): String = watchUrl(YouTubeVideoId.require(videoId))
 
-    /** Returns the medium-quality thumbnail URL for [videoId]. */
-    fun thumbnailUrl(videoId: YouTubeVideoId): String = "https://i.ytimg.com/vi/${videoId.value}/mqdefault.jpg"
+    /** Returns the high-quality (480x360) thumbnail URL for [videoId]; always available, unlike sd / maxres. */
+    fun thumbnailUrl(videoId: YouTubeVideoId): String = "https://i.ytimg.com/vi/${videoId.value}/hqdefault.jpg"
 
-    /** Returns the medium-quality thumbnail URL for [videoId]. */
+    /** Returns the high-quality (480x360) thumbnail URL for [videoId]; always available, unlike sd / maxres. */
     fun thumbnailUrl(videoId: String): String = thumbnailUrl(YouTubeVideoId.require(videoId))
+
+    /**
+     * Returns the max-resolution (up to 1920x1080) thumbnail URL for [videoId]. Not every video has
+     * one: when it's missing, YouTube serves `HTTP 200` with a tiny grey placeholder image instead of
+     * a `404`, so callers must verify the response (e.g. by size) before trusting it and fall back to
+     * [thumbnailUrl] otherwise.
+     */
+    fun maxResThumbnailUrl(videoId: YouTubeVideoId): String = "https://i.ytimg.com/vi/${videoId.value}/maxresdefault.jpg"
+
+    /** Returns the max-resolution thumbnail URL for [videoId]; see the [YouTubeVideoId] overload for caveats. */
+    fun maxResThumbnailUrl(videoId: String): String = maxResThumbnailUrl(YouTubeVideoId.require(videoId))
 
     /**
      * Extracts the 11-character video ID from a full URL (`youtube.com/watch`, `youtu.be`, shorts,

@@ -45,6 +45,43 @@ internal interface FramePipe {
     fun cleanup()
 }
 
+/**
+ * Caches the most recent frame handed to a pipe's raw-frame sink (popout / menu preview) so a
+ * sink that attaches while playback is paused or parked - and so won't see a new decoded frame
+ * for a while, possibly ever if playback stays paused - gets an immediate picture instead of
+ * waiting indefinitely for the next one.
+ */
+internal class LastFrameCache {
+    @Volatile
+    private var buffer: ByteBuffer? = null
+    private var width = 0
+    private var height = 0
+    private var format = FramePixelFormat.RGB24
+
+    /** Reader-thread only: stores a copy of the first [size] bytes of [src] (read from position 0). */
+    fun store(src: ByteBuffer, w: Int, h: Int, size: Int, fmt: FramePixelFormat) {
+        var dst = buffer
+        if (dst == null || dst.capacity() < size) {
+            dst = ByteBuffer.allocateDirect(size)
+        }
+        dst.clear()
+        val view = src.duplicate()
+        view.position(0).limit(size)
+        dst.put(view)
+        dst.flip()
+        width = w
+        height = h
+        format = fmt
+        buffer = dst
+    }
+
+    /** Replays the cached frame into [sink], if one has been stored yet. Safe to call from any thread. */
+    fun replay(sink: (ByteBuffer, Int, Int, FramePixelFormat) -> Unit) {
+        val buf = buffer ?: return
+        sink(buf.duplicate(), width, height, format)
+    }
+}
+
 /** A/V pacing shared by both frame pipes: sleep until a frame is due, drop when too late. */
 internal object FramePacing {
     /** Threshold under which we use busy-wait (spin) instead of sleep for precise timing. */

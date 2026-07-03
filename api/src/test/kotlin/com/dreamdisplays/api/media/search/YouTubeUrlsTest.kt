@@ -42,7 +42,7 @@ class YouTubeUrlsTest {
     @Test
     fun buildersRequireValidatedIds() {
         assertEquals("https://www.youtube.com/watch?v=$VIDEO_ID", YouTubeUrls.watchUrl(VIDEO_ID))
-        assertEquals("https://i.ytimg.com/vi/$VIDEO_ID/mqdefault.jpg", YouTubeUrls.thumbnailUrl(VIDEO_ID))
+        assertEquals("https://i.ytimg.com/vi/$VIDEO_ID/hqdefault.jpg", YouTubeUrls.thumbnailUrl(VIDEO_ID))
         assertFailsWith<IllegalArgumentException> { YouTubeUrls.watchUrl("not-a-video-id") }
     }
 
