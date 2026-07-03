@@ -17,7 +17,6 @@ import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.api.media.MediaServices
-import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
@@ -229,7 +228,7 @@ class PreviewSection(
         val avg = Thumbnails.averageColor(id) ?: run {
             // Warm the thumbnail even while the video plays, so the tint appears once it decodes
             // (request de-dups, so calling it per frame is cheap).
-            Thumbnails.request(id, YouTubeUrls.thumbnailUrl(id))
+            Thumbnails.request(id)
             return UiTheme.AMBIENT_DEFAULT
         }
         return darkenRgb(avg, 0.30f)
@@ -239,7 +238,7 @@ class PreviewSection(
     private fun currentThumbnail(): Identifier? {
         val id = currentVideoId() ?: return null
         Thumbnails.get(id)?.let { return it }
-        Thumbnails.request(id, YouTubeUrls.thumbnailUrl(id))
+        Thumbnails.request(id)
         return null
     }
 

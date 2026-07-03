@@ -89,53 +89,70 @@ object Thumbnails {
         }
     }
 
-    /** Returns the registered Minecraft texture [Identifier] for [videoId], or null if not yet loaded. */
-    fun get(videoId: String): Identifier? = READY.getIfPresent(videoId)
+    /** Requested thumbnail resolution tier: [HIGH] for the big preview, [LOW] for the small cards. */
+    enum class Quality { HIGH, LOW }
+
+    /** Composite cache key so [Quality.HIGH] (preview) and [Quality.LOW] (cards) never overwrite each other. */
+    private fun key(videoId: String, quality: Quality): String =
+        if (quality == Quality.HIGH) videoId else "$videoId@lq"
+
+    /** Returns the registered Minecraft texture [Identifier] for [videoId] at [quality], or null if not loaded. */
+    fun get(videoId: String, quality: Quality = Quality.HIGH): Identifier? = READY.getIfPresent(key(videoId, quality))
 
     /** Returns the average ARGB color of [videoId]'s thumbnail, or null until it has been decoded. */
     fun averageColor(videoId: String): Int? = AVG_COLOR.getIfPresent(videoId)
 
-    /** Schedules a background download of the thumbnail at [url] for [videoId] if not already in flight or ready. */
-    fun request(videoId: String, url: String) {
-        if (READY.getIfPresent(videoId) != null) return
-        if (IN_FLIGHT.asMap().putIfAbsent(videoId, true) != null) return
-        DreamCoroutines.clientIo.launch { download(videoId, loadBytesAsync(videoId, url)) }
+    /** Schedules a background download of [videoId]'s thumbnail at [quality] if not already in flight or ready. */
+    fun request(videoId: String, quality: Quality = Quality.HIGH) {
+        val k = key(videoId, quality)
+        if (READY.getIfPresent(k) != null) return
+        if (IN_FLIGHT.asMap().putIfAbsent(k, true) != null) return
+        DreamCoroutines.clientIo.launch { download(videoId, quality, loadBytesAsync(videoId, quality)) }
     }
 
-    /** Starts or joins the thumbnail byte load for [videoId]. */
-    private fun loadBytesAsync(videoId: String, url: String): Deferred<ByteArray> =
-        BYTES.load(videoId) { loadBytes(it, url) }
+    /** Starts or joins the thumbnail byte load for [videoId] at [quality]. */
+    private fun loadBytesAsync(videoId: String, quality: Quality): Deferred<ByteArray> =
+        BYTES.load(key(videoId, quality)) { loadBytes(videoId, quality) }
 
-    /** Fetches the thumbnail bytes for [videoId] from memory, disk, or network. */
-    private fun loadBytes(videoId: String, fallbackUrl: String): ByteArray {
-        readDiskCache(videoId)?.let { return it }
-        val bytes = fetchBestAvailable(videoId, fallbackUrl) ?: throw IOException("thumbnail HTTP fetch failed")
-        writeDiskCacheAsync(videoId, bytes)
+    /** Fetches the thumbnail bytes for [videoId] at [quality] from memory, disk, or network. */
+    private fun loadBytes(videoId: String, quality: Quality): ByteArray {
+        readDiskCache(videoId, quality)?.let { return it }
+        val bytes = fetchForQuality(videoId, quality) ?: throw IOException("thumbnail HTTP fetch failed")
+        writeDiskCacheAsync(videoId, quality, bytes)
         return bytes
     }
 
-    /** Tries the sharper max-res thumbnail first, falling back to [fallbackUrl] (hqdefault) when it's unavailable. */
-    private fun fetchBestAvailable(videoId: String, fallbackUrl: String): ByteArray? {
-        val maxRes = fetch(YouTubeUrls.maxResThumbnailUrl(videoId))
-        if (maxRes != null && maxRes.size > MAXRES_PLACEHOLDER_MAX_BYTES) return maxRes
-        return fetch(fallbackUrl)
-    }
-
-    /** Awaits the thumbnail bytes and registers them on the render thread. */
-    private suspend fun download(videoId: String, bytesDeferred: Deferred<ByteArray>) {
-        try {
-            val bytes = bytesDeferred.await()
-            Minecraft.getInstance().execute { register(videoId, bytes) }
-        } catch (e: Exception) {
-            logger.warn("Fetch failed for $videoId: ${e.message}")
-            BYTES.invalidate(videoId)
-            IN_FLIGHT.invalidate(videoId)
+    /**
+     * Fetches bytes for the requested tier. [Quality.LOW] pulls the compact 320x180 mqdefault (plenty
+     * for the small suggestion cards); [Quality.HIGH] tries the sharp maxresdefault and falls back to
+     * mqdefault when it's missing. hqdefault is deliberately avoided — it's 4:3 with black bars,
+     * unlike the clean 16:9 mq / maxres.
+     */
+    private fun fetchForQuality(videoId: String, quality: Quality): ByteArray? = when (quality) {
+        Quality.LOW -> fetch(YouTubeUrls.mqThumbnailUrl(videoId))
+        Quality.HIGH -> {
+            val maxRes = fetch(YouTubeUrls.maxResThumbnailUrl(videoId))
+            if (maxRes != null && maxRes.size > MAXRES_PLACEHOLDER_MAX_BYTES) maxRes
+            else fetch(YouTubeUrls.mqThumbnailUrl(videoId))
         }
     }
 
-    /** Reads the cached thumbnail bytes for [videoId] from disk; returns null if absent or expired. */
-    private fun readDiskCache(videoId: String): ByteArray? = try {
-        val f = thumbFile(videoId)
+    /** Awaits the thumbnail bytes and registers them on the render thread. */
+    private suspend fun download(videoId: String, quality: Quality, bytesDeferred: Deferred<ByteArray>) {
+        val k = key(videoId, quality)
+        try {
+            val bytes = bytesDeferred.await()
+            Minecraft.getInstance().execute { register(videoId, k, bytes) }
+        } catch (e: Exception) {
+            logger.warn("Fetch failed for $k: ${e.message}")
+            BYTES.invalidate(k)
+            IN_FLIGHT.invalidate(k)
+        }
+    }
+
+    /** Reads the cached thumbnail bytes for ([videoId], [quality]) from disk; returns null if absent or expired. */
+    private fun readDiskCache(videoId: String, quality: Quality): ByteArray? = try {
+        val f = thumbFile(videoId, quality)
         when {
             !f.isFile -> null
             System.currentTimeMillis() - f.lastModified() > THUMB_CACHE_TTL_MS -> {
@@ -148,12 +165,12 @@ object Thumbnails {
         null
     }
 
-    /** Atomically writes [bytes] to the disk cache for [videoId] via a temp-file rename in the background. */
-    private fun writeDiskCacheAsync(videoId: String, bytes: ByteArray) {
+    /** Atomically writes [bytes] to the disk cache for ([videoId], [quality]) via a temp-file rename in the background. */
+    private fun writeDiskCacheAsync(videoId: String, quality: Quality, bytes: ByteArray) {
         DreamCoroutines.clientIo.launch {
             try {
                 Files.createDirectories(THUMB_CACHE_DIR)
-                val target = thumbFile(videoId)
+                val target = thumbFile(videoId, quality)
                 val tmp = File(target.parentFile, target.name + ".tmp")
                 Files.write(tmp.toPath(), bytes)
                 Files.move(
@@ -165,9 +182,9 @@ object Thumbnails {
         }
     }
 
-    /** Returns the cache file for [videoId], hashing the raw ID so case-sensitive IDs never collide. */
-    private fun thumbFile(videoId: String): File =
-        File(THUMB_CACHE_DIR.toFile(), hash(videoId) + ".jpg")
+    /** Returns the cache file for ([videoId], [quality]), hashing the composite key so tiers never collide. */
+    private fun thumbFile(videoId: String, quality: Quality): File =
+        File(THUMB_CACHE_DIR.toFile(), hash(key(videoId, quality)) + ".jpg")
 
     /** Returns a SHA-1 hex digest of [s], falling back to `hashCode` if SHA-1 is unavailable. */
     private fun hash(s: String): String = try {
@@ -180,31 +197,34 @@ object Thumbnails {
     /** A decoded thumbnail: the GPU-ready image plus its average color for the ambient preview tint. */
     private class Decoded(val image: NativeImage, val avgColor: Int)
 
-    /** Decodes [bytes] into a [NativeImage], registers it with Minecraft's texture manager, and marks the entry ready. */
-    private fun register(videoId: String, bytes: ByteArray) {
+    /**
+     * Decodes [bytes] into a [NativeImage] and registers it under [key] (the composite videoId + quality
+     * key). The average color is stored per [videoId] so both tiers share the one ambient tint.
+     */
+    private fun register(videoId: String, key: String, bytes: ByteArray) {
         var image: NativeImage? = null
         var tex: DynamicTexture? = null
         try {
             val decoded = decode(bytes)
             image = decoded.image
             //? if >=1.21.11 {
-            tex = DynamicTexture({ "yt-thumb-$videoId" }, image)
+            tex = DynamicTexture({ "yt-thumb-$key" }, image)
             //?} else
             /*tex = DynamicTexture(image)*/
-            val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/${hash(videoId)}")
+            val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/${hash(key)}")
             Minecraft.getInstance().textureManager.register(id, tex)
             TextureUploadUtil.applyBilinearFilter(tex)
             AVG_COLOR.put(videoId, decoded.avgColor)
-            READY.put(videoId, id)
+            READY.put(key, id)
         } catch (e: Exception) {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.
-            logger.warn("Decode / register failed for $videoId: ${e.message}")
-            BYTES.invalidate(videoId)
+            logger.warn("Decode / register failed for $key: ${e.message}")
+            BYTES.invalidate(key)
             // The texture manager owns the texture only once registration succeeds; closing the
             // texture also closes its image, so close the bare image only when no texture exists yet.
             runCatching { tex?.close() ?: image?.close() }
         } finally {
-            IN_FLIGHT.invalidate(videoId)
+            IN_FLIGHT.invalidate(key)
         }
     }
 

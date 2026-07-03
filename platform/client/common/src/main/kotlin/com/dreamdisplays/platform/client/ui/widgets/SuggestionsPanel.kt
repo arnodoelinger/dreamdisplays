@@ -209,8 +209,8 @@ class SuggestionsPanel(
                         mouseY >= max(cardY, stripTop) && mouseY < min(cardY + ch, stripBottom)
                 if (hover) hoveredCard = i
                 drawCard(g, f, info, cardX, cardY, cw, th, ch, hover)
-                if (Thumbnails.get(info.id) == null)
-                    Thumbnails.request(info.id, info.getThumbnailUrl())
+                if (Thumbnails.get(info.id, Thumbnails.Quality.LOW) == null)
+                    Thumbnails.request(info.id, Thumbnails.Quality.LOW)
             }
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
@@ -264,7 +264,7 @@ class SuggestionsPanel(
         val thumbX = x
         val thumbY = y
         val thumbW = w
-        val thumb = Thumbnails.get(info.id)
+        val thumb = Thumbnails.get(info.id, Thumbnails.Quality.LOW)
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
         } else {

@@ -27,6 +27,12 @@ object YouTubeUrls {
     /** Returns the high-quality (480x360) thumbnail URL for [videoId]; always available, unlike sd / maxres. */
     fun thumbnailUrl(videoId: String): String = thumbnailUrl(YouTubeVideoId.require(videoId))
 
+    /** Returns the compact (320x180) thumbnail URL for [videoId]; clean 16:9 and always available. */
+    fun mqThumbnailUrl(videoId: YouTubeVideoId): String = "https://i.ytimg.com/vi/${videoId.value}/mqdefault.jpg"
+
+    /** Returns the compact (320x180) thumbnail URL for [videoId]; clean 16:9 and always available. */
+    fun mqThumbnailUrl(videoId: String): String = mqThumbnailUrl(YouTubeVideoId.require(videoId))
+
     /**
      * Returns the max-resolution (up to 1920x1080) thumbnail URL for [videoId]. Not every video has
      * one: when it's missing, YouTube serves `HTTP 200` with a tiny grey placeholder image instead of

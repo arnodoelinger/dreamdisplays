@@ -131,7 +131,7 @@ class SuggestionsController {
             }
             statusKey = null
             cards.addAll(results.subList(0, min(results.size, RESULT_LIMIT)))
-            for (info in cards) Thumbnails.request(info.id, info.getThumbnailUrl())
+            for (info in cards) Thumbnails.request(info.id, Thumbnails.Quality.LOW)
         }
     }
 
