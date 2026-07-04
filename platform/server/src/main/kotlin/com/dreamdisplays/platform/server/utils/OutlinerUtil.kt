@@ -29,14 +29,11 @@ object OutlinerUtil {
     fun showOutline(player: Player, pos1: Location, pos2: Location) {
         val world = pos1.world ?: return
 
-        val minX = minOf(pos1.blockX, pos2.blockX).toDouble()
-        val minY = minOf(pos1.blockY, pos2.blockY).toDouble()
-        val minZ = minOf(pos1.blockZ, pos2.blockZ).toDouble()
-        val maxX = maxOf(pos1.blockX, pos2.blockX) + 1.0
-        val maxY = maxOf(pos1.blockY, pos2.blockY) + 1.0
-        val maxZ = maxOf(pos1.blockZ, pos2.blockZ) + 1.0
-
-        val box = BoundingBox(minX, minY, minZ, maxX, maxY, maxZ)
+        val region = RegionUtil.calculateRegion(pos1, pos2)
+        val box = BoundingBox(
+            region.minX.toDouble(), region.minY.toDouble(), region.minZ.toDouble(),
+            (region.maxX + 1).toDouble(), (region.maxY + 1).toDouble(), (region.maxZ + 1).toDouble(),
+        )
         activeOutlines[player.uniqueId] = OutlineData(box, world)
 
         // Draw the outline using particles

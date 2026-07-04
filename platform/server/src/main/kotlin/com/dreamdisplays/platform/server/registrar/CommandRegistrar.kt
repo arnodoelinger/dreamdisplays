@@ -1,28 +1,21 @@
 package com.dreamdisplays.platform.server.registrar
 
-import io.github.arnodoelinger.platformweaver.FabricOnly
-import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.commands.subcommands.*
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
-import net.neoforged.neoforge.event.RegisterCommandsEvent
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
-import java.util.Locale
 
 /**
- * Command registrar. Uses Brigadier to build the `/display` command tree.
+ * Command registrar. Uses Brigadier to build the `/display` command tree. See
+ * `VanillaCommandTree.kt` for the shared `Fabric` / `NeoForge` equivalent.
  */
 @PaperOnly
 object CommandRegistrar {
@@ -37,19 +30,19 @@ object CommandRegistrar {
             simple(
                 "create",
                 CreateCommand()
-            ) { it.sender is Player && it.sender.hasPermission(Main.config.permissions.create) })
+            ) { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.create) })
         .then(
             simple(
                 "delete",
                 DeleteCommand()
-            ) { it.sender is Player && it.sender.hasPermission(Main.config.permissions.delete) })
+            ) { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.delete) })
         .then(
             simple(
                 "info",
                 InfoCommand()
-            ) { it.sender is Player && it.sender.hasPermission(Main.config.permissions.info) })
-        .then(simple("stats", StatsCommand()) { it.sender.hasPermission(Main.config.permissions.stats) })
-        .then(simple("reload", ReloadCommand()) { it.sender.hasPermission(Main.config.permissions.reload) })
+            ) { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.info) })
+        .then(simple("stats", StatsCommand()) { it.sender.hasPermission(PaperServer.config.permissions.stats) })
+        .then(simple("reload", ReloadCommand()) { it.sender.hasPermission(PaperServer.config.permissions.reload) })
         .then(videoSubCommand())
         .then(listSubCommand())
         .then(toggleSubCommand("on", OnCommand()))
@@ -72,7 +65,7 @@ object CommandRegistrar {
 
     /** Builds the `/display video <url> [lang]` subcommand with greedy argument and language suggestions. */
     private fun videoSubCommand() = Commands.literal("video")
-        .requires { it.sender is Player && it.sender.hasPermission(Main.config.permissions.video) }
+        .requires { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.video) }
         .then(
             // greedyString captures the rest of the input (URL + optional lang separated by space)
             Commands.argument("url_and_lang", StringArgumentType.greedyString())
@@ -104,7 +97,7 @@ object CommandRegistrar {
         }
         .then(
             Commands.argument("player", StringArgumentType.word())
-                .requires { it.sender.hasPermission(Main.config.permissions.toggleOthers) }
+                .requires { it.sender.hasPermission(PaperServer.config.permissions.toggleOthers) }
                 .suggests { _, builder ->
                     Bukkit.getOnlinePlayers().forEach { builder.suggest(it.name) }
                     builder.buildFuture()
@@ -120,7 +113,7 @@ object CommandRegistrar {
     private fun listSubCommand(): LiteralArgumentBuilder<CommandSourceStack> {
         val cmd = ListCommand()
         return Commands.literal("list")
-            .requires { it.sender.hasPermission(Main.config.permissions.list) }
+            .requires { it.sender.hasPermission(PaperServer.config.permissions.list) }
             .executes { ctx ->
                 cmd.execute(ctx.source.sender, arrayOf("list"))
                 Command.SINGLE_SUCCESS
@@ -176,383 +169,5 @@ object CommandRegistrar {
                             )
                     )
             )
-    }
-}
-
-/**
- * `Fabric`-specific implementation of [CommandRegistrar].
- */
-@FabricOnly
-object FabricCommandRegistrar {
-    /** Registers the `/display` command tree with `Fabric`'s command dispatcher. */
-    fun register() {
-        net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.register { dispatcher, _, _ ->
-            val displayCmd = net.minecraft.commands.Commands.literal("display")
-                .executes { ctx ->
-                    FabricHelpCommand.execute(ctx)
-                    Command.SINGLE_SUCCESS
-                }
-                .then(helpNode())
-                .then(createNode())
-                .then(deleteNode())
-                .then(infoNode())
-                .then(listNode())
-                .then(statsNode())
-                .then(reloadNode())
-                .then(videoNode())
-                .then(toggleNode("on"))
-                .then(toggleNode("off"))
-                .build()
-
-            dispatcher.root.addChild(displayCmd)
-        }
-    }
-
-    /** Builds the `/display help` subcommand. */
-    private fun helpNode() = net.minecraft.commands.Commands.literal("help")
-        .executes { ctx ->
-            FabricHelpCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display create` subcommand. */
-    private fun createNode() = net.minecraft.commands.Commands.literal("create")
-        .executes { ctx ->
-            FabricCreateCommand.execute(ctx)
-        }
-
-    /** Builds the `/display delete` subcommand. */
-    private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            FabricDeleteCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display info` subcommand. */
-    private fun infoNode() = net.minecraft.commands.Commands.literal("info")
-        .executes { ctx ->
-            FabricInfoCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display stats` subcommand. */
-    private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            FabricStatsCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display reload` subcommand. */
-    private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            FabricReloadCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display video <url> [lang]` subcommand. */
-    private fun videoNode() = net.minecraft.commands.Commands.literal("video")
-        .then(
-            net.minecraft.commands.Commands.argument("url_and_lang", StringArgumentType.greedyString())
-                .suggests { _, builder ->
-                    if (builder.remaining.contains(' ')) {
-                        val prefix = builder.remaining.substringAfterLast(' ')
-                        getLanguageSuggestions()
-                            .filter { it.startsWith(prefix, ignoreCase = true) }
-                            .forEach { builder.suggest(builder.remaining.substringBeforeLast(' ') + " " + it) }
-                    }
-                    builder.buildFuture()
-                }
-                .executes { ctx ->
-                    val urlAndLang = StringArgumentType.getString(ctx, "url_and_lang")
-                    FabricVideoCommand.execute(ctx, urlAndLang)
-                    Command.SINGLE_SUCCESS
-                }
-        )
-
-    /** Builds the `/display list [filter] [value] [page]` subcommand. */
-    private fun listNode(): LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> {
-        return net.minecraft.commands.Commands.literal("list")
-            .requires { source ->
-                val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                player == null || ServerPacketHandler.isOpLevel2(player)
-            }
-            .executes { ctx ->
-                FabricListCommand.execute(ctx)
-                Command.SINGLE_SUCCESS
-            }
-            .then(
-                net.minecraft.commands.Commands.argument("filter", StringArgumentType.word())
-                    .suggests { _, builder ->
-                        ListFilter.tokens.forEach { builder.suggest(it) }
-                        builder.buildFuture()
-                    }
-                    .executes { ctx ->
-                        val filter = StringArgumentType.getString(ctx, "filter")
-                        FabricListCommand.execute(ctx, filter = filter)
-                        Command.SINGLE_SUCCESS
-                    }
-                    .then(
-                        net.minecraft.commands.Commands.argument("value", StringArgumentType.word())
-                            .executes { ctx ->
-                                val filter = StringArgumentType.getString(ctx, "filter")
-                                val value = StringArgumentType.getString(ctx, "value")
-                                FabricListCommand.execute(ctx, filter = filter, value = value)
-                                Command.SINGLE_SUCCESS
-                            }
-                            .then(
-                                net.minecraft.commands.Commands.argument("page", StringArgumentType.word())
-                                    .executes { ctx ->
-                                        val filter = StringArgumentType.getString(ctx, "filter")
-                                        val value = StringArgumentType.getString(ctx, "value")
-                                        val page = StringArgumentType.getString(ctx, "page")
-                                        FabricListCommand.execute(ctx, filter = filter, value = value, pageStr = page)
-                                        Command.SINGLE_SUCCESS
-                                    }
-                            )
-                    )
-            )
-    }
-
-    /** Builds the `/display on/off [player]` subcommand. */
-    private fun toggleNode(name: String) = net.minecraft.commands.Commands.literal(name)
-        .executes { ctx ->
-            when (name) {
-                "on" -> FabricOnCommand.execute(ctx)
-                "off" -> FabricOffCommand.execute(ctx)
-            }
-            Command.SINGLE_SUCCESS
-        }
-        .then(
-            net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
-                .requires { source ->
-                    val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                    player == null || ServerPacketHandler.isOpLevel2(player)
-                }
-                .suggests { ctx, builder ->
-                    ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
-                    builder.buildFuture()
-                }
-                .executes { ctx ->
-                    val targetName = StringArgumentType.getString(ctx, "player")
-                    when (name) {
-                        "on" -> FabricOnCommand.execute(ctx, targetName)
-                        "off" -> FabricOffCommand.execute(ctx, targetName)
-                    }
-                    Command.SINGLE_SUCCESS
-                }
-        )
-
-    /** Returns a list of language codes from Java and config. */
-    private fun getLanguageSuggestions(): List<String> {
-        val fromJava = Locale.getAvailableLocales()
-            .map { it.language.lowercase(Locale.ROOT) }
-        val fromConfig = Server.config.languages.keys
-            .map { it.trim().lowercase(Locale.ROOT).substringBefore('_') }
-        return (fromJava + fromConfig)
-            .filter { it.matches(Regex("^[a-z]{2}$")) }
-            .map { if (it == "uk") "ua" else it }
-            .distinct()
-            .sorted()
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of [CommandRegistrar]. Registered on `NeoForge.EVENT_BUS`
- * from [NeoForgeServer] rather than `Fabric`'s `CommandRegistrationCallback`.
- */
-@NeoForgeOnly
-object NeoForgeCommandRegistrar {
-    /** Registers the `/display` command tree against a `RegisterCommandsEvent`. */
-    fun register(event: RegisterCommandsEvent) {
-        val dispatcher = event.dispatcher
-        val displayCmd = net.minecraft.commands.Commands.literal("display")
-            .executes { ctx ->
-                NeoForgeHelpCommand.execute(ctx)
-                Command.SINGLE_SUCCESS
-            }
-            .then(helpNode())
-            .then(createNode())
-            .then(deleteNode())
-            .then(infoNode())
-            .then(listNode())
-            .then(statsNode())
-            .then(reloadNode())
-            .then(videoNode())
-            .then(toggleNode("on"))
-            .then(toggleNode("off"))
-            .build()
-
-        dispatcher.root.addChild(displayCmd)
-    }
-
-    /** Builds the `/display help` subcommand. */
-    private fun helpNode() = net.minecraft.commands.Commands.literal("help")
-        .executes { ctx ->
-            NeoForgeHelpCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display create` subcommand. */
-    private fun createNode() = net.minecraft.commands.Commands.literal("create")
-        .executes { ctx ->
-            NeoForgeCreateCommand.execute(ctx)
-        }
-
-    /** Builds the `/display delete` subcommand. */
-    private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            NeoForgeDeleteCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display info` subcommand. */
-    private fun infoNode() = net.minecraft.commands.Commands.literal("info")
-        .executes { ctx ->
-            NeoForgeInfoCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display stats` subcommand. */
-    private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            NeoForgeStatsCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display reload` subcommand. */
-    private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
-        }
-        .executes { ctx ->
-            NeoForgeReloadCommand.execute(ctx)
-            Command.SINGLE_SUCCESS
-        }
-
-    /** Builds the `/display video <url> [lang]` subcommand. */
-    private fun videoNode() = net.minecraft.commands.Commands.literal("video")
-        .then(
-            net.minecraft.commands.Commands.argument("url_and_lang", StringArgumentType.greedyString())
-                .suggests { _, builder ->
-                    if (builder.remaining.contains(' ')) {
-                        val prefix = builder.remaining.substringAfterLast(' ')
-                        getLanguageSuggestions()
-                            .filter { it.startsWith(prefix, ignoreCase = true) }
-                            .forEach { builder.suggest(builder.remaining.substringBeforeLast(' ') + " " + it) }
-                    }
-                    builder.buildFuture()
-                }
-                .executes { ctx ->
-                    val urlAndLang = StringArgumentType.getString(ctx, "url_and_lang")
-                    NeoForgeVideoCommand.execute(ctx, urlAndLang)
-                    Command.SINGLE_SUCCESS
-                }
-        )
-
-    /** Builds the `/display list [filter] [value] [page]` subcommand. */
-    private fun listNode(): LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> {
-        return net.minecraft.commands.Commands.literal("list")
-            .requires { source ->
-                val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
-            }
-            .executes { ctx ->
-                NeoForgeListCommand.execute(ctx)
-                Command.SINGLE_SUCCESS
-            }
-            .then(
-                net.minecraft.commands.Commands.argument("filter", StringArgumentType.word())
-                    .suggests { _, builder ->
-                        ListFilter.tokens.forEach { builder.suggest(it) }
-                        builder.buildFuture()
-                    }
-                    .executes { ctx ->
-                        val filter = StringArgumentType.getString(ctx, "filter")
-                        NeoForgeListCommand.execute(ctx, filter = filter)
-                        Command.SINGLE_SUCCESS
-                    }
-                    .then(
-                        net.minecraft.commands.Commands.argument("value", StringArgumentType.word())
-                            .executes { ctx ->
-                                val filter = StringArgumentType.getString(ctx, "filter")
-                                val value = StringArgumentType.getString(ctx, "value")
-                                NeoForgeListCommand.execute(ctx, filter = filter, value = value)
-                                Command.SINGLE_SUCCESS
-                            }
-                            .then(
-                                net.minecraft.commands.Commands.argument("page", StringArgumentType.word())
-                                    .executes { ctx ->
-                                        val filter = StringArgumentType.getString(ctx, "filter")
-                                        val value = StringArgumentType.getString(ctx, "value")
-                                        val page = StringArgumentType.getString(ctx, "page")
-                                        NeoForgeListCommand.execute(ctx, filter = filter, value = value, pageStr = page)
-                                        Command.SINGLE_SUCCESS
-                                    }
-                            )
-                    )
-            )
-    }
-
-    /** Builds the `/display on/off [player]` subcommand. */
-    private fun toggleNode(name: String) = net.minecraft.commands.Commands.literal(name)
-        .executes { ctx ->
-            when (name) {
-                "on" -> NeoForgeOnCommand.execute(ctx)
-                "off" -> NeoForgeOffCommand.execute(ctx)
-            }
-            Command.SINGLE_SUCCESS
-        }
-        .then(
-            net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
-                .requires { source ->
-                    val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                    player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
-                }
-                .suggests { ctx, builder ->
-                    ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
-                    builder.buildFuture()
-                }
-                .executes { ctx ->
-                    val targetName = StringArgumentType.getString(ctx, "player")
-                    when (name) {
-                        "on" -> NeoForgeOnCommand.execute(ctx, targetName)
-                        "off" -> NeoForgeOffCommand.execute(ctx, targetName)
-                    }
-                    Command.SINGLE_SUCCESS
-                }
-        )
-
-    /** Returns a list of language codes from Java and config. */
-    private fun getLanguageSuggestions(): List<String> {
-        val fromJava = Locale.getAvailableLocales()
-            .map { it.language.lowercase(Locale.ROOT) }
-        val fromConfig = NeoForgeServer.config.languages.keys
-            .map { it.trim().lowercase(Locale.ROOT).substringBefore('_') }
-        return (fromJava + fromConfig)
-            .filter { it.matches(Regex("^[a-z]{2}$")) }
-            .map { if (it == "uk") "ua" else it }
-            .distinct()
-            .sorted()
     }
 }

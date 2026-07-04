@@ -2,9 +2,10 @@ package com.dreamdisplays.platform.server.registrar
 
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
+import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
@@ -28,7 +29,7 @@ object SchedulerRegistrar {
     private const val UPDATE_CHECK_INTERVAL_TICKS = 60L * 60L * TICKS_PER_SECOND
 
     /** Schedules the periodic display update tick and, when enabled, the hourly update check. */
-    fun runRepeatingTasks(plugin: Main) {
+    fun runRepeatingTasks(plugin: PaperServer) {
         runRepeatingSync(
             plugin,
             DISPLAY_UPDATE_INTERVAL_TICKS,
@@ -44,14 +45,14 @@ object SchedulerRegistrar {
             TimelineManager.tick()
             WatchPartyManager.tick()
         }
-        val settings = Main.config.settings
+        val settings = PaperServer.config.settings
         if (settings.updatesEnabled) {
             runRepeatingAsync(
                 plugin,
                 TICKS_PER_SECOND,
                 UPDATE_CHECK_INTERVAL_TICKS
             ) {
-                checkForUpdates(
+                Updater.checkForUpdates(
                     settings.repoOwner,
                     settings.repoName
                 )
@@ -60,7 +61,7 @@ object SchedulerRegistrar {
     }
 
     /** Schedules [task] on the `Paper` / `Folia` global tick scheduler. */
-    private fun runRepeatingSync(plugin: Main, delayTicks: Long, intervalTicks: Long, task: Runnable) {
+    private fun runRepeatingSync(plugin: PaperServer, delayTicks: Long, intervalTicks: Long, task: Runnable) {
         if (PlatformUtil.isFolia) {
             plugin.server.globalRegionScheduler.runAtFixedRate(
                 plugin,
@@ -74,7 +75,7 @@ object SchedulerRegistrar {
     }
 
     /** Schedules [task] on `Paper`'s async scheduler. */
-    private fun runRepeatingAsync(plugin: Main, delayTicks: Long, intervalTicks: Long, task: Runnable) {
+    private fun runRepeatingAsync(plugin: PaperServer, delayTicks: Long, intervalTicks: Long, task: Runnable) {
         plugin.server.asyncScheduler.runAtFixedRate(
             plugin,
             { task.run() },
@@ -82,13 +83,5 @@ object SchedulerRegistrar {
             intervalTicks.coerceAtLeast(1L) * TICK_MILLIS,
             TimeUnit.MILLISECONDS,
         )
-    }
-
-    /** Calls the `Paper`-only updater without requiring its symbol in `Fabric` compilation. */
-    private fun checkForUpdates(repoOwner: String, repoName: String) {
-        val updaterClass = Class.forName("com.dreamdisplays.platform.server.meta.Updater")
-        val updater = updaterClass.getField("INSTANCE").get(null)
-        updaterClass.getMethod("checkForUpdates", String::class.java, String::class.java)
-            .invoke(updater, repoOwner, repoName)
     }
 }

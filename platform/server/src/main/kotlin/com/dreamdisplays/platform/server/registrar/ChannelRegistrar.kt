@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.registrar
 
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.utils.net.PacketReceiver
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
@@ -37,14 +37,13 @@ object ChannelRegistrar {
     )
 
     /** Registers all incoming and outgoing plugin messaging channels for this plugin. */
-    fun registerChannels(plugin: Main) {
+    fun registerChannels(plugin: PaperServer) {
         val messenger = plugin.server.messenger
         val receiver = PacketReceiver(plugin)
 
         incomingChannels.forEach { messenger.registerIncomingPluginChannel(plugin, it, receiver) }
         outgoingChannels.forEach { messenger.registerOutgoingPluginChannel(plugin, it) }
 
-        // Protocol v2: a single envelope channel in both directions.
         messenger.registerIncomingPluginChannel(plugin, V2_CHANNEL, PaperV2Networking)
         messenger.registerOutgoingPluginChannel(plugin, V2_CHANNEL)
     }

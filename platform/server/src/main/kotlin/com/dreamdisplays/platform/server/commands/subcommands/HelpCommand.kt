@@ -1,10 +1,8 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -22,7 +20,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class HelpCommand : SubCommand {
     override val name = "help"
-    override val permission = Main.config.permissions.help
+    override val permission = PaperServer.config.permissions.help
     override val playerOnly = true
 
     /** Prints the help message listing every `/display` subcommand. */
@@ -31,12 +29,12 @@ class HelpCommand : SubCommand {
 
         MessageUtil.sendColoredMessage(
             sender,
-            $$"&7D |&f $${Main.config.getMessageForPlayer(player, "displayHelpHeader")}"
+            $$"&7D |&f $${PaperServer.config.getMessageForPlayer(player, "displayHelpHeader")}"
         )
 
         fun line(key: String) {
             MessageUtil.sendColoredMessage(
-                sender, $$"&f $${Main.config.getMessageForPlayer(player, key)}"
+                sender, $$"&f $${PaperServer.config.getMessageForPlayer(player, key)}"
             )
         }
 
@@ -54,14 +52,13 @@ class HelpCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display help` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display help` command.
  */
-@FabricOnly
-object FabricHelpCommand {
+object VanillaHelpCommand {
     /** Prints the help message listing every `/display` subcommand. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
-        val config = Server.config
+        val config = VanillaServerState.config
 
         /** Prints the localized message for [key] to the player, or to the command source if not a player. */
         fun line(key: String) {
@@ -71,42 +68,6 @@ object FabricHelpCommand {
 
         val header = config.getMessageForPlayer(player, "displayHelpHeader")
         MessageUtil.sendColoredMessage(player ?: run {
-            ctx.source.sendSystemMessage(Component.literal("D | Help"))
-            return 1
-        }, header)
-
-        line("displayHelpCreate")
-        line("displayHelpVideo")
-        line("displayHelpInfo")
-        line("displayHelpDelete")
-        line("displayHelpList")
-        line("displayHelpStats")
-        line("displayHelpReload")
-        line("displayHelpOn")
-        line("displayHelpOff")
-        line("displayHelpHelp")
-        return 1
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display help` command.
- */
-@NeoForgeOnly
-object NeoForgeHelpCommand {
-    /** Prints the help message listing every `/display` subcommand. */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = ctx.source.entity as? ServerPlayer
-        val config = NeoForgeServer.config
-
-        /** Prints the localized message for [key] to the player, or to the command source if not a player. */
-        fun line(key: String) {
-            val msg = config.getMessageForPlayer(player, key)
-            NeoForgeMessageUtil.sendColoredMessage(player ?: return, msg)
-        }
-
-        val header = config.getMessageForPlayer(player, "displayHelpHeader")
-        NeoForgeMessageUtil.sendColoredMessage(player ?: run {
             ctx.source.sendSystemMessage(Component.literal("D | Help"))
             return 1
         }, header)

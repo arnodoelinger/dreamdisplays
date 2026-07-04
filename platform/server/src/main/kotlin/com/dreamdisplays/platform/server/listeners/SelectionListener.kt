@@ -1,19 +1,17 @@
 package com.dreamdisplays.platform.server.listeners
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
+import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.level.ServerLevel
@@ -37,7 +35,7 @@ import org.bukkit.inventory.EquipmentSlot
  * Sneaking and right-clicking resets the selection.
  */
 @PaperOnly
-class SelectionListener(plugin: Main) : Listener {
+class SelectionListener(plugin: PaperServer) : Listener {
     init {
         SelectionVisualizer.startParticleTask(plugin)
     }
@@ -58,7 +56,7 @@ class SelectionListener(plugin: Main) : Listener {
             return
         }
 
-        if (heldItem != Main.config.settings.selectionMaterial || block.type != Main.config.settings.baseMaterial) return
+        if (heldItem != PaperServer.config.settings.selectionMaterial || block.type != PaperServer.config.settings.baseMaterial) return
         event.isCancelled = true
 
         when (event.action) {
@@ -78,33 +76,69 @@ class SelectionListener(plugin: Main) : Listener {
 }
 
 /**
- * `Fabric`-specific implementation of [SelectionListener].
+ * Shared `Fabric` / `NeoForge` selection-point handling. [FabricSelectionListener] and
+ * [NeoForgeSelectionListener] only adapt their loader's event API and hand off here.
  */
+object VanillaSelectionListener {
+    /** Left-click: sets pos1 if holding the selection tool over the base material. Returns true if handled. */
+    fun handleLeftClick(player: ServerPlayer, world: ServerLevel, pos: BlockPos): Boolean {
+        val config = VanillaServerState.config
+        val selMaterialKey = config.settings.selectionMaterial
+        val heldItem = player.mainHandItem
+        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
+        if (heldItemKey != selMaterialKey) return false
+
+        val baseMaterialKey = config.settings.baseMaterial
+        val blockState = world.getBlockState(pos)
+        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
+        if (blockKey != baseMaterialKey) return false
+
+        val worldKey = RegionUtil.getLevelKey(world)
+        val face = Direction.orderedByNearest(player)[0].opposite
+        SelectionManager.setFirstPoint(player, pos, worldKey, face)
+        return true
+    }
+
+    /** Right-click: sets pos2, or resets when sneaking. Returns true if handled. */
+    fun handleRightClick(player: ServerPlayer, world: ServerLevel, pos: BlockPos): Boolean {
+        val config = VanillaServerState.config
+        val selMaterialKey = config.settings.selectionMaterial
+        val heldItem = player.mainHandItem
+        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
+        if (heldItemKey != selMaterialKey) return false
+
+        val worldKey = RegionUtil.getLevelKey(world)
+
+        if (player.isShiftKeyDown) {
+            if (SelectionManager.selectionPoints.containsKey(player.uuid)) {
+                SelectionManager.resetSelection(player)
+                MessageUtil.sendMessage(player, "selectionClear")
+            }
+            return true
+        }
+
+        val baseMaterialKey = config.settings.baseMaterial
+        val blockState = world.getBlockState(pos)
+        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
+        if (blockKey != baseMaterialKey) return false
+
+        SelectionManager.setSecondPoint(player, pos, worldKey)
+        return true
+    }
+}
+
+/** `Fabric` event adapter for [VanillaSelectionListener]. */
 @FabricOnly
 object FabricSelectionListener {
     /** Registers the selection listener. */
     fun register() {
-        AttackBlockCallback.EVENT.register { player, world, hand, pos, direction ->
+        AttackBlockCallback.EVENT.register { player, world, hand, pos, _ ->
             if (hand != InteractionHand.MAIN_HAND) return@register InteractionResult.PASS
             if (player !is ServerPlayer) return@register InteractionResult.PASS
             if (world !is ServerLevel) return@register InteractionResult.PASS
 
-            val config = Server.config
-            val selMaterialKey = config.settings.selectionMaterial
-            val heldItem = player.mainHandItem
-            val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
-            if (heldItemKey != selMaterialKey) return@register InteractionResult.PASS
-
-            val baseMaterialKey = config.settings.baseMaterial
-            val blockState = world.getBlockState(pos)
-            val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-            if (blockKey != baseMaterialKey) return@register InteractionResult.PASS
-
-            val worldKey = RegionUtil.getLevelKey(world)
-            val face = Direction.orderedByNearest(player)[0].opposite
-            SelectionManager.setFirstPoint(player, pos, worldKey, face)
-
-            InteractionResult.SUCCESS
+            if (VanillaSelectionListener.handleLeftClick(player, world, pos)) InteractionResult.SUCCESS
+            else InteractionResult.PASS
         }
 
         UseBlockCallback.EVENT.register { player, world, hand, hitResult ->
@@ -112,38 +146,13 @@ object FabricSelectionListener {
             if (player !is ServerPlayer) return@register InteractionResult.PASS
             if (world !is ServerLevel) return@register InteractionResult.PASS
 
-            val config = Server.config
-            val selMaterialKey = config.settings.selectionMaterial
-            val heldItem = player.mainHandItem
-            val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
-            if (heldItemKey != selMaterialKey) return@register InteractionResult.PASS
-
-            val pos = hitResult.blockPos
-            val worldKey = RegionUtil.getLevelKey(world)
-
-            if (player.isShiftKeyDown) {
-                if (SelectionManager.selectionPoints.containsKey(player.uuid)) {
-                    SelectionManager.resetSelection(player)
-                    MessageUtil.sendMessage(player, "selectionClear")
-                }
-                return@register InteractionResult.SUCCESS
-            }
-
-            val baseMaterialKey = config.settings.baseMaterial
-            val blockState = world.getBlockState(pos)
-            val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-            if (blockKey != baseMaterialKey) return@register InteractionResult.PASS
-
-            SelectionManager.setSecondPoint(player, pos, worldKey)
-            InteractionResult.SUCCESS
+            if (VanillaSelectionListener.handleRightClick(player, world, hitResult.blockPos)) InteractionResult.SUCCESS
+            else InteractionResult.PASS
         }
     }
-
 }
 
-/**
- * `NeoForge`-specific implementation of [SelectionListener].
- */
+/** `NeoForge` event adapter for [VanillaSelectionListener]. */
 @NeoForgeOnly
 object NeoForgeSelectionListener {
     /** Left-click sets pos1. */
@@ -154,22 +163,7 @@ object NeoForgeSelectionListener {
         val player = event.entity as? ServerPlayer ?: return
         val world = event.level as? ServerLevel ?: return
 
-        val config = NeoForgeServer.config
-        val selMaterialKey = config.settings.selectionMaterial
-        val heldItem = player.mainHandItem
-        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
-        if (heldItemKey != selMaterialKey) return
-
-        val baseMaterialKey = config.settings.baseMaterial
-        val pos = event.pos
-        val blockState = world.getBlockState(pos)
-        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-        if (blockKey != baseMaterialKey) return
-
-        val worldKey = RegionUtil.getLevelKey(world)
-        val face = Direction.orderedByNearest(player)[0].opposite
-        NeoForgeSelectionManager.setFirstPoint(player, pos, worldKey, face)
-        event.setCanceled(true)
+        if (VanillaSelectionListener.handleLeftClick(player, world, event.pos)) event.setCanceled(true)
     }
 
     /** Right-click sets pos2; sneak + right-click resets. */
@@ -179,30 +173,6 @@ object NeoForgeSelectionListener {
         val player = event.entity as? ServerPlayer ?: return
         val world = event.level as? ServerLevel ?: return
 
-        val config = NeoForgeServer.config
-        val selMaterialKey = config.settings.selectionMaterial
-        val heldItem = player.mainHandItem
-        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
-        if (heldItemKey != selMaterialKey) return
-
-        val pos = event.pos
-        val worldKey = RegionUtil.getLevelKey(world)
-
-        if (player.isShiftKeyDown) {
-            if (SelectionManager.selectionPoints.containsKey(player.uuid)) {
-                NeoForgeSelectionManager.resetSelection(player)
-                NeoForgeMessageUtil.sendMessage(player, "selectionClear")
-            }
-            event.setCanceled(true)
-            return
-        }
-
-        val baseMaterialKey = config.settings.baseMaterial
-        val blockState = world.getBlockState(pos)
-        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-        if (blockKey != baseMaterialKey) return
-
-        NeoForgeSelectionManager.setSecondPoint(player, pos, worldKey)
-        event.setCanceled(true)
+        if (VanillaSelectionListener.handleRightClick(player, world, event.pos)) event.setCanceled(true)
     }
 }

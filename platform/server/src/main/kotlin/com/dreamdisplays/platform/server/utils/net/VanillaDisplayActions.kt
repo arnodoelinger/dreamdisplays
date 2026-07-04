@@ -1,0 +1,208 @@
+package com.dreamdisplays.platform.server.utils.net
+
+import com.dreamdisplays.api.security.MediaUrlPolicy
+import com.dreamdisplays.api.playback.PlaybackAction
+import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.api.playback.PlaybackPermissions
+import com.dreamdisplays.api.playback.WatchPartyAction
+import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.managers.DisplayManager
+import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.managers.StateManager
+import com.dreamdisplays.platform.server.meta.ServerCoroutines
+import com.dreamdisplays.platform.server.meta.VersionState
+import com.dreamdisplays.platform.server.playback.PlaybackContexts
+import com.dreamdisplays.platform.server.playback.TimelineManager
+import com.dreamdisplays.platform.server.playback.WatchPartyManager
+import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.RegionUtil
+import com.dreamdisplays.platform.server.utils.VersionUtil
+import kotlinx.coroutines.launch
+import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerPlayer
+//? if >=1.21.11 {
+import net.minecraft.server.players.NameAndId
+//?}
+import org.semver4j.Semver
+
+/**
+ * Vanilla Minecraft API packet actions, shared between the frozen v1 receivers registered by
+ * [VanillaServerPacketHandler] and the protocol-v2 dispatch in [V2Fabric] / [V2NeoForge]. All
+ * business logic is shared by `Fabric` and `NeoForge`.
+ */
+object VanillaDisplayActions {
+    /** Records the player's reported mod version and runs the mod / plugin update checks. */
+    fun recordVersionAndCheckUpdates(player: ServerPlayer, version: String) {
+        val parsedVersion = VersionUtil.parseOrNull(version)
+        PlayerManager.setVersion(player.uuid, parsedVersion)
+
+        val config = VanillaServerState.config
+        val modLatest = VersionState.modLatestVersion
+        if (modLatest != null && parsedVersion != null && parsedVersion < modLatest &&
+            !PlayerManager.hasBeenNotifiedAboutModUpdate(player.uuid)
+        ) {
+            val msg = config.getMessageForPlayer(player, "newVersion")
+            MessageUtil.sendColoredMessage(player, MessageUtil.formatMessage(msg, modLatest.toString()))
+            PlayerManager.setModUpdateNotified(player.uuid, true)
+        }
+
+        if (config.settings.updatesEnabled &&
+            !PlayerManager.hasBeenNotifiedAboutPluginUpdate(player.uuid)
+        ) {
+            val latestPlugin = VersionState.pluginLatestVersion
+            val currentVersion = VanillaServerState.serverVersion
+            if (latestPlugin != null && currentVersion != null &&
+                !currentVersion.contains("-SNAPSHOT", ignoreCase = true)
+            ) {
+                val current = Semver.coerce(currentVersion)
+                val latest = Semver.coerce(latestPlugin)
+                if (current != null && latest != null && current < latest) {
+                    val msg = config.getMessageForPlayer(player, "newPluginVersion") as? String
+                    if (msg != null) {
+                        MessageUtil.sendColoredMessage(player, String.format(msg, latestPlugin))
+                        PlayerManager.setPluginUpdateNotified(player.uuid, true)
+                    }
+                }
+            }
+        }
+    }
+
+    /** Streams every display in [player]'s world to them in small staggered batches. */
+    fun sendAllDisplays(player: ServerPlayer, server: MinecraftServer) {
+        val playerWorldKey = RegionUtil.getPlayerLevelKey(player)
+        val displays = DisplayManager.getDisplays()
+            .filterIsInstance<VanillaDisplayData>()
+            .filter { it.worldKey == playerWorldKey }
+
+        val batchSize = 5
+        displays.chunked(batchSize).forEachIndexed { index, batch ->
+            if (index == 0) {
+                batch.forEach { VanillaPacketUtil.sendDisplayInfo(listOf(player), it) }
+            } else {
+                val delayTicks = (index * 2).toLong()
+                VanillaServerScheduler.runLater(server, delayTicks) {
+                    if (player.isAlive) {
+                        batch.forEach { VanillaPacketUtil.sendDisplayInfo(listOf(player), it) }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Handles a client-requested deletion, enforcing owner-or-permission check. */
+    fun delete(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData
+            ?: return MessageUtil.sendMessage(player, "noDisplay")
+
+        // No permission-node API on Fabric/NeoForge: own display = always allowed; others' = op-only.
+        if (displayData.ownerId != player.uuid && !isOpLevel2(player)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
+
+        val receivers = DisplayManager.getReceivers(displayData, server)
+        DisplayManager.delete(displayData)
+        VanillaPacketUtil.sendDelete(receivers, displayId)
+        MessageUtil.sendMessage(player, "displayDeleted")
+    }
+
+    /** Applies a client-supplied URL / language to a display, broadcasting and resetting the timeline. */
+    fun setVideo(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, url: String, lang: String) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
+        if (!MediaUrlPolicy.isAllowed(url)) return
+
+        val wasSync = displayData.isSync
+        displayData.url = url
+        displayData.lang = MediaUrlPolicy.sanitizeLang(lang)
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
+
+        val receivers = DisplayManager.getReceivers(displayData, server)
+        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
+        if (wasSync) StateManager.resetAndBroadcast(displayId, receivers) // Frozen-v1 clock
+        TimelineManager.onVideoChanged(displayData)
+    }
+
+    /** Updates the locked flag of a display owned by [player] and rebroadcasts. */
+    fun setLocked(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, locked: Boolean) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData
+            ?: return MessageUtil.sendMessage(player, "noDisplay")
+        if (!PlaybackPermissions.canToggleLock(context(displayData, player))) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
+
+        displayData.isLocked = locked
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
+
+        val receivers = DisplayManager.getReceivers(displayData, server)
+        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
+    }
+
+    /** Switches a display's persistent base mode (`LOCAL` / `SYNCED` / `BROADCAST`) and re-anchors its clock. */
+    fun setMode(
+        player: ServerPlayer,
+        server: MinecraftServer,
+        displayId: java.util.UUID,
+        mode: PlaybackMode,
+        positionMs: Long
+    ) {
+        if (!PlaybackMode.isBaseMode(mode)) return
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        if (!PlaybackPermissions.canSetMode(context(displayData, player))) return
+
+        // Note: mode-specific permission nodes (dreamdisplays.local/synced/broadcast) are not enforced
+        // here because Fabric/NeoForge have no permission-node API. Enforcement is Paper-only (DisplayActions.kt).
+
+        displayData.mode = mode
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
+        VanillaPacketUtil.sendDisplayInfo(DisplayManager.getReceivers(displayData, server), displayData)
+        TimelineManager.onModeChanged(displayData, positionMs)
+    }
+
+    /** Applies a playback intent (play / pause / seek / restart) to a `SYNCED` display's server clock. */
+    fun playbackCommand(player: ServerPlayer, displayId: java.util.UUID, action: PlaybackAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        TimelineManager.onCommand(displayData, player.uuid, action, positionMs)
+    }
+
+    /** Starts a watch-party session with [player] as host. */
+    fun watchPartyStart(player: ServerPlayer, displayId: java.util.UUID, url: String, lang: String) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        if (!MediaUrlPolicy.isAllowed(url)) return
+        WatchPartyManager.start(displayData, player.uuid, url, MediaUrlPolicy.sanitizeLang(lang))
+    }
+
+    /** Routes a watch-party control (ready / host action) to the session manager. */
+    fun watchPartyControl(player: ServerPlayer, displayId: java.util.UUID, action: WatchPartyAction, positionMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        WatchPartyManager.control(displayData, player.uuid, action, positionMs)
+    }
+
+    /** Replies to a client's catch-up request with the current timeline and any live session. */
+    fun requestSync(player: ServerPlayer, displayId: java.util.UUID) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.sendCurrent(displayData, player.uuid)
+        WatchPartyManager.sendCurrent(displayData, player.uuid)
+    }
+
+    /** Builds the permission context for [player] acting on [display]. */
+    private fun context(display: VanillaDisplayData, player: ServerPlayer) =
+        PlaybackContexts.of(display, player.uuid, isOpLevel2(player))
+
+    /** Checks if [player] has operator level 2 permissions, which is the threshold for privileged actions. */
+    fun isOpLevel2(player: ServerPlayer): Boolean {
+        val server =
+            //? if >=1.21.11 {
+            player.level().server
+            //?} else
+            /*player.serverLevel().server*/
+        return server.playerList.isOp(
+            //? if >=1.21.11 {
+            NameAndId(player.gameProfile)
+            //?} else
+            /*player.gameProfile*/
+        )
+    }
+}

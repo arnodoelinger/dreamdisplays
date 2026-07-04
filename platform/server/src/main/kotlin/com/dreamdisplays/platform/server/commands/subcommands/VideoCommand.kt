@@ -3,9 +3,8 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.security.LanguageTag
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
@@ -13,23 +12,17 @@ import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
-import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import java.util.*
@@ -42,7 +35,7 @@ import java.util.*
 @PaperOnly
 class VideoCommand : SubCommand {
     override val name = "video"
-    override val permission = Main.config.permissions.video
+    override val permission = PaperServer.config.permissions.video
     override val playerOnly = true
 
     /**
@@ -64,7 +57,7 @@ class VideoCommand : SubCommand {
 
         val block = player.getTargetBlock(null, 32)
 
-        if (block.type != Main.config.settings.baseMaterial) {
+        if (block.type != PaperServer.config.settings.baseMaterial) {
             MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock")
             return
         }
@@ -76,7 +69,7 @@ class VideoCommand : SubCommand {
         }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
+                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
@@ -89,7 +82,7 @@ class VideoCommand : SubCommand {
             lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
         }
 
-        runAsync { Main.getInstance().storage.saveDisplay(data) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(data) }
         DisplayManager.broadcastUpdate(data)
         if (wasSync) StateManager.resetAndBroadcast(data)
         TimelineManager.onVideoChanged(data)
@@ -111,7 +104,7 @@ class VideoCommand : SubCommand {
                 .asSequence()
                 .map { it.language.lowercase(Locale.ROOT) }
 
-            val fromPlugin = Main.config.languages.keys
+            val fromPlugin = PaperServer.config.languages.keys
                 .asSequence()
                 .map { it.trim().lowercase(Locale.ROOT).replace('-', '_').substringBefore('_') }
 
@@ -128,11 +121,10 @@ class VideoCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display video` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display video` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricVideoCommand {
+object VanillaVideoCommand {
     /** Assigns a YouTube URL (and optional language) to the targeted display, after validating ownership. */
     fun execute(ctx: CommandContext<CommandSourceStack>, urlAndLang: String): Int {
         val player = ctx.source.entity as? ServerPlayer
@@ -150,7 +142,7 @@ object FabricVideoCommand {
         val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
             ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
-        val targetPos = getTargetBlockPos(player)
+        val targetPos = RegionUtil.getTargetedBlockPos(player)
             ?: return MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
 
         val worldKey = RegionUtil.getPlayerLevelKey(player)
@@ -158,7 +150,7 @@ object FabricVideoCommand {
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, ServerPacketHandler.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaDisplayActions.isOpLevel2(player))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
@@ -168,85 +160,14 @@ object FabricVideoCommand {
         val wasSync = data.isSync
         data.url = YouTubeUrls.watchUrl(videoId)
         data.lang = LanguageTag.canonicalAudioCode(langRaw).value
-        ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        FabricPacketUtil.sendDisplayInfo(receivers, data)
+        VanillaPacketUtil.sendDisplayInfo(receivers, data)
         if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
         TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
         return 1
-    }
-
-    /** Gets the block position the player is currently looking at (within 32 blocks). */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val start = player.eyePosition
-        val end = start.add(player.lookAngle.scale(32.0))
-        val hit = level.clip(ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player))
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display video` command.
- */
-@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@NeoForgeOnly
-object NeoForgeVideoCommand {
-    /** Assigns a YouTube URL (and optional language) to the targeted display, after validating ownership. */
-    fun execute(ctx: CommandContext<CommandSourceStack>, urlAndLang: String): Int {
-        val player = ctx.source.entity as? ServerPlayer
-            ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
-
-        val parts = urlAndLang.trim().split(" ")
-        val urlRaw = parts[0]
-        val langRaw = if (parts.size > 1) parts.last() else ""
-
-        if (urlRaw.isBlank()) {
-            NeoForgeMessageUtil.sendMessage(player, "invalidURL")
-            return 0
-        }
-
-        val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "invalidURL").let { 0 }
-
-        val targetPos = getTargetBlockPos(player)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
-
-        val worldKey = RegionUtil.getPlayerLevelKey(player)
-        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
-
-        if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, NeoForgeServerPacketHandler.isOpLevel2(player))
-            )
-        ) {
-            NeoForgeMessageUtil.sendMessage(player, "displayVideoNotOwner")
-            return 0
-        }
-
-        val wasSync = data.isSync
-        data.url = YouTubeUrls.watchUrl(videoId)
-        data.lang = LanguageTag.canonicalAudioCode(langRaw).value
-        ServerCoroutines.io.launch { NeoForgeServer.storage?.saveDisplay(data) }
-
-        val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        NeoForgePacketUtil.sendDisplayInfo(receivers, data)
-        if (wasSync) StateManager.resetAndBroadcastNeoForge(data.id, receivers)
-        TimelineManager.onVideoChanged(data)
-
-        NeoForgeMessageUtil.sendMessage(player, "settedURL")
-        return 1
-    }
-
-    /** Gets the block position the player is currently looking at (within 32 blocks). */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val start = player.eyePosition
-        val end = start.add(player.lookAngle.scale(32.0))
-        val hit = level.clip(ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player))
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
     }
 }

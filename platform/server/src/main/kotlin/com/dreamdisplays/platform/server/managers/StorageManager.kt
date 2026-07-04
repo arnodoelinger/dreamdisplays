@@ -1,10 +1,20 @@
 package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.security.MediaUrlPolicy
-import com.dreamdisplays.platform.server.datatypes.*
+import com.dreamdisplays.platform.server.datatypes.display.*
 import com.dreamdisplays.platform.server.storage.StorageBackend
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.DIRECTION_TO_ORDINAL
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.ORDINAL_TO_DIRECTION
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packFacing
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packInts
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packPos
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.toBytes
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.toUUID
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackFacingOrdinal
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackInts
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackPos
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackRotation
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.arnodoelinger.platformweaver.*
@@ -25,7 +35,6 @@ import org.jspecify.annotations.NullMarked
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.nio.ByteBuffer
 import java.util.*
 
 /**
@@ -33,27 +42,52 @@ import java.util.*
  * the schema compact across both `Paper` and `Fabric` server variants.
  */
 class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
+    /** Unique identifier for the display. */
     val id = binary("id", 16)
+
+    /** Unique identifier for the owner of the display. */
     val ownerId = binary("ownerId", 16)
-    // Sized to MediaUrlPolicy.MAX_URL_LENGTH so accepted URLs always fit the column.
+
+    /** Video code or URL associated with the display. */
     val videoCode = varchar("videoCode", MediaUrlPolicy.MAX_URL_LENGTH).default("")
+
+    /** Name of the world where the display is located. */
     val world = varchar("world", 255)
+
+    /** Packed long representing the first corner of the display area. */
     val pos1 = long("pos1")
+
+    /** Packed long representing the opposite corner of the display area. */
     val pos2 = long("pos2")
+
+    /** Packed long representing the width and height of the display. */
     val size = long("size")
+
+    /** Integer representing the facing direction and rotation of the display. */
     val facing = integer("facing")
+
+    /** Boolean indicating whether the display is synchronized across clients. */
     val isSync = bool("isSync")
+
+    /** Nullable long representing the duration of the video associated with the display. */
     val duration = long("duration").nullable()
+
+    /** String representing the language code of the video associated with the display. */
     val lang = varchar("lang", 255).default("")
+
+    /** Boolean indicating whether the display is locked to its owner. */
     val isLocked = bool("isLocked").default(true)
+
+    /** Integer representing the playback mode of the display. */
     val mode = integer("mode").default(PlaybackMode.LOCAL.wire)
 
+    /** Primary key for the displays table, which is the unique identifier of the display. */
     override val primaryKey = PrimaryKey(id)
 }
 
 /**
- * SQL-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
- * objects and writes updates from managers back to SQLite or MySQL through Exposed / Hikari.
+ * `SQL`-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
+ * objects and writes updates from managers back to `SQLite` or `MySQL` through `Exposed` / `Hikari`.
  */
 @NullMarked
 class StorageManager(
@@ -149,15 +183,13 @@ class StorageManager(
         ).applyCommon(row)
     }
 
-    /** Load all displays from the database, returning a list of [FabricDisplayData] objects. */
-    @FabricOnly
-    fun loadAllFabricDisplays(): List<FabricDisplayData> = transaction(db) {
-        table.selectAll().mapNotNull(::rowToFabric)
+    /** Load all displays from the database, returning a list of [VanillaDisplayData] objects. */
+    fun loadAllVanillaDisplays(): List<VanillaDisplayData> = transaction(db) {
+        table.selectAll().mapNotNull(::rowToVanilla)
     }
 
     /** Upserts the full row for [data] into the displays table. */
-    @FabricOnly
-    fun saveDisplay(data: FabricDisplayData) {
+    fun saveDisplay(data: VanillaDisplayData) {
         upsert(
             data, data.worldKey,
             packPos(data.pos1.x, data.pos1.y, data.pos1.z),
@@ -166,54 +198,15 @@ class StorageManager(
         )
     }
 
-    /** Converts a row from the displays table into a [FabricDisplayData] object. */
-    @FabricOnly
-    private fun rowToFabric(row: ResultRow): FabricDisplayData {
+    /** Converts a row from the displays table into a [VanillaDisplayData] object. */
+    private fun rowToVanilla(row: ResultRow): VanillaDisplayData {
         val (x1, y1, z1) = unpackPos(row[table.pos1])
         val (x2, y2, z2) = unpackPos(row[table.pos2])
         val (w, h) = unpackInts(row[table.size])
         val facing = ORDINAL_TO_DIRECTION.getOrDefault(unpackFacingOrdinal(row[table.facing]), Direction.NORTH)
         val rotation = unpackRotation(row[table.facing])
 
-        return FabricDisplayData(
-            row[table.id].toUUID(), row[table.ownerId].toUUID(),
-            row[table.world],
-            BlockPos(x1, y1, z1), BlockPos(x2, y2, z2),
-            w, h, facing, rotation,
-        ).applyCommon(row)
-    }
-
-    /**
-     * Load all displays from the database, returning a list of [NeoForgeDisplayData] objects.
-     * Naturally disambiguated from [loadAllFabricDisplays] by return type, so no separate object
-     * is needed here (unlike the loader-API-touching pieces elsewhere).
-     */
-    @NeoForgeOnly
-    fun loadAllNeoForgeDisplays(): List<NeoForgeDisplayData> = transaction(db) {
-        table.selectAll().mapNotNull(::rowToNeoForge)
-    }
-
-    /** Upserts the full row for [data] into the displays table. */
-    @NeoForgeOnly
-    fun saveDisplay(data: NeoForgeDisplayData) {
-        upsert(
-            data, data.worldKey,
-            packPos(data.pos1.x, data.pos1.y, data.pos1.z),
-            packPos(data.pos2.x, data.pos2.y, data.pos2.z),
-            packFacing(DIRECTION_TO_ORDINAL.getValue(data.facing), data.rotation)
-        )
-    }
-
-    /** Converts a row from the displays table into a [NeoForgeDisplayData] object. */
-    @NeoForgeOnly
-    private fun rowToNeoForge(row: ResultRow): NeoForgeDisplayData {
-        val (x1, y1, z1) = unpackPos(row[table.pos1])
-        val (x2, y2, z2) = unpackPos(row[table.pos2])
-        val (w, h) = unpackInts(row[table.size])
-        val facing = ORDINAL_TO_DIRECTION.getOrDefault(unpackFacingOrdinal(row[table.facing]), Direction.NORTH)
-        val rotation = unpackRotation(row[table.facing])
-
-        return NeoForgeDisplayData(
+        return VanillaDisplayData(
             row[table.id].toUUID(), row[table.ownerId].toUUID(),
             row[table.world],
             BlockPos(x1, y1, z1), BlockPos(x2, y2, z2),
@@ -256,57 +249,5 @@ class StorageManager(
         duration = row[table.duration]
         lang = row[table.lang]
         isLocked = row[table.isLocked]
-    }
-
-    companion object {
-        /** Directions and content rotations are packed into a single column. */
-        private val DIRECTION_TO_ORDINAL = mapOf(
-            Direction.NORTH to 0, Direction.EAST to 1, Direction.SOUTH to 2, Direction.WEST to 3,
-            Direction.UP to 4, Direction.DOWN to 5,
-        )
-
-        /** Inverse mapping of [DIRECTION_TO_ORDINAL]. */
-        private val ORDINAL_TO_DIRECTION = mapOf(
-            0 to Direction.NORTH, 1 to Direction.EAST, 2 to Direction.SOUTH, 3 to Direction.WEST,
-            4 to Direction.UP, 5 to Direction.DOWN,
-        )
-
-        /** Packs the facing ordinal (low byte) and content rotation (next byte) into one column int. */
-        private fun packFacing(facingOrdinal: Int, rotation: ContentRotation): Int =
-            (facingOrdinal and 0xFF) or ((rotation.quarterTurns and 0xFF) shl 8)
-
-        /** Extracts the facing ordinal from a [packFacing] value; legacy rows (rotation=0) decode unchanged. */
-        private fun unpackFacingOrdinal(packed: Int): Int = packed and 0xFF
-
-        /** Extracts the content rotation from a [packFacing] value. */
-        private fun unpackRotation(packed: Int): ContentRotation =
-            ContentRotation.fromQuarterTurns((packed shr 8) and 0xFF)
-
-        /** Packs a 3D position into a 64-bit long. */
-        private fun packPos(x: Int, y: Int, z: Int): Long =
-            ((x and 0x3FFFFFF).toLong() shl 38) or ((z and 0x3FFFFFF).toLong() shl 12) or (y and 0xFFF).toLong()
-
-        /** Unpacks a 64-bit long into a 3D position. */
-        private fun unpackPos(packed: Long) = Triple(
-            (packed shr 38).toInt(),
-            (packed shl 52 shr 52).toInt(),
-            (packed shl 26 shr 38).toInt()
-        )
-
-        /** Packs two 16-bit integers into a 64-bit long. */
-        private fun packInts(high: Int, low: Int): Long =
-            (high.toLong() shl 32) or (low.toLong() and 0xFFFFFFFFL)
-
-        /** Unpacks a 64-bit long into two 16-bit integers. */
-        private fun unpackInts(packed: Long): Pair<Int, Int> =
-            (packed shr 32).toInt() to packed.toInt()
-
-        /** Converts a UUID to a byte array and vice versa. */
-        private fun UUID.toBytes(): ByteArray = ByteBuffer.allocate(16).apply {
-            putLong(mostSignificantBits); putLong(leastSignificantBits)
-        }.array()
-
-        /** Converts a byte array to a UUID. */
-        private fun ByteArray.toUUID(): UUID = ByteBuffer.wrap(this).let { UUID(it.getLong(), it.getLong()) }
     }
 }

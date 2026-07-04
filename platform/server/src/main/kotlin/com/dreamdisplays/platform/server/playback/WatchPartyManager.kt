@@ -12,7 +12,7 @@ import com.dreamdisplays.api.playback.WatchPartySessionState.PLAYING
 import com.dreamdisplays.api.playback.WatchPartySessionState.PREPARING
 import com.dreamdisplays.api.playback.WatchPartySessionState.WAITING
 import com.dreamdisplays.core.protocol.WatchPartyState
-import com.dreamdisplays.platform.server.datatypes.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -24,6 +24,7 @@ import java.util.concurrent.ConcurrentHashMap
  * or owner closes it. All wire traffic is the [WatchPartyState] snapshot, rebroadcast on every
  * transition and once per second while live.
  */
+// TODO: release in 1.9.0
 object WatchPartyManager {
     private const val COUNTDOWN_MS = 3_000L
     private const val HOST_GRACE_MS = 30_000L

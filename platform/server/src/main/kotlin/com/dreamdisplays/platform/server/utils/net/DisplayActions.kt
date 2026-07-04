@@ -5,13 +5,14 @@ import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.playback.WatchPartyAction
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
+import com.dreamdisplays.platform.server.meta.VersionState
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -41,7 +42,7 @@ object DisplayActions {
             ?: return MessageUtil.sendMessage(player, "noDisplay")
 
         val isOwner = displayData.ownerId == player.uniqueId
-        val canDelete = isOwner || player.hasPermission(Main.config.permissions.deleteOthers)
+        val canDelete = isOwner || player.hasPermission(PaperServer.config.permissions.deleteOthers)
         if (!canDelete) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
@@ -61,7 +62,7 @@ object DisplayActions {
         displayData.url = url
         displayData.lang = MediaUrlPolicy.sanitizeLang(lang)
 
-        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(displayData) }
         DisplayManager.broadcastUpdate(displayData)
         if (wasSync) StateManager.resetAndBroadcast(displayData) // Frozen-v1 clock
         TimelineManager.onVideoChanged(displayData)
@@ -74,7 +75,7 @@ object DisplayActions {
 
         displayData.isLocked = locked
 
-        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(displayData) }
         DisplayManager.broadcastUpdate(displayData)
     }
 
@@ -91,7 +92,7 @@ object DisplayActions {
         }
 
         displayData.mode = mode
-        runAsync { Main.getInstance().storage.saveDisplay(displayData) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(displayData) }
         DisplayManager.broadcastUpdate(displayData)
         TimelineManager.onModeChanged(displayData, positionMs)
     }
@@ -105,7 +106,7 @@ object DisplayActions {
     /** Starts a watch-party session with [player] as host. */
     fun watchPartyStart(player: Player, displayId: UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
-        if (!player.hasPermission(Main.config.permissions.watchparty)) {
+        if (!player.hasPermission(PaperServer.config.permissions.watchparty)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
         }
@@ -131,21 +132,21 @@ object DisplayActions {
 
     /** Builds the permission context for [player] acting on [display]. */
     private fun context(display: PaperDisplayData, player: Player) =
-        PlaybackContexts.of(display, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
+        PlaybackContexts.of(display, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))
 
     /** Like [context] but elevates [player] to admin if they hold the [lock][Config.PermissionsSection.lock] permission. */
     private fun lockContext(display: PaperDisplayData, player: Player) =
         PlaybackContexts.of(
             display, player.uniqueId,
-            player.hasPermission(Main.config.permissions.delete) || player.hasPermission(Main.config.permissions.lock)
+            player.hasPermission(PaperServer.config.permissions.delete) || player.hasPermission(PaperServer.config.permissions.lock)
         )
 
     /** Checks if [player] has permission to access the specified [mode]. */
     private fun canAccessMode(player: Player, mode: PlaybackMode): Boolean {
         val permission = when (mode) {
-            PlaybackMode.LOCAL -> Main.config.permissions.local
-            PlaybackMode.SYNCED -> Main.config.permissions.synced
-            PlaybackMode.BROADCAST -> Main.config.permissions.broadcast
+            PlaybackMode.LOCAL -> PaperServer.config.permissions.local
+            PlaybackMode.SYNCED -> PaperServer.config.permissions.synced
+            PlaybackMode.BROADCAST -> PaperServer.config.permissions.broadcast
             else -> return true
         }
         return player.hasPermission(permission)
@@ -158,8 +159,8 @@ object DisplayActions {
         PlayerManager.setVersion(player, version)
 
         if (version != null) checkModUpdate(player, version)
-        if (Main.config.settings.updatesEnabled &&
-            player.hasPermission(Main.config.permissions.updates)
+        if (PaperServer.config.settings.updatesEnabled &&
+            player.hasPermission(PaperServer.config.permissions.updates)
         ) {
             checkPluginUpdate(player)
         }
@@ -209,7 +210,7 @@ object DisplayActions {
 
     /** Tells [player] about a newer mod version if they haven't been notified this session. */
     private fun checkModUpdate(player: Player, userVersion: Semver) {
-        val latestVersion = Main.modVersion ?: return
+        val latestVersion = VersionState.modLatestVersion ?: return
 
         if (userVersion < latestVersion && !PlayerManager.hasBeenNotifiedAboutModUpdate(player)) {
             sendModUpdateMessage(player, latestVersion)
@@ -220,11 +221,11 @@ object DisplayActions {
     /** Tells privileged [player] about a newer plugin release; skipped for `-SNAPSHOT` builds. */
     @Suppress("DEPRECATION")
     private fun checkPluginUpdate(player: Player) {
-        val latestPluginVersion = Main.pluginLatestVersion ?: return
+        val latestPluginVersion = VersionState.pluginLatestVersion ?: return
 
         if (PlayerManager.hasBeenNotifiedAboutPluginUpdate(player)) return
 
-        val currentVersionString = Main.getInstance().description.version
+        val currentVersionString = PaperServer.getInstance().description.version
         if (currentVersionString.contains("-SNAPSHOT", ignoreCase = true) ||
             currentVersionString.contains("-DEV", ignoreCase = true)
         ) {
@@ -242,7 +243,7 @@ object DisplayActions {
 
     /** Sends the localized `newVersion` message to [player], handling both plain and JSON templates. */
     private fun sendModUpdateMessage(player: Player, version: Semver) {
-        val message = when (val rawMessage = Main.config.getMessageForPlayer(player, "newVersion")) {
+        val message = when (val rawMessage = PaperServer.config.getMessageForPlayer(player, "newVersion")) {
             is String -> String.format(rawMessage, version.toString())
             else -> {
                 val component = MessageUtil.deserializeJsonComponent(rawMessage)
@@ -260,7 +261,7 @@ object DisplayActions {
 
     /** Sends the localized `newPluginVersion` message with the latest version interpolated in. */
     private fun sendPluginUpdateMessage(player: Player, version: String) {
-        val template = Main.config.getMessageForPlayer(player, "newPluginVersion") as? String ?: return
+        val template = PaperServer.config.getMessageForPlayer(player, "newPluginVersion") as? String ?: return
         val message = String.format(template, version)
         MessageUtil.sendColoredMessage(player, message)
     }

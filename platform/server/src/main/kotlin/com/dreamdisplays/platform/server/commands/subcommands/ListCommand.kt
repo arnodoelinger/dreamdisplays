@@ -1,14 +1,10 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
-import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -44,7 +40,7 @@ class ListCommand : SubCommand {
     )
 
     override val name = "list"
-    override val permission = Main.config.permissions.list
+    override val permission = PaperServer.config.permissions.list
 
     /** Renders a paged, filterable listing of all displays, with `/tp` and URL buttons for players. */
     override fun execute(sender: CommandSender, args: Array<String?>) {
@@ -69,7 +65,7 @@ class ListCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayListHeader")
         MessageUtil.sendColoredMessage(
             sender,
-            msgf(
+            MessageUtil.formatIndexed(
                 sender,
                 "displayListPageLine",
                 page.toString(),
@@ -80,11 +76,11 @@ class ListCommand : SubCommand {
 
         pageDisplays.forEachIndexed { localIndex, d ->
             val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId, ownerNameCache) ?: msg(sender, "displayListUnknownOwner")
-            val worldName = d.pos1.world?.name ?: msg(sender, "displayListUnknownWorld")
+            val owner = getOwnerName(d.ownerId, ownerNameCache) ?: MessageUtil.messageFor(sender, "displayListUnknownOwner")
+            val worldName = d.pos1.world?.name ?: MessageUtil.messageFor(sender, "displayListUnknownWorld")
             val idShort = d.id.toString().substring(0, 8)
-            val url = d.url.ifBlank { msg(sender, "displayListUnavailableUrl") }
-            val baseLine = msgf(
+            val url = d.url.ifBlank { MessageUtil.messageFor(sender, "displayListUnavailableUrl") }
+            val baseLine = MessageUtil.formatIndexed(
                 sender,
                 "displayListEntry",
                 index.toString(),
@@ -94,7 +90,7 @@ class ListCommand : SubCommand {
                 d.pos1.blockZ.toString(),
                 url
             )
-            val details = msgf(
+            val details = MessageUtil.formatIndexed(
                 sender,
                 "displayListDetails",
                 worldName,
@@ -112,7 +108,7 @@ class ListCommand : SubCommand {
 
             val component = LEGACY_SERIALIZER.deserialize(fullLine)
                 .append(
-                    text(msg(sender, "displayListTpButton"))
+                    text(MessageUtil.messageFor(sender, "displayListTpButton"))
                         .color(NamedTextColor.GREEN)
                         .clickEvent(
                             ClickEvent.runCommand(
@@ -125,7 +121,7 @@ class ListCommand : SubCommand {
                 component
             } else {
                 component.append(
-                    text(msg(sender, "displayListUrlButton")).color(NamedTextColor.RED)
+                    text(MessageUtil.messageFor(sender, "displayListUrlButton")).color(NamedTextColor.RED)
                         .clickEvent(ClickEvent.openUrl(d.url))
                 )
             }
@@ -288,33 +284,13 @@ class ListCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayWrongCommand")
         return null
     }
-
-    /** Replaces `{0}`, `{1}`, ... placeholders in [template] with the matching value from [values]. */
-    private fun applyPlaceholders(template: String, vararg values: String): String {
-        var result = template
-        values.forEachIndexed { index, value ->
-            result = result.replace("{$index}", value)
-        }
-        return result
-    }
-
-    /** Returns the localized string for [key] in [sender]'s language, or [key] when missing. */
-    private fun msg(sender: CommandSender, key: String): String {
-        return Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
-    }
-
-    /** Returns the localized string for [key] after substituting positional [values]. */
-    private fun msgf(sender: CommandSender, key: String, vararg values: String): String {
-        return applyPlaceholders(msg(sender, key), *values)
-    }
 }
 
 /**
- * `Fabric`-specific implementation of the `/display list` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display list` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricListCommand {
+object VanillaListCommand {
     private const val PAGE_SIZE = 10
 
     /** Renders a paged, filterable listing of all displays; supports `mine`, `world`, `owner`, and `sync` filters. */
@@ -325,7 +301,6 @@ object FabricListCommand {
         pageStr: String? = null
     ): Int {
         val player = ctx.source.entity as? ServerPlayer
-        val config = Server.config
         val server = ctx.source.server
 
         val displays = sortedDisplays()
@@ -341,11 +316,11 @@ object FabricListCommand {
                 server.playerList.players.find { it.uuid == ownerId }?.name?.string
             }
 
-        val filtered: List<FabricDisplayData> = when (ListFilter.fromToken(filter)) {
+        val filtered: List<VanillaDisplayData> = when (ListFilter.fromToken(filter)) {
             null -> {
                 val pageNum = filter?.toIntOrNull()
                 if (pageNum != null) {
-                    sendPage(ctx, player, displays, ownerNameCache, pageNum, config)
+                    sendPage(ctx, player, displays, ownerNameCache, pageNum)
                     return 1
                 }
                 displays
@@ -373,7 +348,7 @@ object FabricListCommand {
         }
 
         val page = (pageStr?.toIntOrNull() ?: 1)
-        sendPage(ctx, player, filtered, ownerNameCache, page, config)
+        sendPage(ctx, player, filtered, ownerNameCache, page)
         return 1
     }
 
@@ -381,23 +356,15 @@ object FabricListCommand {
     private fun sendPage(
         ctx: CommandContext<CommandSourceStack>,
         player: ServerPlayer?,
-        displays: List<FabricDisplayData>,
+        displays: List<VanillaDisplayData>,
         ownerNameCache: MutableMap<UUID, String?>,
         page: Int,
-        config: com.dreamdisplays.platform.server.FabricConfig,
     ) {
         val server = ctx.source.server
         fun getOwnerName(ownerId: UUID): String? =
             ownerNameCache.getOrPut(ownerId) {
                 server.playerList.players.find { it.uuid == ownerId }?.name?.string
             }
-
-        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
-        fun msgf(key: String, vararg args: String): String {
-            var t = msg(key)
-            args.forEachIndexed { i, v -> t = t.replace("{$i}", v) }
-            return t
-        }
 
         val totalPages = max(1, (displays.size + PAGE_SIZE - 1) / PAGE_SIZE)
         val p = page.coerceIn(1, totalPages)
@@ -409,16 +376,17 @@ object FabricListCommand {
         sendColoredMsg(
             ctx,
             player,
-            msgf("displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
+            MessageUtil.formatIndexed(player, "displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
         )
 
         pageDisplays.forEachIndexed { localIndex, d ->
             val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId) ?: msg("displayListUnknownOwner")
+            val owner = getOwnerName(d.ownerId) ?: MessageUtil.messageFor(player, "displayListUnknownOwner")
             val worldName = d.worldKey.substringAfterLast(':')
             val idShort = d.id.toString().substring(0, 8)
-            val url = d.url.ifBlank { msg("displayListUnavailableUrl") }
-            val baseLine = msgf(
+            val url = d.url.ifBlank { MessageUtil.messageFor(player, "displayListUnavailableUrl") }
+            val baseLine = MessageUtil.formatIndexed(
+                player,
                 "displayListEntry",
                 index.toString(),
                 owner,
@@ -427,7 +395,8 @@ object FabricListCommand {
                 d.minZ.toString(),
                 url
             )
-            val details = msgf(
+            val details = MessageUtil.formatIndexed(
+                player,
                 "displayListDetails",
                 worldName,
                 d.width.toString(),
@@ -439,9 +408,9 @@ object FabricListCommand {
         }
     }
 
-    /** Returns all `Fabric` displays sorted by world key, X, Y, Z, and UUID for deterministic page order. */
-    private fun sortedDisplays(): List<FabricDisplayData> =
-        DisplayManager.getDisplays().filterIsInstance<FabricDisplayData>().sortedWith(
+    /** Returns all `Fabric`/`NeoForge` displays sorted by world key, X, Y, Z, and UUID for deterministic page order. */
+    private fun sortedDisplays(): List<VanillaDisplayData> =
+        DisplayManager.getDisplays().filterIsInstance<VanillaDisplayData>().sortedWith(
             compareBy(
                 { it.worldKey },
                 { it.minX },
@@ -453,182 +422,18 @@ object FabricListCommand {
 
     /** Sends the localized message for [key] to [player] or falls back to the command source. */
     private fun sendMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, key: String) {
-        val config = Server.config
-        val msg = config.getMessageForPlayer(player, key)
-        if (player != null) {
-            MessageUtil.sendColoredMessage(player, msg)
-        } else {
-            ctx.source.sendSystemMessage(Component.literal(msg?.toString() ?: key))
-        }
-    }
-
-    /** Sends a color-formatted [msg] to [player] or falls back to the command source as plain text. */
-    private fun sendColoredMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, msg: String) {
+        val msg = MessageUtil.messageFor(player, key)
         if (player != null) {
             MessageUtil.sendColoredMessage(player, msg)
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg))
         }
     }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display list` command.
- */
-@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@NeoForgeOnly
-object NeoForgeListCommand {
-    private const val PAGE_SIZE = 10
-
-    /** Renders a paged, filterable listing of all displays; supports `mine`, `world`, `owner`, and `sync` filters. */
-    fun execute(
-        ctx: CommandContext<CommandSourceStack>,
-        filter: String? = null,
-        value: String? = null,
-        pageStr: String? = null
-    ): Int {
-        val player = ctx.source.entity as? ServerPlayer
-        val config = NeoForgeServer.config
-        val server = ctx.source.server
-
-        val displays = sortedDisplays()
-        if (displays.isEmpty()) {
-            sendMsg(ctx, player, "noDisplaysFound")
-            return 1
-        }
-
-        val ownerNameCache = mutableMapOf<UUID, String?>()
-
-        fun getOwnerName(ownerId: UUID): String? =
-            ownerNameCache.getOrPut(ownerId) {
-                server.playerList.players.find { it.uuid == ownerId }?.name?.string
-            }
-
-        val filtered: List<NeoForgeDisplayData> = when (ListFilter.fromToken(filter)) {
-            null -> {
-                val pageNum = filter?.toIntOrNull()
-                if (pageNum != null) {
-                    sendPage(ctx, player, displays, ownerNameCache, pageNum, config)
-                    return 1
-                }
-                displays
-            }
-
-            ListFilter.MINE -> if (player != null) displays.filter { it.ownerId == player.uuid } else displays
-            ListFilter.WORLD -> value?.let { wn -> displays.filter { it.worldKey.endsWith(wn, ignoreCase = true) } }
-                ?: displays
-
-            ListFilter.OWNER -> value?.let { on ->
-                displays.filter {
-                    getOwnerName(it.ownerId)?.equals(
-                        on,
-                        ignoreCase = true
-                    ) == true || it.ownerId.toString().equals(on, ignoreCase = true)
-                }
-            } ?: displays
-
-            ListFilter.SYNC -> displays.filter { it.isSync }
-        }
-
-        if (filtered.isEmpty()) {
-            sendMsg(ctx, player, "noDisplaysFound")
-            return 1
-        }
-
-        val page = (pageStr?.toIntOrNull() ?: 1)
-        sendPage(ctx, player, filtered, ownerNameCache, page, config)
-        return 1
-    }
-
-    /** Renders a single page of [displays] to the command source, substituting owner names and localized strings. */
-    private fun sendPage(
-        ctx: CommandContext<CommandSourceStack>,
-        player: ServerPlayer?,
-        displays: List<NeoForgeDisplayData>,
-        ownerNameCache: MutableMap<UUID, String?>,
-        page: Int,
-        config: com.dreamdisplays.platform.server.NeoForgeConfig,
-    ) {
-        val server = ctx.source.server
-        fun getOwnerName(ownerId: UUID): String? =
-            ownerNameCache.getOrPut(ownerId) {
-                server.playerList.players.find { it.uuid == ownerId }?.name?.string
-            }
-
-        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
-        fun msgf(key: String, vararg args: String): String {
-            var t = msg(key)
-            args.forEachIndexed { i, v -> t = t.replace("{$i}", v) }
-            return t
-        }
-
-        val totalPages = max(1, (displays.size + PAGE_SIZE - 1) / PAGE_SIZE)
-        val p = page.coerceIn(1, totalPages)
-        val startIndex = (p - 1) * PAGE_SIZE
-        val endExclusive = minOf(startIndex + PAGE_SIZE, displays.size)
-        val pageDisplays = displays.subList(startIndex, endExclusive)
-
-        sendMsg(ctx, player, "displayListHeader")
-        sendColoredMsg(
-            ctx,
-            player,
-            msgf("displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
-        )
-
-        pageDisplays.forEachIndexed { localIndex, d ->
-            val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId) ?: msg("displayListUnknownOwner")
-            val worldName = d.worldKey.substringAfterLast(':')
-            val idShort = d.id.toString().substring(0, 8)
-            val url = d.url.ifBlank { msg("displayListUnavailableUrl") }
-            val baseLine = msgf(
-                "displayListEntry",
-                index.toString(),
-                owner,
-                d.minX.toString(),
-                d.minY.toString(),
-                d.minZ.toString(),
-                url
-            )
-            val details = msgf(
-                "displayListDetails",
-                worldName,
-                d.width.toString(),
-                d.height.toString(),
-                d.isSync.toString(),
-                idShort
-            )
-            sendColoredMsg(ctx, player, baseLine + details)
-        }
-    }
-
-    /** Returns all `NeoForge` displays sorted by world key, X, Y, Z, and UUID for deterministic page order. */
-    private fun sortedDisplays(): List<NeoForgeDisplayData> =
-        DisplayManager.getDisplays().filterIsInstance<NeoForgeDisplayData>().sortedWith(
-            compareBy(
-                { it.worldKey },
-                { it.minX },
-                { it.minY },
-                { it.minZ },
-                { it.id.toString() }
-            )
-        )
-
-    /** Sends the localized message for [key] to [player] or falls back to the command source. */
-    private fun sendMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, key: String) {
-        val config = NeoForgeServer.config
-        val msg = config.getMessageForPlayer(player, key)
-        if (player != null) {
-            NeoForgeMessageUtil.sendColoredMessage(player, msg)
-        } else {
-            ctx.source.sendSystemMessage(Component.literal(msg?.toString() ?: key))
-        }
-    }
 
     /** Sends a color-formatted [msg] to [player] or falls back to the command source as plain text. */
     private fun sendColoredMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, msg: String) {
         if (player != null) {
-            NeoForgeMessageUtil.sendColoredMessage(player, msg)
+            MessageUtil.sendColoredMessage(player, msg)
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg))
         }

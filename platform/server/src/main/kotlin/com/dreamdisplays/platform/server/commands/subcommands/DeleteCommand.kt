@@ -1,24 +1,18 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
-import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
@@ -30,7 +24,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class DeleteCommand : SubCommand {
     override val name = "delete"
-    override val permission = Main.config.permissions.delete
+    override val permission = PaperServer.config.permissions.delete
     override val playerOnly = true
 
     /** Deletes the display the player is currently looking at (within 32 blocks). */
@@ -38,7 +32,7 @@ class DeleteCommand : SubCommand {
         val player = (sender as? Player) ?: return
 
         val block = player.getTargetBlock(null, 32)
-        if (block.type != Main.config.settings.baseMaterial) {
+        if (block.type != PaperServer.config.settings.baseMaterial) {
             MessageUtil.sendMessage(player, "noDisplay")
             return
         }
@@ -52,17 +46,16 @@ class DeleteCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display delete` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display delete` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricDeleteCommand {
+object VanillaDeleteCommand {
     /** Deletes the display the player is currently looking at (within 32 blocks). */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
 
-        val targetPos = getTargetBlockPos(player) ?: run {
+        val targetPos = RegionUtil.getTargetedBlockPos(player) ?: run {
             MessageUtil.sendMessage(player, "noDisplay")
             return 0
         }
@@ -72,83 +65,15 @@ object FabricDeleteCommand {
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !ServerPacketHandler.isOpLevel2(player)) {
+        if (data.ownerId != player.uuid && !VanillaDisplayActions.isOpLevel2(player)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
         DisplayManager.delete(data)
-        FabricPacketUtil.sendDelete(receivers, data.id)
+        VanillaPacketUtil.sendDelete(receivers, data.id)
         MessageUtil.sendMessage(player, "displayDeleted")
         return 1
-    }
-
-    /** Gets the block position the player is currently looking at. */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val eyePos = player.eyePosition
-        val lookVec = player.lookAngle
-        val hit = level.clip(
-            ClipContext(
-                eyePos,
-                eyePos.add(lookVec.scale(32.0)),
-                ClipContext.Block.OUTLINE,
-                ClipContext.Fluid.NONE,
-                player
-            )
-        )
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display delete` command.
- */
-@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@NeoForgeOnly
-object NeoForgeDeleteCommand {
-    /** Deletes the display the player is currently looking at (within 32 blocks). */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = ctx.source.entity as? ServerPlayer
-            ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
-
-        val targetPos = getTargetBlockPos(player) ?: run {
-            NeoForgeMessageUtil.sendMessage(player, "noDisplay")
-            return 0
-        }
-
-        val worldKey = RegionUtil.getPlayerLevelKey(player)
-
-        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
-
-        if (data.ownerId != player.uuid && !NeoForgeServerPacketHandler.isOpLevel2(player)) {
-            NeoForgeMessageUtil.sendMessage(player, "displayCommandMissingPermission")
-            return 0
-        }
-
-        val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        DisplayManager.delete(data)
-        NeoForgePacketUtil.sendDelete(receivers, data.id)
-        NeoForgeMessageUtil.sendMessage(player, "displayDeleted")
-        return 1
-    }
-
-    /** Gets the block position the player is currently looking at. */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val eyePos = player.eyePosition
-        val lookVec = player.lookAngle
-        val hit = level.clip(
-            ClipContext(
-                eyePos,
-                eyePos.add(lookVec.scale(32.0)),
-                ClipContext.Block.OUTLINE,
-                ClipContext.Fluid.NONE,
-                player
-            )
-        )
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
     }
 }

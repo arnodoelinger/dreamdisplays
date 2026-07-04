@@ -21,7 +21,7 @@ import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.core.protocol.WatchPartyStart
-import com.dreamdisplays.platform.server.NeoForgeServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
@@ -53,7 +53,7 @@ object NeoForgeV2Networking {
     /**
      * Registers the single v2 envelope receiver against [registrar]. Must be called exactly once
      * total for the whole mod (NeoForge's payload registry rejects a second registration of the
-     * same id) - see [NeoForgeServer.registerPayloads] for why this can't also be registered from
+     * same id) - see `NeoForgeServer.registerPayloads` for why this can't also be registered from
      * `Client`.
      */
     fun registerReceivers(registrar: PayloadRegistrar) {
@@ -93,12 +93,12 @@ object NeoForgeV2Networking {
     private fun dispatch(player: ServerPlayer, server: MinecraftServer, packet: DreamPacket) {
         when (packet) {
             is ClientHello -> handleHello(player, server, packet)
-            is RequestSync -> NeoForgeServerPacketHandler.requestSync(player, packet.id)
-            is DisplayDelete -> NeoForgeServerPacketHandler.delete(player, server, packet.id)
-            is ReportDisplay -> DisplayManager.reportNeoForge(packet.id, player, server)
-            is SetVideo -> NeoForgeServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
-            is SetLocked -> NeoForgeServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
-            is SetMode -> NeoForgeServerPacketHandler.setMode(
+            is RequestSync -> VanillaDisplayActions.requestSync(player, packet.id)
+            is DisplayDelete -> VanillaDisplayActions.delete(player, server, packet.id)
+            is ReportDisplay -> DisplayManager.report(packet.id, player, server)
+            is SetVideo -> VanillaDisplayActions.setVideo(player, server, packet.id, packet.url, packet.lang)
+            is SetLocked -> VanillaDisplayActions.setLocked(player, server, packet.id, packet.locked)
+            is SetMode -> VanillaDisplayActions.setMode(
                 player,
                 server,
                 packet.id,
@@ -107,12 +107,12 @@ object NeoForgeV2Networking {
             )
 
             is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
-                NeoForgeServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
+                VanillaDisplayActions.playbackCommand(player, packet.id, it, packet.positionMs)
             }
 
-            is WatchPartyStart -> NeoForgeServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
+            is WatchPartyStart -> VanillaDisplayActions.watchPartyStart(player, packet.id, packet.url, packet.lang)
             is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
-                NeoForgeServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
+                VanillaDisplayActions.watchPartyControl(player, packet.id, it, packet.positionMs)
             }
 
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player.uuid, packet.enabled)
@@ -127,14 +127,14 @@ object NeoForgeV2Networking {
         send(
             listOf(player),
             ServerHello(
-                isPremium = NeoForgeServerPacketHandler.isOpLevel2(player),
-                isAdmin = NeoForgeServerPacketHandler.isOpLevel2(player),
-                isReportingEnabled = NeoForgeServer.config.settings.webhookUrl.isNotEmpty(),
+                isPremium = VanillaDisplayActions.isOpLevel2(player),
+                isAdmin = VanillaDisplayActions.isOpLevel2(player),
+                isReportingEnabled = VanillaServerState.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
-                defaultVolume = NeoForgeServer.config.settings.defaultVolume,
+                defaultVolume = VanillaServerState.config.settings.defaultVolume,
             ),
         )
-        NeoForgeServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)
-        NeoForgeServerPacketHandler.sendAllDisplays(player, server)
+        VanillaDisplayActions.recordVersionAndCheckUpdates(player, hello.modVersion)
+        VanillaDisplayActions.sendAllDisplays(player, server)
     }
 }
