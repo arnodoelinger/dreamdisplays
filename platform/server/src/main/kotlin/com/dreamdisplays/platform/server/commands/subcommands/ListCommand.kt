@@ -3,12 +3,10 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
-import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
+import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -341,7 +339,7 @@ object FabricListCommand {
                 server.playerList.players.find { it.uuid == ownerId }?.name?.string
             }
 
-        val filtered: List<FabricDisplayData> = when (ListFilter.fromToken(filter)) {
+        val filtered: List<VanillaDisplayData> = when (ListFilter.fromToken(filter)) {
             null -> {
                 val pageNum = filter?.toIntOrNull()
                 if (pageNum != null) {
@@ -381,10 +379,10 @@ object FabricListCommand {
     private fun sendPage(
         ctx: CommandContext<CommandSourceStack>,
         player: ServerPlayer?,
-        displays: List<FabricDisplayData>,
+        displays: List<VanillaDisplayData>,
         ownerNameCache: MutableMap<UUID, String?>,
         page: Int,
-        config: com.dreamdisplays.platform.server.FabricConfig,
+        config: com.dreamdisplays.platform.server.VanillaConfig,
     ) {
         val server = ctx.source.server
         fun getOwnerName(ownerId: UUID): String? =
@@ -440,8 +438,8 @@ object FabricListCommand {
     }
 
     /** Returns all `Fabric` displays sorted by world key, X, Y, Z, and UUID for deterministic page order. */
-    private fun sortedDisplays(): List<FabricDisplayData> =
-        DisplayManager.getDisplays().filterIsInstance<FabricDisplayData>().sortedWith(
+    private fun sortedDisplays(): List<VanillaDisplayData> =
+        DisplayManager.getDisplays().filterIsInstance<VanillaDisplayData>().sortedWith(
             compareBy(
                 { it.worldKey },
                 { it.minX },
@@ -504,7 +502,7 @@ object NeoForgeListCommand {
                 server.playerList.players.find { it.uuid == ownerId }?.name?.string
             }
 
-        val filtered: List<NeoForgeDisplayData> = when (ListFilter.fromToken(filter)) {
+        val filtered: List<VanillaDisplayData> = when (ListFilter.fromToken(filter)) {
             null -> {
                 val pageNum = filter?.toIntOrNull()
                 if (pageNum != null) {
@@ -544,10 +542,10 @@ object NeoForgeListCommand {
     private fun sendPage(
         ctx: CommandContext<CommandSourceStack>,
         player: ServerPlayer?,
-        displays: List<NeoForgeDisplayData>,
+        displays: List<VanillaDisplayData>,
         ownerNameCache: MutableMap<UUID, String?>,
         page: Int,
-        config: com.dreamdisplays.platform.server.NeoForgeConfig,
+        config: com.dreamdisplays.platform.server.VanillaConfig,
     ) {
         val server = ctx.source.server
         fun getOwnerName(ownerId: UUID): String? =
@@ -603,8 +601,8 @@ object NeoForgeListCommand {
     }
 
     /** Returns all `NeoForge` displays sorted by world key, X, Y, Z, and UUID for deterministic page order. */
-    private fun sortedDisplays(): List<NeoForgeDisplayData> =
-        DisplayManager.getDisplays().filterIsInstance<NeoForgeDisplayData>().sortedWith(
+    private fun sortedDisplays(): List<VanillaDisplayData> =
+        DisplayManager.getDisplays().filterIsInstance<VanillaDisplayData>().sortedWith(
             compareBy(
                 { it.worldKey },
                 { it.minX },
@@ -619,7 +617,7 @@ object NeoForgeListCommand {
         val config = NeoForgeServer.config
         val msg = config.getMessageForPlayer(player, key)
         if (player != null) {
-            NeoForgeMessageUtil.sendColoredMessage(player, msg)
+            MessageUtil.sendColoredMessage(player, msg)
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg?.toString() ?: key))
         }
@@ -628,7 +626,7 @@ object NeoForgeListCommand {
     /** Sends a color-formatted [msg] to [player] or falls back to the command source as plain text. */
     private fun sendColoredMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, msg: String) {
         if (player != null) {
-            NeoForgeMessageUtil.sendColoredMessage(player, msg)
+            MessageUtil.sendColoredMessage(player, msg)
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg))
         }

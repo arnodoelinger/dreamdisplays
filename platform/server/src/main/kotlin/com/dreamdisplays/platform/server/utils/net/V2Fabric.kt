@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory
 
 /**
  * Protocol-v2 networking for the `Fabric` flavor: one envelope payload in both directions.
- * Business logic is shared with the frozen-v1 receivers through [ServerPacketHandler].
+ * Business logic is shared with the frozen-v1 receivers through [VanillaServerPacketHandler].
  */
 @FabricOnly
 object FabricV2Networking {
@@ -67,12 +67,12 @@ object FabricV2Networking {
     private fun dispatch(player: ServerPlayer, server: MinecraftServer, packet: DreamPacket) {
         when (packet) {
             is ClientHello -> handleHello(player, server, packet)
-            is RequestSync -> ServerPacketHandler.requestSync(player, packet.id)
-            is DisplayDelete -> ServerPacketHandler.delete(player, server, packet.id)
+            is RequestSync -> VanillaServerPacketHandler.requestSync(player, packet.id)
+            is DisplayDelete -> VanillaServerPacketHandler.delete(player, server, packet.id)
             is ReportDisplay -> DisplayManager.report(packet.id, player, server)
-            is SetVideo -> ServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
-            is SetLocked -> ServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
-            is SetMode -> ServerPacketHandler.setMode(
+            is SetVideo -> VanillaServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
+            is SetLocked -> VanillaServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
+            is SetMode -> VanillaServerPacketHandler.setMode(
                 player,
                 server,
                 packet.id,
@@ -81,12 +81,12 @@ object FabricV2Networking {
             )
 
             is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
-                ServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
+                VanillaServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
             }
 
-            is WatchPartyStart -> ServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
+            is WatchPartyStart -> VanillaServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
             is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
-                ServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
+                VanillaServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
             }
 
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
@@ -101,14 +101,14 @@ object FabricV2Networking {
         send(
             listOf(player),
             ServerHello(
-                isPremium = ServerPacketHandler.isOpLevel2(player),
-                isAdmin = ServerPacketHandler.isOpLevel2(player),
+                isPremium = VanillaServerPacketHandler.isOpLevel2(player),
+                isAdmin = VanillaServerPacketHandler.isOpLevel2(player),
                 isReportingEnabled = Server.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
                 defaultVolume = Server.config.settings.defaultVolume,
             ),
         )
-        ServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)
-        ServerPacketHandler.sendAllDisplays(player, server)
+        VanillaServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)
+        VanillaServerPacketHandler.sendAllDisplays(player, server)
     }
 }

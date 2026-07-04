@@ -5,7 +5,6 @@ import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -212,10 +211,10 @@ object NeoForgeInfoCommand {
 
         val worldKey = RegionUtil.getPlayerLevelKey(player)
         val targetPos = getTargetBlockPos(player)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+            ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+        val data = DisplayManager.isContains(worldKey, targetPos)
+            ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         val config = NeoForgeServer.config
         val server = ctx.source.server
@@ -237,10 +236,10 @@ object NeoForgeInfoCommand {
         val displayLang = data.lang.ifBlank { text("displayInfoAutoLang") }
         val duration = data.duration?.toString() ?: text("displayInfoUnknownDuration")
 
-        NeoForgeMessageUtil.sendColoredMessage(player, text("displayInfoHeader"))
-        NeoForgeMessageUtil.sendColoredMessage(player, format("displayInfoOwnerLine", ownerName, data.ownerId.toString()))
-        NeoForgeMessageUtil.sendColoredMessage(player, format("displayInfoUuidLine", data.id.toString()))
-        NeoForgeMessageUtil.sendColoredMessage(
+        MessageUtil.sendColoredMessage(player, text("displayInfoHeader"))
+        MessageUtil.sendColoredMessage(player, format("displayInfoOwnerLine", ownerName, data.ownerId.toString()))
+        MessageUtil.sendColoredMessage(player, format("displayInfoUuidLine", data.id.toString()))
+        MessageUtil.sendColoredMessage(
             player,
             format(
                 "displayInfoPositionLine",
@@ -249,7 +248,7 @@ object NeoForgeInfoCommand {
                 data.pos2.x.toString(), data.pos2.y.toString(), data.pos2.z.toString()
             )
         )
-        NeoForgeMessageUtil.sendColoredMessage(
+        MessageUtil.sendColoredMessage(
             player,
             format(
                 "displayInfoStateLine",
@@ -259,7 +258,7 @@ object NeoForgeInfoCommand {
                 data.isSync.toString()
             )
         )
-        NeoForgeMessageUtil.sendColoredMessage(
+        MessageUtil.sendColoredMessage(
             player,
             format("displayInfoMediaLine", displayLang, duration, displayUrl)
         )

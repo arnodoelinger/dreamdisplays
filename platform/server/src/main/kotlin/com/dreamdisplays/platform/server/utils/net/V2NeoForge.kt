@@ -93,12 +93,12 @@ object NeoForgeV2Networking {
     private fun dispatch(player: ServerPlayer, server: MinecraftServer, packet: DreamPacket) {
         when (packet) {
             is ClientHello -> handleHello(player, server, packet)
-            is RequestSync -> NeoForgeServerPacketHandler.requestSync(player, packet.id)
-            is DisplayDelete -> NeoForgeServerPacketHandler.delete(player, server, packet.id)
-            is ReportDisplay -> DisplayManager.reportNeoForge(packet.id, player, server)
-            is SetVideo -> NeoForgeServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
-            is SetLocked -> NeoForgeServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
-            is SetMode -> NeoForgeServerPacketHandler.setMode(
+            is RequestSync -> VanillaServerPacketHandler.requestSync(player, packet.id)
+            is DisplayDelete -> VanillaServerPacketHandler.delete(player, server, packet.id)
+            is ReportDisplay -> DisplayManager.report(packet.id, player, server)
+            is SetVideo -> VanillaServerPacketHandler.setVideo(player, server, packet.id, packet.url, packet.lang)
+            is SetLocked -> VanillaServerPacketHandler.setLocked(player, server, packet.id, packet.locked)
+            is SetMode -> VanillaServerPacketHandler.setMode(
                 player,
                 server,
                 packet.id,
@@ -107,12 +107,12 @@ object NeoForgeV2Networking {
             )
 
             is PlaybackCommand -> PlaybackAction.fromWire(packet.action)?.let {
-                NeoForgeServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
+                VanillaServerPacketHandler.playbackCommand(player, packet.id, it, packet.positionMs)
             }
 
-            is WatchPartyStart -> NeoForgeServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
+            is WatchPartyStart -> VanillaServerPacketHandler.watchPartyStart(player, packet.id, packet.url, packet.lang)
             is WatchPartyControl -> WatchPartyAction.fromWire(packet.action)?.let {
-                NeoForgeServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
+                VanillaServerPacketHandler.watchPartyControl(player, packet.id, it, packet.positionMs)
             }
 
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player.uuid, packet.enabled)
@@ -127,14 +127,14 @@ object NeoForgeV2Networking {
         send(
             listOf(player),
             ServerHello(
-                isPremium = NeoForgeServerPacketHandler.isOpLevel2(player),
-                isAdmin = NeoForgeServerPacketHandler.isOpLevel2(player),
+                isPremium = VanillaServerPacketHandler.isOpLevel2(player),
+                isAdmin = VanillaServerPacketHandler.isOpLevel2(player),
                 isReportingEnabled = NeoForgeServer.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
                 defaultVolume = NeoForgeServer.config.settings.defaultVolume,
             ),
         )
-        NeoForgeServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)
-        NeoForgeServerPacketHandler.sendAllDisplays(player, server)
+        VanillaServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)
+        VanillaServerPacketHandler.sendAllDisplays(player, server)
     }
 }

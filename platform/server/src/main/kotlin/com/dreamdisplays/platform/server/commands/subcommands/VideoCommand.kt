@@ -13,12 +13,9 @@ import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -158,7 +155,7 @@ object FabricVideoCommand {
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, ServerPacketHandler.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaServerPacketHandler.isOpLevel2(player))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
@@ -171,7 +168,7 @@ object FabricVideoCommand {
         ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        FabricPacketUtil.sendDisplayInfo(receivers, data)
+        VanillaPacketUtil.sendDisplayInfo(receivers, data)
         if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
         TimelineManager.onVideoChanged(data)
 
@@ -205,25 +202,25 @@ object NeoForgeVideoCommand {
         val langRaw = if (parts.size > 1) parts.last() else ""
 
         if (urlRaw.isBlank()) {
-            NeoForgeMessageUtil.sendMessage(player, "invalidURL")
+            MessageUtil.sendMessage(player, "invalidURL")
             return 0
         }
 
         val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "invalidURL").let { 0 }
+            ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
         val targetPos = getTargetBlockPos(player)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
+            ?: return MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
 
         val worldKey = RegionUtil.getPlayerLevelKey(player)
-        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+        val data = DisplayManager.isContains(worldKey, targetPos)
+            ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, NeoForgeServerPacketHandler.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaServerPacketHandler.isOpLevel2(player))
             )
         ) {
-            NeoForgeMessageUtil.sendMessage(player, "displayVideoNotOwner")
+            MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return 0
         }
 
@@ -233,11 +230,11 @@ object NeoForgeVideoCommand {
         ServerCoroutines.io.launch { NeoForgeServer.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        NeoForgePacketUtil.sendDisplayInfo(receivers, data)
-        if (wasSync) StateManager.resetAndBroadcastNeoForge(data.id, receivers)
+        VanillaPacketUtil.sendDisplayInfo(receivers, data)
+        if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
         TimelineManager.onVideoChanged(data)
 
-        NeoForgeMessageUtil.sendMessage(player, "settedURL")
+        MessageUtil.sendMessage(player, "settedURL")
         return 1
     }
 

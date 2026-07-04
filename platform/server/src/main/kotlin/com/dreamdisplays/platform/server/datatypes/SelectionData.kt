@@ -2,8 +2,6 @@ package com.dreamdisplays.platform.server.datatypes
 
 import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import io.github.arnodoelinger.platformweaver.FabricOnly
-import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -18,7 +16,7 @@ import java.util.UUID.randomUUID
 /**
  * Shared selection data.
  *
- * Per-platform concrete classes ([PaperSelectionData], [FabricSelectionData]) carry the actual
+ * Per-platform concrete classes ([PaperSelectionData], [VanillaSelectionData]) carry the actual
  * coordinate types; only readiness state and reset are shared on this interface.
  */
 interface SelectionData {
@@ -101,10 +99,9 @@ class PaperSelectionData(player: Player) : SelectionData {
 }
 
 /**
- * `Fabric`-specific implementation of [SelectionData].
+ * Vanilla implementation of [SelectionData], shared by `Fabric` and `NeoForge`.
  */
-@FabricOnly
-class FabricSelectionData : SelectionData {
+class VanillaSelectionData : SelectionData {
     var pos1: BlockPos? = null
     var pos2: BlockPos? = null
     var worldKey: String? = null
@@ -168,122 +165,15 @@ class FabricSelectionData : SelectionData {
     }
 
     /**
-     * Builds a [FabricDisplayData] from the current selection.
+     * Builds a [VanillaDisplayData] from the current selection.
      *
      * Throws if region or worldKey is not yet set.
      */
-    fun generateDisplayData(ownerId: UUID): FabricDisplayData {
+    fun generateDisplayData(ownerId: UUID): VanillaDisplayData {
         val r = requireNotNull(region()) { "region is null" }
         val wk = requireNotNull(worldKey) { "worldKey is null" }
         val isVertical = facing == Direction.UP || facing == Direction.DOWN
-        return FabricDisplayData(
-            id = randomUUID(),
-            ownerId = ownerId,
-            worldKey = wk,
-            pos1 = BlockPos(r.minX, r.minY, r.minZ),
-            pos2 = BlockPos(r.maxX, r.maxY, r.maxZ),
-            width = if (isVertical) r.deltaX else r.width,
-            height = if (isVertical) r.deltaZ else r.height,
-            facing = facing,
-            rotation = if (isVertical) horizontalRotation(horizontalFacing) else ContentRotation.NONE,
-        )
-    }
-
-    /** Maps a horizontal cardinal to a content rotation for floor/ceiling screens. */
-    private fun horizontalRotation(dir: Direction): ContentRotation = when (dir) {
-        Direction.NORTH -> ContentRotation.NONE
-        Direction.EAST -> ContentRotation.RIGHT
-        Direction.SOUTH -> ContentRotation.HALF_TURN
-        Direction.WEST -> ContentRotation.LEFT
-        else -> ContentRotation.NONE
-    }
-
-    /** Compact result of a selection region calculation. */
-    data class RegionResult(
-        val minX: Int, val minY: Int, val minZ: Int,
-        val maxX: Int, val maxY: Int, val maxZ: Int,
-        val width: Int, val height: Int,
-        val deltaX: Int, val deltaZ: Int,
-    )
-}
-
-/**
- * `NeoForge`-specific implementation of [SelectionData].
- */
-@NeoForgeOnly
-class NeoForgeSelectionData : SelectionData {
-    var pos1: BlockPos? = null
-    var pos2: BlockPos? = null
-    var worldKey: String? = null
-    var facing: Direction = Direction.NORTH
-
-    /** Player's horizontal look cardinal at first-point time; orients floor/ceiling content. */
-    var horizontalFacing: Direction = Direction.NORTH
-    override var isReady: Boolean = false
-
-    /** Resets all selection state back to defaults. */
-    override fun reset() {
-        pos1 = null
-        pos2 = null
-        worldKey = null
-        facing = Direction.NORTH
-        horizontalFacing = Direction.NORTH
-        isReady = false
-    }
-
-    /** Returns the AABB covering the selected region, or `null` if either corner is missing. */
-    fun selectionBox(): AABB? {
-        val p1 = pos1 ?: return null
-        val p2 = pos2 ?: return null
-        val minX = minOf(p1.x, p2.x).toDouble()
-        val minY = minOf(p1.y, p2.y).toDouble()
-        val minZ = minOf(p1.z, p2.z).toDouble()
-        val maxX = (maxOf(p1.x, p2.x) + 1).toDouble()
-        val maxY = (maxOf(p1.y, p2.y) + 1).toDouble()
-        val maxZ = (maxOf(p1.z, p2.z) + 1).toDouble()
-        return AABB(minX, minY, minZ, maxX, maxY, maxZ)
-    }
-
-    /** Returns `true` if [pos] lies within the selected bounding box. */
-    fun contains(pos: BlockPos): Boolean {
-        val p1 = pos1 ?: return false
-        val p2 = pos2 ?: return false
-        val minX = minOf(p1.x, p2.x)
-        val maxX = maxOf(p1.x, p2.x)
-        val minY = minOf(p1.y, p2.y)
-        val maxY = maxOf(p1.y, p2.y)
-        val minZ = minOf(p1.z, p2.z)
-        val maxZ = maxOf(p1.z, p2.z)
-        return pos.x in minX..maxX && pos.y in minY..maxY && pos.z in minZ..maxZ
-    }
-
-    /** Computes dimension data for the selection, or `null` if either corner is missing. */
-    fun region(): RegionResult? {
-        val p1 = pos1 ?: return null
-        val p2 = pos2 ?: return null
-        val minX = minOf(p1.x, p2.x)
-        val maxX = maxOf(p1.x, p2.x)
-        val minY = minOf(p1.y, p2.y)
-        val maxY = maxOf(p1.y, p2.y)
-        val minZ = minOf(p1.z, p2.z)
-        val maxZ = maxOf(p1.z, p2.z)
-        val deltaX = maxX - minX + 1
-        val deltaZ = maxZ - minZ + 1
-        val width = maxOf(deltaX, deltaZ)
-        val height = maxY - minY + 1
-        return RegionResult(minX, minY, minZ, maxX, maxY, maxZ, width, height, deltaX, deltaZ)
-    }
-
-    /**
-     * Builds a [NeoForgeDisplayData] from the current selection.
-     *
-     * Throws if region or worldKey is not yet set.
-     */
-    fun generateDisplayData(ownerId: UUID): NeoForgeDisplayData {
-        val r = requireNotNull(region()) { "region is null" }
-        val wk = requireNotNull(worldKey) { "worldKey is null" }
-        val isVertical = facing == Direction.UP || facing == Direction.DOWN
-        return NeoForgeDisplayData(
+        return VanillaDisplayData(
             id = randomUUID(),
             ownerId = ownerId,
             worldKey = wk,

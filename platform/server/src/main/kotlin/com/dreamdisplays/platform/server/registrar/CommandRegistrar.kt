@@ -8,8 +8,7 @@ import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.commands.subcommands.*
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
@@ -225,7 +224,7 @@ object FabricCommandRegistrar {
     private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             FabricDeleteCommand.execute(ctx)
@@ -243,7 +242,7 @@ object FabricCommandRegistrar {
     private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             FabricStatsCommand.execute(ctx)
@@ -254,7 +253,7 @@ object FabricCommandRegistrar {
     private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || ServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             FabricReloadCommand.execute(ctx)
@@ -286,7 +285,7 @@ object FabricCommandRegistrar {
         return net.minecraft.commands.Commands.literal("list")
             .requires { source ->
                 val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                player == null || ServerPacketHandler.isOpLevel2(player)
+                player == null || VanillaServerPacketHandler.isOpLevel2(player)
             }
             .executes { ctx ->
                 FabricListCommand.execute(ctx)
@@ -338,7 +337,7 @@ object FabricCommandRegistrar {
             net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
                 .requires { source ->
                     val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                    player == null || ServerPacketHandler.isOpLevel2(player)
+                    player == null || VanillaServerPacketHandler.isOpLevel2(player)
                 }
                 .suggests { ctx, builder ->
                     ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
@@ -414,7 +413,7 @@ object NeoForgeCommandRegistrar {
     private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             NeoForgeDeleteCommand.execute(ctx)
@@ -432,7 +431,7 @@ object NeoForgeCommandRegistrar {
     private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             NeoForgeStatsCommand.execute(ctx)
@@ -443,7 +442,7 @@ object NeoForgeCommandRegistrar {
     private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
         .requires { source ->
             val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
+            player == null || VanillaServerPacketHandler.isOpLevel2(player)
         }
         .executes { ctx ->
             NeoForgeReloadCommand.execute(ctx)
@@ -475,7 +474,7 @@ object NeoForgeCommandRegistrar {
         return net.minecraft.commands.Commands.literal("list")
             .requires { source ->
                 val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
+                player == null || VanillaServerPacketHandler.isOpLevel2(player)
             }
             .executes { ctx ->
                 NeoForgeListCommand.execute(ctx)
@@ -527,7 +526,7 @@ object NeoForgeCommandRegistrar {
             net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
                 .requires { source ->
                     val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                    player == null || NeoForgeServerPacketHandler.isOpLevel2(player)
+                    player == null || VanillaServerPacketHandler.isOpLevel2(player)
                 }
                 .suggests { ctx, builder ->
                     ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }

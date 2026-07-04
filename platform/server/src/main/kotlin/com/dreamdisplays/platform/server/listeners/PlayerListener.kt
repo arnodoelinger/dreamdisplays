@@ -8,15 +8,12 @@ import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerScheduler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaServerScheduler
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
-import com.dreamdisplays.platform.server.utils.net.ServerScheduler
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
@@ -100,10 +97,10 @@ object FabricPlayerListener {
 
             if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
                 hasValidatedWorld = true
-                ServerScheduler.runLater(server, 40L) {
+                VanillaServerScheduler.runLater(server, 40L) {
                     val removedUuids = DisplayManager.validateDisplaysAndCleanup(server)
                     if (removedUuids.isNotEmpty()) {
-                        FabricPacketUtil.sendClearCache(server.playerList.players, removedUuids)
+                        VanillaPacketUtil.sendClearCache(server.playerList.players, removedUuids)
                     }
                 }
             }
@@ -112,7 +109,7 @@ object FabricPlayerListener {
             if (!config.settings.modDetectionEnabled) return@register
             if (DisplayManager.getDisplays().isEmpty()) return@register
 
-            ServerScheduler.runLater(server, 600L) {
+            VanillaServerScheduler.runLater(server, 600L) {
                 if (player.isAlive &&
                     PlayerManager.getVersion(player) == null &&
                     !PlayerManager.hasBeenNotifiedAboutModRequired(player)
@@ -149,10 +146,10 @@ object NeoForgePlayerListener {
 
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
-            NeoForgeServerScheduler.runLater(server, 40L) {
-                val removedUuids = DisplayManager.validateDisplaysAndCleanupNeoForge(server)
+            VanillaServerScheduler.runLater(server, 40L) {
+                val removedUuids = DisplayManager.validateDisplaysAndCleanup(server)
                 if (removedUuids.isNotEmpty()) {
-                    NeoForgePacketUtil.sendClearCache(server.playerList.players, removedUuids)
+                    VanillaPacketUtil.sendClearCache(server.playerList.players, removedUuids)
                 }
             }
         }
@@ -161,12 +158,12 @@ object NeoForgePlayerListener {
         if (!config.settings.modDetectionEnabled) return
         if (DisplayManager.getDisplays().isEmpty()) return
 
-        NeoForgeServerScheduler.runLater(server, 600L) {
+        VanillaServerScheduler.runLater(server, 600L) {
             if (player.isAlive &&
                 PlayerManager.getVersion(player.uuid) == null &&
                 !PlayerManager.hasBeenNotifiedAboutModRequired(player.uuid)
             ) {
-                NeoForgeMessageUtil.sendMessage(player, "modRequired")
+                MessageUtil.sendMessage(player, "modRequired")
                 PlayerManager.setModRequiredNotified(player.uuid, true)
             }
         }

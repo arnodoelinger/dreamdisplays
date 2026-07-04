@@ -3,7 +3,6 @@ package com.dreamdisplays.platform.server
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.client.net.V2Payload
-import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.listeners.FabricPlayerListener
 import com.dreamdisplays.platform.server.listeners.FabricProtectionListener
@@ -14,14 +13,13 @@ import com.dreamdisplays.platform.server.listeners.NeoForgeSelectionListener
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.StorageManager
-import com.dreamdisplays.platform.server.meta.NeoForgeUpdater
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
+import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.metrics.TelemetryMetrics
-import com.dreamdisplays.platform.server.playback.FabricPlaybackTransport
-import com.dreamdisplays.platform.server.playback.NeoForgePlaybackTransport
 import com.dreamdisplays.platform.server.playback.PaperPlaybackTransport
 import com.dreamdisplays.platform.server.playback.TimelineManager
+import com.dreamdisplays.platform.server.playback.VanillaPlaybackTransport
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.registrar.ChannelRegistrar
 import com.dreamdisplays.platform.server.registrar.CommandRegistrar
@@ -29,12 +27,13 @@ import com.dreamdisplays.platform.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.platform.server.registrar.ListenerRegistrar
 import com.dreamdisplays.platform.server.registrar.NeoForgeCommandRegistrar
 import com.dreamdisplays.platform.server.storage.StorageBackend
+import com.dreamdisplays.platform.server.utils.net.FabricNetworkingAdapter
 import com.dreamdisplays.platform.server.utils.net.FabricV2Networking
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.NeoForgeNetworkingAdapter
 import com.dreamdisplays.platform.server.utils.net.NeoForgeV2Networking
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
+import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import io.github.arnodoelinger.platformweaver.*
-import org.semver4j.Semver
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents
 import net.fabricmc.api.ModInitializer
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents
@@ -147,12 +146,6 @@ class Main : JavaPlugin() {
         /** Mod config (`Fabric` server included). */
         lateinit var config: Config
 
-        /** Mod version */
-        var modVersion: Semver? = null
-
-        /** Latest plugin version string from GitHub (populated by updater). */
-        var pluginLatestVersion: String? = null
-
         /** Returns the singleton plugin instance. */
         fun getInstance(): Main = instance
 
@@ -181,11 +174,14 @@ class Server : ModInitializer {
     override fun onInitialize() {
         logger.info("Initializing server-side mod...")
 
-        configInstance = FabricConfig()
+        configInstance = VanillaConfig(FabricLoader.getInstance().configDir.resolve("dreamdisplays").toFile())
+        VanillaServerState.config = configInstance
+        VanillaServerState.serverVersion = serverVersion
+        VanillaNetworking.adapter = FabricNetworkingAdapter
 
         registerPayloadTypes()
 
-        ServerPacketHandler.registerReceivers()
+        VanillaServerPacketHandler.registerReceivers()
         FabricV2Networking.registerReceivers()
         FabricCommandRegistrar.register()
         FabricPlayerListener.register()
@@ -193,32 +189,33 @@ class Server : ModInitializer {
         FabricSelectionListener.register()
 
         ServerLifecycleEvents.SERVER_STARTED.register { server ->
-            serverInstance = server
+            VanillaServerState.server = server
             val s = configInstance.storage
             val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
                 .resolve("dreamdisplays").toFile().also { it.mkdirs() }
             val backend = StorageBackend.fromConfig(s.type)
             if (backend == StorageBackend.SQLITE) migrateGlobalDb(dataDir)
-            storageInstance = StorageManager(
+            val storage = StorageManager(
                 backend = backend, dataDir = dataDir,
                 tablePrefix = s.tablePrefix,
                 host = s.host, port = s.port, database = s.database,
                 username = s.username, password = s.password,
             )
-            storageInstance!!.createSchema()
-            DisplayManager.register(storageInstance!!.loadAllFabricDisplays())
-            FabricPlaybackTransport.bind(server)
-            WatchPartyManager.init(FabricPlaybackTransport)
-            TimelineManager.init(FabricPlaybackTransport)
+            VanillaServerState.storage = storage
+            storage.createSchema()
+            DisplayManager.register(storage.loadAllVanillaDisplays())
+            VanillaPlaybackTransport.bind(server)
+            WatchPartyManager.init(VanillaPlaybackTransport)
+            TimelineManager.init(VanillaPlaybackTransport)
             logger.info("Server started. Storage connected.")
             startRepeatingTasks(server)
         }
 
         ServerLifecycleEvents.SERVER_STOPPING.register { _ ->
             logger.info("Server stopping. Saving displays...")
-            DisplayManager.save { storageInstance?.saveDisplay(it) }
+            DisplayManager.save { VanillaServerState.storage?.saveDisplay(it) }
             ServerCoroutines.shutdown()
-            storageInstance?.disconnect()
+            VanillaServerState.storage?.disconnect()
         }
 
         logger.info("Server-side initialization complete.")
@@ -290,21 +287,13 @@ class Server : ModInitializer {
         if (settings.updatesEnabled) {
             ServerCoroutines.io.launch {
                 delay(1000L.milliseconds)
-                runCatching { checkForUpdates(settings.repoOwner, settings.repoName) }
+                runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 while (!server.isStopped) {
                     delay((60L * 60L * 1000L).milliseconds)
-                    runCatching { checkForUpdates(settings.repoOwner, settings.repoName) }
+                    runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 }
             }
         }
-    }
-
-    /** Calls the `Fabric`-only updater without requiring its symbol in `Paper` compilation. */
-    private fun checkForUpdates(repoOwner: String, repoName: String) {
-        val updaterClass = Class.forName("com.dreamdisplays.platform.server.meta.FabricUpdater")
-        val updater = updaterClass.getField("INSTANCE").get(null)
-        updaterClass.getMethod("checkForUpdates", String::class.java, String::class.java)
-            .invoke(updater, repoOwner, repoName)
     }
 
     companion object {
@@ -323,21 +312,11 @@ class Server : ModInitializer {
             }.getOrNull()
         }
 
-        /** Latest mod version from GitHub (populated by updater). */
-        @Volatile
-        var modLatestVersion: Semver? = null
+        private lateinit var configInstance: VanillaConfig
 
-        /** Latest plugin version string from GitHub (populated by updater). */
-        @Volatile
-        var pluginLatestVersion: String? = null
-
-        private lateinit var configInstance: FabricConfig
-        private var serverInstance: MinecraftServer? = null
-        private var storageInstance: StorageManager? = null
-
-        val config: FabricConfig; get() = configInstance
-        val server: MinecraftServer?; get() = serverInstance
-        val storage: StorageManager?; get() = storageInstance
+        val config: VanillaConfig; get() = configInstance
+        val server: MinecraftServer?; get() = VanillaServerState.server
+        val storage: StorageManager?; get() = VanillaServerState.storage
 
         /** Copies the pre-1.8.1 global `SQLite DB` into [worldDataDir] on first startup for this world. */
         @Deprecated("Will be removed in 1.9.0")
@@ -368,7 +347,10 @@ class Server : ModInitializer {
 class NeoForgeServer(modEventBus: IEventBus) {
     init {
         logger.info("Initializing server-side mod...")
-        configInstance = NeoForgeConfig()
+        configInstance = VanillaConfig(FMLPaths.CONFIGDIR.get().resolve("dreamdisplays").toFile())
+        VanillaServerState.config = configInstance
+        VanillaServerState.serverVersion = serverVersion
+        VanillaNetworking.adapter = NeoForgeNetworkingAdapter
 
         modEventBus.addListener(::registerPayloads)
         NeoForge.EVENT_BUS.register(this)
@@ -384,29 +366,30 @@ class NeoForgeServer(modEventBus: IEventBus) {
     private fun registerPayloads(event: RegisterPayloadHandlersEvent) {
         val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
         NeoForgeV2Networking.registerReceivers(registrar)
-        NeoForgeServerPacketHandler.registerReceivers(registrar)
+        VanillaServerPacketHandler.registerReceivers(registrar)
     }
 
     /** Storage bring-up, display registration, and repeating tasks; covers dedicated + integrated servers alike. */
     @SubscribeEvent
     fun onServerStarted(event: ServerStartedEvent) {
         val server = event.server
-        serverInstance = server
+        VanillaServerState.server = server
         val s = configInstance.storage
         val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
             .resolve("dreamdisplays").toFile().also { it.mkdirs() }
         val backend = StorageBackend.fromConfig(s.type)
-        storageInstance = StorageManager(
+        val storage = StorageManager(
             backend = backend, dataDir = dataDir,
             tablePrefix = s.tablePrefix,
             host = s.host, port = s.port, database = s.database,
             username = s.username, password = s.password,
         )
-        storageInstance!!.createSchema()
-        DisplayManager.register(storageInstance!!.loadAllNeoForgeDisplays())
-        NeoForgePlaybackTransport.bind(server)
-        WatchPartyManager.init(NeoForgePlaybackTransport)
-        TimelineManager.init(NeoForgePlaybackTransport)
+        VanillaServerState.storage = storage
+        storage.createSchema()
+        DisplayManager.register(storage.loadAllVanillaDisplays())
+        VanillaPlaybackTransport.bind(server)
+        WatchPartyManager.init(VanillaPlaybackTransport)
+        TimelineManager.init(VanillaPlaybackTransport)
         logger.info("Server started. Storage connected.")
         startRepeatingTasks(server)
     }
@@ -415,9 +398,9 @@ class NeoForgeServer(modEventBus: IEventBus) {
     @SubscribeEvent
     fun onServerStopping(event: ServerStoppingEvent) {
         logger.info("Server stopping. Saving displays...")
-        DisplayManager.saveNeoForge { storageInstance?.saveDisplay(it) }
+        DisplayManager.save { VanillaServerState.storage?.saveDisplay(it) }
         ServerCoroutines.shutdown()
-        storageInstance?.disconnect()
+        VanillaServerState.storage?.disconnect()
     }
 
     /** Starts repeating coroutines for display updates and update checking on [ServerCoroutines.io]. */
@@ -429,8 +412,8 @@ class NeoForgeServer(modEventBus: IEventBus) {
                 delay(1000L.milliseconds)
                 runCatching {
                     server.execute {
-                        DisplayManager.updateAllDisplaysNeoForge(server)
-                        StateManager.tickBroadcastNeoForge(server)
+                        DisplayManager.updateAllDisplays(server)
+                        StateManager.tickBroadcast(server)
                         TimelineManager.tick()
                         WatchPartyManager.tick()
                     }
@@ -441,10 +424,10 @@ class NeoForgeServer(modEventBus: IEventBus) {
         if (settings.updatesEnabled) {
             ServerCoroutines.io.launch {
                 delay(1000L.milliseconds)
-                runCatching { NeoForgeUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 while (!server.isStopped) {
                     delay((60L * 60L * 1000L).milliseconds)
-                    runCatching { NeoForgeUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                    runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
                 }
             }
         }
@@ -463,20 +446,10 @@ class NeoForgeServer(modEventBus: IEventBus) {
             }.getOrNull()
         }
 
-        /** Latest mod version from GitHub (populated by updater). */
-        @Volatile
-        var modLatestVersion: Semver? = null
+        private lateinit var configInstance: VanillaConfig
 
-        /** Latest plugin version string from GitHub (populated by updater). */
-        @Volatile
-        var pluginLatestVersion: String? = null
-
-        private lateinit var configInstance: NeoForgeConfig
-        private var serverInstance: MinecraftServer? = null
-        private var storageInstance: StorageManager? = null
-
-        val config: NeoForgeConfig; get() = configInstance
-        val server: MinecraftServer?; get() = serverInstance
-        val storage: StorageManager?; get() = storageInstance
+        val config: VanillaConfig; get() = configInstance
+        val server: MinecraftServer?; get() = VanillaServerState.server
+        val storage: StorageManager?; get() = VanillaServerState.storage
     }
 }

@@ -4,7 +4,6 @@ import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -75,14 +74,14 @@ object NeoForgeReloadCommand {
         try {
             NeoForgeServer.config.reload()
             if (player != null) {
-                NeoForgeMessageUtil.sendMessage(player, "configReloaded")
-                NeoForgeMessageUtil.sendMessage(player, "configReloadSummary")
+                MessageUtil.sendMessage(player, "configReloaded")
+                MessageUtil.sendMessage(player, "configReloadSummary")
             } else {
                 ctx.source.sendSystemMessage(Component.literal("Dream Displays config reloaded."))
             }
         } catch (e: Exception) {
             if (player != null) {
-                NeoForgeMessageUtil.sendMessage(player, "configReloadFailed")
+                MessageUtil.sendMessage(player, "configReloadFailed")
             } else {
                 ctx.source.sendFailure(Component.literal("Failed to reload config: ${e.message}"))
             }

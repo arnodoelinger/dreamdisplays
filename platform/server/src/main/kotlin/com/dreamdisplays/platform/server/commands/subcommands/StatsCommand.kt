@@ -5,7 +5,6 @@ import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -118,12 +117,12 @@ object NeoForgeStatsCommand {
             .toSortedMap()
 
         if (player != null) {
-            NeoForgeMessageUtil.sendMessage(player, "displayStatsHeader")
+            MessageUtil.sendMessage(player, "displayStatsHeader")
             for ((version, count) in counts) {
-                NeoForgeMessageUtil.sendColoredMessage(player, format("displayStatsEntry", version, count))
+                MessageUtil.sendColoredMessage(player, format("displayStatsEntry", version, count))
             }
             val total = counts.values.sum()
-            NeoForgeMessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
+            MessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg("displayStatsHeader")))
             for ((version, count) in counts) {

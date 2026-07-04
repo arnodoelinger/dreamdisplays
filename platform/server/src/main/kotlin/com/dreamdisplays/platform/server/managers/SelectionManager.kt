@@ -3,12 +3,10 @@ package com.dreamdisplays.platform.server.managers
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
-import com.dreamdisplays.platform.server.datatypes.NeoForgeSelectionData
+import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
 import com.dreamdisplays.platform.server.datatypes.SelectionData
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.*
 import net.minecraft.core.BlockPos
@@ -43,8 +41,8 @@ object SelectionManager {
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
     @FabricOnly
     fun setFirstPoint(player: ServerPlayer, pos: BlockPos, worldKey: String, face: Direction) {
-        val sel = (selectionPoints[player.uuid] as? FabricSelectionData)
-            ?: FabricSelectionData().also { selectionPoints[player.uuid] = it }
+        val sel = (selectionPoints[player.uuid] as? VanillaSelectionData)
+            ?: VanillaSelectionData().also { selectionPoints[player.uuid] = it }
         if (sel.worldKey != worldKey) sel.reset()
         sel.pos1 = pos
         sel.worldKey = worldKey
@@ -74,7 +72,7 @@ object SelectionManager {
     /** Records the second selection corner, validating the worlds match the first point. */
     @FabricOnly
     fun setSecondPoint(player: ServerPlayer, pos: BlockPos, worldKey: String) {
-        val sel = selectionPoints[player.uuid] as? FabricSelectionData ?: return
+        val sel = selectionPoints[player.uuid] as? VanillaSelectionData ?: return
         if (sel.pos1 == null || sel.worldKey != worldKey) {
             sel.reset()
             MessageUtil.sendMessageWithMaterials(
@@ -96,7 +94,7 @@ object SelectionManager {
     /** Returns true if [pos] lies within any player's finalized selection in [worldKey]. */
     @FabricOnly
     fun isLocationSelected(pos: BlockPos, worldKey: String): Boolean =
-        selectionPoints.values.filterIsInstance<FabricSelectionData>().any { sel ->
+        selectionPoints.values.filterIsInstance<VanillaSelectionData>().any { sel ->
             sel.isReady && sel.worldKey == worldKey && sel.contains(pos)
         }
 
@@ -127,23 +125,23 @@ object SelectionManager {
 object NeoForgeSelectionManager {
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
     fun setFirstPoint(player: ServerPlayer, pos: BlockPos, worldKey: String, face: Direction) {
-        val sel = (SelectionManager.selectionPoints[player.uuid] as? NeoForgeSelectionData)
-            ?: NeoForgeSelectionData().also { SelectionManager.selectionPoints[player.uuid] = it }
+        val sel = (SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData)
+            ?: VanillaSelectionData().also { SelectionManager.selectionPoints[player.uuid] = it }
         if (sel.worldKey != worldKey) sel.reset()
         sel.pos1 = pos
         sel.worldKey = worldKey
         sel.facing = face
         sel.horizontalFacing = player.direction
         sel.isReady = false
-        NeoForgeMessageUtil.sendMessage(player, "firstPointSelected")
+        MessageUtil.sendMessage(player, "firstPointSelected")
     }
 
     /** Records the second selection corner, validating the worlds match the first point. */
     fun setSecondPoint(player: ServerPlayer, pos: BlockPos, worldKey: String) {
-        val sel = SelectionManager.selectionPoints[player.uuid] as? NeoForgeSelectionData ?: return
+        val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData ?: return
         if (sel.pos1 == null || sel.worldKey != worldKey) {
             sel.reset()
-            NeoForgeMessageUtil.sendMessageWithMaterials(
+            MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
                 NeoForgeServer.config.settings.selectionMaterial, NeoForgeServer.config.settings.baseMaterial
             )
@@ -151,12 +149,12 @@ object NeoForgeSelectionManager {
         }
         sel.pos2 = pos
         sel.isReady = true
-        NeoForgeMessageUtil.sendMessage(player, "secondPointSelected")
+        MessageUtil.sendMessage(player, "secondPointSelected")
     }
 
     /** Returns true if [pos] lies within any player's finalized selection in [worldKey]. */
     fun isLocationSelected(pos: BlockPos, worldKey: String): Boolean =
-        SelectionManager.selectionPoints.values.filterIsInstance<NeoForgeSelectionData>().any { sel ->
+        SelectionManager.selectionPoints.values.filterIsInstance<VanillaSelectionData>().any { sel ->
             sel.isReady && sel.worldKey == worldKey && sel.contains(pos)
         }
 

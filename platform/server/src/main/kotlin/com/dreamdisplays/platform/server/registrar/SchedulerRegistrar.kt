@@ -5,6 +5,7 @@ import io.github.arnodoelinger.platformweaver.PaperOnly
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
+import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
@@ -51,7 +52,7 @@ object SchedulerRegistrar {
                 TICKS_PER_SECOND,
                 UPDATE_CHECK_INTERVAL_TICKS
             ) {
-                checkForUpdates(
+                Updater.checkForUpdates(
                     settings.repoOwner,
                     settings.repoName
                 )
@@ -82,13 +83,5 @@ object SchedulerRegistrar {
             intervalTicks.coerceAtLeast(1L) * TICK_MILLIS,
             TimeUnit.MILLISECONDS,
         )
-    }
-
-    /** Calls the `Paper`-only updater without requiring its symbol in `Fabric` compilation. */
-    private fun checkForUpdates(repoOwner: String, repoName: String) {
-        val updaterClass = Class.forName("com.dreamdisplays.platform.server.meta.Updater")
-        val updater = updaterClass.getField("INSTANCE").get(null)
-        updaterClass.getMethod("checkForUpdates", String::class.java, String::class.java)
-            .invoke(updater, repoOwner, repoName)
     }
 }

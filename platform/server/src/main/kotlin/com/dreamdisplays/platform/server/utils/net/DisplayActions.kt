@@ -12,6 +12,7 @@ import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
+import com.dreamdisplays.platform.server.meta.VersionState
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -209,7 +210,7 @@ object DisplayActions {
 
     /** Tells [player] about a newer mod version if they haven't been notified this session. */
     private fun checkModUpdate(player: Player, userVersion: Semver) {
-        val latestVersion = Main.modVersion ?: return
+        val latestVersion = VersionState.modLatestVersion ?: return
 
         if (userVersion < latestVersion && !PlayerManager.hasBeenNotifiedAboutModUpdate(player)) {
             sendModUpdateMessage(player, latestVersion)
@@ -220,7 +221,7 @@ object DisplayActions {
     /** Tells privileged [player] about a newer plugin release; skipped for `-SNAPSHOT` builds. */
     @Suppress("DEPRECATION")
     private fun checkPluginUpdate(player: Player) {
-        val latestPluginVersion = Main.pluginLatestVersion ?: return
+        val latestPluginVersion = VersionState.pluginLatestVersion ?: return
 
         if (PlayerManager.hasBeenNotifiedAboutPluginUpdate(player)) return
 

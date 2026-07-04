@@ -5,7 +5,6 @@ import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -126,13 +125,13 @@ object NeoForgeProtectionListener {
         val worldKey = RegionUtil.getLevelKey(level)
         val pos = event.pos
 
-        val isProtected = DisplayManager.isContainsNeoForge(worldKey, pos) != null ||
+        val isProtected = DisplayManager.isContains(worldKey, pos) != null ||
                 NeoForgeSelectionManager.isLocationSelected(pos, worldKey)
 
         if (isProtected) {
             val player = event.player as? ServerPlayer
             if (player != null && PlayerManager.getVersion(player.uuid) == null) {
-                NeoForgeMessageUtil.sendMessage(player, "displayBlockBreak")
+                MessageUtil.sendMessage(player, "displayBlockBreak")
             }
             event.setCanceled(true)
         }

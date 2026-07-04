@@ -4,7 +4,6 @@ import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -102,11 +101,11 @@ object NeoForgeHelpCommand {
         /** Prints the localized message for [key] to the player, or to the command source if not a player. */
         fun line(key: String) {
             val msg = config.getMessageForPlayer(player, key)
-            NeoForgeMessageUtil.sendColoredMessage(player ?: return, msg)
+            MessageUtil.sendColoredMessage(player ?: return, msg)
         }
 
         val header = config.getMessageForPlayer(player, "displayHelpHeader")
-        NeoForgeMessageUtil.sendColoredMessage(player ?: run {
+        MessageUtil.sendColoredMessage(player ?: run {
             ctx.source.sendSystemMessage(Component.literal("D | Help"))
             return 1
         }, header)

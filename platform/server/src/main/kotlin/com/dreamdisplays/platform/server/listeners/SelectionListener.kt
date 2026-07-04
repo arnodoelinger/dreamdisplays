@@ -7,7 +7,6 @@ import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -191,7 +190,7 @@ object NeoForgeSelectionListener {
         if (player.isShiftKeyDown) {
             if (SelectionManager.selectionPoints.containsKey(player.uuid)) {
                 NeoForgeSelectionManager.resetSelection(player)
-                NeoForgeMessageUtil.sendMessage(player, "selectionClear")
+                MessageUtil.sendMessage(player, "selectionClear")
             }
             event.setCanceled(true)
             return

@@ -3,8 +3,6 @@ package com.dreamdisplays.platform.server.datatypes
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.playback.PlaybackPermissions
-import io.github.arnodoelinger.platformweaver.FabricOnly
-import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -18,7 +16,7 @@ import java.util.*
 /**
  * Shared display data.
  *
- * Per-platform concrete classes ([PaperDisplayData], [FabricDisplayData]) carry platform-specific
+ * Per-platform concrete classes ([PaperDisplayData], [VanillaDisplayData]) carry platform-specific
  * position / box types; shared state and identity live on this interface.
  */
 interface DisplayData {
@@ -92,45 +90,9 @@ class PaperDisplayData(
 }
 
 /**
- * `Fabric`-specific implementation of [DisplayData].
+ * Vanilla implementation of [DisplayData], shared by `Fabric` and `NeoForge`.
  */
-@FabricOnly
-class FabricDisplayData(
-    override val id: UUID,
-    override val ownerId: UUID,
-    val worldKey: String,
-    val pos1: BlockPos,
-    val pos2: BlockPos,
-    override val width: Int,
-    override val height: Int,
-    val facing: Direction,
-    override val rotation: ContentRotation = ContentRotation.NONE,
-) : DisplayData {
-    override var url: String = ""
-    override var lang: String = ""
-    override var mode: PlaybackMode = PlaybackMode.LOCAL
-    override var isLocked: Boolean = true
-    override var duration: Long? = null
-
-    val minX = minOf(pos1.x, pos2.x)
-    val minY = minOf(pos1.y, pos2.y)
-    val minZ = minOf(pos1.z, pos2.z)
-    val maxX = maxOf(pos1.x, pos2.x)
-    val maxY = maxOf(pos1.y, pos2.y)
-    val maxZ = maxOf(pos1.z, pos2.z)
-
-    val box: AABB = AABB(
-        minX.toDouble(), minY.toDouble(), minZ.toDouble(),
-        (maxX + 1).toDouble(), (maxY + 1).toDouble(), (maxZ + 1).toDouble()
-    )
-}
-
-/**
- * `NeoForge`-specific implementation of [DisplayData]. Identical shape to [FabricDisplayData]
- * (both are pure vanilla-Minecraft types).
- */
-@NeoForgeOnly
-class NeoForgeDisplayData(
+class VanillaDisplayData(
     override val id: UUID,
     override val ownerId: UUID,
     val worldKey: String,

@@ -3,17 +3,14 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
-import com.dreamdisplays.platform.server.datatypes.NeoForgeSelectionData
+import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -165,7 +162,7 @@ object FabricCreateCommand {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("This command can only be used by a player.")).let { 0 }
 
-        val sel = SelectionManager.selectionPoints[player.uuid] as? FabricSelectionData
+        val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
                 Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial
@@ -205,7 +202,7 @@ object FabricCreateCommand {
         ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
-        FabricPacketUtil.sendDisplayInfo(receivers, displayData)
+        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
 
         MessageUtil.sendMessage(player, "successfulCreation")
         return 1
@@ -216,11 +213,11 @@ object FabricCreateCommand {
      * registers the resulting display.
      */
     private fun validate(
-        sel: FabricSelectionData,
+        sel: VanillaSelectionData,
         server: MinecraftServer,
         sendError: (String, Array<out Any>) -> Unit,
         onWrongStructure: (() -> Unit)? = null,
-    ): FabricSelectionData? {
+    ): VanillaSelectionData? {
         if (!sel.isReady || sel.pos1 == null || sel.pos2 == null) {
             sendError("noDisplayTerritories", emptyArray())
             return null
@@ -293,8 +290,8 @@ object NeoForgeCreateCommand {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("This command can only be used by a player.")).let { 0 }
 
-        val sel = SelectionManager.selectionPoints[player.uuid] as? NeoForgeSelectionData
-            ?: return NeoForgeMessageUtil.sendMessageWithMaterials(
+        val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
+            ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
                 NeoForgeServer.config.settings.selectionMaterial, NeoForgeServer.config.settings.baseMaterial
             ).let { 0 }
@@ -303,17 +300,17 @@ object NeoForgeCreateCommand {
             sel, ctx.source.server,
             sendError = { key, args ->
                 if (key == "noDisplayTerritories")
-                    NeoForgeMessageUtil.sendMessageWithMaterials(
+                    MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
                         NeoForgeServer.config.settings.selectionMaterial,
                         NeoForgeServer.config.settings.baseMaterial
                     )
                 else
-                    NeoForgeMessageUtil.sendMessage(player, key, *args)
+                    MessageUtil.sendMessage(player, key, *args)
             },
             onWrongStructure = {
-                NeoForgeMessageUtil.sendMessageWithMaterials(
+                MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
                     NeoForgeServer.config.settings.baseMaterial
@@ -322,7 +319,7 @@ object NeoForgeCreateCommand {
         ) ?: return 0
 
         if (DisplayManager.isOverlaps(sel)) {
-            NeoForgeMessageUtil.sendMessage(player, "displayOverlap")
+            MessageUtil.sendMessage(player, "displayOverlap")
             return 0
         }
 
@@ -333,9 +330,9 @@ object NeoForgeCreateCommand {
         ServerCoroutines.io.launch { NeoForgeServer.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
-        NeoForgePacketUtil.sendDisplayInfo(receivers, displayData)
+        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
 
-        NeoForgeMessageUtil.sendMessage(player, "successfulCreation")
+        MessageUtil.sendMessage(player, "successfulCreation")
         return 1
     }
 
@@ -344,11 +341,11 @@ object NeoForgeCreateCommand {
      * registers the resulting display.
      */
     private fun validate(
-        sel: NeoForgeSelectionData,
+        sel: VanillaSelectionData,
         server: MinecraftServer,
         sendError: (String, Array<out Any>) -> Unit,
         onWrongStructure: (() -> Unit)? = null,
-    ): NeoForgeSelectionData? {
+    ): VanillaSelectionData? {
         if (!sel.isReady || sel.pos1 == null || sel.pos2 == null) {
             sendError("noDisplayTerritories", emptyArray())
             return null

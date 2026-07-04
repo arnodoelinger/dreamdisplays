@@ -5,12 +5,9 @@ import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -126,7 +123,7 @@ object FabricOnCommand {
 
         val selfTarget = self?.uuid == target.uuid
 
-        if (!selfTarget && (self == null || !ServerPacketHandler.isOpLevel2(self))) {
+        if (!selfTarget && (self == null || !VanillaServerPacketHandler.isOpLevel2(self))) {
             if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))
             return 0
@@ -142,7 +139,7 @@ object FabricOnCommand {
         }
 
         PlayerManager.setDisplaysEnabled(target, true)
-        FabricPacketUtil.sendDisplayEnabled(target, true)
+        VanillaPacketUtil.sendDisplayEnabled(target, true)
         MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
             val msg = config.getMessageForPlayer(self, "display.enabled.target") as? String
@@ -171,7 +168,7 @@ object NeoForgeOnCommand {
         } else {
             ctx.source.server.playerList.getPlayerByName(targetName) ?: run {
                 val msg = config.getMessageForPlayer(self, "displayTargetNotFound") as? String ?: "Player not found: %s"
-                if (self != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, targetName))
+                if (self != null) MessageUtil.sendColoredMessage(self, String.format(msg, targetName))
                 else ctx.source.sendFailure(Component.literal(String.format(msg, targetName)))
                 return 0
             }
@@ -179,27 +176,27 @@ object NeoForgeOnCommand {
 
         val selfTarget = self?.uuid == target.uuid
 
-        if (!selfTarget && (self == null || !NeoForgeServerPacketHandler.isOpLevel2(self))) {
-            if (self != null) NeoForgeMessageUtil.sendMessage(self, "displayCommandMissingPermission")
+        if (!selfTarget && (self == null || !VanillaServerPacketHandler.isOpLevel2(self))) {
+            if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))
             return 0
         }
 
         if (PlayerManager.isDisplaysEnabled(target.uuid)) {
-            NeoForgeMessageUtil.sendMessage(target, "display.already-enabled")
+            MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
                 val msg = config.getMessageForPlayer(self, "display.already-enabled.target") as? String
-                if (msg != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
+                if (msg != null) MessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
             }
             return 1
         }
 
         PlayerManager.setDisplaysEnabled(target.uuid, true)
-        NeoForgePacketUtil.sendDisplayEnabled(target, true)
-        NeoForgeMessageUtil.sendMessage(target, "display.enabled")
+        VanillaPacketUtil.sendDisplayEnabled(target, true)
+        MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
             val msg = config.getMessageForPlayer(self, "display.enabled.target") as? String
-            if (msg != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
+            if (msg != null) MessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
         }
         return 1
     }

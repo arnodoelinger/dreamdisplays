@@ -3,12 +3,9 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -72,14 +69,14 @@ object FabricDeleteCommand {
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !ServerPacketHandler.isOpLevel2(player)) {
+        if (data.ownerId != player.uuid && !VanillaServerPacketHandler.isOpLevel2(player)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
         DisplayManager.delete(data)
-        FabricPacketUtil.sendDelete(receivers, data.id)
+        VanillaPacketUtil.sendDelete(receivers, data.id)
         MessageUtil.sendMessage(player, "displayDeleted")
         return 1
     }
@@ -114,24 +111,24 @@ object NeoForgeDeleteCommand {
             ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
 
         val targetPos = getTargetBlockPos(player) ?: run {
-            NeoForgeMessageUtil.sendMessage(player, "noDisplay")
+            MessageUtil.sendMessage(player, "noDisplay")
             return 0
         }
 
         val worldKey = RegionUtil.getPlayerLevelKey(player)
 
-        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
-            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+        val data = DisplayManager.isContains(worldKey, targetPos)
+            ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !NeoForgeServerPacketHandler.isOpLevel2(player)) {
-            NeoForgeMessageUtil.sendMessage(player, "displayCommandMissingPermission")
+        if (data.ownerId != player.uuid && !VanillaServerPacketHandler.isOpLevel2(player)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
         DisplayManager.delete(data)
-        NeoForgePacketUtil.sendDelete(receivers, data.id)
-        NeoForgeMessageUtil.sendMessage(player, "displayDeleted")
+        VanillaPacketUtil.sendDelete(receivers, data.id)
+        MessageUtil.sendMessage(player, "displayDeleted")
         return 1
     }
 

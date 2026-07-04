@@ -1,12 +1,9 @@
 package com.dreamdisplays.platform.server.managers
 
-import io.github.arnodoelinger.platformweaver.FabricOnly
-import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
-import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
+import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.datatypes.StateData
 import com.dreamdisplays.platform.server.datatypes.SyncData
@@ -18,8 +15,7 @@ import com.dreamdisplays.platform.server.managers.DisplayManager.getReceivers
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import net.minecraft.server.MinecraftServer
@@ -118,13 +114,12 @@ object StateManager {
      * Handles a sync packet from [player]: validates it, updates the per-display state,
      * and rebroadcasts to other receivers (rate-limited to avoid packet floods).
      */
-    @FabricOnly
     fun processSyncPacket(packet: SyncData, player: ServerPlayer, server: MinecraftServer, isAdmin: Boolean) {
         if (!applySyncPacket(packet, player.uuid, isAdmin)) return
         val data = getDisplayData(packet.id) ?: return
-        val receivers = getReceivers(data as FabricDisplayData, server)
+        val receivers = getReceivers(data as VanillaDisplayData, server)
             .filter { it.uuid != player.uuid }
-        FabricPacketUtil.sendSync(receivers, packet.copy(id = packet.id))
+        VanillaPacketUtil.sendSync(receivers, packet.copy(id = packet.id))
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
@@ -140,14 +135,13 @@ object StateManager {
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
-    @FabricOnly
     fun sendSyncPacket(id: UUID?, player: ServerPlayer) {
         val displayId = id ?: return
         if (V2PlayerTracker.isV2(player.uuid)) return
         val state = playStates[displayId] ?: return
-        val display = getDisplayData(displayId) as? FabricDisplayData
+        val display = getDisplayData(displayId) as? VanillaDisplayData
         val packet = state.createPacket(display)
-        FabricPacketUtil.sendSync(listOf(player), packet)
+        VanillaPacketUtil.sendSync(listOf(player), packet)
     }
 
     /**
@@ -186,12 +180,11 @@ object StateManager {
     }
 
     /** Resets the server-side clock for [displayId] to 0 (called when owner switches video). */
-    @FabricOnly
-    @JvmName("resetAndBroadcastFabric")
+    @JvmName("resetAndBroadcastVanilla")
     fun resetAndBroadcast(displayId: UUID, receivers: List<ServerPlayer>) {
         val state = resetState(displayId) ?: return
-        val display = getDisplayData(displayId) as? FabricDisplayData
-        FabricPacketUtil.sendSync(receivers, state.createPacket(display))
+        val display = getDisplayData(displayId) as? VanillaDisplayData
+        VanillaPacketUtil.sendSync(receivers, state.createPacket(display))
     }
 
     /**
@@ -237,59 +230,10 @@ object StateManager {
      * Periodically broadcasts the current sync packet for every active sync display to keep
      * clients in lockstep. Without this, clients drift after the initial sync.
      */
-    @FabricOnly
     fun tickBroadcast(server: MinecraftServer) = forEachBroadcastDue { state, display ->
-        val fabricDisplay = display as FabricDisplayData
-        val receivers = getReceivers(fabricDisplay, server)
+        val vanillaDisplay = display as VanillaDisplayData
+        val receivers = getReceivers(vanillaDisplay, server)
             .filterNot { V2PlayerTracker.isV2(it.uuid) }
-        if (receivers.isNotEmpty()) FabricPacketUtil.sendSync(receivers, state.createPacket(fabricDisplay))
-    }
-
-    /**
-     * Handles a sync packet from [player]: validates it, updates the per-display state,
-     * and rebroadcasts to other receivers (rate-limited to avoid packet floods).
-     *
-     * Named distinctly from the `Fabric` overload (rather than overloaded in place) because both
-     * take the identical vanilla `ServerPlayer`/`MinecraftServer` parameter types, which would
-     * collide at the frontend before platformweaver ever strips anything.
-     */
-    @NeoForgeOnly
-    fun processSyncPacketNeoForge(packet: SyncData, player: ServerPlayer, server: MinecraftServer, isAdmin: Boolean) {
-        if (!applySyncPacket(packet, player.uuid, isAdmin)) return
-        val data = getDisplayData(packet.id) ?: return
-        val receivers = getReceivers(data as NeoForgeDisplayData, server)
-            .filter { it.uuid != player.uuid }
-        NeoForgePacketUtil.sendSync(receivers, packet.copy(id = packet.id))
-    }
-
-    /** Sends the current sync packet for display [id] to a single [player], if state exists. */
-    @NeoForgeOnly
-    fun sendSyncPacketNeoForge(id: UUID?, player: ServerPlayer) {
-        val displayId = id ?: return
-        if (V2PlayerTracker.isV2(player.uuid)) return
-        val state = playStates[displayId] ?: return
-        val display = getDisplayData(displayId) as? NeoForgeDisplayData
-        val packet = state.createPacket(display)
-        NeoForgePacketUtil.sendSync(listOf(player), packet)
-    }
-
-    /** Resets the server-side clock for [displayId] to 0 (called when owner switches video). */
-    @NeoForgeOnly
-    fun resetAndBroadcastNeoForge(displayId: UUID, receivers: List<ServerPlayer>) {
-        val state = resetState(displayId) ?: return
-        val display = getDisplayData(displayId) as? NeoForgeDisplayData
-        NeoForgePacketUtil.sendSync(receivers, state.createPacket(display))
-    }
-
-    /**
-     * Periodically broadcasts the current sync packet for every active sync display to keep
-     * clients in lockstep. Without this, clients drift after the initial sync.
-     */
-    @NeoForgeOnly
-    fun tickBroadcastNeoForge(server: MinecraftServer) = forEachBroadcastDue { state, display ->
-        val neoForgeDisplay = display as NeoForgeDisplayData
-        val receivers = getReceivers(neoForgeDisplay, server)
-            .filterNot { V2PlayerTracker.isV2(it.uuid) }
-        if (receivers.isNotEmpty()) NeoForgePacketUtil.sendSync(receivers, state.createPacket(neoForgeDisplay))
+        if (receivers.isNotEmpty()) VanillaPacketUtil.sendSync(receivers, state.createPacket(vanillaDisplay))
     }
 }
