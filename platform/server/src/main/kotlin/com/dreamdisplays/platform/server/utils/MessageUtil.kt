@@ -84,6 +84,23 @@ object MessageUtil {
         sender.sendMessage(component)
     }
 
+    /** Returns the localized string for [key] in [sender]'s language, or [key] when missing. */
+    @PaperOnly
+    fun messageFor(sender: CommandSender, key: String): String =
+        Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
+
+    /** Returns the localized string for [key], substituting `{0}`, `{1}`, ... with [values]. */
+    @PaperOnly
+    fun formatIndexed(sender: CommandSender, key: String, vararg values: String): String =
+        applyPlaceholders(messageFor(sender, key), *values)
+
+    /** Returns the localized string for [key], substituting `%s`/`%d`-style [values] via `String.format`. */
+    @PaperOnly
+    fun formatPrintf(sender: CommandSender, key: String, vararg values: Any): String {
+        val template = messageFor(sender, key)
+        return runCatching { String.format(template, *values) }.getOrElse { template }
+    }
+
     /**
      * Sends a localized message to [sender], replacing `{0}`, `{1}` ... placeholders with
      * inline item sprite icons for each [materials] entry. Hovering reveals the item tooltip.
@@ -148,6 +165,27 @@ object MessageUtil {
         is Map<*, *> -> replacePlaceholders(message, args, intArrayOf(0))
         is List<*> -> replacePlaceholders(message, args, intArrayOf(0))
         else -> message
+    }
+
+    /** Returns the localized string for [key] in [player]'s language, or [key] when missing. */
+    fun messageFor(player: ServerPlayer?, key: String): String =
+        VanillaServerState.config.getMessageForPlayer(player, key) as? String ?: key
+
+    /** Returns the localized string for [key], substituting `{0}`, `{1}`, ... with [values]. */
+    fun formatIndexed(player: ServerPlayer?, key: String, vararg values: String): String =
+        applyPlaceholders(messageFor(player, key), *values)
+
+    /** Returns the localized string for [key], substituting `%s`/`%d`-style [values] via `String.format`. */
+    fun formatPrintf(player: ServerPlayer?, key: String, vararg values: Any): String {
+        val template = messageFor(player, key)
+        return runCatching { String.format(template, *values) }.getOrElse { template }
+    }
+
+    /** Replaces `{0}`, `{1}`, ... placeholders in [template] with the matching value from [values]. */
+    fun applyPlaceholders(template: String, vararg values: String): String {
+        var result = template
+        values.forEachIndexed { index, value -> result = result.replace("{$index}", value) }
+        return result
     }
 
     /** Sends [message] to [player], converting strings / maps to `NMS Component`. */

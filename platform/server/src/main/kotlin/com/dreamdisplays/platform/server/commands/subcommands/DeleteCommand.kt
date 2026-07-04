@@ -11,11 +11,8 @@ import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
-import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 
@@ -58,7 +55,7 @@ object VanillaDeleteCommand {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
 
-        val targetPos = getTargetBlockPos(player) ?: run {
+        val targetPos = RegionUtil.getTargetedBlockPos(player) ?: run {
             MessageUtil.sendMessage(player, "noDisplay")
             return 0
         }
@@ -78,22 +75,5 @@ object VanillaDeleteCommand {
         VanillaPacketUtil.sendDelete(receivers, data.id)
         MessageUtil.sendMessage(player, "displayDeleted")
         return 1
-    }
-
-    /** Gets the block position the player is currently looking at. */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val eyePos = player.eyePosition
-        val lookVec = player.lookAngle
-        val hit = level.clip(
-            ClipContext(
-                eyePos,
-                eyePos.add(lookVec.scale(32.0)),
-                ClipContext.Block.OUTLINE,
-                ClipContext.Fluid.NONE,
-                player
-            )
-        )
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
     }
 }

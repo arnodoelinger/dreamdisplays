@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
@@ -12,7 +11,6 @@ import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.command.CommandSender
-import org.bukkit.entity.Player
 
 /**
  * Handles the `/display stats` command. Prints a per-mod-version breakdown of currently
@@ -35,17 +33,11 @@ class StatsCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayStatsHeader")
 
         for ((version, count) in counts) {
-            MessageUtil.sendColoredMessage(sender, format(sender, "displayStatsEntry", version, count))
+            MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "displayStatsEntry", version, count))
         }
 
         val total = counts.values.sum()
-        MessageUtil.sendColoredMessage(sender, format(sender, "displayStatsTotal", total))
-    }
-
-    /** Looks up the localized template for [key] and substitutes [values] via `String.format`. */
-    private fun format(sender: CommandSender, key: String, vararg values: Any): String {
-        val template = Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
-        return runCatching { String.format(template, *values) }.getOrElse { template }
+        MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "displayStatsTotal", total))
     }
 }
 
@@ -56,13 +48,6 @@ object VanillaStatsCommand {
     /** Prints a per-mod-version breakdown of currently connected players that have reported their client version. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
-        val config = VanillaServerState.config
-
-        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
-        fun format(key: String, vararg values: Any): String {
-            val template = msg(key)
-            return runCatching { String.format(template, *values) }.getOrElse { template }
-        }
 
         val versions = PlayerManager.getVersions()
         val counts = versions.values
@@ -74,17 +59,17 @@ object VanillaStatsCommand {
         if (player != null) {
             MessageUtil.sendMessage(player, "displayStatsHeader")
             for ((version, count) in counts) {
-                MessageUtil.sendColoredMessage(player, format("displayStatsEntry", version, count))
+                MessageUtil.sendColoredMessage(player, MessageUtil.formatPrintf(player, "displayStatsEntry", version, count))
             }
             val total = counts.values.sum()
-            MessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
+            MessageUtil.sendColoredMessage(player, MessageUtil.formatPrintf(player, "displayStatsTotal", total))
         } else {
-            ctx.source.sendSystemMessage(Component.literal(msg("displayStatsHeader")))
+            ctx.source.sendSystemMessage(Component.literal(MessageUtil.messageFor(player, "displayStatsHeader")))
             for ((version, count) in counts) {
-                ctx.source.sendSystemMessage(Component.literal(format("displayStatsEntry", version, count)))
+                ctx.source.sendSystemMessage(Component.literal(MessageUtil.formatPrintf(player, "displayStatsEntry", version, count)))
             }
             val total = counts.values.sum()
-            ctx.source.sendSystemMessage(Component.literal(format("displayStatsTotal", total)))
+            ctx.source.sendSystemMessage(Component.literal(MessageUtil.formatPrintf(player, "displayStatsTotal", total)))
         }
 
         return 1

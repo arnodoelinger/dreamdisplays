@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -66,7 +65,7 @@ class ListCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayListHeader")
         MessageUtil.sendColoredMessage(
             sender,
-            msgf(
+            MessageUtil.formatIndexed(
                 sender,
                 "displayListPageLine",
                 page.toString(),
@@ -77,11 +76,11 @@ class ListCommand : SubCommand {
 
         pageDisplays.forEachIndexed { localIndex, d ->
             val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId, ownerNameCache) ?: msg(sender, "displayListUnknownOwner")
-            val worldName = d.pos1.world?.name ?: msg(sender, "displayListUnknownWorld")
+            val owner = getOwnerName(d.ownerId, ownerNameCache) ?: MessageUtil.messageFor(sender, "displayListUnknownOwner")
+            val worldName = d.pos1.world?.name ?: MessageUtil.messageFor(sender, "displayListUnknownWorld")
             val idShort = d.id.toString().substring(0, 8)
-            val url = d.url.ifBlank { msg(sender, "displayListUnavailableUrl") }
-            val baseLine = msgf(
+            val url = d.url.ifBlank { MessageUtil.messageFor(sender, "displayListUnavailableUrl") }
+            val baseLine = MessageUtil.formatIndexed(
                 sender,
                 "displayListEntry",
                 index.toString(),
@@ -91,7 +90,7 @@ class ListCommand : SubCommand {
                 d.pos1.blockZ.toString(),
                 url
             )
-            val details = msgf(
+            val details = MessageUtil.formatIndexed(
                 sender,
                 "displayListDetails",
                 worldName,
@@ -109,7 +108,7 @@ class ListCommand : SubCommand {
 
             val component = LEGACY_SERIALIZER.deserialize(fullLine)
                 .append(
-                    text(msg(sender, "displayListTpButton"))
+                    text(MessageUtil.messageFor(sender, "displayListTpButton"))
                         .color(NamedTextColor.GREEN)
                         .clickEvent(
                             ClickEvent.runCommand(
@@ -122,7 +121,7 @@ class ListCommand : SubCommand {
                 component
             } else {
                 component.append(
-                    text(msg(sender, "displayListUrlButton")).color(NamedTextColor.RED)
+                    text(MessageUtil.messageFor(sender, "displayListUrlButton")).color(NamedTextColor.RED)
                         .clickEvent(ClickEvent.openUrl(d.url))
                 )
             }
@@ -285,25 +284,6 @@ class ListCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayWrongCommand")
         return null
     }
-
-    /** Replaces `{0}`, `{1}`, ... placeholders in [template] with the matching value from [values]. */
-    private fun applyPlaceholders(template: String, vararg values: String): String {
-        var result = template
-        values.forEachIndexed { index, value ->
-            result = result.replace("{$index}", value)
-        }
-        return result
-    }
-
-    /** Returns the localized string for [key] in [sender]'s language, or [key] when missing. */
-    private fun msg(sender: CommandSender, key: String): String {
-        return Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
-    }
-
-    /** Returns the localized string for [key] after substituting positional [values]. */
-    private fun msgf(sender: CommandSender, key: String, vararg values: String): String {
-        return applyPlaceholders(msg(sender, key), *values)
-    }
 }
 
 /**
@@ -321,7 +301,6 @@ object VanillaListCommand {
         pageStr: String? = null
     ): Int {
         val player = ctx.source.entity as? ServerPlayer
-        val config = VanillaServerState.config
         val server = ctx.source.server
 
         val displays = sortedDisplays()
@@ -341,7 +320,7 @@ object VanillaListCommand {
             null -> {
                 val pageNum = filter?.toIntOrNull()
                 if (pageNum != null) {
-                    sendPage(ctx, player, displays, ownerNameCache, pageNum, config)
+                    sendPage(ctx, player, displays, ownerNameCache, pageNum)
                     return 1
                 }
                 displays
@@ -369,7 +348,7 @@ object VanillaListCommand {
         }
 
         val page = (pageStr?.toIntOrNull() ?: 1)
-        sendPage(ctx, player, filtered, ownerNameCache, page, config)
+        sendPage(ctx, player, filtered, ownerNameCache, page)
         return 1
     }
 
@@ -380,20 +359,12 @@ object VanillaListCommand {
         displays: List<VanillaDisplayData>,
         ownerNameCache: MutableMap<UUID, String?>,
         page: Int,
-        config: com.dreamdisplays.platform.server.VanillaConfig,
     ) {
         val server = ctx.source.server
         fun getOwnerName(ownerId: UUID): String? =
             ownerNameCache.getOrPut(ownerId) {
                 server.playerList.players.find { it.uuid == ownerId }?.name?.string
             }
-
-        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
-        fun msgf(key: String, vararg args: String): String {
-            var t = msg(key)
-            args.forEachIndexed { i, v -> t = t.replace("{$i}", v) }
-            return t
-        }
 
         val totalPages = max(1, (displays.size + PAGE_SIZE - 1) / PAGE_SIZE)
         val p = page.coerceIn(1, totalPages)
@@ -405,16 +376,17 @@ object VanillaListCommand {
         sendColoredMsg(
             ctx,
             player,
-            msgf("displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
+            MessageUtil.formatIndexed(player, "displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
         )
 
         pageDisplays.forEachIndexed { localIndex, d ->
             val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId) ?: msg("displayListUnknownOwner")
+            val owner = getOwnerName(d.ownerId) ?: MessageUtil.messageFor(player, "displayListUnknownOwner")
             val worldName = d.worldKey.substringAfterLast(':')
             val idShort = d.id.toString().substring(0, 8)
-            val url = d.url.ifBlank { msg("displayListUnavailableUrl") }
-            val baseLine = msgf(
+            val url = d.url.ifBlank { MessageUtil.messageFor(player, "displayListUnavailableUrl") }
+            val baseLine = MessageUtil.formatIndexed(
+                player,
                 "displayListEntry",
                 index.toString(),
                 owner,
@@ -423,7 +395,8 @@ object VanillaListCommand {
                 d.minZ.toString(),
                 url
             )
-            val details = msgf(
+            val details = MessageUtil.formatIndexed(
+                player,
                 "displayListDetails",
                 worldName,
                 d.width.toString(),
@@ -449,12 +422,11 @@ object VanillaListCommand {
 
     /** Sends the localized message for [key] to [player] or falls back to the command source. */
     private fun sendMsg(ctx: CommandContext<CommandSourceStack>, player: ServerPlayer?, key: String) {
-        val config = VanillaServerState.config
-        val msg = config.getMessageForPlayer(player, key)
+        val msg = MessageUtil.messageFor(player, key)
         if (player != null) {
             MessageUtil.sendColoredMessage(player, msg)
         } else {
-            ctx.source.sendSystemMessage(Component.literal(msg?.toString() ?: key))
+            ctx.source.sendSystemMessage(Component.literal(msg))
         }
     }
 

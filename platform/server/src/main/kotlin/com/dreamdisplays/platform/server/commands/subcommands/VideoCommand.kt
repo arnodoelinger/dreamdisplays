@@ -21,11 +21,8 @@ import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
-import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import java.util.*
@@ -145,7 +142,7 @@ object VanillaVideoCommand {
         val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
             ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
-        val targetPos = getTargetBlockPos(player)
+        val targetPos = RegionUtil.getTargetedBlockPos(player)
             ?: return MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
 
         val worldKey = RegionUtil.getPlayerLevelKey(player)
@@ -172,14 +169,5 @@ object VanillaVideoCommand {
 
         MessageUtil.sendMessage(player, "settedURL")
         return 1
-    }
-
-    /** Gets the block position the player is currently looking at (within 32 blocks). */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val start = player.eyePosition
-        val end = start.add(player.lookAngle.scale(32.0))
-        val hit = level.clip(ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player))
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
     }
 }

@@ -42,7 +42,7 @@ class OnCommand : SubCommand {
         if (PlayerManager.isDisplaysEnabled(target)) {
             MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
-                MessageUtil.sendColoredMessage(sender, format(sender, "display.already-enabled.target", target.name))
+                MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "display.already-enabled.target", target.name))
             }
             return
         }
@@ -51,7 +51,7 @@ class OnCommand : SubCommand {
         PacketUtil.sendDisplayEnabled(target, true)
         MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
-            MessageUtil.sendColoredMessage(sender, format(sender, "display.enabled.target", target.name))
+            MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "display.enabled.target", target.name))
         }
     }
 
@@ -84,14 +84,8 @@ class OnCommand : SubCommand {
         val target = Bukkit.getPlayerExact(targetName)
         if (target != null) return target
 
-        MessageUtil.sendColoredMessage(sender, format(sender, "displayTargetNotFound", targetName))
+        MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "displayTargetNotFound", targetName))
         return null
-    }
-
-    /** Looks up the localized template for [key] and substitutes [values] via `String.format`. */
-    private fun format(sender: CommandSender, key: String, vararg values: Any): String {
-        val template = Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
-        return runCatching { String.format(template, *values) }.getOrElse { template }
     }
 }
 

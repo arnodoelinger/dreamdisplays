@@ -11,6 +11,8 @@ import net.minecraft.resources.Identifier
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.level.ClipContext
+import net.minecraft.world.phys.HitResult
 import org.bukkit.Location
 import org.bukkit.World
 import org.jspecify.annotations.NullMarked
@@ -68,6 +70,21 @@ object RegionUtil {
 
     /** Returns the inclusive integer range covering [a] and [b] regardless of order. */
     private fun getRange(a: Int, b: Int): IntRange = min(a, b)..max(a, b)
+
+    /** Returns the block position [player] is looking at within [maxDistance] blocks, or `null`. */
+    fun getTargetedBlockPos(player: ServerPlayer, maxDistance: Double = 32.0): BlockPos? {
+        val eyePos = player.eyePosition
+        val hit = player.level().clip(
+            ClipContext(
+                eyePos,
+                eyePos.add(player.lookAngle.scale(maxDistance)),
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
+                player,
+            )
+        )
+        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
+    }
 
     /** Resolves a [ServerLevel] from a dimension key string like `"minecraft:overworld"`. */
     fun getLevelByKey(server: MinecraftServer, worldKey: String): ServerLevel? {

@@ -217,10 +217,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display delete` subcommand. */
     private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || VanillaServerPacketHandler.isOpLevel2(player)
-        }
+        .requires(::requiresOpLevel2)
         .executes { ctx ->
             VanillaDeleteCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -235,10 +232,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display stats` subcommand. */
     private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || VanillaServerPacketHandler.isOpLevel2(player)
-        }
+        .requires(::requiresOpLevel2)
         .executes { ctx ->
             VanillaStatsCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -246,10 +240,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display reload` subcommand. */
     private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
-        .requires { source ->
-            val player = source.entity as? net.minecraft.server.level.ServerPlayer
-            player == null || VanillaServerPacketHandler.isOpLevel2(player)
-        }
+        .requires(::requiresOpLevel2)
         .executes { ctx ->
             VanillaReloadCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -278,10 +269,7 @@ object VanillaCommandTree {
     /** Builds the `/display list [filter] [value] [page]` subcommand. */
     private fun listNode(): LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> {
         return net.minecraft.commands.Commands.literal("list")
-            .requires { source ->
-                val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                player == null || VanillaServerPacketHandler.isOpLevel2(player)
-            }
+            .requires(::requiresOpLevel2)
             .executes { ctx ->
                 VanillaListCommand.execute(ctx)
                 Command.SINGLE_SUCCESS
@@ -330,10 +318,7 @@ object VanillaCommandTree {
         }
         .then(
             net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
-                .requires { source ->
-                    val player = source.entity as? net.minecraft.server.level.ServerPlayer
-                    player == null || VanillaServerPacketHandler.isOpLevel2(player)
-                }
+                .requires(::requiresOpLevel2)
                 .suggests { ctx, builder ->
                     ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
                     builder.buildFuture()
@@ -347,6 +332,12 @@ object VanillaCommandTree {
                     Command.SINGLE_SUCCESS
                 }
         )
+
+    /** Permission gate shared by every admin-only node: console always passes, players need op level 2. */
+    private fun requiresOpLevel2(source: net.minecraft.commands.CommandSourceStack): Boolean {
+        val player = source.entity as? net.minecraft.server.level.ServerPlayer
+        return player == null || VanillaServerPacketHandler.isOpLevel2(player)
+    }
 
     /** Returns a list of language codes from Java and config. */
     private fun getLanguageSuggestions(): List<String> {
