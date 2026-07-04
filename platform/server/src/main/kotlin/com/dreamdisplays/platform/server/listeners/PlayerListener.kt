@@ -1,20 +1,29 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.Main.Companion.config
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
+import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgeServerScheduler
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import com.dreamdisplays.platform.server.utils.net.ServerScheduler
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+import net.minecraft.server.level.ServerPlayer
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.event.entity.player.PlayerEvent
 import org.bukkit.Bukkit
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
@@ -119,5 +128,56 @@ object FabricPlayerListener {
             V2PlayerTracker.clear(handler.player.uuid)
             WatchPartyManager.onPlayerQuit(handler.player.uuid)
         }
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of [PlayerListener].
+ */
+@NeoForgeOnly
+object NeoForgePlayerListener {
+    private var hasValidatedWorld = false
+
+    /**
+     * On the first join after startup, validates all stored displays once. Also schedules a delayed
+     * `modRequired` message for vanilla clients when mod detection is enabled.
+     */
+    @SubscribeEvent
+    fun onLogin(event: PlayerEvent.PlayerLoggedInEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        val server = RegionUtil.playerServer(player)
+
+        if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
+            hasValidatedWorld = true
+            NeoForgeServerScheduler.runLater(server, 40L) {
+                val removedUuids = DisplayManager.validateDisplaysAndCleanupNeoForge(server)
+                if (removedUuids.isNotEmpty()) {
+                    NeoForgePacketUtil.sendClearCache(server.playerList.players, removedUuids)
+                }
+            }
+        }
+
+        val config = NeoForgeServer.config
+        if (!config.settings.modDetectionEnabled) return
+        if (DisplayManager.getDisplays().isEmpty()) return
+
+        NeoForgeServerScheduler.runLater(server, 600L) {
+            if (player.isAlive &&
+                PlayerManager.getVersion(player.uuid) == null &&
+                !PlayerManager.hasBeenNotifiedAboutModRequired(player.uuid)
+            ) {
+                NeoForgeMessageUtil.sendMessage(player, "modRequired")
+                PlayerManager.setModRequiredNotified(player.uuid, true)
+            }
+        }
+    }
+
+    /** Drops cached per-player state when a player disconnects. */
+    @SubscribeEvent
+    fun onLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        PlayerManager.removePlayer(player.uuid)
+        V2PlayerTracker.clear(player.uuid)
+        WatchPartyManager.onPlayerQuit(player.uuid)
     }
 }

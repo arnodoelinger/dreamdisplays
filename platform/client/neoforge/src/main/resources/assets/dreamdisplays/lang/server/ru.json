@@ -1,0 +1,168 @@
+{
+  "noDisplayTerritories": "&7D |&f Вы ещё не выбрали территории дисплея! Выберите две точки с {0} на {1}",
+  "createDisplayCommand": "&7D |&f Теперь введите /display create чтобы создать дисплей",
+  "secondPointNotSelected": "&7D |&f Вы ещё не выбрали вторую точку!",
+  "displayOverlap": "&7D |&f В этой области уже есть дисплей!",
+  "structureTooLarge": "&7D |&f Вы не можете создать дисплей больше %d × %d блоков",
+  "structureTooSmall": "&7D |&f Вы не можете создать дисплей меньше %d × %d блоков",
+  "firstPointSelected": "&7D |&f Первая точка выбрана! Теперь выберите вторую точку",
+  "secondPointSelected": "&7D |&f Вторая точка выбрана!",
+  "structureWrongDepth": "&7D |&f Выбор должен быть хотя бы 1 блок в длину",
+  "wrongStructure": "&7D |&f Для дисплеев можно использовать только {0}",
+  "displayTooHigh": "&7D |&f Высота дисплея слишком высока (макс. %d)",
+  "displayTooLow": "&7D |&f Дисплей слишком низко (мин. %d)",
+  "selectionClear": "&7D |&f Выбор очищен!",
+  "successfulCreation": "&7D |&f Дисплей создан! Теперь сфокусируйтесь на нём и введите /display video <youtube_url> [lang], чтобы установить видео",
+  "noDisplay": "&7D |&f Дисплей не найден!",
+  "settedURL": "&7D |&f Видео загружено!",
+  "invalidURL": "&7D |&f Ваша ссылка недействительна! Пожалуйста, используйте действительную ссылку YouTube",
+  "displayVideoWrongTargetBlock": "&7D |&f Чтобы использовать эту команду, смотрите на блок дисплея!",
+  "displayVideoNotOwner": "&7D |&f Вы не владелец этого дисплея!",
+  "reportTooQuickly": "&7D |&f Вы отправляете жалобы слишком быстро! Подождите перед отправкой следующей",
+  "reportSent": "&7D |&f Жалоба отправлена!",
+  "reportFailed": "&7D |&f Не удалось отправить жалобу. Пожалуйста, попробуйте позже",
+  "displayDeleted": "&7D |&f Дисплей удалён!",
+  "displayReported": "&7D |&f Жалоба на дисплей отправлена!",
+  "reportNotConfigured": "&7D |&f Система жалоб не настроена на этом сервере!",
+  "newVersion": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Доступна новая версия %s Dream Displays! Пожалуйста, ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "обновите ваш мод",
+        "color": "#023EB6",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays/versions"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать новую версию"
+        }
+      },
+      {
+        "text": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "newPluginVersion": "&7D |&f Доступна новая версия плагина Dream Displays (%s)! Пожалуйста, обновите плагин на сервере!",
+  "configReloaded": "&7D | &fDream Displays перезагружен!",
+  "configReloadFailed": "&7D |&f Не удалось перезагрузить Dream Displays. Пожалуйста, проверьте консоль на наличие ошибок",
+  "configReloadSummary": "&7D |&f Перезагружено: конфиг, языковые сообщения, права команд",
+  "noDisplaysFound": "&7D |&f Дисплеи не найдены",
+  "displayListHeader": "&7D |&f Дисплеи:",
+  "displayListEntry": "&7D |&f {0}. Владелец: {1}, Расположение: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 страница=&f{0}/{1} &8| &7всего=&f{2}",
+  "displayListDetails": " &8| &7мир=&f{0} &8| &7размер=&f{1}x{2} &8| &7синхр=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Неизвестно",
+  "displayListUnknownWorld": "неизвестно",
+  "displayListUnavailableUrl": "Н/Д",
+  "displayListTpButton": " [ТП]",
+  "displayListUrlButton": " [URL]",
+  "displayBlockBreak": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Это блок дисплея. Установите мод ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать Dream Displays"
+        }
+      },
+      {
+        "text": ", чтобы взаимодействовать с ним!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "modRequired": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Мод Dream Displays необходим для отображения дисплеев на сервере. Пожалуйста, ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "скачайте Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать Dream Displays"
+        }
+      },
+      {
+        "text": ", чтобы увидеть их!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "display.enabled": "&7D |&f Дисплеи включены. Подождите немного...",
+  "display.disabled": "&7D |&f Дисплеи отключены",
+  "display.already-disabled": "&7D |&f Дисплеи уже отключены",
+  "display.already-enabled": "&7D |&f Дисплеи уже включены",
+  "displayTargetNotFound": "&7D |&f Игрок '%s' не найден онлайн!",
+  "display.enabled.target": "&7D |&f Дисплеи включены для %s",
+  "display.disabled.target": "&7D |&f Дисплеи отключены для %s",
+  "display.already-enabled.target": "&7D |&f У %s дисплеи уже включены",
+  "display.already-disabled.target": "&7D |&f У %s дисплеи уже отключены",
+  "displayWrongCommand": "&7D |&f Вы ввели что-то неправильно!",
+  "displayCommandMissingPermission": "&7D |&f У вас нет разрешения на использование этой команды!",
+  "commandPlayersOnly": "&7D |&f Эту команду может использовать только игрок в игре",
+  "displayStatsHeader": "&7D |&f Статистика использования мода:",
+  "displayStatsEntry": "&7D |&f Версия %s: %d игроков",
+  "displayStatsTotal": "&7D |&f Всего игроков с модом: %d",
+  "displayHelpHeader": "Доступные команды:",
+  "displayHelpCreate": "– /display create: создать новый дисплей",
+  "displayHelpVideo": "– /display video <url>: установить видео для вашего дисплея",
+  "displayHelpInfo": "– /display info: показать детали дисплея, на который вы смотрите",
+  "displayHelpDelete": "– /display delete: удалить дисплей, на который вы смотрите",
+  "displayHelpList": "– /display list: список всех дисплеев",
+  "displayHelpStats": "– /display stats: показать статистику использования мода",
+  "displayHelpReload": "– /display reload: перезагрузить конфигурацию",
+  "displayHelpOn": "– /display on [игрок]: включить дисплеи себе или выбранному игроку",
+  "displayHelpOff": "– /display off [игрок]: отключить дисплеи себе или выбранному игроку",
+  "displayHelpHelp": "– /display help: показать эту справку",
+  "displayInfoHeader": "&7D |&f Информация о дисплее:",
+  "displayInfoOwnerLine": "&7D |&7 владелец=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 id-дисплея=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 мир=&f{0} &8| &7точка1=&f[{1}, {2}, {3}] &8| &7точка2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 размер=&f{0}x{1} &8| &7сторона=&f{2} &8| &7синхр=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 язык=&f{0} &8| &7длительность=&f{1} &8| &7url=&f{2}",
+  "displayInfoUnknownOwner": "Неизвестно",
+  "displayInfoUnknownWorld": "Неизвестно",
+  "displayInfoUnknownDuration": "неизвестно",
+  "displayInfoAutoLang": "авто",
+  "displayInfoUnavailableUrl": "Н/Д"
+}

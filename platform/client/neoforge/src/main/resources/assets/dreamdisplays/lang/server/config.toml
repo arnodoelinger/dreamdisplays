@@ -1,0 +1,75 @@
+# Dream Displays configuration
+# NeoForge server implementation
+# Support: https://discord.gg/uwMMZ2KWk6
+
+[language]
+# Default language if no translation is available
+default_language = "en"
+
+[display]
+# Selection tool and base material
+selection_material = "minecraft:diamond_axe"
+base_material = "minecraft:black_concrete"
+
+# Display size limits
+# All values are in blocks
+max_render_distance = 96.0
+min_width = 1
+min_height = 1
+max_width = 32
+max_height = 24
+
+# Particle effects for selection visualization
+# Note that it doesn't work on Folia and Fabric servers for now
+particles = true
+particles_color = "#00FFFF"
+
+# Mod detection notifications
+# Players without Dream Displays will be asked to install it
+# Note that it doesn't work on Folia for now
+mod_detection_enabled = true
+
+# Update notifications
+updates = true
+
+# Default volume for new players in percent (0 to 100, default 50)
+default_volume = 50
+
+[reports]
+# Report settings
+# webhook_url is a discord webhook URL for sending reports
+# cooldown is in seconds
+webhook_url = ""
+cooldown = 30
+
+[storage]
+# Storage type: SQLITE or MYSQL
+# If you choose MYSQL, fill in the details below
+type = "SQLITE"
+host = "localhost"
+port = "3306"
+database = "database"
+username = "username"
+password = "password"
+table_prefix = ""
+
+[permissions]
+# Permission nodes
+create = "dreamdisplays.create"               # Default: everyone
+video = "dreamdisplays.video"                 # Default: everyone
+info = "dreamdisplays.info"                   # Default: everyone
+help = "dreamdisplays.help"                   # Default: everyone
+local = "dreamdisplays.local"                 # Default: everyone
+synced = "dreamdisplays.synced"               # Default: everyone
+broadcast = "dreamdisplays.broadcast"         # Default: everyone
+watchparty = "dreamdisplays.watchparty"       # Default: everyone
+lock = "dreamdisplays.lock"                   # Default: everyone
+list = "dreamdisplays.list"                   # Default: operator
+stats = "dreamdisplays.stats"                 # Default: operator
+premium = "dreamdisplays.premium"             # Default: operator
+delete = "dreamdisplays.delete"               # Default: everyone
+delete_others = "dreamdisplays.delete.others" # Default: operator
+reload = "dreamdisplays.reload"               # Default: operator
+updates = "dreamdisplays.updates"             # Default: operator
+toggle_others = "dreamdisplays.toggle.others" # Default: operator
+create_bypass = "dreamdisplays.create.bypass" # Default: operator

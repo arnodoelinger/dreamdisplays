@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.server.datatypes
 
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.jspecify.annotations.NullMarked
 import java.util.*
@@ -55,6 +56,23 @@ class StateData(private val id: UUID) {
      */
     @FabricOnly
     fun createPacket(display: FabricDisplayData?): SyncData {
+        val nanos = System.nanoTime()
+        val currentTime = if (paused) lastReportedTime
+        else lastReportedTime + (nanos - lastReportedTimestamp)
+
+        if (limitTime == 0L) display?.duration?.let { limitTime = it }
+
+        val time = if (limitTime > 0) currentTime % limitTime else currentTime
+        return SyncData(id, true, paused, time, limitTime)
+    }
+
+    /**
+     * Builds a fresh [SyncData] packet describing the current playback position.
+     *
+     * @param display optional display data used to seed [limitTime] on first call.
+     */
+    @NeoForgeOnly
+    fun createPacket(display: NeoForgeDisplayData?): SyncData {
         val nanos = System.nanoTime()
         val currentTime = if (paused) lastReportedTime
         else lastReportedTime + (nanos - lastReportedTimestamp)

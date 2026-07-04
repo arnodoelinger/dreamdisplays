@@ -183,6 +183,44 @@ class StorageManager(
         ).applyCommon(row)
     }
 
+    /**
+     * Load all displays from the database, returning a list of [NeoForgeDisplayData] objects.
+     * Naturally disambiguated from [loadAllFabricDisplays] by return type, so no separate object
+     * is needed here (unlike the loader-API-touching pieces elsewhere).
+     */
+    @NeoForgeOnly
+    fun loadAllNeoForgeDisplays(): List<NeoForgeDisplayData> = transaction(db) {
+        table.selectAll().mapNotNull(::rowToNeoForge)
+    }
+
+    /** Upserts the full row for [data] into the displays table. */
+    @NeoForgeOnly
+    fun saveDisplay(data: NeoForgeDisplayData) {
+        upsert(
+            data, data.worldKey,
+            packPos(data.pos1.x, data.pos1.y, data.pos1.z),
+            packPos(data.pos2.x, data.pos2.y, data.pos2.z),
+            packFacing(DIRECTION_TO_ORDINAL.getValue(data.facing), data.rotation)
+        )
+    }
+
+    /** Converts a row from the displays table into a [NeoForgeDisplayData] object. */
+    @NeoForgeOnly
+    private fun rowToNeoForge(row: ResultRow): NeoForgeDisplayData {
+        val (x1, y1, z1) = unpackPos(row[table.pos1])
+        val (x2, y2, z2) = unpackPos(row[table.pos2])
+        val (w, h) = unpackInts(row[table.size])
+        val facing = ORDINAL_TO_DIRECTION.getOrDefault(unpackFacingOrdinal(row[table.facing]), Direction.NORTH)
+        val rotation = unpackRotation(row[table.facing])
+
+        return NeoForgeDisplayData(
+            row[table.id].toUUID(), row[table.ownerId].toUUID(),
+            row[table.world],
+            BlockPos(x1, y1, z1), BlockPos(x2, y2, z2),
+            w, h, facing, rotation,
+        ).applyCommon(row)
+    }
+
     /** Upserts the given display data into the displays table. */
     private fun upsert(data: DisplayData, worldName: String, p1: Long, p2: Long, facingOrd: Int) {
         transaction(db) {

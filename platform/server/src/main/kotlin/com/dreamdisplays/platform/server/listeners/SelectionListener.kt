@@ -1,12 +1,16 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.event.player.AttackBlockCallback
 import net.fabricmc.fabric.api.event.player.UseBlockCallback
@@ -16,6 +20,8 @@ import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent as NeoForgePlayerInteractEvent
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
@@ -133,4 +139,70 @@ object FabricSelectionListener {
         }
     }
 
+}
+
+/**
+ * `NeoForge`-specific implementation of [SelectionListener].
+ */
+@NeoForgeOnly
+object NeoForgeSelectionListener {
+    /** Left-click sets pos1. */
+    @SubscribeEvent
+    fun onLeftClick(event: NeoForgePlayerInteractEvent.LeftClickBlock) {
+        if (event.action != NeoForgePlayerInteractEvent.LeftClickBlock.Action.START) return
+        if (event.hand != InteractionHand.MAIN_HAND) return
+        val player = event.entity as? ServerPlayer ?: return
+        val world = event.level as? ServerLevel ?: return
+
+        val config = NeoForgeServer.config
+        val selMaterialKey = config.settings.selectionMaterial
+        val heldItem = player.mainHandItem
+        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
+        if (heldItemKey != selMaterialKey) return
+
+        val baseMaterialKey = config.settings.baseMaterial
+        val pos = event.pos
+        val blockState = world.getBlockState(pos)
+        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
+        if (blockKey != baseMaterialKey) return
+
+        val worldKey = RegionUtil.getLevelKey(world)
+        val face = Direction.orderedByNearest(player)[0].opposite
+        NeoForgeSelectionManager.setFirstPoint(player, pos, worldKey, face)
+        event.setCanceled(true)
+    }
+
+    /** Right-click sets pos2; sneak + right-click resets. */
+    @SubscribeEvent
+    fun onRightClick(event: NeoForgePlayerInteractEvent.RightClickBlock) {
+        if (event.hand != InteractionHand.MAIN_HAND) return
+        val player = event.entity as? ServerPlayer ?: return
+        val world = event.level as? ServerLevel ?: return
+
+        val config = NeoForgeServer.config
+        val selMaterialKey = config.settings.selectionMaterial
+        val heldItem = player.mainHandItem
+        val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
+        if (heldItemKey != selMaterialKey) return
+
+        val pos = event.pos
+        val worldKey = RegionUtil.getLevelKey(world)
+
+        if (player.isShiftKeyDown) {
+            if (SelectionManager.selectionPoints.containsKey(player.uuid)) {
+                NeoForgeSelectionManager.resetSelection(player)
+                NeoForgeMessageUtil.sendMessage(player, "selectionClear")
+            }
+            event.setCanceled(true)
+            return
+        }
+
+        val baseMaterialKey = config.settings.baseMaterial
+        val blockState = world.getBlockState(pos)
+        val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
+        if (blockKey != baseMaterialKey) return
+
+        NeoForgeSelectionManager.setSecondPoint(player, pos, worldKey)
+        event.setCanceled(true)
+    }
 }

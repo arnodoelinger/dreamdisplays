@@ -60,7 +60,6 @@ object RegionUtil {
     private fun getRange(a: Int, b: Int): IntRange = min(a, b)..max(a, b)
 
     /** Resolves a [ServerLevel] from a dimension key string like `"minecraft:overworld"`. */
-    @FabricOnly
     fun getLevelByKey(server: MinecraftServer, worldKey: String): ServerLevel? {
         val rl = runCatching { Identifier.parse(worldKey) }.getOrNull() ?: return null
         val key = ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, rl)
@@ -68,7 +67,6 @@ object RegionUtil {
     }
 
     /** Returns the dimension key string (e.g. `"minecraft:overworld"`) for a given [ServerLevel]. */
-    @FabricOnly
     fun getLevelKey(level: ServerLevel): String =
         //? if >=1.21.11 {
         level.dimension().identifier().toString()
@@ -76,8 +74,13 @@ object RegionUtil {
         /*level.dimension().location().toString()*/
 
     /** Returns the dimension key string for a [ServerPlayer]'s current server level. */
-    @FabricOnly
     fun getPlayerLevelKey(player: ServerPlayer): String = getLevelKey(playerServerLevel(player))
+
+    /**
+     * Returns the owning [MinecraftServer] for [player]. `ServerPlayer.server` is a private field;
+     * the running server is only reachable through the player's [ServerLevel] (public `.server`).
+     */
+    fun playerServer(player: ServerPlayer): MinecraftServer = playerServerLevel(player).server
 
     /**
      * Returns the [ServerLevel] of a [ServerPlayer]. `ServerPlayer.serverLevel()` was renamed to

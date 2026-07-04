@@ -1,10 +1,13 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
@@ -52,6 +55,34 @@ object FabricReloadCommand {
         } catch (e: Exception) {
             if (player != null) {
                 MessageUtil.sendMessage(player, "configReloadFailed")
+            } else {
+                ctx.source.sendFailure(Component.literal("Failed to reload config: ${e.message}"))
+            }
+        }
+        return 1
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of the `/display reload` command.
+ */
+@NeoForgeOnly
+object NeoForgeReloadCommand {
+    /** Reloads the server config from disk; replies with success or failure to the command source. */
+    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.entity as? ServerPlayer
+
+        try {
+            NeoForgeServer.config.reload()
+            if (player != null) {
+                NeoForgeMessageUtil.sendMessage(player, "configReloaded")
+                NeoForgeMessageUtil.sendMessage(player, "configReloadSummary")
+            } else {
+                ctx.source.sendSystemMessage(Component.literal("Dream Displays config reloaded."))
+            }
+        } catch (e: Exception) {
+            if (player != null) {
+                NeoForgeMessageUtil.sendMessage(player, "configReloadFailed")
             } else {
                 ctx.source.sendFailure(Component.literal("Failed to reload config: ${e.message}"))
             }

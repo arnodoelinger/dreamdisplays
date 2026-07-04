@@ -1,14 +1,19 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
@@ -142,6 +147,59 @@ object FabricOnCommand {
         if (!selfTarget) {
             val msg = config.getMessageForPlayer(self, "display.enabled.target") as? String
             if (msg != null) MessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
+        }
+        return 1
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of the `/display on` command.
+ */
+@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
+@NeoForgeOnly
+object NeoForgeOnCommand {
+    /** Enables displays for the executing player or the named [targetName], checking op-level permission for the latter. */
+    fun execute(ctx: CommandContext<CommandSourceStack>, targetName: String? = null): Int {
+        val self = ctx.source.entity as? ServerPlayer
+        val config = NeoForgeServer.config
+
+        val target: ServerPlayer = if (targetName == null) {
+            self ?: run {
+                ctx.source.sendFailure(Component.literal("This command must be used in-game or with a player argument."))
+                return 0
+            }
+        } else {
+            ctx.source.server.playerList.getPlayerByName(targetName) ?: run {
+                val msg = config.getMessageForPlayer(self, "displayTargetNotFound") as? String ?: "Player not found: %s"
+                if (self != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, targetName))
+                else ctx.source.sendFailure(Component.literal(String.format(msg, targetName)))
+                return 0
+            }
+        }
+
+        val selfTarget = self?.uuid == target.uuid
+
+        if (!selfTarget && (self == null || !NeoForgeServerPacketHandler.isOpLevel2(self))) {
+            if (self != null) NeoForgeMessageUtil.sendMessage(self, "displayCommandMissingPermission")
+            else ctx.source.sendFailure(Component.literal("Missing permission."))
+            return 0
+        }
+
+        if (PlayerManager.isDisplaysEnabled(target.uuid)) {
+            NeoForgeMessageUtil.sendMessage(target, "display.already-enabled")
+            if (!selfTarget) {
+                val msg = config.getMessageForPlayer(self, "display.already-enabled.target") as? String
+                if (msg != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
+            }
+            return 1
+        }
+
+        PlayerManager.setDisplaysEnabled(target.uuid, true)
+        NeoForgePacketUtil.sendDisplayEnabled(target, true)
+        NeoForgeMessageUtil.sendMessage(target, "display.enabled")
+        if (!selfTarget) {
+            val msg = config.getMessageForPlayer(self, "display.enabled.target") as? String
+            if (msg != null) NeoForgeMessageUtil.sendColoredMessage(self, String.format(msg, target.name.string))
         }
         return 1
     }

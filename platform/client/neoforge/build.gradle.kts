@@ -12,6 +12,12 @@ plugins {
 repositories {
     mavenCentral()
     maven("https://jitpack.io")
+    maven("https://maven.fabricmc.net/")
+    maven("https://repo.papermc.io/repository/maven-public/")
+    maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods")) {
+        name = "fabricLoomRemappedMods"
+    }
+    maven("https://thedarkcolour.github.io/KotlinForForge/")
 }
 
 sourceSets.main {
@@ -30,9 +36,65 @@ tasks.matching { it.name == "sourcesJar" }.configureEach {
     dependsOn(":platform:server:chiselSource")
 }
 
+val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+val stonecutterVersions = Properties().apply {
+    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+}
+
+fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
+    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+
+fun mainSourceSetOf(path: String): SourceSet =
+    project(path).extensions.getByType(SourceSetContainer::class.java).getByName("main")
+
+fun kotlinForForgeVersion(): String = if (scVersion("minecraft.version") == "1.21.1") "5.12.0" else "6.3.0"
+
+val vendoredLibraries: Configuration = configurations.create("vendoredLibraries") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    exclude(group = "org.jetbrains.kotlin")
+    exclude(group = "org.jetbrains.kotlinx")
+    exclude(group = "com.google.code.findbugs", module = "jsr305")
+    exclude(group = "com.google.errorprone", module = "error_prone_annotations")
+    exclude(group = "com.google.guava")
+    exclude(group = "com.google.j2objc", module = "j2objc-annotations")
+    exclude(group = "org.checkerframework", module = "checker-qual")
+    exclude(group = "org.antlr", module = "antlr4-runtime")
+    exclude(group = "org.slf4j")
+}
+
+val unpackVendoredLibraries = tasks.register<Sync>("unpackVendoredLibraries") {
+    from(vendoredLibraries.elements.map { files -> files.map { zipTree(it) } })
+    into(layout.buildDirectory.dir("vendoredLibraries"))
+    exclude("module-info.class", "META-INF/versions/**")
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+sourceSets.create("vendoredLibraries") {
+    output.dir(unpackVendoredLibraries.map { it.destinationDir })
+}
+
+val isLegacyObfuscated = scVersion("minecraft.version").startsWith("1.")
+if (isLegacyObfuscated) {
+    evaluationDependsOn(":platform:client:fabric")
+}
+
+configurations.all {
+    resolutionStrategy.force("org.slf4j:slf4j-api:2.0.9")
+}
+
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
+    compileOnly(libs.bstats)
+    compileOnly("io.papermc.paper:paper-api:${scVersion("paper.api.version")}")
+    compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+    if (isLegacyObfuscated) {
+        compileOnly(project(path = ":platform:client:fabric", configuration = "mappedFabricApiElements"))
+    } else {
+        compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+    }
     implementation(project(":platform:client:common"))
+    implementation("thedarkcolour:kotlinforforge-neoforge:${kotlinForForgeVersion()}")
     implementation(libs.tomlj)
     implementation(libs.semver4j)
     implementation(libs.exposedCore)
@@ -40,6 +102,17 @@ dependencies {
     implementation(libs.exposedMigrationJdbc)
     implementation(libs.hikari)
     runtimeOnly(libs.sqliteJdbc)
+    vendoredLibraries(libs.tomlj)
+    vendoredLibraries(libs.semver4j)
+    vendoredLibraries(libs.caffeine)
+    vendoredLibraries(libs.okhttp)
+    vendoredLibraries(libs.okio)
+    vendoredLibraries(libs.sqliteJdbc)
+    vendoredLibraries(libs.exposedCore)
+    vendoredLibraries(libs.exposedJdbc)
+    vendoredLibraries(libs.exposedMigrationJdbc)
+    vendoredLibraries(libs.hikari)
+    vendoredLibraries(libs.newpipeExtractor)
     shadow(project(":core"))
     shadow(project(":api"))
     shadow(project(":util"))
@@ -63,19 +136,24 @@ dependencies {
     shadow(libs.newpipeExtractor)
 }
 
-val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-val stonecutterVersions = Properties().apply {
-    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-}
-
-fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
-
 neoForge {
     enable {
         version = scVersion("neoforge.version")
     }
     accessTransformers.from(file("src/main/resources/META-INF/accesstransformer.cfg"))
+    mods {
+        register("dreamdisplays") {
+            sourceSet(sourceSets.main.get())
+            sourceSet(mainSourceSetOf(":platform:client:common"))
+            sourceSet(mainSourceSetOf(":core"))
+            sourceSet(mainSourceSetOf(":api"))
+            sourceSet(mainSourceSetOf(":util"))
+            sourceSet(mainSourceSetOf(":media:runtime"))
+            sourceSet(mainSourceSetOf(":media:source"))
+            sourceSet(mainSourceSetOf(":media:player"))
+            sourceSet(sourceSets["vendoredLibraries"])
+        }
+    }
     runs {
         register("neoClient") {
             client()

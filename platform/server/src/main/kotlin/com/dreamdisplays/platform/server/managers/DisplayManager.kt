@@ -4,15 +4,19 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.Expiry
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.Main.Companion.config
 import com.dreamdisplays.platform.server.Main.Companion.getInstance
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.datatypes.DisplayData
 import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
 import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
+import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
+import com.dreamdisplays.platform.server.datatypes.NeoForgeSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
 import com.dreamdisplays.platform.server.datatypes.SyncData
@@ -24,12 +28,14 @@ import kotlinx.coroutines.launch
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil.calculateRegion
 import com.dreamdisplays.platform.server.utils.ReporterUtil
 import com.dreamdisplays.platform.server.utils.ReporterUtil.sendReport
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil.sendDelete
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
@@ -109,6 +115,7 @@ object DisplayManager {
         when (data) {
             is PaperDisplayData -> delete(data)
             is FabricDisplayData -> delete(data)
+            is NeoForgeDisplayData -> delete(data)
         }
     }
 
@@ -568,6 +575,163 @@ object DisplayManager {
 
         return removeDisplays(invalidDisplays) { display ->
             ServerCoroutines.io.launch { Server.storage?.deleteDisplay(display as FabricDisplayData) }
+        }
+    }
+
+    /**
+     * Returns the first display whose bounding box contains [blockPos] in [worldKey]. Named
+     * distinctly from the `Fabric` overload (rather than reused) because both take the identical
+     * `(String, BlockPos)` parameter list — only the return type differs, which the JVM does not
+     * use for overload resolution, so this would otherwise be a genuine redeclaration clash.
+     */
+    @NeoForgeOnly
+    fun isContainsNeoForge(worldKey: String, blockPos: BlockPos): NeoForgeDisplayData? {
+        return displays.values.filterIsInstance<NeoForgeDisplayData>().firstOrNull { d ->
+            d.worldKey == worldKey &&
+                    d.box.contains(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5)
+        }
+    }
+
+    /** Returns true if the selection [sel] intersects any existing display. */
+    @NeoForgeOnly
+    fun isOverlaps(sel: NeoForgeSelectionData): Boolean {
+        val selBox = sel.selectionBox() ?: return false
+        val wk = sel.worldKey ?: return false
+        return displays.values.filterIsInstance<NeoForgeDisplayData>().any { d ->
+            d.worldKey == wk && d.box.intersects(selBox)
+        }
+    }
+
+    /** Registers a new display. Caller is responsible for broadcasting. */
+    @NeoForgeOnly
+    fun register(data: NeoForgeDisplayData) {
+        displays[data.id] = data
+    }
+
+    /** Returns the players currently in range of [display] in its world. */
+    @NeoForgeOnly
+    fun getReceivers(display: NeoForgeDisplayData, server: MinecraftServer): List<ServerPlayer> {
+        return server.playerList.players.filter { p ->
+            RegionUtil.getPlayerLevelKey(p) == display.worldKey &&
+                    p.blockPosition().isInRange(display)
+        }
+    }
+
+    /** Returns true if this block position lies within `maxRenderDistance` of the [display]'s box. */
+    @NeoForgeOnly
+    private fun BlockPos.isInRange(display: NeoForgeDisplayData): Boolean =
+        isInRangeImpl(
+            x, y, z,
+            display.minX, display.minY, display.minZ,
+            display.maxX, display.maxY, display.maxZ,
+            NeoForgeServer.config.settings.maxRenderDistance,
+        )
+
+    /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
+    @NeoForgeOnly
+    fun sendUpdate(display: NeoForgeDisplayData, players: List<ServerPlayer>) {
+        NeoForgePacketUtil.sendDisplayInfo(players, display)
+    }
+
+    /** Sends a refresh packet for every display to in-range players. */
+    @NeoForgeOnly
+    fun updateAllDisplaysNeoForge(server: MinecraftServer) {
+        displays.values.filterIsInstance<NeoForgeDisplayData>().forEach { display ->
+            val receivers = getReceivers(display, server)
+            if (receivers.isNotEmpty()) sendUpdate(display, receivers)
+        }
+    }
+
+    /** Removes [data] from storage and the registry. The JDBC delete runs off-thread on [ServerCoroutines.io]. */
+    @NeoForgeOnly
+    fun delete(data: NeoForgeDisplayData) {
+        displays.remove(data.id)
+        TimelineManager.remove(data.id)
+        WatchPartyManager.remove(data.id)
+        ServerCoroutines.io.launch { NeoForgeServer.storage?.deleteDisplay(data) }
+    }
+
+    /**
+     * Posts a report about display [id] to the configured webhook, respecting per-display cooldown
+     * and informing [player] about the outcome.
+     */
+    @NeoForgeOnly
+    fun reportNeoForge(id: UUID, player: ServerPlayer, server: MinecraftServer) {
+        val displayData = displays[id] as? NeoForgeDisplayData ?: return
+        val cfg = NeoForgeServer.config
+        if (isReportThrottled(id, player.uuid, cfg.settings.reportCooldown)) {
+            NeoForgeMessageUtil.sendMessage(player, "reportTooQuickly")
+            return
+        }
+        if (cfg.settings.webhookUrl.isEmpty()) return
+
+        val ownerName = server.playerList.players.find { it.uuid == displayData.ownerId }?.name?.string ?: "Unknown"
+        val locationStr =
+            "${displayData.worldKey} (x=${displayData.minX}, y=${displayData.minY}, z=${displayData.minZ})"
+
+        ServerCoroutines.io.launch {
+            runCatching {
+                ReporterUtil.sendReportNeoForge(
+                    locationStr,
+                    displayData.url,
+                    displayData.id,
+                    player.name.string,
+                    ownerName,
+                    cfg.settings.webhookUrl,
+                )
+                server.execute { NeoForgeMessageUtil.sendMessage(player, "reportSent") }
+            }.onFailure {
+                server.execute { NeoForgeMessageUtil.sendMessage(player, "reportFailed") }
+            }
+        }
+    }
+
+    /**
+     * Invokes [saveDisplay] for every currently registered display (used by storage flush). Named
+     * distinctly from the `Fabric` overload because both take a `(DisplayData) -> Unit`-shaped
+     * lambda, which erases to the same JVM signature (`Function1`) regardless of the generic type
+     * argument — a genuine platform declaration clash, not just a Kotlin-source-level ambiguity.
+     */
+    @NeoForgeOnly
+    fun saveNeoForge(saveDisplay: (NeoForgeDisplayData) -> Unit) {
+        displays.values.filterIsInstance<NeoForgeDisplayData>().forEach(saveDisplay)
+    }
+
+    /**
+     * Scans every display's bounding box for the configured base material; displays with none
+     * are removed from disk and memory. Returns the UUIDs of removed displays.
+     */
+    @NeoForgeOnly
+    fun validateDisplaysAndCleanupNeoForge(server: MinecraftServer): List<UUID> {
+        val cfg = NeoForgeServer.config
+        val baseMaterialKey = cfg.settings.baseMaterial
+        val invalidDisplays = mutableListOf<NeoForgeDisplayData>()
+
+        displays.values.filterIsInstance<NeoForgeDisplayData>().forEach { display ->
+            // An unloaded dimension is not an invalid display: skip it this pass instead of wiping
+            // it from the database.
+            val level = RegionUtil.getLevelByKey(server, display.worldKey) ?: run {
+                NeoForgeServer.logger.warn("Skipping validation for display ${display.id}: dimension '${display.worldKey}' is not loaded.")
+                return@forEach
+            }
+            var hasBaseMaterial = false
+            outerLoop@ for (x in display.minX..display.maxX) {
+                for (y in display.minY..display.maxY) {
+                    for (z in display.minZ..display.maxZ) {
+                        val state = level.getBlockState(BlockPos(x, y, z))
+                        val regName = BuiltInRegistries.BLOCK.getKey(state.block).toString()
+                        if (regName == baseMaterialKey) {
+                            hasBaseMaterial = true
+                            break@outerLoop
+                        }
+                    }
+                }
+            }
+            if (!hasBaseMaterial) invalidDisplays.add(display)
+        }
+
+        return removeDisplays(invalidDisplays) { display ->
+            ServerCoroutines.io.launch { NeoForgeServer.storage?.deleteDisplay(display as NeoForgeDisplayData) }
         }
     }
 }

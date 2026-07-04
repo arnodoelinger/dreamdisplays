@@ -18,6 +18,12 @@ fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
 
 val isLegacyObfuscatedMinecraft = scVersion("minecraft.version").startsWith("1.")
 
+fun fancyModLoaderVersion(neoForgeVersion: String): String = when (neoForgeVersion) {
+    "21.1.233" -> "4.0.42"
+    "21.11.42" -> "10.0.36"
+    else -> "11.0.13"
+}
+
 if (isLegacyObfuscatedMinecraft) {
     evaluationDependsOn(":platform:client:fabric")
 }
@@ -103,6 +109,7 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
+    maven("https://maven.neoforged.net/releases")
 }
 
 platformweaver {
@@ -120,6 +127,9 @@ dependencies {
     compileOnly(project(":core"))
     compileOnly(project(":platform:client:common"))
     compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+    compileOnly("net.neoforged:neoforge:${scVersion("neoforge.version")}:universal")
+    compileOnly("net.neoforged:bus:8.0.5")
+    compileOnly("net.neoforged.fancymodloader:loader:${fancyModLoaderVersion(scVersion("neoforge.version"))}")
     if (isLegacyObfuscatedMinecraft) {
         compileOnly(project(path = ":platform:client:fabric", configuration = "mappedFabricApiElements"))
     } else {
