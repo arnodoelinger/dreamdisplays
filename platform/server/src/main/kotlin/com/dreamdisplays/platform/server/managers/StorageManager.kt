@@ -1,10 +1,20 @@
 package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.platform.server.datatypes.*
 import com.dreamdisplays.platform.server.storage.StorageBackend
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.DIRECTION_TO_ORDINAL
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.ORDINAL_TO_DIRECTION
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packFacing
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packInts
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.packPos
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.toBytes
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.toUUID
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackFacingOrdinal
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackInts
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackPos
+import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackRotation
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
 import io.github.arnodoelinger.platformweaver.*
@@ -25,7 +35,6 @@ import org.jspecify.annotations.NullMarked
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.nio.ByteBuffer
 import java.util.*
 
 /**
@@ -35,7 +44,6 @@ import java.util.*
 class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
     val id = binary("id", 16)
     val ownerId = binary("ownerId", 16)
-    // Sized to MediaUrlPolicy.MAX_URL_LENGTH so accepted URLs always fit the column.
     val videoCode = varchar("videoCode", MediaUrlPolicy.MAX_URL_LENGTH).default("")
     val world = varchar("world", 255)
     val pos1 = long("pos1")
@@ -215,57 +223,5 @@ class StorageManager(
         duration = row[table.duration]
         lang = row[table.lang]
         isLocked = row[table.isLocked]
-    }
-
-    companion object {
-        /** Directions and content rotations are packed into a single column. */
-        private val DIRECTION_TO_ORDINAL = mapOf(
-            Direction.NORTH to 0, Direction.EAST to 1, Direction.SOUTH to 2, Direction.WEST to 3,
-            Direction.UP to 4, Direction.DOWN to 5,
-        )
-
-        /** Inverse mapping of [DIRECTION_TO_ORDINAL]. */
-        private val ORDINAL_TO_DIRECTION = mapOf(
-            0 to Direction.NORTH, 1 to Direction.EAST, 2 to Direction.SOUTH, 3 to Direction.WEST,
-            4 to Direction.UP, 5 to Direction.DOWN,
-        )
-
-        /** Packs the facing ordinal (low byte) and content rotation (next byte) into one column int. */
-        private fun packFacing(facingOrdinal: Int, rotation: ContentRotation): Int =
-            (facingOrdinal and 0xFF) or ((rotation.quarterTurns and 0xFF) shl 8)
-
-        /** Extracts the facing ordinal from a [packFacing] value; legacy rows (rotation=0) decode unchanged. */
-        private fun unpackFacingOrdinal(packed: Int): Int = packed and 0xFF
-
-        /** Extracts the content rotation from a [packFacing] value. */
-        private fun unpackRotation(packed: Int): ContentRotation =
-            ContentRotation.fromQuarterTurns((packed shr 8) and 0xFF)
-
-        /** Packs a 3D position into a 64-bit long. */
-        private fun packPos(x: Int, y: Int, z: Int): Long =
-            ((x and 0x3FFFFFF).toLong() shl 38) or ((z and 0x3FFFFFF).toLong() shl 12) or (y and 0xFFF).toLong()
-
-        /** Unpacks a 64-bit long into a 3D position. */
-        private fun unpackPos(packed: Long) = Triple(
-            (packed shr 38).toInt(),
-            (packed shl 52 shr 52).toInt(),
-            (packed shl 26 shr 38).toInt()
-        )
-
-        /** Packs two 16-bit integers into a 64-bit long. */
-        private fun packInts(high: Int, low: Int): Long =
-            (high.toLong() shl 32) or (low.toLong() and 0xFFFFFFFFL)
-
-        /** Unpacks a 64-bit long into two 16-bit integers. */
-        private fun unpackInts(packed: Long): Pair<Int, Int> =
-            (packed shr 32).toInt() to packed.toInt()
-
-        /** Converts a UUID to a byte array and vice versa. */
-        private fun UUID.toBytes(): ByteArray = ByteBuffer.allocate(16).apply {
-            putLong(mostSignificantBits); putLong(leastSignificantBits)
-        }.array()
-
-        /** Converts a byte array to a UUID. */
-        private fun ByteArray.toUUID(): UUID = ByteBuffer.wrap(this).let { UUID(it.getLong(), it.getLong()) }
     }
 }

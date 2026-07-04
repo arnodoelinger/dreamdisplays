@@ -44,7 +44,6 @@ object ChannelRegistrar {
         incomingChannels.forEach { messenger.registerIncomingPluginChannel(plugin, it, receiver) }
         outgoingChannels.forEach { messenger.registerOutgoingPluginChannel(plugin, it) }
 
-        // Protocol v2: a single envelope channel in both directions.
         messenger.registerIncomingPluginChannel(plugin, V2_CHANNEL, PaperV2Networking)
         messenger.registerOutgoingPluginChannel(plugin, V2_CHANNEL)
     }
