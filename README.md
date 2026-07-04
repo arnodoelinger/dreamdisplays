@@ -31,7 +31,7 @@ On the server side, admins can install one of the following options depending on
 - Server plugin (Paper / Purpur / Folia / etc.): Drop the plugin .jar into your `/plugins` folder
 - Server mod (Fabric / NeoForge / Quilt): Drop the mod .jar into your `/mods` folder
 
-![img](https://i.imgur.com/lOKNx6g.png)
+![Display menu](https://i.imgur.com/jlNLdwn.jpeg)
 
 ## Features
 
@@ -70,4 +70,4 @@ Done! To customize the display, look at it and press `Shift + RMB`
 
 [Read more in our wiki](https://github.com/arnodoelinger/dreamdisplays/wiki).
 
-![img](https://i.imgur.com/yyIKdp8.png)
+![Display](https://i.imgur.com/yyIKdp8.png)
