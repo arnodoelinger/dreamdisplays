@@ -19,7 +19,7 @@ import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.core.protocol.WatchPartyStart
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import io.github.arnodoelinger.platformweaver.PaperOnly
@@ -40,7 +40,7 @@ const val V2_CHANNEL: String = "dreamdisplays:v2"
 @NullMarked
 object PaperV2Networking : PluginMessageListener {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PaperV2Networking")
-    private val plugin: Main by lazy { Main.getInstance() }
+    private val plugin: PaperServer by lazy { PaperServer.getInstance() }
 
     /** Encodes [packet] once and sends it to every non-null player in [players]. */
     fun send(players: List<Player?>, packet: DreamPacket) {
@@ -55,11 +55,11 @@ object PaperV2Networking : PluginMessageListener {
 
     /** The capability snapshot for [player], rebuilt from permissions and config. */
     fun buildServerHello(player: Player): ServerHello = ServerHello(
-        isPremium = player.hasPermission(Main.config.permissions.premium),
-        isAdmin = player.hasPermission(Main.config.permissions.delete),
-        isReportingEnabled = Main.config.settings.webhookUrl.isNotEmpty(),
+        isPremium = player.hasPermission(PaperServer.config.permissions.premium),
+        isAdmin = player.hasPermission(PaperServer.config.permissions.delete),
+        isReportingEnabled = PaperServer.config.settings.webhookUrl.isNotEmpty(),
         allowedFeatures = ServerFeature.playbackFeatureWires,
-        defaultVolume = Main.config.settings.defaultVolume,
+        defaultVolume = PaperServer.config.settings.defaultVolume,
     )
 
     /** Decodes an envelope frame and dispatches the packet; unknown type ids are skipped. */

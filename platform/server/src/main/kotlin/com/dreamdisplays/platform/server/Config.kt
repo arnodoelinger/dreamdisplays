@@ -29,7 +29,7 @@ private fun loadLanguageMessages(file: File): Map<String, Any> {
  */
 @PaperOnly
 @NullMarked
-class Config(private val plugin: Main) {
+class Config(private val plugin: PaperServer) {
     /** The plugin's configuration file. */
     private val configFile = File(plugin.dataFolder, "config.toml")
 

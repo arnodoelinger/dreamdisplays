@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.managers
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
@@ -58,7 +58,7 @@ object SelectionManager {
             sel.reset()
             MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial
+                PaperServer.config.settings.selectionMaterial, PaperServer.config.settings.baseMaterial
             )
             return
         }

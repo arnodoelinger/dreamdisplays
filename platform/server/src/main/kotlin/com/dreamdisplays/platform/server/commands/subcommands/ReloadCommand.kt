@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
@@ -19,12 +19,12 @@ import org.bukkit.command.CommandSender
 @PaperOnly
 class ReloadCommand : SubCommand {
     override val name = "reload"
-    override val permission = Main.config.permissions.reload
+    override val permission = PaperServer.config.permissions.reload
 
     /** Reloads `config.yml` from disk; replies with success or failure message. */
     override fun execute(sender: CommandSender, args: Array<String?>) {
         try {
-            Main.config.reload()
+            PaperServer.config.reload()
             MessageUtil.sendMessage(sender, "configReloaded")
             MessageUtil.sendMessage(sender, "configReloadSummary")
         } catch (_: Exception) {

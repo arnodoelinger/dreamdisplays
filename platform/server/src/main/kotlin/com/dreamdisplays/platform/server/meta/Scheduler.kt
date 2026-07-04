@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.meta
 
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
@@ -142,6 +142,6 @@ object Scheduler {
     /** Updates the tracked player snapshot for [player]. */
     private fun refreshPlayerSnapshot(player: Player) {
         trackedNames[player.uniqueId] = player.name
-        trackedAdmins[player.uniqueId] = player.hasPermission(Main.config.permissions.delete)
+        trackedAdmins[player.uniqueId] = player.hasPermission(PaperServer.config.permissions.delete)
     }
 }

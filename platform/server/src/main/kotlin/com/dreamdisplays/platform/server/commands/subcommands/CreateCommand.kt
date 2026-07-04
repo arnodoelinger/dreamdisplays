@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
@@ -36,7 +36,7 @@ import kotlin.math.abs
 @PaperOnly
 class CreateCommand : SubCommand {
     override val name = "create"
-    override val permission = Main.config.permissions.create
+    override val permission = PaperServer.config.permissions.create
     override val playerOnly = true
 
     /** Command execution logic. */
@@ -46,7 +46,7 @@ class CreateCommand : SubCommand {
         val sel = SelectionManager.selectionPoints[player.uniqueId] as? PaperSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial
+                PaperServer.config.settings.selectionMaterial, PaperServer.config.settings.baseMaterial
             )
 
         validate(
@@ -56,8 +56,8 @@ class CreateCommand : SubCommand {
                     MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
-                        Main.config.settings.selectionMaterial,
-                        Main.config.settings.baseMaterial
+                        PaperServer.config.settings.selectionMaterial,
+                        PaperServer.config.settings.baseMaterial
                     )
                 else
                     MessageUtil.sendMessage(player, key, *args)
@@ -66,7 +66,7 @@ class CreateCommand : SubCommand {
                 MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
-                    Main.config.settings.baseMaterial
+                    PaperServer.config.settings.baseMaterial
                 )
             }
         ) ?: return
@@ -119,16 +119,16 @@ class CreateCommand : SubCommand {
             faceModY = if (isVertical) abs(face.modY) else 0,
             width = region.screenWidth(isVertical),
             height = region.screenHeight(isVertical),
-            minHeight = Main.config.settings.minHeight,
-            minWidth = Main.config.settings.minWidth,
-            maxHeight = Main.config.settings.maxHeight,
-            maxWidth = Main.config.settings.maxWidth,
+            minHeight = PaperServer.config.settings.minHeight,
+            minWidth = PaperServer.config.settings.minWidth,
+            maxHeight = PaperServer.config.settings.maxHeight,
+            maxWidth = PaperServer.config.settings.maxWidth,
             hasExpectedBaseMaterial = {
                 val world = pos1.world ?: return@validateRegion false
                 for (x in region.minX..region.maxX) {
                     for (y in region.minY..region.maxY) {
                         for (z in region.minZ..region.maxZ) {
-                            if (world.getBlockAt(x, y, z).type != Main.config.settings.baseMaterial) {
+                            if (world.getBlockAt(x, y, z).type != PaperServer.config.settings.baseMaterial) {
                                 return@validateRegion false
                             }
                         }

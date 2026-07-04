@@ -3,7 +3,7 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.security.LanguageTag
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
@@ -14,7 +14,7 @@ import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -35,7 +35,7 @@ import java.util.*
 @PaperOnly
 class VideoCommand : SubCommand {
     override val name = "video"
-    override val permission = Main.config.permissions.video
+    override val permission = PaperServer.config.permissions.video
     override val playerOnly = true
 
     /**
@@ -57,7 +57,7 @@ class VideoCommand : SubCommand {
 
         val block = player.getTargetBlock(null, 32)
 
-        if (block.type != Main.config.settings.baseMaterial) {
+        if (block.type != PaperServer.config.settings.baseMaterial) {
             MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock")
             return
         }
@@ -69,7 +69,7 @@ class VideoCommand : SubCommand {
         }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
+                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
@@ -82,7 +82,7 @@ class VideoCommand : SubCommand {
             lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
         }
 
-        runAsync { Main.getInstance().storage.saveDisplay(data) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(data) }
         DisplayManager.broadcastUpdate(data)
         if (wasSync) StateManager.resetAndBroadcast(data)
         TimelineManager.onVideoChanged(data)
@@ -104,7 +104,7 @@ class VideoCommand : SubCommand {
                 .asSequence()
                 .map { it.language.lowercase(Locale.ROOT) }
 
-            val fromPlugin = Main.config.languages.keys
+            val fromPlugin = PaperServer.config.languages.keys
                 .asSequence()
                 .map { it.trim().lowercase(Locale.ROOT).replace('-', '_').substringBefore('_') }
 
@@ -150,7 +150,7 @@ object VanillaVideoCommand {
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, VanillaServerPacketHandler.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaDisplayActions.isOpLevel2(player))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")

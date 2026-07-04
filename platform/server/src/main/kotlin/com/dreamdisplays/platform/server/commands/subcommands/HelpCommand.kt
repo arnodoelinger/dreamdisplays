@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
@@ -20,7 +20,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class HelpCommand : SubCommand {
     override val name = "help"
-    override val permission = Main.config.permissions.help
+    override val permission = PaperServer.config.permissions.help
     override val playerOnly = true
 
     /** Prints the help message listing every `/display` subcommand. */
@@ -29,12 +29,12 @@ class HelpCommand : SubCommand {
 
         MessageUtil.sendColoredMessage(
             sender,
-            $$"&7D |&f $${Main.config.getMessageForPlayer(player, "displayHelpHeader")}"
+            $$"&7D |&f $${PaperServer.config.getMessageForPlayer(player, "displayHelpHeader")}"
         )
 
         fun line(key: String) {
             MessageUtil.sendColoredMessage(
-                sender, $$"&f $${Main.config.getMessageForPlayer(player, key)}"
+                sender, $$"&f $${PaperServer.config.getMessageForPlayer(player, key)}"
             )
         }
 

@@ -1,6 +1,6 @@
 name: DreamDisplays
 version: '${version}'
-main: com.dreamdisplays.platform.server.Main
+main: com.dreamdisplays.platform.server.PaperServer
 api-version: '${paperMinecraftApi}'
 description: 'Plugin for the Dream Displays mod.'
 authors:

@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.playback
 
 import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.DisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -39,7 +39,7 @@ object PaperPlaybackTransport : PlaybackTransport {
             }
             return
         }
-        val player = Main.getInstance().server.getPlayer(playerId) ?: return
+        val player = PaperServer.getInstance().server.getPlayer(playerId) ?: return
         if (V2PlayerTracker.isV2(playerId)) PaperV2Networking.send(listOf(player), packet)
     }
 
@@ -53,12 +53,12 @@ object PaperPlaybackTransport : PlaybackTransport {
     /** Display name for [playerId], or null if unknown / offline. */
     override fun playerName(playerId: UUID): String? {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerName(playerId)
-        return Main.getInstance().server.getPlayer(playerId)?.name
+        return PaperServer.getInstance().server.getPlayer(playerId)?.name
     }
 
     /** True if [playerId] is recognized as an admin (op / delete permission). */
     override fun isAdmin(playerId: UUID): Boolean {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerIsAdmin(playerId)
-        return Main.getInstance().server.getPlayer(playerId)?.hasPermission(Main.config.permissions.delete) == true
+        return PaperServer.getInstance().server.getPlayer(playerId)?.hasPermission(PaperServer.config.permissions.delete) == true
     }
 }

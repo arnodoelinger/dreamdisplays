@@ -5,7 +5,7 @@ import com.dreamdisplays.platform.server.datatypes.DisplayData
 import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
-import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import net.minecraft.server.MinecraftServer
 import java.util.UUID
@@ -54,6 +54,6 @@ object VanillaPlaybackTransport : PlaybackTransport {
     /** True if [playerId] is recognized as an admin (op / delete permission). */
     override fun isAdmin(playerId: UUID): Boolean {
         val player = server?.playerList?.getPlayer(playerId) ?: return false
-        return VanillaServerPacketHandler.isOpLevel2(player)
+        return VanillaDisplayActions.isOpLevel2(player)
     }
 }

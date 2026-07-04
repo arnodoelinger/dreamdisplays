@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
@@ -19,7 +19,7 @@ import org.bukkit.command.CommandSender
 @PaperOnly
 class StatsCommand : SubCommand {
     override val name = "stats"
-    override val permission = Main.config.permissions.stats
+    override val permission = PaperServer.config.permissions.stats
 
     /** Prints a per-mod-version count of currently connected players that have reported a version. */
     override fun execute(sender: CommandSender, args: Array<String?>) {

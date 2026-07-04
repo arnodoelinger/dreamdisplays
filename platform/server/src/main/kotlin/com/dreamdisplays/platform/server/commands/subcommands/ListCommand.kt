@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -40,7 +40,7 @@ class ListCommand : SubCommand {
     )
 
     override val name = "list"
-    override val permission = Main.config.permissions.list
+    override val permission = PaperServer.config.permissions.list
 
     /** Renders a paged, filterable listing of all displays, with `/tp` and URL buttons for players. */
     override fun execute(sender: CommandSender, args: Array<String?>) {

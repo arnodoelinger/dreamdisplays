@@ -1,13 +1,10 @@
 package com.dreamdisplays.platform.server.managers
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Expiry
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.Main.Companion.config
-import com.dreamdisplays.platform.server.Main.Companion.getInstance
+import com.dreamdisplays.platform.server.PaperServer.Companion.config
+import com.dreamdisplays.platform.server.PaperServer.Companion.getInstance
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.datatypes.DisplayData
 import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
@@ -44,7 +41,6 @@ import org.bukkit.util.BoundingBox
 import org.jspecify.annotations.NullMarked
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 /**
@@ -53,41 +49,9 @@ import java.util.function.Consumer
  */
 @NullMarked
 object DisplayManager {
-    private const val REPORT_RATE_LIMIT_MAX_SIZE = 20_000L
-
-    private data class ReportCooldown(val durationNanos: Long)
-
-    private val reportCooldownExpiry = object : Expiry<UUID, ReportCooldown> {
-        override fun expireAfterCreate(key: UUID, value: ReportCooldown, currentTime: Long): Long =
-            value.durationNanos
-
-        override fun expireAfterUpdate(
-            key: UUID,
-            value: ReportCooldown,
-            currentTime: Long,
-            currentDuration: Long
-        ): Long = value.durationNanos
-
-        override fun expireAfterRead(
-            key: UUID,
-            value: ReportCooldown,
-            currentTime: Long,
-            currentDuration: Long
-        ): Long = currentDuration
-    }
-
     private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
-    private val reportTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
-        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
-        .expireAfter(reportCooldownExpiry)
-        .build()
-    private val reporterTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
-        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
-        .expireAfter(reportCooldownExpiry)
-        .build()
-    private val reportRateLimitLock = Any()
-    private val nearbyPlayersByDisplay: MutableMap<UUID, MutableSet<UUID>> = ConcurrentHashMap()
-    private val nearbyDisplaysByPlayer: MutableMap<UUID, Set<UUID>> = ConcurrentHashMap()
+    private val reportThrottle = ReportThrottle()
+    private val proximityIndex = DisplayProximityIndex()
 
     /** Returns the display registered under [id], or null if none exists. */
     @JvmStatic
@@ -125,34 +89,13 @@ object DisplayManager {
     }
 
     /**
-     * Checks whether a report from [reporterId] about display [id] should be rate-limited. Drops
-     * the request when either the per-display or the per-reporter cooldown is still active; the
-     * per-reporter limit stops an attacker from amplifying the webhook by spreading reports across
-     * many displays. Records both cooldown markers only when the report may proceed.
-     */
-    private fun isReportThrottled(id: UUID, reporterId: UUID, cooldownMs: Long): Boolean {
-        val durationNanos = TimeUnit.MILLISECONDS.toNanos(cooldownMs).coerceAtLeast(0L)
-        if (durationNanos == 0L) return false
-
-        synchronized(reportRateLimitLock) {
-            if (reportTime.getIfPresent(id) != null || reporterTime.getIfPresent(reporterId) != null) {
-                return true
-            }
-            val marker = ReportCooldown(durationNanos)
-            reportTime.put(id, marker)
-            reporterTime.put(reporterId, marker)
-            return false
-        }
-    }
-
-    /**
      * Removes every display in [toRemove] from the in-memory registry, invokes [delete] for each,
      * and returns the list of removed UUIDs.
      */
     private fun removeDisplays(toRemove: List<DisplayData>, delete: (DisplayData) -> Unit): List<UUID> {
         return toRemove.map { display ->
             displays.remove(display.id)
-            forgetNearbyDisplay(display.id)
+            proximityIndex.forgetDisplay(display.id)
             delete(display)
             display.id
         }
@@ -212,38 +155,14 @@ object DisplayManager {
         return location.isInRange(display)
     }
 
-    /** Removes a display from the cached proximity index. */
-    private fun forgetNearbyDisplay(displayId: UUID) {
-        nearbyPlayersByDisplay.remove(displayId)
-        nearbyDisplaysByPlayer.replaceAll { _, ids -> ids - displayId }
-    }
-
     /** Removes [playerId] from the cached Folia proximity index. */
     @PaperOnly
-    fun forgetNearbyPlayer(playerId: UUID) {
-        nearbyDisplaysByPlayer.remove(playerId)?.forEach { displayId ->
-            nearbyPlayersByDisplay[displayId]?.remove(playerId)
-        }
-    }
+    fun forgetNearbyPlayer(playerId: UUID) = proximityIndex.forgetPlayer(playerId)
 
     /** Cached nearby player ids for Folia global coordinators that cannot read entity locations directly. */
     @PaperOnly
     fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> =
-        nearbyPlayersByDisplay[display.id]?.toList() ?: emptyList()
-
-    /** Updates the cached proximity index after [player]'s entity task computed their nearby displays. */
-    @PaperOnly
-    private fun updateNearbyIndex(player: Player, nearbyDisplayIds: Set<UUID>) {
-        val playerId = player.uniqueId
-        val previous = nearbyDisplaysByPlayer.put(playerId, nearbyDisplayIds) ?: emptySet()
-
-        (previous - nearbyDisplayIds).forEach { displayId ->
-            nearbyPlayersByDisplay[displayId]?.remove(playerId)
-        }
-        (nearbyDisplayIds - previous).forEach { displayId ->
-            nearbyPlayersByDisplay.computeIfAbsent(displayId) { ConcurrentHashMap.newKeySet() }.add(playerId)
-        }
-    }
+        proximityIndex.trackedNearbyPlayerIds(display.id)
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly
@@ -288,7 +207,7 @@ object DisplayManager {
         Scheduler.forEachTrackedPlayer { player ->
             val visible = displays.values.filterIsInstance<PaperDisplayData>()
                 .filter { player.isInRange(it) }
-            updateNearbyIndex(player, visible.mapTo(mutableSetOf()) { it.id })
+            proximityIndex.update(player.uniqueId, visible.mapTo(mutableSetOf()) { it.id })
             visible.forEach { display -> sendUpdate(display, listOf(player)) }
         }
     }
@@ -343,7 +262,7 @@ object DisplayManager {
         TimelineManager.remove(displayData.id)
         WatchPartyManager.remove(displayData.id)
         displays.remove(displayData.id)
-        forgetNearbyDisplay(displayData.id)
+        proximityIndex.forgetDisplay(displayData.id)
     }
 
     /**
@@ -354,7 +273,7 @@ object DisplayManager {
     @JvmStatic
     fun report(id: UUID, player: Player) {
         val displayData = displays[id] as? PaperDisplayData ?: return
-        if (isReportThrottled(id, player.uniqueId, config.settings.reportCooldown.toLong())) {
+        if (reportThrottle.isThrottled(id, player.uniqueId, config.settings.reportCooldown.toLong())) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
@@ -490,7 +409,7 @@ object DisplayManager {
     fun report(id: UUID, player: ServerPlayer, server: MinecraftServer) {
         val displayData = displays[id] as? VanillaDisplayData ?: return
         val cfg = VanillaServerState.config
-        if (isReportThrottled(id, player.uuid, cfg.settings.reportCooldown)) {
+        if (reportThrottle.isThrottled(id, player.uuid, cfg.settings.reportCooldown)) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }

@@ -9,7 +9,7 @@ import com.dreamdisplays.platform.server.datatypes.StateData
 import com.dreamdisplays.platform.server.datatypes.SyncData
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager.getDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager.getReceivers
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
@@ -93,7 +93,7 @@ object StateManager {
     @PaperOnly
     @JvmStatic
     fun processSyncPacket(packet: SyncData, player: Player) {
-        if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(Main.config.permissions.delete))) return
+        if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))) return
         val data = getDisplayData(packet.id) ?: return
         if (PlatformUtil.isFolia) {
             DisplayManager.sendLegacySyncToTrackedNearbyPlayers(

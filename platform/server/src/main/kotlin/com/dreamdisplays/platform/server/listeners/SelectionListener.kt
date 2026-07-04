@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.listeners
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
@@ -35,7 +35,7 @@ import org.bukkit.inventory.EquipmentSlot
  * Sneaking and right-clicking resets the selection.
  */
 @PaperOnly
-class SelectionListener(plugin: Main) : Listener {
+class SelectionListener(plugin: PaperServer) : Listener {
     init {
         SelectionVisualizer.startParticleTask(plugin)
     }
@@ -56,7 +56,7 @@ class SelectionListener(plugin: Main) : Listener {
             return
         }
 
-        if (heldItem != Main.config.settings.selectionMaterial || block.type != Main.config.settings.baseMaterial) return
+        if (heldItem != PaperServer.config.settings.selectionMaterial || block.type != PaperServer.config.settings.baseMaterial) return
         event.isCancelled = true
 
         when (event.action) {

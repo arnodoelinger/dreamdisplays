@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.utils.net
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
@@ -22,7 +22,7 @@ import java.util.*
 @Deprecated("Protocol v1 receiver; remove when v1 client support is dropped.")
 @PaperOnly
 @NullMarked
-class PacketReceiver(private val plugin: Main) : PluginMessageListener {
+class PacketReceiver(private val plugin: PaperServer) : PluginMessageListener {
     private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
     private val maxVersionBytes = 128
     private val maxStringBytes = 4096
@@ -90,9 +90,9 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
             if (V2PlayerTracker.isV2(player.uniqueId)) return
 
             DisplayActions.recordVersionAndCheckUpdates(player, version)
-            PacketUtil.sendPremium(player, player.hasPermission(Main.config.permissions.premium))
-            PacketUtil.sendIsAdmin(player, player.hasPermission(Main.config.permissions.delete))
-            PacketUtil.sendReportEnabled(player, Main.config.settings.webhookUrl.isNotEmpty())
+            PacketUtil.sendPremium(player, player.hasPermission(PaperServer.config.permissions.premium))
+            PacketUtil.sendIsAdmin(player, player.hasPermission(PaperServer.config.permissions.delete))
+            PacketUtil.sendReportEnabled(player, PaperServer.config.settings.webhookUrl.isNotEmpty())
             DisplayActions.sendAllDisplays(player)
         }.onFailure { e ->
             logger.warn("Failed to process version packet", e)

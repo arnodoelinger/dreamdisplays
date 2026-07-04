@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -24,7 +24,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class DeleteCommand : SubCommand {
     override val name = "delete"
-    override val permission = Main.config.permissions.delete
+    override val permission = PaperServer.config.permissions.delete
     override val playerOnly = true
 
     /** Deletes the display the player is currently looking at (within 32 blocks). */
@@ -32,7 +32,7 @@ class DeleteCommand : SubCommand {
         val player = (sender as? Player) ?: return
 
         val block = player.getTargetBlock(null, 32)
-        if (block.type != Main.config.settings.baseMaterial) {
+        if (block.type != PaperServer.config.settings.baseMaterial) {
             MessageUtil.sendMessage(player, "noDisplay")
             return
         }
@@ -65,7 +65,7 @@ object VanillaDeleteCommand {
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !VanillaServerPacketHandler.isOpLevel2(player)) {
+        if (data.ownerId != player.uuid && !VanillaDisplayActions.isOpLevel2(player)) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }

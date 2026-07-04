@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -34,7 +34,7 @@ class OnCommand : SubCommand {
         val target = resolveTarget(sender, args) ?: return
         val selfTarget = sender is Player && sender.uniqueId == target.uniqueId
 
-        if (!selfTarget && !sender.hasPermission(Main.config.permissions.toggleOthers)) {
+        if (!selfTarget && !sender.hasPermission(PaperServer.config.permissions.toggleOthers)) {
             MessageUtil.sendMessage(sender, "displayCommandMissingPermission")
             return
         }
@@ -58,7 +58,7 @@ class OnCommand : SubCommand {
     /** Suggests online player names when [sender] is allowed to toggle others. */
     override fun complete(sender: CommandSender, args: Array<String?>): List<String> {
         if (args.size != 2) return emptyList()
-        if (!sender.hasPermission(Main.config.permissions.toggleOthers)) return emptyList()
+        if (!sender.hasPermission(PaperServer.config.permissions.toggleOthers)) return emptyList()
         return Bukkit.getOnlinePlayers().map { it.name }.sorted()
     }
 
@@ -115,7 +115,7 @@ object VanillaOnCommand {
 
         val selfTarget = self?.uuid == target.uuid
 
-        if (!selfTarget && (self == null || !VanillaServerPacketHandler.isOpLevel2(self))) {
+        if (!selfTarget && (self == null || !VanillaDisplayActions.isOpLevel2(self))) {
             if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))
             return 0

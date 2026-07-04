@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
@@ -23,7 +23,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class InfoCommand : SubCommand {
     override val name = "info"
-    override val permission = Main.config.permissions.info
+    override val permission = PaperServer.config.permissions.info
     override val playerOnly = true
 
     /** Prints the owner, UUID, region, size and media metadata of the targeted display. */

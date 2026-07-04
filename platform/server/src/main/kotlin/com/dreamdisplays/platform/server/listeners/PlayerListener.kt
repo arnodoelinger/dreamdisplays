@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.listeners
 
-import com.dreamdisplays.platform.server.Main.Companion.config
+import com.dreamdisplays.platform.server.PaperServer.Companion.config
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager

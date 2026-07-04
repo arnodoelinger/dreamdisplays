@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.utils
 
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.util.toJsonString
 import net.kyori.adventure.text.Component
@@ -53,7 +53,7 @@ object MessageUtil {
     @PaperOnly
     @NullMarked
     fun sendMessage(sender: CommandSender?, messageKey: String, vararg args: Any) {
-        val raw = Main.config.getMessageForPlayer(sender as? Player, messageKey)
+        val raw = PaperServer.config.getMessageForPlayer(sender as? Player, messageKey)
         val message = if (args.isNotEmpty() && raw is String) raw.format(*args) else raw
         sendColoredMessage(sender, message)
     }
@@ -87,7 +87,7 @@ object MessageUtil {
     /** Returns the localized string for [key] in [sender]'s language, or [key] when missing. */
     @PaperOnly
     fun messageFor(sender: CommandSender, key: String): String =
-        Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
+        PaperServer.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
 
     /** Returns the localized string for [key], substituting `{0}`, `{1}`, ... with [values]. */
     @PaperOnly
@@ -109,7 +109,7 @@ object MessageUtil {
     @NullMarked
     fun sendMessageWithMaterials(sender: CommandSender?, messageKey: String, vararg materials: Material) {
         if (sender == null) return
-        val rawMessage = Main.config.getMessageForPlayer(sender as? Player, messageKey) as? String ?: run {
+        val rawMessage = PaperServer.config.getMessageForPlayer(sender as? Player, messageKey) as? String ?: run {
             sendMessage(sender, messageKey)
             return
         }
