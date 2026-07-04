@@ -81,8 +81,8 @@ class PaperSelectionData(player: Player) : SelectionData {
         val dPos2 = region.getMaxLocation(p1.world)
 
         val isVertical = f == BlockFace.UP || f == BlockFace.DOWN
-        val screenWidth = if (isVertical) region.deltaX else region.width
-        val screenHeight = if (isVertical) region.deltaZ else region.height
+        val screenWidth = region.screenWidth(isVertical)
+        val screenHeight = region.screenHeight(isVertical)
         val rotation = if (isVertical) horizontalRotation(horizontal) else ContentRotation.NONE
 
         return PaperDisplayData(randomUUID(), playerId, dPos1, dPos2, screenWidth, screenHeight, f, rotation)
@@ -123,45 +123,25 @@ class VanillaSelectionData : SelectionData {
 
     /** Returns the AABB covering the selected region, or `null` if either corner is missing. */
     fun selectionBox(): AABB? {
-        val p1 = pos1 ?: return null
-        val p2 = pos2 ?: return null
-        val minX = minOf(p1.x, p2.x).toDouble()
-        val minY = minOf(p1.y, p2.y).toDouble()
-        val minZ = minOf(p1.z, p2.z).toDouble()
-        val maxX = (maxOf(p1.x, p2.x) + 1).toDouble()
-        val maxY = (maxOf(p1.y, p2.y) + 1).toDouble()
-        val maxZ = (maxOf(p1.z, p2.z) + 1).toDouble()
-        return AABB(minX, minY, minZ, maxX, maxY, maxZ)
+        val r = region() ?: return null
+        return AABB(
+            r.minX.toDouble(), r.minY.toDouble(), r.minZ.toDouble(),
+            (r.maxX + 1).toDouble(), (r.maxY + 1).toDouble(), (r.maxZ + 1).toDouble(),
+        )
     }
 
     /** Returns `true` if [pos] lies within the selected bounding box. */
     fun contains(pos: BlockPos): Boolean {
         val p1 = pos1 ?: return false
         val p2 = pos2 ?: return false
-        val minX = minOf(p1.x, p2.x)
-        val maxX = maxOf(p1.x, p2.x)
-        val minY = minOf(p1.y, p2.y)
-        val maxY = maxOf(p1.y, p2.y)
-        val minZ = minOf(p1.z, p2.z)
-        val maxZ = maxOf(p1.z, p2.z)
-        return pos.x in minX..maxX && pos.y in minY..maxY && pos.z in minZ..maxZ
+        return RegionUtil.isInBoundaries(p1, p2, pos)
     }
 
     /** Computes dimension data for the selection, or `null` if either corner is missing. */
-    fun region(): RegionResult? {
+    fun region(): RegionUtil.RegionData? {
         val p1 = pos1 ?: return null
         val p2 = pos2 ?: return null
-        val minX = minOf(p1.x, p2.x)
-        val maxX = maxOf(p1.x, p2.x)
-        val minY = minOf(p1.y, p2.y)
-        val maxY = maxOf(p1.y, p2.y)
-        val minZ = minOf(p1.z, p2.z)
-        val maxZ = maxOf(p1.z, p2.z)
-        val deltaX = maxX - minX + 1
-        val deltaZ = maxZ - minZ + 1
-        val width = maxOf(deltaX, deltaZ)
-        val height = maxY - minY + 1
-        return RegionResult(minX, minY, minZ, maxX, maxY, maxZ, width, height, deltaX, deltaZ)
+        return RegionUtil.calculateRegion(p1, p2)
     }
 
     /**
@@ -177,10 +157,10 @@ class VanillaSelectionData : SelectionData {
             id = randomUUID(),
             ownerId = ownerId,
             worldKey = wk,
-            pos1 = BlockPos(r.minX, r.minY, r.minZ),
-            pos2 = BlockPos(r.maxX, r.maxY, r.maxZ),
-            width = if (isVertical) r.deltaX else r.width,
-            height = if (isVertical) r.deltaZ else r.height,
+            pos1 = r.getMinBlockPos(),
+            pos2 = r.getMaxBlockPos(),
+            width = r.screenWidth(isVertical),
+            height = r.screenHeight(isVertical),
             facing = facing,
             rotation = if (isVertical) horizontalRotation(horizontalFacing) else ContentRotation.NONE,
         )
@@ -194,12 +174,4 @@ class VanillaSelectionData : SelectionData {
         Direction.WEST -> ContentRotation.LEFT
         else -> ContentRotation.NONE
     }
-
-    /** Compact result of a selection region calculation. */
-    data class RegionResult(
-        val minX: Int, val minY: Int, val minZ: Int,
-        val maxX: Int, val maxY: Int, val maxZ: Int,
-        val width: Int, val height: Int,
-        val deltaX: Int, val deltaZ: Int,
-    )
 }

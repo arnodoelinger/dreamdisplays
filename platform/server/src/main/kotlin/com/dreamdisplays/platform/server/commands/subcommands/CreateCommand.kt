@@ -104,40 +104,30 @@ class CreateCommand : SubCommand {
             return null
         }
 
-        val minX = minOf(pos1.blockX, pos2.blockX)
-        val maxX = maxOf(pos1.blockX, pos2.blockX)
-        val minY = minOf(pos1.blockY, pos2.blockY)
-        val maxY = maxOf(pos1.blockY, pos2.blockY)
-        val minZ = minOf(pos1.blockZ, pos2.blockZ)
-        val maxZ = maxOf(pos1.blockZ, pos2.blockZ)
-        val deltaX = maxX - minX + 1
-        val deltaZ = maxZ - minZ + 1
-        val deltaY = maxY - minY + 1
+        val region = RegionUtil.calculateRegion(pos1, pos2)
         val face = sel.getFace()
         val isVertical = face == BlockFace.UP || face == BlockFace.DOWN
-        val width = if (isVertical) deltaX else maxOf(deltaX, deltaZ)
-        val height = if (isVertical) deltaZ else deltaY
 
         return validateRegion(
-            minY = minY,
-            maxY = maxY,
-            deltaX = deltaX,
-            deltaZ = deltaZ,
-            deltaY = deltaY,
+            minY = region.minY,
+            maxY = region.maxY,
+            deltaX = region.deltaX,
+            deltaZ = region.deltaZ,
+            deltaY = region.deltaY,
             faceModX = if (!isVertical) abs(face.modX) else 0,
             faceModZ = if (!isVertical) abs(face.modZ) else 0,
             faceModY = if (isVertical) abs(face.modY) else 0,
-            width = width,
-            height = height,
+            width = region.screenWidth(isVertical),
+            height = region.screenHeight(isVertical),
             minHeight = Main.config.settings.minHeight,
             minWidth = Main.config.settings.minWidth,
             maxHeight = Main.config.settings.maxHeight,
             maxWidth = Main.config.settings.maxWidth,
             hasExpectedBaseMaterial = {
                 val world = pos1.world ?: return@validateRegion false
-                for (x in minX..maxX) {
-                    for (y in minY..maxY) {
-                        for (z in minZ..maxZ) {
+                for (x in region.minX..region.maxX) {
+                    for (y in region.minY..region.maxY) {
+                        for (z in region.minZ..region.maxZ) {
                             if (world.getBlockAt(x, y, z).type != Main.config.settings.baseMaterial) {
                                 return@validateRegion false
                             }
@@ -237,24 +227,18 @@ object VanillaCreateCommand {
 
         val facing = sel.facing
         val isVertical = facing == Direction.UP || facing == Direction.DOWN
-        val faceModX = if (!isVertical && (facing == Direction.EAST || facing == Direction.WEST)) 1 else 0
-        val faceModZ = if (!isVertical && (facing == Direction.NORTH || facing == Direction.SOUTH)) 1 else 0
-        val faceModY = if (isVertical) 1 else 0
-        val deltaY = region.maxY - region.minY + 1
-        val screenWidth = if (isVertical) region.deltaX else region.width
-        val screenHeight = if (isVertical) region.deltaZ else region.height
 
         return validateRegion(
             minY = region.minY,
             maxY = region.maxY,
             deltaX = region.deltaX,
             deltaZ = region.deltaZ,
-            deltaY = deltaY,
-            faceModX = faceModX,
-            faceModZ = faceModZ,
-            faceModY = faceModY,
-            width = screenWidth,
-            height = screenHeight,
+            deltaY = region.deltaY,
+            faceModX = if (!isVertical) abs(facing.stepX) else 0,
+            faceModZ = if (!isVertical) abs(facing.stepZ) else 0,
+            faceModY = if (isVertical) abs(facing.stepY) else 0,
+            width = region.screenWidth(isVertical),
+            height = region.screenHeight(isVertical),
             minHeight = VanillaServerState.config.settings.minHeight,
             minWidth = VanillaServerState.config.settings.minWidth,
             maxHeight = VanillaServerState.config.settings.maxHeight,

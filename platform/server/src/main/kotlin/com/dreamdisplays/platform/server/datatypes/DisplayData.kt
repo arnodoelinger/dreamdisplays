@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.server.datatypes
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.api.playback.PlaybackPermissions
+import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
@@ -79,13 +80,11 @@ class PaperDisplayData(
     override var isLocked: Boolean = true
     override var duration: Long? = null
 
+    private val region = RegionUtil.calculateRegion(pos1, pos2)
+
     val box: BoundingBox = BoundingBox(
-        minOf(pos1.blockX, pos2.blockX).toDouble(),
-        minOf(pos1.blockY, pos2.blockY).toDouble(),
-        minOf(pos1.blockZ, pos2.blockZ).toDouble(),
-        (maxOf(pos1.blockX, pos2.blockX) + 1).toDouble(),
-        (maxOf(pos1.blockY, pos2.blockY) + 1).toDouble(),
-        (maxOf(pos1.blockZ, pos2.blockZ) + 1).toDouble()
+        region.minX.toDouble(), region.minY.toDouble(), region.minZ.toDouble(),
+        (region.maxX + 1).toDouble(), (region.maxY + 1).toDouble(), (region.maxZ + 1).toDouble(),
     )
 }
 
@@ -109,15 +108,17 @@ class VanillaDisplayData(
     override var isLocked: Boolean = true
     override var duration: Long? = null
 
-    val minX = minOf(pos1.x, pos2.x)
-    val minY = minOf(pos1.y, pos2.y)
-    val minZ = minOf(pos1.z, pos2.z)
-    val maxX = maxOf(pos1.x, pos2.x)
-    val maxY = maxOf(pos1.y, pos2.y)
-    val maxZ = maxOf(pos1.z, pos2.z)
+    private val region = RegionUtil.calculateRegion(pos1, pos2)
+
+    val minX = region.minX
+    val minY = region.minY
+    val minZ = region.minZ
+    val maxX = region.maxX
+    val maxY = region.maxY
+    val maxZ = region.maxZ
 
     val box: AABB = AABB(
         minX.toDouble(), minY.toDouble(), minZ.toDouble(),
-        (maxX + 1).toDouble(), (maxY + 1).toDouble(), (maxZ + 1).toDouble()
+        (maxX + 1).toDouble(), (maxY + 1).toDouble(), (maxZ + 1).toDouble(),
     )
 }
