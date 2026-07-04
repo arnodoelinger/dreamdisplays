@@ -1,8 +1,7 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.Main.Companion.config
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.meta.Scheduler
@@ -18,6 +17,7 @@ import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents
+import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.entity.player.PlayerEvent
@@ -27,6 +27,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.jspecify.annotations.NullMarked
+import java.util.UUID
 
 /**
  * Handles player join and leave events. If mod detection is enabled, schedules a delayed `modRequired` message for
@@ -81,69 +82,17 @@ class PlayerListener : Listener {
 }
 
 /**
- * `Fabric` specific implementation of [PlayerListener].
+ * Shared `Fabric` / `NeoForge` player join / leave handling. [FabricPlayerListener] and
+ * [NeoForgePlayerListener] only adapt their loader's event-subscription API and hand off here.
  */
-@FabricOnly
-object FabricPlayerListener {
+object VanillaPlayerListener {
     private var hasValidatedWorld = false
 
     /**
      * On the first join after startup, validates all stored displays once. Also schedules a delayed
      * `modRequired` message for vanilla clients when mod detection is enabled.
      */
-    fun register() {
-        ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
-            val player = handler.player
-
-            if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
-                hasValidatedWorld = true
-                VanillaServerScheduler.runLater(server, 40L) {
-                    val removedUuids = DisplayManager.validateDisplaysAndCleanup(server)
-                    if (removedUuids.isNotEmpty()) {
-                        VanillaPacketUtil.sendClearCache(server.playerList.players, removedUuids)
-                    }
-                }
-            }
-
-            val config = Server.config
-            if (!config.settings.modDetectionEnabled) return@register
-            if (DisplayManager.getDisplays().isEmpty()) return@register
-
-            VanillaServerScheduler.runLater(server, 600L) {
-                if (player.isAlive &&
-                    PlayerManager.getVersion(player) == null &&
-                    !PlayerManager.hasBeenNotifiedAboutModRequired(player)
-                ) {
-                    MessageUtil.sendMessage(player, "modRequired")
-                    PlayerManager.setModRequiredNotified(player, true)
-                }
-            }
-        }
-
-        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
-            PlayerManager.removeVersion(handler.player)
-            V2PlayerTracker.clear(handler.player.uuid)
-            WatchPartyManager.onPlayerQuit(handler.player.uuid)
-        }
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of [PlayerListener].
- */
-@NeoForgeOnly
-object NeoForgePlayerListener {
-    private var hasValidatedWorld = false
-
-    /**
-     * On the first join after startup, validates all stored displays once. Also schedules a delayed
-     * `modRequired` message for vanilla clients when mod detection is enabled.
-     */
-    @SubscribeEvent
-    fun onLogin(event: PlayerEvent.PlayerLoggedInEvent) {
-        val player = event.entity as? ServerPlayer ?: return
-        val server = RegionUtil.playerServer(player)
-
+    fun onJoin(player: ServerPlayer, server: MinecraftServer) {
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
             VanillaServerScheduler.runLater(server, 40L) {
@@ -154,8 +103,7 @@ object NeoForgePlayerListener {
             }
         }
 
-        val config = NeoForgeServer.config
-        if (!config.settings.modDetectionEnabled) return
+        if (!VanillaServerState.config.settings.modDetectionEnabled) return
         if (DisplayManager.getDisplays().isEmpty()) return
 
         VanillaServerScheduler.runLater(server, 600L) {
@@ -170,11 +118,38 @@ object NeoForgePlayerListener {
     }
 
     /** Drops cached per-player state when a player disconnects. */
+    fun onLeave(playerId: UUID) {
+        PlayerManager.removePlayer(playerId)
+        V2PlayerTracker.clear(playerId)
+        WatchPartyManager.onPlayerQuit(playerId)
+    }
+}
+
+/** `Fabric` event-subscription adapter for [VanillaPlayerListener]. */
+@FabricOnly
+object FabricPlayerListener {
+    fun register() {
+        ServerPlayConnectionEvents.JOIN.register { handler, _, server ->
+            VanillaPlayerListener.onJoin(handler.player, server)
+        }
+        ServerPlayConnectionEvents.DISCONNECT.register { handler, _ ->
+            VanillaPlayerListener.onLeave(handler.player.uuid)
+        }
+    }
+}
+
+/** `NeoForge` event-subscription adapter for [VanillaPlayerListener]. */
+@NeoForgeOnly
+object NeoForgePlayerListener {
+    @SubscribeEvent
+    fun onLogin(event: PlayerEvent.PlayerLoggedInEvent) {
+        val player = event.entity as? ServerPlayer ?: return
+        VanillaPlayerListener.onJoin(player, RegionUtil.playerServer(player))
+    }
+
     @SubscribeEvent
     fun onLogout(event: PlayerEvent.PlayerLoggedOutEvent) {
         val player = event.entity as? ServerPlayer ?: return
-        PlayerManager.removePlayer(player.uuid)
-        V2PlayerTracker.clear(player.uuid)
-        WatchPartyManager.onPlayerQuit(player.uuid)
+        VanillaPlayerListener.onLeave(player.uuid)
     }
 }

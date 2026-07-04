@@ -1,15 +1,15 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
-import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
+import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
+import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.neoforged.bus.api.SubscribeEvent
@@ -88,7 +88,24 @@ class ProtectionListener : Listener {
         DisplayManager.isContains(loc) != null || SelectionManager.isLocationSelected(loc)
 }
 
-/** Fabric-specific implementation of [ProtectionListener]. */
+/**
+ * Shared `Fabric` / `NeoForge` block-break protection check. [FabricProtectionListener] and
+ * [NeoForgeProtectionListener] only adapt their loader's event API and hand off here.
+ */
+object VanillaProtectionListener {
+    /** Returns true if the break at [pos] in [worldKey] should be cancelled; warns [player] if known. */
+    fun handleBreak(worldKey: String, pos: BlockPos, player: ServerPlayer?): Boolean {
+        val isProtected = DisplayManager.isContains(worldKey, pos) != null ||
+                SelectionManager.isLocationSelected(pos, worldKey)
+
+        if (isProtected && player != null && PlayerManager.getVersion(player.uuid) == null) {
+            MessageUtil.sendMessage(player, "displayBlockBreak")
+        }
+        return isProtected
+    }
+}
+
+/** `Fabric` event adapter for [VanillaProtectionListener]. */
 @FabricOnly
 object FabricProtectionListener {
     /**
@@ -96,26 +113,14 @@ object FabricProtectionListener {
      * register it, yey.
      */
     fun register() {
-        PlayerBlockBreakEvents.BEFORE.register { world, player, pos, state, blockEntity ->
+        PlayerBlockBreakEvents.BEFORE.register { world, player, pos, _, _ ->
             val worldKey = RegionUtil.getLevelKey(world as ServerLevel)
-
-            val isProtected = DisplayManager.isContains(worldKey, pos) != null
-                    || SelectionManager.isLocationSelected(pos, worldKey)
-
-            if (isProtected) {
-                if (player is ServerPlayer) {
-                    if (PlayerManager.getVersion(player) == null) {
-                        MessageUtil.sendMessage(player, "displayBlockBreak")
-                    }
-                }
-                return@register false
-            }
-            true
+            !VanillaProtectionListener.handleBreak(worldKey, pos, player as? ServerPlayer)
         }
     }
 }
 
-/** `NeoForge`-specific implementation of [ProtectionListener]. */
+/** `NeoForge` event adapter for [VanillaProtectionListener]. */
 @NeoForgeOnly
 object NeoForgeProtectionListener {
     /** Cancels the break and (for known players) warns them when the block is inside a protected area. */
@@ -123,16 +128,7 @@ object NeoForgeProtectionListener {
     fun onBreak(event: NeoForgeBreakEvent) {
         val level = event.level as? ServerLevel ?: return
         val worldKey = RegionUtil.getLevelKey(level)
-        val pos = event.pos
-
-        val isProtected = DisplayManager.isContains(worldKey, pos) != null ||
-                NeoForgeSelectionManager.isLocationSelected(pos, worldKey)
-
-        if (isProtected) {
-            val player = event.player as? ServerPlayer
-            if (player != null && PlayerManager.getVersion(player.uuid) == null) {
-                MessageUtil.sendMessage(player, "displayBlockBreak")
-            }
+        if (VanillaProtectionListener.handleBreak(worldKey, event.pos, event.player as? ServerPlayer)) {
             event.setCanceled(true)
         }
     }

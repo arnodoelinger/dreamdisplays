@@ -1,8 +1,7 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
@@ -51,57 +50,13 @@ class StatsCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display stats` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display stats` command.
  */
-@FabricOnly
-object FabricStatsCommand {
+object VanillaStatsCommand {
     /** Prints a per-mod-version breakdown of currently connected players that have reported their client version. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
-        val config = Server.config
-
-        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
-        fun format(key: String, vararg values: Any): String {
-            val template = msg(key)
-            return runCatching { String.format(template, *values) }.getOrElse { template }
-        }
-
-        val versions = PlayerManager.getVersions()
-        val counts = versions.values
-            .filterNotNull()
-            .groupingBy { it }
-            .eachCount()
-            .toSortedMap()
-
-        if (player != null) {
-            MessageUtil.sendMessage(player, "displayStatsHeader")
-            for ((version, count) in counts) {
-                MessageUtil.sendColoredMessage(player, format("displayStatsEntry", version, count))
-            }
-            val total = counts.values.sum()
-            MessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
-        } else {
-            ctx.source.sendSystemMessage(Component.literal(msg("displayStatsHeader")))
-            for ((version, count) in counts) {
-                ctx.source.sendSystemMessage(Component.literal(format("displayStatsEntry", version, count)))
-            }
-            val total = counts.values.sum()
-            ctx.source.sendSystemMessage(Component.literal(format("displayStatsTotal", total)))
-        }
-
-        return 1
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display stats` command.
- */
-@NeoForgeOnly
-object NeoForgeStatsCommand {
-    /** Prints a per-mod-version breakdown of currently connected players that have reported their client version. */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = ctx.source.entity as? ServerPlayer
-        val config = NeoForgeServer.config
+        val config = VanillaServerState.config
 
         fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
         fun format(key: String, vararg values: Any): String {

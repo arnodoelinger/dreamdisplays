@@ -21,7 +21,7 @@ import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.core.protocol.WatchPartyStart
-import com.dreamdisplays.platform.server.NeoForgeServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
@@ -53,7 +53,7 @@ object NeoForgeV2Networking {
     /**
      * Registers the single v2 envelope receiver against [registrar]. Must be called exactly once
      * total for the whole mod (NeoForge's payload registry rejects a second registration of the
-     * same id) - see [NeoForgeServer.registerPayloads] for why this can't also be registered from
+     * same id) - see `NeoForgeServer.registerPayloads` for why this can't also be registered from
      * `Client`.
      */
     fun registerReceivers(registrar: PayloadRegistrar) {
@@ -129,9 +129,9 @@ object NeoForgeV2Networking {
             ServerHello(
                 isPremium = VanillaServerPacketHandler.isOpLevel2(player),
                 isAdmin = VanillaServerPacketHandler.isOpLevel2(player),
-                isReportingEnabled = NeoForgeServer.config.settings.webhookUrl.isNotEmpty(),
+                isReportingEnabled = VanillaServerState.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
-                defaultVolume = NeoForgeServer.config.settings.defaultVolume,
+                defaultVolume = VanillaServerState.config.settings.defaultVolume,
             ),
         )
         VanillaServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)

@@ -1,8 +1,7 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -35,44 +34,15 @@ class ReloadCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display reload` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display reload` command.
  */
-@FabricOnly
-object FabricReloadCommand {
+object VanillaReloadCommand {
     /** Reloads the server config from disk; replies with success or failure to the command source. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
 
         try {
-            Server.config.reload()
-            if (player != null) {
-                MessageUtil.sendMessage(player, "configReloaded")
-                MessageUtil.sendMessage(player, "configReloadSummary")
-            } else {
-                ctx.source.sendSystemMessage(Component.literal("Dream Displays config reloaded."))
-            }
-        } catch (e: Exception) {
-            if (player != null) {
-                MessageUtil.sendMessage(player, "configReloadFailed")
-            } else {
-                ctx.source.sendFailure(Component.literal("Failed to reload config: ${e.message}"))
-            }
-        }
-        return 1
-    }
-}
-
-/**
- * `NeoForge`-specific implementation of the `/display reload` command.
- */
-@NeoForgeOnly
-object NeoForgeReloadCommand {
-    /** Reloads the server config from disk; replies with success or failure to the command source. */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = ctx.source.entity as? ServerPlayer
-
-        try {
-            NeoForgeServer.config.reload()
+            VanillaServerState.config.reload()
             if (player != null) {
                 MessageUtil.sendMessage(player, "configReloaded")
                 MessageUtil.sendMessage(player, "configReloadSummary")

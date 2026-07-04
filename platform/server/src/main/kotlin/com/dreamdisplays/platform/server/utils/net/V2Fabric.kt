@@ -20,7 +20,7 @@ import com.dreamdisplays.core.protocol.SetVideo
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.core.protocol.WatchPartyControl
 import com.dreamdisplays.core.protocol.WatchPartyStart
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -103,9 +103,9 @@ object FabricV2Networking {
             ServerHello(
                 isPremium = VanillaServerPacketHandler.isOpLevel2(player),
                 isAdmin = VanillaServerPacketHandler.isOpLevel2(player),
-                isReportingEnabled = Server.config.settings.webhookUrl.isNotEmpty(),
+                isReportingEnabled = VanillaServerState.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
-                defaultVolume = Server.config.settings.defaultVolume,
+                defaultVolume = VanillaServerState.config.settings.defaultVolume,
             ),
         )
         VanillaServerPacketHandler.recordVersionAndCheckUpdates(player, hello.modVersion)

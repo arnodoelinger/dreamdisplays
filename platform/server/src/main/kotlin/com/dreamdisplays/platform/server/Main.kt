@@ -190,32 +190,18 @@ class Server : ModInitializer {
 
         ServerLifecycleEvents.SERVER_STARTED.register { server ->
             VanillaServerState.server = server
-            val s = configInstance.storage
             val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
                 .resolve("dreamdisplays").toFile().also { it.mkdirs() }
-            val backend = StorageBackend.fromConfig(s.type)
-            if (backend == StorageBackend.SQLITE) migrateGlobalDb(dataDir)
-            val storage = StorageManager(
-                backend = backend, dataDir = dataDir,
-                tablePrefix = s.tablePrefix,
-                host = s.host, port = s.port, database = s.database,
-                username = s.username, password = s.password,
-            )
-            VanillaServerState.storage = storage
-            storage.createSchema()
-            DisplayManager.register(storage.loadAllVanillaDisplays())
-            VanillaPlaybackTransport.bind(server)
-            WatchPartyManager.init(VanillaPlaybackTransport)
-            TimelineManager.init(VanillaPlaybackTransport)
+            if (StorageBackend.fromConfig(configInstance.storage.type) == StorageBackend.SQLITE) {
+                migrateGlobalDb(dataDir)
+            }
+            VanillaBootstrap.onServerStarted(server, dataDir)
             logger.info("Server started. Storage connected.")
-            startRepeatingTasks(server)
         }
 
         ServerLifecycleEvents.SERVER_STOPPING.register { _ ->
             logger.info("Server stopping. Saving displays...")
-            DisplayManager.save { VanillaServerState.storage?.saveDisplay(it) }
-            ServerCoroutines.shutdown()
-            VanillaServerState.storage?.disconnect()
+            VanillaBootstrap.onServerStopping()
         }
 
         logger.info("Server-side initialization complete.")
@@ -264,36 +250,6 @@ class Server : ModInitializer {
             it.name == "register" && it.parameterCount == 2
         }
         register.invoke(registry, packetId, packetCodec)
-    }
-
-    /** Starts repeating coroutines for display updates and update checking on [ServerCoroutines.io]. */
-    private fun startRepeatingTasks(server: MinecraftServer) {
-        val settings = configInstance.settings
-
-        ServerCoroutines.io.launch {
-            while (!server.isStopped) {
-                delay(1000L.milliseconds)
-                runCatching {
-                    server.execute {
-                        DisplayManager.updateAllDisplays(server)
-                        StateManager.tickBroadcast(server)
-                        TimelineManager.tick()
-                        WatchPartyManager.tick()
-                    }
-                }
-            }
-        }
-
-        if (settings.updatesEnabled) {
-            ServerCoroutines.io.launch {
-                delay(1000L.milliseconds)
-                runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
-                while (!server.isStopped) {
-                    delay((60L * 60L * 1000L).milliseconds)
-                    runCatching { Updater.checkForUpdates(settings.repoOwner, settings.repoName) }
-                }
-            }
-        }
     }
 
     companion object {
@@ -374,12 +330,51 @@ class NeoForgeServer(modEventBus: IEventBus) {
     fun onServerStarted(event: ServerStartedEvent) {
         val server = event.server
         VanillaServerState.server = server
-        val s = configInstance.storage
         val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
             .resolve("dreamdisplays").toFile().also { it.mkdirs() }
-        val backend = StorageBackend.fromConfig(s.type)
+        VanillaBootstrap.onServerStarted(server, dataDir)
+        logger.info("Server started. Storage connected.")
+    }
+
+    /** Persists state and tears down resources. */
+    @SubscribeEvent
+    fun onServerStopping(event: ServerStoppingEvent) {
+        logger.info("Server stopping. Saving displays...")
+        VanillaBootstrap.onServerStopping()
+    }
+
+    companion object {
+        /** Logger. */
+        val logger = LoggerFactory.getLogger("DreamDisplays")
+
+        /** The mod version string, read from the bundled, Gradle-templated `version.txt` resource. */
+        val serverVersion: String? by lazy {
+            runCatching {
+                NeoForgeServer::class.java.classLoader
+                    .getResourceAsStream("assets/dreamdisplays/version.txt")
+                    ?.use { it.readBytes().decodeToString().trim() }
+            }.getOrNull()
+        }
+
+        private lateinit var configInstance: VanillaConfig
+
+        val config: VanillaConfig; get() = configInstance
+        val server: MinecraftServer?; get() = VanillaServerState.server
+        val storage: StorageManager?; get() = VanillaServerState.storage
+    }
+}
+
+/**
+ * Shared `Fabric` / `NeoForge` server-lifecycle bootstrap: storage bring-up, display registration,
+ * playback transport bind, and the repeating display-update / update-check coroutines. [Server]
+ * and [NeoForgeServer] only adapt their loader's lifecycle-event API and hand off here.
+ */
+object VanillaBootstrap {
+    /** Connects storage, loads displays, binds playback, and starts the repeating tasks. */
+    fun onServerStarted(server: MinecraftServer, dataDir: File) {
+        val s = VanillaServerState.config.storage
         val storage = StorageManager(
-            backend = backend, dataDir = dataDir,
+            backend = StorageBackend.fromConfig(s.type), dataDir = dataDir,
             tablePrefix = s.tablePrefix,
             host = s.host, port = s.port, database = s.database,
             username = s.username, password = s.password,
@@ -390,14 +385,11 @@ class NeoForgeServer(modEventBus: IEventBus) {
         VanillaPlaybackTransport.bind(server)
         WatchPartyManager.init(VanillaPlaybackTransport)
         TimelineManager.init(VanillaPlaybackTransport)
-        logger.info("Server started. Storage connected.")
         startRepeatingTasks(server)
     }
 
-    /** Persists state and tears down resources. */
-    @SubscribeEvent
-    fun onServerStopping(event: ServerStoppingEvent) {
-        logger.info("Server stopping. Saving displays...")
+    /** Persists all displays and disconnects storage. */
+    fun onServerStopping() {
         DisplayManager.save { VanillaServerState.storage?.saveDisplay(it) }
         ServerCoroutines.shutdown()
         VanillaServerState.storage?.disconnect()
@@ -405,7 +397,7 @@ class NeoForgeServer(modEventBus: IEventBus) {
 
     /** Starts repeating coroutines for display updates and update checking on [ServerCoroutines.io]. */
     private fun startRepeatingTasks(server: MinecraftServer) {
-        val settings = configInstance.settings
+        val settings = VanillaServerState.config.settings
 
         ServerCoroutines.io.launch {
             while (!server.isStopped) {
@@ -431,25 +423,5 @@ class NeoForgeServer(modEventBus: IEventBus) {
                 }
             }
         }
-    }
-
-    companion object {
-        /** Logger. */
-        val logger = LoggerFactory.getLogger("DreamDisplays")
-
-        /** The mod version string, read from the bundled, Gradle-templated `version.txt` resource. */
-        val serverVersion: String? by lazy {
-            runCatching {
-                NeoForgeServer::class.java.classLoader
-                    .getResourceAsStream("assets/dreamdisplays/version.txt")
-                    ?.use { it.readBytes().decodeToString().trim() }
-            }.getOrNull()
-        }
-
-        private lateinit var configInstance: VanillaConfig
-
-        val config: VanillaConfig; get() = configInstance
-        val server: MinecraftServer?; get() = VanillaServerState.server
-        val storage: StorageManager?; get() = VanillaServerState.storage
     }
 }

@@ -1,8 +1,7 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.NeoForgeServer
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -153,10 +152,9 @@ class CreateCommand : SubCommand {
     }
 }
 
-/** `Fabric`-specific version of the [CreateCommand]. */
+/** Shared `Fabric` / `NeoForge` version of the [CreateCommand]. */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricCreateCommand {
+object VanillaCreateCommand {
     /** Command execution logic. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
@@ -165,7 +163,7 @@ object FabricCreateCommand {
         val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial
+                VanillaServerState.config.settings.selectionMaterial, VanillaServerState.config.settings.baseMaterial
             ).let { 0 }
 
         validate(
@@ -175,8 +173,8 @@ object FabricCreateCommand {
                     MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
-                        Server.config.settings.selectionMaterial,
-                        Server.config.settings.baseMaterial
+                        VanillaServerState.config.settings.selectionMaterial,
+                        VanillaServerState.config.settings.baseMaterial
                     )
                 else
                     MessageUtil.sendMessage(player, key, *args)
@@ -185,7 +183,7 @@ object FabricCreateCommand {
                 MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
-                    Server.config.settings.baseMaterial
+                    VanillaServerState.config.settings.baseMaterial
                 )
             }
         ) ?: return 0
@@ -199,7 +197,7 @@ object FabricCreateCommand {
         SelectionManager.selectionPoints.remove(player.uuid)
 
         DisplayManager.register(displayData)
-        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
         VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
@@ -257,145 +255,17 @@ object FabricCreateCommand {
             faceModY = faceModY,
             width = screenWidth,
             height = screenHeight,
-            minHeight = Server.config.settings.minHeight,
-            minWidth = Server.config.settings.minWidth,
-            maxHeight = Server.config.settings.maxHeight,
-            maxWidth = Server.config.settings.maxWidth,
+            minHeight = VanillaServerState.config.settings.minHeight,
+            minWidth = VanillaServerState.config.settings.minWidth,
+            maxHeight = VanillaServerState.config.settings.maxHeight,
+            maxWidth = VanillaServerState.config.settings.maxWidth,
             hasExpectedBaseMaterial = {
                 for (x in region.minX..region.maxX) {
                     for (y in region.minY..region.maxY) {
                         for (z in region.minZ..region.maxZ) {
                             val blockState = level.getBlockState(BlockPos(x, y, z))
                             val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-                            if (blockKey != Server.config.settings.baseMaterial) {
-                                return@validateRegion false
-                            }
-                        }
-                    }
-                }
-                true
-            },
-            sendError = sendError,
-            onWrongStructure = onWrongStructure,
-        )?.let { sel }
-    }
-}
-
-/** `NeoForge`-specific version of the [CreateCommand]. */
-@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@NeoForgeOnly
-object NeoForgeCreateCommand {
-    /** Command execution logic. */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
-        val player = ctx.source.entity as? ServerPlayer
-            ?: return ctx.source.sendFailure(Component.literal("This command can only be used by a player.")).let { 0 }
-
-        val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
-            ?: return MessageUtil.sendMessageWithMaterials(
-                player, "noDisplayTerritories",
-                NeoForgeServer.config.settings.selectionMaterial, NeoForgeServer.config.settings.baseMaterial
-            ).let { 0 }
-
-        validate(
-            sel, ctx.source.server,
-            sendError = { key, args ->
-                if (key == "noDisplayTerritories")
-                    MessageUtil.sendMessageWithMaterials(
-                        player,
-                        key,
-                        NeoForgeServer.config.settings.selectionMaterial,
-                        NeoForgeServer.config.settings.baseMaterial
-                    )
-                else
-                    MessageUtil.sendMessage(player, key, *args)
-            },
-            onWrongStructure = {
-                MessageUtil.sendMessageWithMaterials(
-                    player,
-                    "wrongStructure",
-                    NeoForgeServer.config.settings.baseMaterial
-                )
-            }
-        ) ?: return 0
-
-        if (DisplayManager.isOverlaps(sel)) {
-            MessageUtil.sendMessage(player, "displayOverlap")
-            return 0
-        }
-
-        val displayData = sel.generateDisplayData(player.uuid)
-        SelectionManager.selectionPoints.remove(player.uuid)
-
-        DisplayManager.register(displayData)
-        ServerCoroutines.io.launch { NeoForgeServer.storage?.saveDisplay(displayData) }
-
-        val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
-        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
-
-        MessageUtil.sendMessage(player, "successfulCreation")
-        return 1
-    }
-
-    /**
-     * Validates the player's current selection, enforces overlap and Y-range limits, and
-     * registers the resulting display.
-     */
-    private fun validate(
-        sel: VanillaSelectionData,
-        server: MinecraftServer,
-        sendError: (String, Array<out Any>) -> Unit,
-        onWrongStructure: (() -> Unit)? = null,
-    ): VanillaSelectionData? {
-        if (!sel.isReady || sel.pos1 == null || sel.pos2 == null) {
-            sendError("noDisplayTerritories", emptyArray())
-            return null
-        }
-
-        val region = sel.region() ?: run {
-            sendError("noDisplayTerritories", emptyArray())
-            return null
-        }
-
-        val worldKey = sel.worldKey ?: run {
-            sendError("noDisplay", emptyArray())
-            return null
-        }
-        val level = RegionUtil.getLevelByKey(server, worldKey) ?: run {
-            sendError("noDisplay", emptyArray())
-            return null
-        }
-
-        val facing = sel.facing
-        val isVertical = facing == Direction.UP || facing == Direction.DOWN
-        val faceModX = if (!isVertical && (facing == Direction.EAST || facing == Direction.WEST)) 1 else 0
-        val faceModZ = if (!isVertical && (facing == Direction.NORTH || facing == Direction.SOUTH)) 1 else 0
-        val faceModY = if (isVertical) 1 else 0
-        val deltaY = region.maxY - region.minY + 1
-        val screenWidth = if (isVertical) region.deltaX else region.width
-        val screenHeight = if (isVertical) region.deltaZ else region.height
-
-        return validateRegion(
-            minY = region.minY,
-            maxY = region.maxY,
-            deltaX = region.deltaX,
-            deltaZ = region.deltaZ,
-            deltaY = deltaY,
-            faceModX = faceModX,
-            faceModZ = faceModZ,
-            faceModY = faceModY,
-            width = screenWidth,
-            height = screenHeight,
-            minHeight = NeoForgeServer.config.settings.minHeight,
-            minWidth = NeoForgeServer.config.settings.minWidth,
-            maxHeight = NeoForgeServer.config.settings.maxHeight,
-            maxWidth = NeoForgeServer.config.settings.maxWidth,
-            hasExpectedBaseMaterial = {
-                for (x in region.minX..region.maxX) {
-                    for (y in region.minY..region.maxY) {
-                        for (z in region.minZ..region.maxZ) {
-                            val blockState = level.getBlockState(BlockPos(x, y, z))
-                            val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-                            if (blockKey != NeoForgeServer.config.settings.baseMaterial) {
+                            if (blockKey != VanillaServerState.config.settings.baseMaterial) {
                                 return@validateRegion false
                             }
                         }
