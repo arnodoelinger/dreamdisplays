@@ -36,6 +36,7 @@ repositories {
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
+    maven("https://maven.neoforged.net/releases")
 }
 
 val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
@@ -49,6 +50,12 @@ fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
 // Legacy (obfuscated) Minecraft targets need layered Mojang+Parchment mappings and modImplementation;
 // year-versioned (deobfuscated) targets resolve the source set directly with plain implementation.
 val isLegacyObfuscated = scVersion("minecraft.version").startsWith("1.")
+
+fun fancyModLoaderVersion(neoForgeVersion: String): String = when (neoForgeVersion) {
+    "21.1.233" -> "4.0.42"
+    "21.11.42" -> "10.0.36"
+    else -> "11.0.13"
+}
 
 sourceSets.main {
     // Consume :platform:server's chiseled output (version directives already resolved) rather than its raw
@@ -98,6 +105,9 @@ configurations.register("mappedFabricApiElements") {
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
     compileOnly("io.papermc.paper:paper-api:${scVersion("paper.api.version")}")
+    compileOnly("net.neoforged:neoforge:${scVersion("neoforge.version")}:universal")
+    compileOnly("net.neoforged:bus:8.0.5")
+    compileOnly("net.neoforged.fancymodloader:loader:${fancyModLoaderVersion(scVersion("neoforge.version"))}")
     implementation(libs.bstats)
     implementation(libs.tomlj)
     implementation(libs.semver4j)

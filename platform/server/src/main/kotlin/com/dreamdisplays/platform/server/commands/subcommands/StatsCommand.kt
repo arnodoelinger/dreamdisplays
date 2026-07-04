@@ -1,11 +1,14 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
@@ -78,6 +81,49 @@ object FabricStatsCommand {
             }
             val total = counts.values.sum()
             MessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
+        } else {
+            ctx.source.sendSystemMessage(Component.literal(msg("displayStatsHeader")))
+            for ((version, count) in counts) {
+                ctx.source.sendSystemMessage(Component.literal(format("displayStatsEntry", version, count)))
+            }
+            val total = counts.values.sum()
+            ctx.source.sendSystemMessage(Component.literal(format("displayStatsTotal", total)))
+        }
+
+        return 1
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of the `/display stats` command.
+ */
+@NeoForgeOnly
+object NeoForgeStatsCommand {
+    /** Prints a per-mod-version breakdown of currently connected players that have reported their client version. */
+    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.entity as? ServerPlayer
+        val config = NeoForgeServer.config
+
+        fun msg(key: String): String = config.getMessageForPlayer(player, key) as? String ?: key
+        fun format(key: String, vararg values: Any): String {
+            val template = msg(key)
+            return runCatching { String.format(template, *values) }.getOrElse { template }
+        }
+
+        val versions = PlayerManager.getVersions()
+        val counts = versions.values
+            .filterNotNull()
+            .groupingBy { it }
+            .eachCount()
+            .toSortedMap()
+
+        if (player != null) {
+            NeoForgeMessageUtil.sendMessage(player, "displayStatsHeader")
+            for ((version, count) in counts) {
+                NeoForgeMessageUtil.sendColoredMessage(player, format("displayStatsEntry", version, count))
+            }
+            val total = counts.values.sum()
+            NeoForgeMessageUtil.sendColoredMessage(player, format("displayStatsTotal", total))
         } else {
             ctx.source.sendSystemMessage(Component.literal(msg("displayStatsHeader")))
             for ((version, count) in counts) {

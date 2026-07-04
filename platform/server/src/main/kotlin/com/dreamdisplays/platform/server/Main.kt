@@ -1,18 +1,25 @@
 package com.dreamdisplays.platform.server
 
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.client.net.V2Payload
+import com.dreamdisplays.platform.server.datatypes.NeoForgeDisplayData
 import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
 import com.dreamdisplays.platform.server.listeners.FabricPlayerListener
 import com.dreamdisplays.platform.server.listeners.FabricProtectionListener
 import com.dreamdisplays.platform.server.listeners.FabricSelectionListener
+import com.dreamdisplays.platform.server.listeners.NeoForgePlayerListener
+import com.dreamdisplays.platform.server.listeners.NeoForgeProtectionListener
+import com.dreamdisplays.platform.server.listeners.NeoForgeSelectionListener
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.StorageManager
+import com.dreamdisplays.platform.server.meta.NeoForgeUpdater
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.metrics.TelemetryMetrics
 import com.dreamdisplays.platform.server.playback.FabricPlaybackTransport
+import com.dreamdisplays.platform.server.playback.NeoForgePlaybackTransport
 import com.dreamdisplays.platform.server.playback.PaperPlaybackTransport
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -20,8 +27,11 @@ import com.dreamdisplays.platform.server.registrar.ChannelRegistrar
 import com.dreamdisplays.platform.server.registrar.CommandRegistrar
 import com.dreamdisplays.platform.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.platform.server.registrar.ListenerRegistrar
+import com.dreamdisplays.platform.server.registrar.NeoForgeCommandRegistrar
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.FabricV2Networking
+import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.NeoForgeV2Networking
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import io.github.arnodoelinger.platformweaver.*
 import org.semver4j.Semver
@@ -33,7 +43,16 @@ import net.fabricmc.loader.api.FabricLoader
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import net.minecraft.server.MinecraftServer
+import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.level.storage.LevelResource
+import net.neoforged.bus.api.IEventBus
+import net.neoforged.bus.api.SubscribeEvent
+import net.neoforged.fml.common.Mod
+import net.neoforged.fml.loading.FMLPaths
+import net.neoforged.neoforge.common.NeoForge
+import net.neoforged.neoforge.event.server.ServerStartedEvent
+import net.neoforged.neoforge.event.server.ServerStoppingEvent
+import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
 import org.bstats.bukkit.Metrics
 import org.bukkit.plugin.java.JavaPlugin
 import org.jspecify.annotations.NullMarked
@@ -337,5 +356,127 @@ class Server : ModInitializer {
                 }
                 .onFailure { logger.error("Failed to migrate global DB to ${newDb.absolutePath}.", it) }
         }
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of [Main].
+ */
+@Suppress("UNUSED")
+@NeoForgeOnly
+@Mod(Initializer.MOD_ID)
+class NeoForgeServer(modEventBus: IEventBus) {
+    init {
+        logger.info("Initializing server-side mod...")
+        configInstance = NeoForgeConfig()
+
+        modEventBus.addListener(::registerPayloads)
+        NeoForge.EVENT_BUS.register(this)
+        NeoForge.EVENT_BUS.register(NeoForgePlayerListener)
+        NeoForge.EVENT_BUS.register(NeoForgeProtectionListener)
+        NeoForge.EVENT_BUS.register(NeoForgeSelectionListener)
+        NeoForge.EVENT_BUS.addListener(NeoForgeCommandRegistrar::register)
+
+        logger.info("Server-side initialization complete.")
+    }
+
+    /** Registers all custom payload types for clientbound and serverbound play channels. */
+    private fun registerPayloads(event: RegisterPayloadHandlersEvent) {
+        val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
+        NeoForgeV2Networking.registerReceivers(registrar)
+        NeoForgeServerPacketHandler.registerReceivers(registrar)
+    }
+
+    /** Storage bring-up, display registration, and repeating tasks; covers dedicated + integrated servers alike. */
+    @SubscribeEvent
+    fun onServerStarted(event: ServerStartedEvent) {
+        val server = event.server
+        serverInstance = server
+        val s = configInstance.storage
+        val dataDir = server.getWorldPath(LevelResource.LEVEL_DATA_FILE).parent
+            .resolve("dreamdisplays").toFile().also { it.mkdirs() }
+        val backend = StorageBackend.fromConfig(s.type)
+        storageInstance = StorageManager(
+            backend = backend, dataDir = dataDir,
+            tablePrefix = s.tablePrefix,
+            host = s.host, port = s.port, database = s.database,
+            username = s.username, password = s.password,
+        )
+        storageInstance!!.createSchema()
+        DisplayManager.register(storageInstance!!.loadAllNeoForgeDisplays())
+        NeoForgePlaybackTransport.bind(server)
+        WatchPartyManager.init(NeoForgePlaybackTransport)
+        TimelineManager.init(NeoForgePlaybackTransport)
+        logger.info("Server started. Storage connected.")
+        startRepeatingTasks(server)
+    }
+
+    /** Persists state and tears down resources. */
+    @SubscribeEvent
+    fun onServerStopping(event: ServerStoppingEvent) {
+        logger.info("Server stopping. Saving displays...")
+        DisplayManager.saveNeoForge { storageInstance?.saveDisplay(it) }
+        ServerCoroutines.shutdown()
+        storageInstance?.disconnect()
+    }
+
+    /** Starts repeating coroutines for display updates and update checking on [ServerCoroutines.io]. */
+    private fun startRepeatingTasks(server: MinecraftServer) {
+        val settings = configInstance.settings
+
+        ServerCoroutines.io.launch {
+            while (!server.isStopped) {
+                delay(1000L.milliseconds)
+                runCatching {
+                    server.execute {
+                        DisplayManager.updateAllDisplaysNeoForge(server)
+                        StateManager.tickBroadcastNeoForge(server)
+                        TimelineManager.tick()
+                        WatchPartyManager.tick()
+                    }
+                }
+            }
+        }
+
+        if (settings.updatesEnabled) {
+            ServerCoroutines.io.launch {
+                delay(1000L.milliseconds)
+                runCatching { NeoForgeUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                while (!server.isStopped) {
+                    delay((60L * 60L * 1000L).milliseconds)
+                    runCatching { NeoForgeUpdater.checkForUpdates(settings.repoOwner, settings.repoName) }
+                }
+            }
+        }
+    }
+
+    companion object {
+        /** Logger. */
+        val logger = LoggerFactory.getLogger("DreamDisplays")
+
+        /** The mod version string, read from the bundled, Gradle-templated `version.txt` resource. */
+        val serverVersion: String? by lazy {
+            runCatching {
+                NeoForgeServer::class.java.classLoader
+                    .getResourceAsStream("assets/dreamdisplays/version.txt")
+                    ?.use { it.readBytes().decodeToString().trim() }
+            }.getOrNull()
+        }
+
+        /** Latest mod version from GitHub (populated by updater). */
+        @Volatile
+        var modLatestVersion: Semver? = null
+
+        /** Latest plugin version string from GitHub (populated by updater). */
+        @Volatile
+        var pluginLatestVersion: String? = null
+
+        private lateinit var configInstance: NeoForgeConfig
+        private var serverInstance: MinecraftServer? = null
+        private var storageInstance: StorageManager? = null
+
+        val config: NeoForgeConfig; get() = configInstance
+        val server: MinecraftServer?; get() = serverInstance
+        val storage: StorageManager?; get() = storageInstance
     }
 }

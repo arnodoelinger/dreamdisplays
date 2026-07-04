@@ -1,15 +1,23 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.managers.DisplayManager
+import com.dreamdisplays.platform.server.managers.NeoForgeSelectionManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.fabricmc.fabric.api.event.player.PlayerBlockBreakEvents
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
+import net.neoforged.bus.api.SubscribeEvent
+//? if >=26 {
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreakEvent
+//?} else
+/*import net.neoforged.neoforge.event.level.BlockEvent.BreakEvent as NeoForgeBreakEvent*/
 import org.bukkit.Location
 import org.bukkit.block.Block
 import org.bukkit.event.Cancellable
@@ -104,6 +112,29 @@ object FabricProtectionListener {
                 return@register false
             }
             true
+        }
+    }
+}
+
+/** `NeoForge`-specific implementation of [ProtectionListener]. */
+@NeoForgeOnly
+object NeoForgeProtectionListener {
+    /** Cancels the break and (for known players) warns them when the block is inside a protected area. */
+    @SubscribeEvent
+    fun onBreak(event: NeoForgeBreakEvent) {
+        val level = event.level as? ServerLevel ?: return
+        val worldKey = RegionUtil.getLevelKey(level)
+        val pos = event.pos
+
+        val isProtected = DisplayManager.isContainsNeoForge(worldKey, pos) != null ||
+                NeoForgeSelectionManager.isLocationSelected(pos, worldKey)
+
+        if (isProtected) {
+            val player = event.player as? ServerPlayer
+            if (player != null && PlayerManager.getVersion(player.uuid) == null) {
+                NeoForgeMessageUtil.sendMessage(player, "displayBlockBreak")
+            }
+            event.setCanceled(true)
         }
     }
 }

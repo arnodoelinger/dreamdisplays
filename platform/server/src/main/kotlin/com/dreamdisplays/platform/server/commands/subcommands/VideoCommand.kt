@@ -4,6 +4,7 @@ import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.security.LanguageTag
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
@@ -12,11 +13,15 @@ import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
@@ -171,6 +176,68 @@ object FabricVideoCommand {
         TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
+        return 1
+    }
+
+    /** Gets the block position the player is currently looking at (within 32 blocks). */
+    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
+        val level = player.level()
+        val start = player.eyePosition
+        val end = start.add(player.lookAngle.scale(32.0))
+        val hit = level.clip(ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player))
+        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of the `/display video` command.
+ */
+@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
+@NeoForgeOnly
+object NeoForgeVideoCommand {
+    /** Assigns a YouTube URL (and optional language) to the targeted display, after validating ownership. */
+    fun execute(ctx: CommandContext<CommandSourceStack>, urlAndLang: String): Int {
+        val player = ctx.source.entity as? ServerPlayer
+            ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
+
+        val parts = urlAndLang.trim().split(" ")
+        val urlRaw = parts[0]
+        val langRaw = if (parts.size > 1) parts.last() else ""
+
+        if (urlRaw.isBlank()) {
+            NeoForgeMessageUtil.sendMessage(player, "invalidURL")
+            return 0
+        }
+
+        val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
+            ?: return NeoForgeMessageUtil.sendMessage(player, "invalidURL").let { 0 }
+
+        val targetPos = getTargetBlockPos(player)
+            ?: return NeoForgeMessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
+
+        val worldKey = RegionUtil.getPlayerLevelKey(player)
+        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
+            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+
+        if (!PlaybackPermissions.canSetVideo(
+                PlaybackContexts.of(data, player.uuid, NeoForgeServerPacketHandler.isOpLevel2(player))
+            )
+        ) {
+            NeoForgeMessageUtil.sendMessage(player, "displayVideoNotOwner")
+            return 0
+        }
+
+        val wasSync = data.isSync
+        data.url = YouTubeUrls.watchUrl(videoId)
+        data.lang = LanguageTag.canonicalAudioCode(langRaw).value
+        ServerCoroutines.io.launch { NeoForgeServer.storage?.saveDisplay(data) }
+
+        val receivers = DisplayManager.getReceivers(data, ctx.source.server)
+        NeoForgePacketUtil.sendDisplayInfo(receivers, data)
+        if (wasSync) StateManager.resetAndBroadcastNeoForge(data.id, receivers)
+        TimelineManager.onVideoChanged(data)
+
+        NeoForgeMessageUtil.sendMessage(player, "settedURL")
         return 1
     }
 

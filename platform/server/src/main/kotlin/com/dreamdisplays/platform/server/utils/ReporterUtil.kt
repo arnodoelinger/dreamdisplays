@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.server.utils
 import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.util.json.DreamJson
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
@@ -57,6 +58,22 @@ object ReporterUtil {
     ) {
         val locationStr = "${location.world?.name} (x=${location.blockX}, y=${location.blockY}, z=${location.blockZ})"
         val payload = buildWebhookPayload(locationStr, videoLink, displayId, reporter.name, ownerName)
+        sendWebhookRequest(webhookUrl, payload)
+    }
+
+    /**
+     * Sends a report to Discord. `NeoForge` overload.
+     */
+    @NeoForgeOnly
+    fun sendReportNeoForge(
+        locationStr: String,
+        videoLink: String?,
+        displayId: UUID,
+        reporterName: String,
+        ownerName: String?,
+        webhookUrl: String,
+    ) {
+        val payload = buildWebhookPayload(locationStr, videoLink, displayId, reporterName, ownerName)
         sendWebhookRequest(webhookUrl, payload)
     }
 

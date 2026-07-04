@@ -1,9 +1,11 @@
 package com.dreamdisplays.platform.server.utils
 
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.NeoForgeServer
 import com.dreamdisplays.platform.server.Server
 import com.dreamdisplays.util.toJsonString
 import net.kyori.adventure.text.Component
@@ -327,6 +329,199 @@ object MessageUtil {
 
     /** Converts `&` color codes to a plain NMS text component (strips formatting on `Fabric`). */
     @FabricOnly
+    private fun parseAmpersandLegacy(text: String): NmsComponent =
+        NmsComponent.literal(text.replace(Regex("&[0-9a-fA-FrRlLoOnNmMkK]"), ""))
+}
+
+/**
+ * `NeoForge`-specific counterpart of [MessageUtil]'s `Fabric` block.
+ */
+@NeoForgeOnly
+object NeoForgeMessageUtil {
+    /** Sends a localized message identified by [messageKey] to [player]. */
+    fun sendMessage(player: ServerPlayer?, messageKey: String, vararg args: Any) {
+        val config = NeoForgeServer.config
+        val raw = config.getMessageForPlayer(player, messageKey)
+        val message = if (args.isNotEmpty() && raw is String) raw.format(*args) else raw
+        sendColoredMessage(player, message)
+    }
+
+    /**
+     * Interpolates `%s` placeholders in a raw config [message] with [args], preserving its form:
+     * plain strings are formatted directly, JSON component maps have `%s` substituted inside their
+     * text fields so the resulting component still renders (rather than being dumped via `toString`).
+     */
+    fun formatMessage(message: Any?, vararg args: String): Any? = when (message) {
+        null -> null
+        is String -> if (args.isEmpty()) message else String.format(message, *args)
+        is Map<*, *> -> replacePlaceholders(message, args, intArrayOf(0))
+        is List<*> -> replacePlaceholders(message, args, intArrayOf(0))
+        else -> message
+    }
+
+    /** Sends [message] to [player], converting strings / maps to `NMS Component`. */
+    fun sendColoredMessage(player: ServerPlayer?, message: Any?) {
+        if (player == null || message == null) return
+        player.sendSystemMessage(toNmsComponent(message))
+    }
+
+    /** Converts an `Adventure` [component] to a `NMS Component`. */
+    private fun toNmsComponent(message: Any): NmsComponent {
+        return when (message) {
+            is String -> parseAmpersandLegacy(message)
+            is Map<*, *> -> nmsComponentFromJsonValue(message) ?: parseAmpersandLegacy(message.toString())
+            is List<*> -> nmsComponentFromJsonValue(message) ?: parseAmpersandLegacy(message.toString())
+            else -> parseAmpersandLegacy(message.toString())
+        }
+    }
+
+    /** Replace placeholders in a JSON component map with [args]. */
+    private fun replacePlaceholders(value: Any?, args: Array<out String>, index: IntArray): Any? = when (value) {
+        is String -> {
+            var formatted: String = value
+            var placeholder = formatted.indexOf("%s")
+            while (placeholder >= 0 && index[0] < args.size) {
+                formatted = formatted.substring(0, placeholder) +
+                    args[index[0]++] +
+                    formatted.substring(placeholder + 2)
+                placeholder = formatted.indexOf("%s", placeholder)
+            }
+            formatted
+        }
+        is Map<*, *> -> value.entries.associate { (key, entryValue) ->
+            key.toString() to replacePlaceholders(entryValue, args, index)
+        }
+        is List<*> -> value.map { replacePlaceholders(it, args, index) }
+        else -> value
+    }
+
+    /** NMS component builder from a JSON component map. */
+    private fun nmsComponentFromJsonValue(value: Any?): NmsComponent? = when (value) {
+        is String -> NmsComponent.literal(value)
+        is Map<*, *> -> {
+            val root = when {
+                value.string("translate") != null -> NmsComponent.translatable(value.string("translate")!!)
+                else -> NmsComponent.literal(value.string("text") ?: "")
+            }
+            value.list("extra")?.forEach { child ->
+                nmsComponentFromJsonValue(child)?.let(root::append)
+            }
+            root.withJsonStyle(value)
+        }
+        is List<*> -> {
+            val root = NmsComponent.empty()
+            value.forEach { child -> nmsComponentFromJsonValue(child)?.let(root::append) }
+            root
+        }
+        else -> null
+    }
+
+    /** Applies JSON component style from a JSON component map. */
+    private fun MutableComponent.withJsonStyle(value: Map<*, *>): MutableComponent = withStyle { base ->
+        var style = base
+        value.string("color")?.let { color ->
+            val parsedColor = net.minecraft.network.chat.TextColor.parseColor(color).result().orElse(null)
+            if (parsedColor != null) style = style.withColor(parsedColor)
+        }
+        value.bool("bold")?.let { style = style.withBold(it) }
+        value.bool("italic")?.let { style = style.withItalic(it) }
+        value.bool("underlined")?.let { style = style.withUnderlined(it) }
+        value.bool("strikethrough")?.let { style = style.withStrikethrough(it) }
+        value.bool("obfuscated")?.let { style = style.withObfuscated(it) }
+
+        val clickEvent = value.map("clickEvent")
+        if (clickEvent?.string("action") == "open_url") {
+            clickEvent.string("value")?.let { url ->
+                runCatching { URI.create(url) }.getOrNull()?.let {
+                    //? if >=1.21.11 {
+                    style = style.withClickEvent(net.minecraft.network.chat.ClickEvent.OpenUrl(it))
+                    //?} else
+                    /*style = style.withClickEvent(
+                        net.minecraft.network.chat.ClickEvent(net.minecraft.network.chat.ClickEvent.Action.OPEN_URL, url)
+                    )*/
+                }
+            }
+        }
+
+        val hoverEvent = value.map("hoverEvent")
+        if (hoverEvent?.string("action") == "show_text") {
+            val hoverComponent = nmsComponentFromJsonValue(hoverEvent["value"])
+                ?: hoverEvent.string("value")?.let(NmsComponent::literal)
+            hoverComponent?.let {
+                //? if >=1.21.11 {
+                style = style.withHoverEvent(net.minecraft.network.chat.HoverEvent.ShowText(it))
+                //?} else
+                /*style = style.withHoverEvent(
+                    net.minecraft.network.chat.HoverEvent(net.minecraft.network.chat.HoverEvent.Action.SHOW_TEXT, it)
+                )*/
+            }
+        }
+        style
+    }
+
+    /** Type-safe accessors for JSON component map values. */
+    private fun Map<*, *>.string(key: String): String? = this[key] as? String
+
+    /** Type-safe accessors for JSON component map values. */
+    private fun Map<*, *>.bool(key: String): Boolean? = this[key] as? Boolean
+
+    /** Type-safe accessors for JSON component map values. */
+    private fun Map<*, *>.map(key: String): Map<*, *>? = this[key] as? Map<*, *>
+
+    /** Type-safe accessors for JSON component list values. */
+    private fun Map<*, *>.list(key: String): List<*>? = this[key] as? List<*>
+
+    /**
+     * Sends a localized message to [player], replacing `{0}`, `{1}` ... placeholders with
+     * inline item sprite icons for each [materialKeys] entry (e.g. `"minecraft:diamond_axe"`).
+     * Hovering reveals the item tooltip.
+     */
+    fun sendMessageWithMaterials(player: ServerPlayer?, messageKey: String, vararg materialKeys: String) {
+        if (player == null) return
+        val rawMessage = NeoForgeServer.config.getMessageForPlayer(player, messageKey) as? String ?: run {
+            sendMessage(player, messageKey)
+            return
+        }
+        val pattern = Regex("""\{(\d+)}""")
+        val root = NmsComponent.literal("")
+        var lastIndex = 0
+        for (match in pattern.findAll(rawMessage)) {
+            val textBefore = rawMessage.substring(lastIndex, match.range.first)
+            if (textBefore.isNotEmpty()) root.append(parseAmpersandLegacy(textBefore))
+            val index = match.groupValues[1].toIntOrNull()
+            if (index != null && index < materialKeys.size) {
+                val itemId = Identifier.parse(materialKeys[index])
+                val spriteComponent =
+                    //? if >=1.21.11 {
+                    run {
+                val item = BuiltInRegistries.ITEM.getValue(itemId)
+                val isBlock = item is net.minecraft.world.item.BlockItem
+                val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
+                val spriteId = Identifier.fromNamespaceAndPath(
+                    itemId.namespace,
+                    (if (isBlock) "block/" else "item/") + itemId.path
+                )
+                val atlasSprite = AtlasSprite(atlasId, spriteId)
+                //? if >=26 {
+                val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStackTemplate(item))
+                val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite, Optional.empty()))
+                    //?} else
+                    /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
+                    val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
+                    spriteComponent.withStyle { it.withHoverEvent(hoverEvent) }
+                    }
+                    //?} else
+                    /*NmsComponent.literal(itemId.toString())*/
+                root.append(spriteComponent)
+            }
+            lastIndex = match.range.last + 1
+        }
+        val remaining = rawMessage.substring(lastIndex)
+        if (remaining.isNotEmpty()) root.append(parseAmpersandLegacy(remaining))
+        player.sendSystemMessage(root)
+    }
+
+    /** Converts `&` color codes to a plain NMS text component (strips formatting on `NeoForge`). */
     private fun parseAmpersandLegacy(text: String): NmsComponent =
         NmsComponent.literal(text.replace(Regex("&[0-9a-fA-FrRlLoOnNmMkK]"), ""))
 }

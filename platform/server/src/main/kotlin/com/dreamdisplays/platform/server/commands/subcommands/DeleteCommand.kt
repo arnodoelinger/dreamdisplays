@@ -3,11 +3,15 @@ package com.dreamdisplays.platform.server.commands.subcommands
 import com.dreamdisplays.platform.server.Main
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.utils.NeoForgeMessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgePacketUtil
+import com.dreamdisplays.platform.server.utils.net.NeoForgeServerPacketHandler
 import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
+import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.core.BlockPos
@@ -77,6 +81,57 @@ object FabricDeleteCommand {
         DisplayManager.delete(data)
         FabricPacketUtil.sendDelete(receivers, data.id)
         MessageUtil.sendMessage(player, "displayDeleted")
+        return 1
+    }
+
+    /** Gets the block position the player is currently looking at. */
+    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
+        val level = player.level()
+        val eyePos = player.eyePosition
+        val lookVec = player.lookAngle
+        val hit = level.clip(
+            ClipContext(
+                eyePos,
+                eyePos.add(lookVec.scale(32.0)),
+                ClipContext.Block.OUTLINE,
+                ClipContext.Fluid.NONE,
+                player
+            )
+        )
+        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
+    }
+}
+
+/**
+ * `NeoForge`-specific implementation of the `/display delete` command.
+ */
+@Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
+@NeoForgeOnly
+object NeoForgeDeleteCommand {
+    /** Deletes the display the player is currently looking at (within 32 blocks). */
+    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
+        val player = ctx.source.entity as? ServerPlayer
+            ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
+
+        val targetPos = getTargetBlockPos(player) ?: run {
+            NeoForgeMessageUtil.sendMessage(player, "noDisplay")
+            return 0
+        }
+
+        val worldKey = RegionUtil.getPlayerLevelKey(player)
+
+        val data = DisplayManager.isContainsNeoForge(worldKey, targetPos)
+            ?: return NeoForgeMessageUtil.sendMessage(player, "noDisplay").let { 0 }
+
+        if (data.ownerId != player.uuid && !NeoForgeServerPacketHandler.isOpLevel2(player)) {
+            NeoForgeMessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return 0
+        }
+
+        val receivers = DisplayManager.getReceivers(data, ctx.source.server)
+        DisplayManager.delete(data)
+        NeoForgePacketUtil.sendDelete(receivers, data.id)
+        NeoForgeMessageUtil.sendMessage(player, "displayDeleted")
         return 1
     }
 
