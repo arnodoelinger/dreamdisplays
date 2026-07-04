@@ -9,7 +9,7 @@ import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player

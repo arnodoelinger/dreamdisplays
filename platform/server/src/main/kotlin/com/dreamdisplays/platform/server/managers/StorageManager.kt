@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.security.MediaUrlPolicy
-import com.dreamdisplays.platform.server.datatypes.*
+import com.dreamdisplays.platform.server.datatypes.display.*
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.DIRECTION_TO_ORDINAL
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.ORDINAL_TO_DIRECTION
@@ -42,26 +42,52 @@ import java.util.*
  * the schema compact across both `Paper` and `Fabric` server variants.
  */
 class DisplaysTable(prefix: String = "") : Table("${prefix}displays") {
+    /** Unique identifier for the display. */
     val id = binary("id", 16)
+
+    /** Unique identifier for the owner of the display. */
     val ownerId = binary("ownerId", 16)
+
+    /** Video code or URL associated with the display. */
     val videoCode = varchar("videoCode", MediaUrlPolicy.MAX_URL_LENGTH).default("")
+
+    /** Name of the world where the display is located. */
     val world = varchar("world", 255)
+
+    /** Packed long representing the first corner of the display area. */
     val pos1 = long("pos1")
+
+    /** Packed long representing the opposite corner of the display area. */
     val pos2 = long("pos2")
+
+    /** Packed long representing the width and height of the display. */
     val size = long("size")
+
+    /** Integer representing the facing direction and rotation of the display. */
     val facing = integer("facing")
+
+    /** Boolean indicating whether the display is synchronized across clients. */
     val isSync = bool("isSync")
+
+    /** Nullable long representing the duration of the video associated with the display. */
     val duration = long("duration").nullable()
+
+    /** String representing the language code of the video associated with the display. */
     val lang = varchar("lang", 255).default("")
+
+    /** Boolean indicating whether the display is locked to its owner. */
     val isLocked = bool("isLocked").default(true)
+
+    /** Integer representing the playback mode of the display. */
     val mode = integer("mode").default(PlaybackMode.LOCAL.wire)
 
+    /** Primary key for the displays table, which is the unique identifier of the display. */
     override val primaryKey = PrimaryKey(id)
 }
 
 /**
- * SQL-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
- * objects and writes updates from managers back to SQLite or MySQL through Exposed / Hikari.
+ * `SQL`-backed display storage adapter. Loads persisted rows into platform-specific [DisplayData]
+ * objects and writes updates from managers back to `SQLite` or `MySQL` through `Exposed` / `Hikari`.
  */
 @NullMarked
 class StorageManager(

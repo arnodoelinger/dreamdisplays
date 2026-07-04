@@ -1,3 +1,5 @@
+import java.lang.Boolean;
+
 pluginManagement {
     val activeStonecutterVersion = file("versions/active.txt").readText().trim()
     val stonecutterVersions = java.util.Properties().apply {
@@ -70,8 +72,12 @@ include(":platform")
 include(":platform:client")
 include(":platform:client:common")
 include(":platform:client:fabric")
-include(":platform:client:neoforge")
 include(":platform:server")
+
+// ModDevGradle issue, ask them wtf is going here
+if (!Boolean.getBoolean("idea.sync.active")) {
+    include(":platform:client:neoforge")
+}
 
 stonecutter {
     create(rootProject) {

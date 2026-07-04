@@ -1,5 +1,8 @@
-package com.dreamdisplays.platform.server.datatypes
+package com.dreamdisplays.platform.server.datatypes.state
 
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.jspecify.annotations.NullMarked
@@ -12,11 +15,20 @@ import java.util.*
  */
 @NullMarked
 class StateData(private val id: UUID) {
+    /** Display data associated with this state. Can be null if the display is not found. */
     @PaperOnly
     private var displayData: PaperDisplayData? = DisplayManager.getDisplayData(id) as? PaperDisplayData
+
+    /** Whether the display is currently paused. */
     private var paused = false
+
+    /** The last reported playback time in nanoseconds. */
     private var lastReportedTime: Long = 0
+
+    /** The timestamp of the last reported time in nanoseconds. */
     private var lastReportedTimestamp: Long = 0
+
+    /** The duration limit of the display in nanoseconds. */
     private var limitTime: Long = 0
 
     /** Applies a client-reported [SyncData] packet to the local state. */

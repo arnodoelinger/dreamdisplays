@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext

@@ -4,7 +4,7 @@ import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.PaperServer.Companion.config
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.SelectionManager.selectionPoints
 import com.dreamdisplays.platform.server.utils.OutlinerUtil.showOutline
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia

@@ -37,6 +37,7 @@ import java.util.UUID
 @PaperOnly
 @NullMarked
 class PlayerListener : Listener {
+    /** Tracks whether the world has been validated after startup. */
     private var hasValidatedWorld = false
 
     /**

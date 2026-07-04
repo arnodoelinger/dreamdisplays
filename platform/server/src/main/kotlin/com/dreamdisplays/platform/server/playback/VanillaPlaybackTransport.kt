@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.server.playback
 
 import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
@@ -14,6 +14,7 @@ import java.util.UUID
  * Vanilla Minecraft API implementation of [PlaybackTransport], shared by `Fabric` and `NeoForge`.
  */
 object VanillaPlaybackTransport : PlaybackTransport {
+    /** The running server instance, bound on `SERVER_STARTED`. */
     @Volatile
     private var server: MinecraftServer? = null
 

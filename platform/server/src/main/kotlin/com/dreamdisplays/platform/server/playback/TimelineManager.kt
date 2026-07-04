@@ -5,7 +5,7 @@ import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.playback.Timeline
 import com.dreamdisplays.core.protocol.toSync
-import com.dreamdisplays.platform.server.datatypes.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -18,14 +18,22 @@ import java.util.concurrent.ConcurrentHashMap
  * `StateManager` for the v2 path. Watch-party timelines live in [WatchPartyManager].
  */
 object TimelineManager {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/TimelineManager")
+
+    /** Minimum interval between rebroadcasts of the same timeline to nearby players. */
     private const val PERIODIC_BROADCAST_MS = 2_000L
 
     /** Ceiling for client seeks when no duration is known, matching the v1 24h sanity limit. */
     internal const val MAX_SEEK_MS = 24L * 60 * 60 * 1_000
 
+    /** Live platform transport, injected at startup. */
     private lateinit var transport: PlaybackTransport
+
+    /** The current authoritative timeline for each display, if any. */
     private val timelines = ConcurrentHashMap<UUID, Timeline>()
+
+    /** The last time a timeline was broadcast for each display, if any. */
     private val lastBroadcast = ConcurrentHashMap<UUID, Long>()
 
     /** Wires the platform transport and seeds timelines for already-loaded displays. */

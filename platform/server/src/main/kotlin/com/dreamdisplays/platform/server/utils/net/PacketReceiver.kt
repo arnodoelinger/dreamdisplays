@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.utils.net
 
 import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.PlayerManager

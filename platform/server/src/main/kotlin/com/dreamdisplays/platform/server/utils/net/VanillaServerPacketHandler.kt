@@ -3,7 +3,7 @@ package com.dreamdisplays.platform.server.utils.net
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.net.Packets
 import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager

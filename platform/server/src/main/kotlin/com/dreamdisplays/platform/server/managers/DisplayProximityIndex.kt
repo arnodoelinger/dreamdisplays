@@ -9,7 +9,10 @@ import java.util.concurrent.ConcurrentHashMap
  * scheduler task, then read back by the global coordinator in [DisplayManager].
  */
 internal class DisplayProximityIndex {
+    /** Cached nearby player ids for each display id. */
     private val nearbyPlayersByDisplay: MutableMap<UUID, MutableSet<UUID>> = ConcurrentHashMap()
+
+    /** Cached nearby display ids for each player id. */
     private val nearbyDisplaysByPlayer: MutableMap<UUID, Set<UUID>> = ConcurrentHashMap()
 
     /** Removes a display from the cached proximity index. */

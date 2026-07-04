@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server
 
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StorageManager
 import com.dreamdisplays.platform.server.meta.Scheduler

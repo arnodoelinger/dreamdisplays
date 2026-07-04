@@ -2,8 +2,8 @@ package com.dreamdisplays.platform.server.playback
 
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.utils.PlatformUtil

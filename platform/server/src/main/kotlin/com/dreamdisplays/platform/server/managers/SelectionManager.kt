@@ -2,9 +2,9 @@ package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
-import com.dreamdisplays.platform.server.datatypes.SelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.SelectionData
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.*
@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
  * second corner positions and exposes helpers to validate and reset the current selection.
  */
 object SelectionManager {
+    /** Map of player UUIDs to their current selection data. */
     val selectionPoints: MutableMap<UUID, SelectionData> = ConcurrentHashMap()
 
     /** Records the first selection corner for [player] and resets stale state if the world changed. */

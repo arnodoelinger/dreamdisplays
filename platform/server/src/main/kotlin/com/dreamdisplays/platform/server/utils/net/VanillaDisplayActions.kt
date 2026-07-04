@@ -6,7 +6,7 @@ import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager

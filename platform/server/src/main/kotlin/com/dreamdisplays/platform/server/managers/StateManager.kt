@@ -2,11 +2,11 @@ package com.dreamdisplays.platform.server.managers
 
 import io.github.arnodoelinger.platformweaver.PaperOnly
 
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
-import com.dreamdisplays.platform.server.datatypes.StateData
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.state.StateData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.platform.server.PaperServer
@@ -33,9 +33,16 @@ import kotlin.jvm.JvmName
  */
 @NullMarked
 object StateManager {
+    /** Play state for each display, keyed by display UUID. */
     private val playStates: MutableMap<UUID, StateData> = ConcurrentHashMap()
+
+    /** Last broadcast timestamp for each display, keyed by display UUID. Used for rate-limiting rebroadcasts. */
     private val lastSyncBroadcast: MutableMap<UUID, Long> = ConcurrentHashMap()
+
+    /** Minimum interval between rebroadcasts of sync packets for a display, in milliseconds. */
     private const val SYNC_MIN_INTERVAL_MS = 250L
+
+    /** Interval for periodic sync broadcasts to keep clients in lockstep, in milliseconds. */
     private const val PERIODIC_BROADCAST_INTERVAL_MS = 2000L
 
     /** Sanity ceiling (24h in ns) for client-reported position and duration. */

@@ -6,12 +6,12 @@ import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.PaperServer.Companion.config
 import com.dreamdisplays.platform.server.PaperServer.Companion.getInstance
 import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.Scheduler.runSync
@@ -49,8 +49,13 @@ import java.util.function.Consumer
  */
 @NullMarked
 object DisplayManager {
+    /** In-memory registry of all displays, keyed by UUID. */
     private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
+
+    /** Throttles reports to prevent spam. */
     private val reportThrottle = ReportThrottle()
+
+    /** Proximity index for tracking nearby players in Folia. */
     private val proximityIndex = DisplayProximityIndex()
 
     /** Returns the display registered under [id], or null if none exists. */
@@ -161,8 +166,7 @@ object DisplayManager {
 
     /** Cached nearby player ids for Folia global coordinators that cannot read entity locations directly. */
     @PaperOnly
-    fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> =
-        proximityIndex.trackedNearbyPlayerIds(display.id)
+    fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> = proximityIndex.trackedNearbyPlayerIds(display.id)
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly

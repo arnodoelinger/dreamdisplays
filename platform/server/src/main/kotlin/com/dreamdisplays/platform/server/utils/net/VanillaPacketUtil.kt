@@ -5,8 +5,8 @@ import com.dreamdisplays.core.protocol.ClearCache
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
-import com.dreamdisplays.platform.server.datatypes.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.util.FacingUtil
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer

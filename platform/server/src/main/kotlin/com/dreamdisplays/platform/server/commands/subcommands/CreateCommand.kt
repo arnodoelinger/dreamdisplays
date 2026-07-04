@@ -2,8 +2,8 @@ package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.datatypes.VanillaSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.meta.ServerCoroutines

@@ -14,10 +14,19 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @NullMarked
 object PlayerManager {
+    /** Map of player UUIDs to their reported mod versions. */
     private val versions: MutableMap<UUID, Semver?> = ConcurrentHashMap()
+
+    /** Set of player UUIDs that have been notified about mod updates. */
     private val modUpdateNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+
+    /** Set of player UUIDs that have been notified about plugin updates. */
     private val pluginUpdateNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+
+    /** Set of player UUIDs that have been notified that the mod is required. */
     private val modRequiredNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+
+    /** Set of player UUIDs for which displays are disabled. */
     private val displaysDisabled: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
 
     /** Records the mod [version] reported by [uuid] for compatibility checks. */
