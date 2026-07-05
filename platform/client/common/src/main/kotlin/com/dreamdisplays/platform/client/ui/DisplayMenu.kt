@@ -42,7 +42,6 @@ import net.minecraft.network.chat.Component
 import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -100,6 +99,8 @@ class DisplayMenu private constructor(
             ValueSlider(
                 initial = ds.volume.toDouble(),
                 label = { Component.literal("${floor(it * 200).toInt()}%") },
+                // Volume's fraction maps to 0-200%, so a 5%-of-displayed-value stop is 0.025 of the fraction.
+                step = 0.025,
             ) { playback.setVolume(displayId, it.toFloat()) })
         volume.enabledWhen = videoReady
         volume.visibleWhen = notErrored
@@ -108,6 +109,8 @@ class DisplayMenu private constructor(
             ValueSlider(
                 initial = chunksToFraction(ds.renderDistance / CHUNK_BLOCKS),
                 label = { Component.translatable("dreamdisplays.button.render-distance.label", fractionToChunks(it)) },
+                // One chunk per stop: CHUNK_STEPS+1 fixed positions from MIN_CHUNKS to MAX_CHUNKS
+                step = 1.0 / CHUNK_STEPS,
             ) {
                 ds.renderDistance = fractionToChunks(it) * CHUNK_BLOCKS
                 DisplayRegistry.saveScreenData(ds)
@@ -126,7 +129,10 @@ class DisplayMenu private constructor(
                         else -> Component.literal("${ds.quality.serialize()}p")
                     }
                 },
-                // Commit on release: a quality change restarts the video, so don't fire on every drag step
+                // One stop per available quality, so the handle can only ever rest exactly on a real option
+                step = qualityStep(ds.qualityList.size),
+                // Commit on release: applying live would restart the decoder on every stop crossed
+                // while dragging, which can drop videoReady() mid-drag and freeze the widget.
                 live = false,
             ) {
                 if (ds.qualityList.isNotEmpty()) playback.setQuality(
@@ -141,6 +147,7 @@ class DisplayMenu private constructor(
             ValueSlider(
                 initial = ds.brightness.toDouble().coerceIn(0.0, 1.0),
                 label = { Component.literal("${floor(it * 100).toInt()}%") },
+                step = 0.05,
             ) { playback.setBrightness(displayId, it.toFloat()) })
         brightness.enabledWhen = { videoReady() && (!ds.isSync || ds.canEdit) }
         brightness.visibleWhen = notErrored
@@ -168,15 +175,6 @@ class DisplayMenu private constructor(
             videoReady() && (ds.canSetModeHere || (ds.watchParty != null && ds.canCloseWatchPartyHere))
         }
         sync.visibleWhen = notErrored
-
-        val defaultVolume = { DisplayScreen.defaultVolumeFor(ds.mode) }
-        val volumeReset = addUi(IconButton("refresh") {
-            val resetValue = defaultVolume()
-            playback.setVolume(displayId, resetValue)
-            volume.value = resetValue.toDouble()
-        })
-        volumeReset.enabledWhen = { videoReady() && abs(volume.value - defaultVolume().toDouble()) > 0.01 }
-        volumeReset.visibleWhen = notErrored
 
         val renderDReset = addUi(IconButton("refresh") {
             val defaultChunks =
@@ -213,14 +211,6 @@ class DisplayMenu private constructor(
         })
         syncReset.enabledWhen = { videoReady() && ds.canSetModeHere && ds.effectiveMode != PlaybackMode.LOCAL }
         syncReset.visibleWhen = notErrored
-
-        val canSeekNow = { ds.canSeekHere && ds.canSeek() }
-        val backButton = addUi(IconButton("left") { playback.seekRelative(displayId, (-5).seconds) })
-        backButton.enabledWhen = canSeekNow
-        backButton.visibleWhen = notErrored
-        val forwardButton = addUi(IconButton("right") { playback.seekRelative(displayId, 5.seconds) })
-        forwardButton.enabledWhen = canSeekNow
-        forwardButton.visibleWhen = notErrored
 
         val muteButton = addUi(
             IconButton(
@@ -303,9 +293,9 @@ class DisplayMenu private constructor(
         suggestions.available = { ds.canSetVideoHere }
 
         preview =
-            PreviewSection(ds, backButton, forwardButton, muteButton, popoutButton, pauseButton, progress, dropdown)
+            PreviewSection(ds, muteButton, volume, popoutButton, pauseButton, progress, dropdown)
         settings = SettingsSection(
-            rows = settingsRows(volumeReset, renderDReset, qualityReset, brightnessReset, syncReset),
+            rows = settingsRows(renderDReset, qualityReset, brightnessReset, syncReset),
             ownerActions = listOf(reportButton, deleteButton, lockButton),
             buttonTooltips = listOf(
                 lockButton to {
@@ -325,21 +315,13 @@ class DisplayMenu private constructor(
         errorPanel = ErrorPanel(retryButton, deleteButton, reportButton) { ds.mediaError }
     }
 
-    /** Builds the five settings rows with their tooltip content. */
+    /** Builds the four settings rows with their tooltip content. */
     private fun settingsRows(
-        volumeReset: IconButton, renderDReset: IconButton, qualityReset: IconButton,
+        renderDReset: IconButton, qualityReset: IconButton,
         brightnessReset: IconButton, syncReset: IconButton,
     ): List<SettingsSection.Row> {
         val ds = displayScreen
         return listOf(
-            SettingsSection.Row("dreamdisplays.button.volume", volume, volumeReset) {
-                listOf(
-                    tooltipTitle("dreamdisplays.button.volume.tooltip.1"),
-                    tooltipBody("dreamdisplays.button.volume.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.volume.tooltip.3"),
-                    tooltipValue("dreamdisplays.button.volume.tooltip.4", (volume.value * 200).toInt()),
-                )
-            },
             SettingsSection.Row("dreamdisplays.button.render-distance", renderD, renderDReset) {
                 listOf(
                     tooltipTitle("dreamdisplays.button.render-distance.tooltip.1"),
@@ -458,6 +440,7 @@ class DisplayMenu private constructor(
         val qualityList = ds.qualityList
         if (qualityList.size != prevQualityListSize) {
             prevQualityListSize = qualityList.size
+            quality.step = qualityStep(qualityList.size)
             if (qualityList.isNotEmpty()) {
                 // In Broadcast the handle should sit on the capped quality, not the user's saved value.
                 quality.value = qualityFraction(
@@ -523,6 +506,9 @@ class DisplayMenu private constructor(
         val cap = ds.qualityCap
         return ds.qualityList.filter { it <= cap }.maxOrNull() ?: cap
     }
+
+    /** The slider step for [size] evenly spaced quality stops (1 per available option). */
+    private fun qualityStep(size: Int): Double = 1.0 / max(1, size - 1)
 
     /** Maps a quality string (e.g. "720") to its fractional position within the available quality list. */
     private fun qualityFraction(q: String): Double {

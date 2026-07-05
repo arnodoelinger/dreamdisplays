@@ -33,14 +33,21 @@ import net.minecraft.util.Mth
  * @param live when true (default) [onApply] fires continuously as the user drags; when false it
  *   fires only once the drag/click is released. Use `live = false` for expensive actions (e.g. a
  *   quality switch that restarts the video) so a single drag across levels doesn't fire a burst.
+ * @param step when set, clicks/drags snap the value to the nearest multiple of [step] instead of
+ *   following the cursor continuously (e.g. `0.05` for 5% increments, or `1.0 / (positions - 1)`
+ *   for a fixed number of evenly spaced stops). Settable from outside since some sliders (e.g.
+ *   quality) have a stop count that only becomes known after construction.
  * @param onApply invoked when the user changes the value (after clamping).
  */
 class ValueSlider(
     initial: Double,
     private val label: (Double) -> Component,
     private val live: Boolean = true,
+    step: Double? = null,
     private val onApply: (Double) -> Unit,
 ) : UiWidget(Component.empty()) {
+
+    var step: Double? = step
 
     /** True while a drag/click that changed the value is in progress but not yet committed (non-live). */
     private var pendingCommit: Boolean = false
@@ -147,7 +154,10 @@ class ValueSlider(
      */
     private fun setValueFromMouse(mouseX: Double) {
         val old = value
-        value = (mouseX - (x + 4).toDouble()) / (width - 8).toDouble()
+        var fraction = (mouseX - (x + 4).toDouble()) / (width - 8).toDouble()
+        val snap = step
+        if (snap != null && snap > 0.0) fraction = Math.round(fraction / snap) * snap
+        value = fraction
         if (Mth.equal(old, value)) return
         if (live) onApply(value) else pendingCommit = true
     }

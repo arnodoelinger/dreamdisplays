@@ -17,9 +17,9 @@ import net.minecraft.resources.Identifier
 
 /**
  * Discrete playback-mode selector styled like the existing sliders. Unlike [ValueSlider], this
- * emits exactly one mode per click and ignores drag updates, so transient pointer movement cannot
- * start multiple watch-party requests. Clicks cycle through modes to preserve the old toggle's
- * "click anywhere" behavior.
+ * ignores drag updates, so transient pointer movement cannot start multiple watch-party requests.
+ * A click snaps directly to whichever mode's notch it lands closest to, like a real slider, instead
+ * of always advancing one step.
  */
 class SyncModeSlider(
     initial: PlaybackMode,
@@ -75,13 +75,15 @@ class SyncModeSlider(
         drawScrollingLabel(g, label(mode).copy().withStyle { it.withColor(color) }, 2)
     }
 
-    // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
-    // (1.21.1) branch overrides mouseClicked itself so the mode cycle fires on both platforms.
-    //? if >=1.21.11 {
-    override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
+    /**
+     * Snaps to the mode at [mouseX]'s notch and applies it if it differs from the current one.
+     * Shared by click and drag so dragging tracks the cursor across notches exactly like a click
+     * would on each one, instead of being ignored mid-drag.
+     */
+    private fun trySelect(mouseX: Double) {
         if (pendingMode != null) return
-        val next = nextEnabledMode() ?: return
-        if (!enabledFor(next)) return
+        val next = modeFromMouse(mouseX)
+        if (next == mode || !enabledFor(next)) return
         mode = next
         if (next != current()) {
             pendingMode = next
@@ -90,29 +92,27 @@ class SyncModeSlider(
         }
         playDownSound(Minecraft.getInstance().soundManager)
     }
+
+    // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
+    // (1.21.1) branch overrides mouseClicked itself so the mode cycle fires on both platforms.
+    //? if >=1.21.11 {
+    override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
+        trySelect(event.x())
+    }
     //?} else
     /*override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         if (!isValidClickButton(button) || !clicked(mouseX, mouseY)) return false
-        if (pendingMode != null) return true
-        val next = nextEnabledMode() ?: return true
-        if (!enabledFor(next)) return true
-        mode = next
-        if (next != current()) {
-            pendingMode = next
-            pendingUntilNanos = System.nanoTime() + PENDING_TIMEOUT_NANOS
-            onApply(next)
-        }
-        playDownSound(Minecraft.getInstance().soundManager)
+        trySelect(mouseX)
         return true
     }*/
 
     //? if >=1.21.11 {
     override fun onDrag(event: MouseButtonEvent, dragX: Double, dragY: Double) {
-        // Mode changes are packet-backed actions; dragging should not spam them
+        trySelect(event.x())
     }
     //?} else
     /*override fun onDrag(mouseX: Double, mouseY: Double, dragX: Double, dragY: Double) {
-        // Mode changes are packet-backed actions; dragging should not spam them
+        trySelect(mouseX)
     }*/
 
     override fun setFocused(focused: Boolean) {
@@ -125,13 +125,11 @@ class SyncModeSlider(
         }
     }
 
-    private fun nextEnabledMode(): PlaybackMode? {
-        val start = modes.indexOf(mode).coerceAtLeast(0)
-        for (offset in 1..modes.size) {
-            val candidate = modes[(start + offset) % modes.size]
-            if (enabledFor(candidate)) return candidate
-        }
-        return null
+    /** Maps a click's x position to the mode whose notch it's closest to (mirrors the [draw] layout). */
+    private fun modeFromMouse(mouseX: Double): PlaybackMode {
+        val fraction = (mouseX - x) / (width - 8).toDouble()
+        val idx = Math.round(fraction * (modes.size - 1)).toInt().coerceIn(0, modes.size - 1)
+        return modes[idx]
     }
 
     companion object {

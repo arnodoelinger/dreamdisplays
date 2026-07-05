@@ -707,12 +707,6 @@ class DisplayScreen(
         PlaybackAction.RESTART -> WatchPartyAction.RESTART
     }
 
-    /** Seeks 5 seconds forward. */
-    fun seekForward() = seekVideoRelative(5.0)
-
-    /** Seeks 5 seconds backward. */
-    fun seekBackward() = seekVideoRelative(-5.0)
-
     /** Seeks [seconds] seconds relative to the current playback position (negative = backward). */
     fun seekVideoRelative(seconds: Double) {
         if (!canSeekHere) return

@@ -13,6 +13,7 @@ import com.dreamdisplays.platform.client.ui.kit.drawShimmer
 import com.dreamdisplays.platform.client.ui.kit.fillVGradient
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
+import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
@@ -39,14 +40,13 @@ import kotlin.math.max
 
 /**
  * The preview panel of the display menu: live video (or thumbnail while loading), the title/metadata
- * overlay strip, and the playback controls row (seek buttons, mute, popout + its dropdown, progress
- * bar, pause). Owns only drawing and per-frame placement; the widgets themselves live on the screen.
+ * overlay strip, and the playback controls row (mute, volume, progress bar, popout + its dropdown,
+ * pause). Owns only drawing and per-frame placement; the widgets themselves live on the screen.
  */
 class PreviewSection(
     private val ds: DisplayScreen,
-    private val backButton: IconButton,
-    private val forwardButton: IconButton,
     private val muteButton: IconButton,
+    private val volume: ValueSlider,
     private val popoutButton: IconButton,
     private val pauseButton: IconButton,
     private val progress: SeekBar,
@@ -57,6 +57,9 @@ class PreviewSection(
     companion object {
         /** Aspect ratio of a YouTube thumbnail image, independent of the screen's own block shape. */
         private const val THUMBNAIL_RATIO = 16f / 9f
+
+        /** Width of the volume slider in the controls row. */
+        private const val VOLUME_W = 76
     }
 
     /** Draws the panel content into [panel] and lays out the controls row along its bottom edge. */
@@ -74,14 +77,14 @@ class PreviewSection(
         drawVideoArea(g, innerX, innerY, innerW, previewMaxH)
         drawTitleOverlay(g, innerX, innerY + previewMaxH, innerW)
 
-        // Controls row: [back][forward][mute][popout] [progress........] [pause]
-        backButton.place(UiRect(innerX, controlsRowY, btn, btn))
-        forwardButton.place(UiRect(innerX + btn + 4, controlsRowY, btn, btn))
-        muteButton.place(UiRect(innerX + btn * 2 + 8, controlsRowY, btn, btn))
-        popoutButton.place(UiRect(innerX + btn * 3 + 12, controlsRowY, btn, btn))
+        // Controls row: [mute][volume] [progress........] [popout][pause]
+        muteButton.place(UiRect(innerX, controlsRowY, btn, btn))
+        val volumeX = innerX + btn + 4
+        volume.place(UiRect(volumeX, controlsRowY, VOLUME_W, btn))
         pauseButton.place(UiRect(controlsRight - btn, controlsRowY, btn, btn))
-        val progX = innerX + btn * 4 + 16
-        val progW = max(40, (controlsRight - btn - 4) - progX)
+        popoutButton.place(UiRect(controlsRight - btn * 2 - 4, controlsRowY, btn, btn))
+        val progX = volumeX + VOLUME_W + 4
+        val progW = max(40, (controlsRight - btn * 2 - 8) - progX)
         progress.place(UiRect(progX, controlsRowY, progW, btn))
 
         dropdown.draw(g, popoutButton.x, popoutButton.y)
