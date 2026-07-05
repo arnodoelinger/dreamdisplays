@@ -96,9 +96,9 @@ object DisplayRegistry {
         DisplayStorage.saveDisplayData(displayScreen.uuid, displayScreen.toFullDisplayData())
     }
 
-    /** Loads all display screens for a given server from disk. */
+    /** Restores the display snapshot cached for [serverId] (e.g. saved timecodes) from a prior session. */
     fun loadScreensForServer(serverId: String) {
-        DisplayStorage.load(serverId)
+        DisplayStorage.load(serverId, DisplayStorage.snapshot(serverId))
     }
 
     /** Saves all display screens to disk. */
