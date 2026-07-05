@@ -1,11 +1,12 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -65,7 +66,9 @@ object VanillaDeleteCommand {
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !VanillaDisplayActions.isOpLevel2(player)) {
+        if (data.ownerId != player.uuid &&
+            !VanillaPermissions.has(player, VanillaServerState.config.permissions.deleteOthers, VanillaPermissions.Fallback.OP)
+        ) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }

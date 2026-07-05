@@ -55,6 +55,6 @@ object VanillaPlaybackTransport : PlaybackTransport {
     /** True if [playerId] is recognized as an admin (op / delete permission). */
     override fun isAdmin(playerId: UUID): Boolean {
         val player = server?.playerList?.getPlayer(playerId) ?: return false
-        return VanillaDisplayActions.isOpLevel2(player)
+        return VanillaDisplayActions.isAdmin(player)
     }
 }

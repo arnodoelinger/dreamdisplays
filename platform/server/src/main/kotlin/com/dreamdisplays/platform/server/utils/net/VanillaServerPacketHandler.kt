@@ -9,7 +9,8 @@ import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.delete
-import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.isOpLevel2
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.isAdmin
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.isPremium
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.recordVersionAndCheckUpdates
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.sendAllDisplays
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.setLocked
@@ -42,8 +43,8 @@ object VanillaServerPacketHandler {
                 if (V2PlayerTracker.isV2(player.uuid)) return@runCatching
 
                 recordVersionAndCheckUpdates(player, payload.version)
-                VanillaPacketUtil.sendPremium(player, isOpLevel2(player))
-                VanillaPacketUtil.sendIsAdmin(player, isOpLevel2(player))
+                VanillaPacketUtil.sendPremium(player, isPremium(player))
+                VanillaPacketUtil.sendIsAdmin(player, isAdmin(player))
                 VanillaPacketUtil.sendReportEnabled(player, VanillaServerState.config.settings.webhookUrl.isNotEmpty())
                 sendAllDisplays(player, server)
             }.onFailure { e ->
@@ -62,7 +63,7 @@ object VanillaServerPacketHandler {
                 limitTime = payload.limitTime
             )
             runCatching {
-                StateManager.processSyncPacket(syncData, player, server, isOpLevel2(player))
+                StateManager.processSyncPacket(syncData, player, server, isAdmin(player))
             }.onFailure { e ->
                 logger.warn("Failed to handle sync packet.", e)
             }
@@ -133,8 +134,8 @@ object VanillaServerPacketHandler {
                 if (V2PlayerTracker.isV2(player.uuid)) return@runCatching
 
                 recordVersionAndCheckUpdates(player, payload.version)
-                VanillaPacketUtil.sendPremium(player, isOpLevel2(player))
-                VanillaPacketUtil.sendIsAdmin(player, isOpLevel2(player))
+                VanillaPacketUtil.sendPremium(player, isPremium(player))
+                VanillaPacketUtil.sendIsAdmin(player, isAdmin(player))
                 VanillaPacketUtil.sendReportEnabled(player, VanillaServerState.config.settings.webhookUrl.isNotEmpty())
                 sendAllDisplays(player, server)
             }.onFailure { e ->
@@ -155,7 +156,7 @@ object VanillaServerPacketHandler {
                     limitTime = payload.limitTime
                 )
                 runCatching {
-                    StateManager.processSyncPacket(syncData, player, server, isOpLevel2(player))
+                    StateManager.processSyncPacket(syncData, player, server, isAdmin(player))
                 }.onFailure { e ->
                     logger.warn("Failed to handle sync packet.", e)
                 }

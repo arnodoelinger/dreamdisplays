@@ -5,7 +5,7 @@ import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -115,7 +115,9 @@ object VanillaOnCommand {
 
         val selfTarget = self?.uuid == target.uuid
 
-        if (!selfTarget && (self == null || !VanillaDisplayActions.isOpLevel2(self))) {
+        if (!selfTarget &&
+            (self == null || !VanillaPermissions.has(self, config.permissions.toggleOthers, VanillaPermissions.Fallback.OP))
+        ) {
             if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))
             return 0

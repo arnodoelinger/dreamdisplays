@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.registrar
 
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.commands.subcommands.*
-import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
@@ -43,13 +43,14 @@ object VanillaCommandTree {
 
     /** Builds the `/display create` subcommand. */
     private fun createNode() = net.minecraft.commands.Commands.literal("create")
+        .requires { requiresNode(it, { p -> p.create }, VanillaPermissions.Fallback.EVERYONE) }
         .executes { ctx ->
             VanillaCreateCommand.execute(ctx)
         }
 
     /** Builds the `/display delete` subcommand. */
     private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
-        .requires(::requiresOpLevel2)
+        .requires { requiresNode(it, { p -> p.delete }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaDeleteCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -57,6 +58,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display info` subcommand. */
     private fun infoNode() = net.minecraft.commands.Commands.literal("info")
+        .requires { requiresNode(it, { p -> p.info }, VanillaPermissions.Fallback.EVERYONE) }
         .executes { ctx ->
             VanillaInfoCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -64,7 +66,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display stats` subcommand. */
     private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
-        .requires(::requiresOpLevel2)
+        .requires { requiresNode(it, { p -> p.stats }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaStatsCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -72,7 +74,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display reload` subcommand. */
     private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
-        .requires(::requiresOpLevel2)
+        .requires { requiresNode(it, { p -> p.reload }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaReloadCommand.execute(ctx)
             Command.SINGLE_SUCCESS
@@ -80,6 +82,7 @@ object VanillaCommandTree {
 
     /** Builds the `/display video <url> [lang]` subcommand. */
     private fun videoNode() = net.minecraft.commands.Commands.literal("video")
+        .requires { requiresNode(it, { p -> p.video }, VanillaPermissions.Fallback.EVERYONE) }
         .then(
             net.minecraft.commands.Commands.argument("url_and_lang", StringArgumentType.greedyString())
                 .suggests { _, builder ->
@@ -101,7 +104,7 @@ object VanillaCommandTree {
     /** Builds the `/display list [filter] [value] [page]` subcommand. */
     private fun listNode(): LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> {
         return net.minecraft.commands.Commands.literal("list")
-            .requires(::requiresOpLevel2)
+            .requires { requiresNode(it, { p -> p.list }, VanillaPermissions.Fallback.OP) }
             .executes { ctx ->
                 VanillaListCommand.execute(ctx)
                 Command.SINGLE_SUCCESS
@@ -150,7 +153,7 @@ object VanillaCommandTree {
         }
         .then(
             net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
-                .requires(::requiresOpLevel2)
+                .requires { requiresNode(it, { p -> p.toggleOthers }, VanillaPermissions.Fallback.OP) }
                 .suggests { ctx, builder ->
                     ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
                     builder.buildFuture()
@@ -165,10 +168,14 @@ object VanillaCommandTree {
                 }
         )
 
-    /** Permission gate shared by every admin-only node: console always passes, players need op level 2. */
-    private fun requiresOpLevel2(source: net.minecraft.commands.CommandSourceStack): Boolean {
+    /** Permission gate shared by every node: console always passes, players are checked against [node]. */
+    private fun requiresNode(
+        source: net.minecraft.commands.CommandSourceStack,
+        node: (com.dreamdisplays.platform.server.VanillaConfig.PermissionsSection) -> String,
+        fallback: VanillaPermissions.Fallback,
+    ): Boolean {
         val player = source.entity as? net.minecraft.server.level.ServerPlayer
-        return player == null || VanillaDisplayActions.isOpLevel2(player)
+        return player == null || VanillaPermissions.has(player, node(VanillaServerState.config.permissions), fallback)
     }
 
     /** Returns a list of language codes from Java and config. */
