@@ -10,6 +10,7 @@ import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.core.protocol.ReportDisplay
 import com.dreamdisplays.core.protocol.RequestSync
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
+import com.dreamdisplays.core.protocol.ServerHello
 import com.dreamdisplays.core.protocol.SetLocked
 import com.dreamdisplays.core.protocol.SetVideo
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -47,7 +48,7 @@ object LegacyAdapter {
 
     /**
      * Lifts an incoming frozen-v1 [payload] into its v2 packet. Per-flag legacy packets merge
-     * into the current [ServerHello][com.dreamdisplays.core.protocol.ServerHello] snapshot.
+     * into the current [ServerHello] snapshot.
      */
     fun fromLegacy(payload: CustomPacketPayload): DreamPacket = when (payload) {
         is Packets.Info -> DisplayInfo(

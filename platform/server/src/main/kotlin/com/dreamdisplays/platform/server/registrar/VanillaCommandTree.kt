@@ -1,23 +1,27 @@
 package com.dreamdisplays.platform.server.registrar
 
+import com.dreamdisplays.platform.server.VanillaConfig
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
+import com.mojang.brigadier.tree.LiteralCommandNode
+import net.minecraft.commands.Commands
+import net.minecraft.commands.CommandSourceStack
+import net.minecraft.server.level.ServerPlayer
 import java.util.Locale
 
 /**
- * Shared `Fabric` / `NeoForge` `/display` command tree. Vanilla Brigadier types
- * (`net.minecraft.commands.Commands`/`CommandSourceStack`) are used fully-qualified throughout
- * since `CommandRegistrar` (see `CommandRegistrar.kt`) already imports Paper's same-named
- * Brigadier wrapper types.
+ * Shared `Fabric` / `NeoForge` `/display` command tree. See `CommandRegistrar.kt` for the
+ * Paper equivalent (built on `io.papermc.paper.command.brigadier` wrapper types of the same
+ * simple names; imports are per-file in Kotlin so the two coexist without collision).
  */
 object VanillaCommandTree {
     /** Builds the full `/display` command tree, ready to attach to a dispatcher root. */
-    fun build(): com.mojang.brigadier.tree.LiteralCommandNode<net.minecraft.commands.CommandSourceStack> =
-        net.minecraft.commands.Commands.literal("display")
+    fun build(): LiteralCommandNode<CommandSourceStack> =
+        Commands.literal("display")
             .executes { ctx ->
                 VanillaHelpCommand.execute(ctx)
                 Command.SINGLE_SUCCESS
@@ -35,28 +39,28 @@ object VanillaCommandTree {
             .build()
 
     /** Builds the `/display help` subcommand. */
-    private fun helpNode() = net.minecraft.commands.Commands.literal("help")
+    private fun helpNode() = Commands.literal("help")
         .executes { ctx ->
             VanillaHelpCommand.execute(ctx)
             Command.SINGLE_SUCCESS
         }
 
     /** Builds the `/display create` subcommand. */
-    private fun createNode() = net.minecraft.commands.Commands.literal("create")
+    private fun createNode() = Commands.literal("create")
         .requires { requiresNode(it, { p -> p.create }, VanillaPermissions.Fallback.EVERYONE) }
         .executes { ctx ->
             VanillaCreateCommand.execute(ctx)
         }
 
     /** Builds the `/display delete` subcommand. */
-    private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
+    private fun deleteNode() = Commands.literal("delete")
         .executes { ctx ->
             VanillaDeleteCommand.execute(ctx)
             Command.SINGLE_SUCCESS
         }
 
     /** Builds the `/display info` subcommand. */
-    private fun infoNode() = net.minecraft.commands.Commands.literal("info")
+    private fun infoNode() = Commands.literal("info")
         .requires { requiresNode(it, { p -> p.info }, VanillaPermissions.Fallback.EVERYONE) }
         .executes { ctx ->
             VanillaInfoCommand.execute(ctx)
@@ -64,7 +68,7 @@ object VanillaCommandTree {
         }
 
     /** Builds the `/display stats` subcommand. */
-    private fun statsNode() = net.minecraft.commands.Commands.literal("stats")
+    private fun statsNode() = Commands.literal("stats")
         .requires { requiresNode(it, { p -> p.stats }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaStatsCommand.execute(ctx)
@@ -72,7 +76,7 @@ object VanillaCommandTree {
         }
 
     /** Builds the `/display reload` subcommand. */
-    private fun reloadNode() = net.minecraft.commands.Commands.literal("reload")
+    private fun reloadNode() = Commands.literal("reload")
         .requires { requiresNode(it, { p -> p.reload }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaReloadCommand.execute(ctx)
@@ -80,10 +84,10 @@ object VanillaCommandTree {
         }
 
     /** Builds the `/display video <url> [lang]` subcommand. */
-    private fun videoNode() = net.minecraft.commands.Commands.literal("video")
+    private fun videoNode() = Commands.literal("video")
         .requires { requiresNode(it, { p -> p.video }, VanillaPermissions.Fallback.EVERYONE) }
         .then(
-            net.minecraft.commands.Commands.argument("url_and_lang", StringArgumentType.greedyString())
+            Commands.argument("url_and_lang", StringArgumentType.greedyString())
                 .suggests { _, builder ->
                     if (builder.remaining.contains(' ')) {
                         val prefix = builder.remaining.substringAfterLast(' ')
@@ -101,15 +105,15 @@ object VanillaCommandTree {
         )
 
     /** Builds the `/display list [filter] [value] [page]` subcommand. */
-    private fun listNode(): LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> {
-        return net.minecraft.commands.Commands.literal("list")
+    private fun listNode(): LiteralArgumentBuilder<CommandSourceStack> {
+        return Commands.literal("list")
             .requires { requiresNode(it, { p -> p.list }, VanillaPermissions.Fallback.OP) }
             .executes { ctx ->
                 VanillaListCommand.execute(ctx)
                 Command.SINGLE_SUCCESS
             }
             .then(
-                net.minecraft.commands.Commands.argument("filter", StringArgumentType.word())
+                Commands.argument("filter", StringArgumentType.word())
                     .suggests { _, builder ->
                         ListFilter.tokens.forEach { builder.suggest(it) }
                         builder.buildFuture()
@@ -120,7 +124,7 @@ object VanillaCommandTree {
                         Command.SINGLE_SUCCESS
                     }
                     .then(
-                        net.minecraft.commands.Commands.argument("value", StringArgumentType.word())
+                        Commands.argument("value", StringArgumentType.word())
                             .executes { ctx ->
                                 val filter = StringArgumentType.getString(ctx, "filter")
                                 val value = StringArgumentType.getString(ctx, "value")
@@ -128,7 +132,7 @@ object VanillaCommandTree {
                                 Command.SINGLE_SUCCESS
                             }
                             .then(
-                                net.minecraft.commands.Commands.argument("page", StringArgumentType.word())
+                                Commands.argument("page", StringArgumentType.word())
                                     .executes { ctx ->
                                         val filter = StringArgumentType.getString(ctx, "filter")
                                         val value = StringArgumentType.getString(ctx, "value")
@@ -142,7 +146,7 @@ object VanillaCommandTree {
     }
 
     /** Builds the `/display on/off [player]` subcommand. */
-    private fun toggleNode(name: String) = net.minecraft.commands.Commands.literal(name)
+    private fun toggleNode(name: String) = Commands.literal(name)
         .executes { ctx ->
             when (name) {
                 "on" -> VanillaOnCommand.execute(ctx)
@@ -151,7 +155,7 @@ object VanillaCommandTree {
             Command.SINGLE_SUCCESS
         }
         .then(
-            net.minecraft.commands.Commands.argument("player", StringArgumentType.word())
+            Commands.argument("player", StringArgumentType.word())
                 .requires { requiresNode(it, { p -> p.toggleOthers }, VanillaPermissions.Fallback.OP) }
                 .suggests { ctx, builder ->
                     ctx.source.server.playerList.players.forEach { builder.suggest(it.name.string) }
@@ -169,11 +173,11 @@ object VanillaCommandTree {
 
     /** Permission gate shared by every node: console always passes, players are checked against [node]. */
     private fun requiresNode(
-        source: net.minecraft.commands.CommandSourceStack,
-        node: (com.dreamdisplays.platform.server.VanillaConfig.PermissionsSection) -> String,
+        source: CommandSourceStack,
+        node: (VanillaConfig.PermissionsSection) -> String,
         fallback: VanillaPermissions.Fallback,
     ): Boolean {
-        val player = source.entity as? net.minecraft.server.level.ServerPlayer
+        val player = source.entity as? ServerPlayer
         return player == null || VanillaPermissions.has(player, node(VanillaServerState.config.permissions), fallback)
     }
 

@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.pipeline
 
+import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.util.daemon
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
@@ -208,7 +209,7 @@ internal class FramePrebuffer(
                 surface.present(tf.buf)
                 if (firstFramePresented.compareAndSet(false, true)) {
                     onFirstFrame()
-                    if (com.dreamdisplays.media.player.MediaPlayer.DEBUG)
+                    if (MediaPlayer.DEBUG)
                         logger.debug("$debugLabel First frame presented (prebuffered, prefill=$prefillFrames).")
                 }
             }

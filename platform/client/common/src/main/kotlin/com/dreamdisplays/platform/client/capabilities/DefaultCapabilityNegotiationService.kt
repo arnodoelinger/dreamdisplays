@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.capabilities
 
 import com.dreamdisplays.api.capability.ServerFeature
+import com.dreamdisplays.platform.client.managers.ClientPacketManager
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.ServerHello
@@ -12,7 +13,7 @@ import org.slf4j.LoggerFactory
  * Default [CapabilityNegotiationService]. Local capabilities are probed once via the
  * [ClientCapabilityDetector]; server capabilities arrive either as a single v2
  * [ServerHello] or merged incrementally from the legacy per-flag handshake packets
- * (via [com.dreamdisplays.platform.client.managers.ClientPacketManager]).
+ * (via [ClientPacketManager]).
  */
 class DefaultCapabilityNegotiationService(
     private val detector: ClientCapabilityDetector,

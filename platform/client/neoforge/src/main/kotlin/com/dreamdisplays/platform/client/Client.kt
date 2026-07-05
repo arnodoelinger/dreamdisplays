@@ -5,6 +5,7 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.platform.NeoForgePlatformIntegrationProvider
 import com.dreamdisplays.api.platform.PlatformServices
 import com.dreamdisplays.platform.client.render.ScreenRenderer
+import com.dreamdisplays.platform.client.Mod as DreamMod
 import com.mojang.blaze3d.systems.RenderSystem
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
@@ -24,7 +25,7 @@ import net.neoforged.neoforge.common.NeoForge
 
 @Suppress("UNUSED")
 @Mod(value = Initializer.MOD_ID, dist = [Dist.CLIENT])
-class Client(modEventBus: IEventBus) : com.dreamdisplays.platform.client.Mod {
+class Client(modEventBus: IEventBus) : DreamMod {
     init {
         // The Platform must be in the registry before onModInit, so ClientStartupManager
         // can host the ClientApplication on top of it during bootstrap.

@@ -7,6 +7,7 @@ import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.sync.SyncData
+import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.util.FacingUtil
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer
@@ -60,7 +61,7 @@ object VanillaPacketUtil {
 
     /**
      * Encodes and broadcasts a frozen-v1 `sync` packet. v2 timelines are server-authoritative
-     * (see [com.dreamdisplays.platform.server.playback.TimelineManager]), so this path serves v1 peers only.
+     * (see [TimelineManager]), so this path serves v1 peers only.
      */
     fun sendSync(players: List<ServerPlayer>, syncData: SyncData) {
         val id = syncData.id ?: return

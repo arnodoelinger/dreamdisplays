@@ -6,7 +6,7 @@ import net.minecraft.client.Camera
 
 /**
  * Minecraft-backed [RenderContext]. The platform adapter that lets the platform-agnostic
- * [com.dreamdisplays.platform.client.render.ClientRenderService] contract drive the existing world renderer:
+ * [ClientRenderService] contract drive the existing world renderer:
  * the contract's `renderAll(RenderContext)` receives this, casts it back, and reaches the live
  * [PoseStack] and [Camera].
  *

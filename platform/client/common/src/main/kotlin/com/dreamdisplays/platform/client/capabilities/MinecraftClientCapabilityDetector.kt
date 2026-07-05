@@ -9,6 +9,7 @@ import com.dreamdisplays.api.render.TextureUploadPath
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.core.protocol.ClientHello
+import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.RenderBackendCompat
 import com.dreamdisplays.platform.client.render.ShaderPackCompat
 
@@ -19,7 +20,7 @@ import com.dreamdisplays.platform.client.render.ShaderPackCompat
  */
 object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
 
-    /** Matches [com.dreamdisplays.platform.client.render.AsyncTextureUploader]; a GL query needs a current context, which detect-time can't guarantee. */
+    /** Matches [AsyncTextureUploader]; a GL query needs a current context, which detect-time can't guarantee. */
     override val maxTextureSize: Int = 8192
 
     /** True when `GLFW` can create the shared-context popout window on this platform. */

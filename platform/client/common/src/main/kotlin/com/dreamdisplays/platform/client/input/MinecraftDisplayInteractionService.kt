@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.input
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.managers.ClientTickManager
 import com.dreamdisplays.platform.client.utils.RayCastingUtil
 import net.minecraft.client.Minecraft
 import net.minecraft.core.Direction
@@ -18,7 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * geometry into the input layer.
  */
 object MinecraftDisplayInteractionService : DisplayInteractionService {
-    /** Max reach, in blocks, for the look raycast. Mirrors the value used by [com.dreamdisplays.managers.ClientTickManager]. */
+    /** Max reach, in blocks, for the look raycast. Mirrors the value used by [ClientTickManager]. */
     private const val MAX_REACH: Double = 64.0
 
     /** Thread-safe list of listeners subscribed to [DisplayInteraction] events. */

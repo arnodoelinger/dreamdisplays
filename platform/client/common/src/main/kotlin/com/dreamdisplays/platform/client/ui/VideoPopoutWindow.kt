@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.client.ui
 
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutWindow
 import com.dreamdisplays.platform.client.popout.WindowBackend
@@ -456,7 +457,7 @@ class VideoPopoutWindow(
          * Always true on macOS (GLFW backend needs no extra preconditions).
          * On Windows / Linux, false only in headless environments (servers, CI).
          * Evaluated lazily so the AWT check sees the correct [java.awt.headless] value
-         * set by [com.dreamdisplays.platform.client.Initializer] during mod init.
+         * set by [Initializer] during mod init.
          */
         val isAvailable: Boolean by lazy {
             if (IS_MACOS) true

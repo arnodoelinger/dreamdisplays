@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.process
 
+import com.dreamdisplays.media.player.pipeline.VideoFramePipe
 import com.dreamdisplays.media.runtime.MediaHostGuard
 import java.io.IOException
 import java.util.*
@@ -18,7 +19,7 @@ object MediaProcess {
 
     /** Wire format the video `FFmpeg` process writes to its stdout pipe. */
     enum class VideoTransport {
-        /** PPM frames (header + RGB24), parsed by the JVM [com.dreamdisplays.media.player.pipeline.VideoFramePipe]. */
+        /** PPM frames (header + RGB24), parsed by the JVM [VideoFramePipe]. */
         PPM,
 
         /** Headerless RGB24 rawvideo, consumed by the native pipeline. */

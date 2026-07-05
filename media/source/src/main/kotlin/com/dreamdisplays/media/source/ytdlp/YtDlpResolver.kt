@@ -2,13 +2,14 @@ package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.source.MediaMetadata
 import com.dreamdisplays.api.media.source.MediaResolver
+import com.dreamdisplays.api.media.source.MediaResolverRegistry
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
 import kotlin.time.Duration.Companion.nanoseconds
 
 /**
  * Subprocess-backed [MediaResolver] wrapping the [YtDlp] orchestrator. This is the slow, robust
- * fallback behind [NewPipeResolver]: a lower [priority] means [com.dreamdisplays.api.media.source.MediaResolverRegistry]
+ * fallback behind [NewPipeResolver]: a lower [priority] means [MediaResolverRegistry]
  * only reaches it after the in-process fast path has declined or failed.
  *
  * Unlike [NewPipeResolver], this path can resolve any HTTP(S) URL `yt-dlp`'s extractors understand,

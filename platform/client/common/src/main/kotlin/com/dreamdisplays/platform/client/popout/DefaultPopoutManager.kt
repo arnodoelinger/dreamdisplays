@@ -5,15 +5,17 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.managers.DisplayPopoutManager
 import com.dreamdisplays.api.media.sink.VideoFrameSink
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
  * Global [PopoutManager] facade. Delegates per-display window and PiP operations to the
- * [com.dreamdisplays.platform.client.managers.DisplayPopoutManager] embedded in each [com.dreamdisplays.platform.client.displays.DisplayScreen]
+ * [DisplayPopoutManager] embedded in each [DisplayScreen]
  * (looked up via [DisplayRegistry]), and queries [OverlayManager] for PiP status.
  *
- * Frame-sink wiring remains internal to [com.dreamdisplays.platform.client.managers.DisplayPopoutManager]; [openWindow] and
+ * Frame-sink wiring remains internal to [DisplayPopoutManager]; [openWindow] and
  * [openPip] return null because the sink is set directly on the player, not surfaced here.
  */
 class DefaultPopoutManager : PopoutManager {
@@ -65,7 +67,7 @@ class DefaultPopoutManager : PopoutManager {
         return AutoCloseable { listeners -= listener }
     }
 
-    /** Fans [event] out to every subscriber. Emitted by [com.dreamdisplays.platform.client.managers.DisplayPopoutManager]. */
+    /** Fans [event] out to every subscriber. Emitted by [DisplayPopoutManager]. */
     override fun emit(event: PopoutEvent) {
         listeners.forEach { it(event) }
     }

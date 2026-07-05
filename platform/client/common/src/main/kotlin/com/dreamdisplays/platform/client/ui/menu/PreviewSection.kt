@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.client.ui.menu
 
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
@@ -347,7 +348,7 @@ class PreviewSection(
                 //?} else
                 /*tex = DynamicTexture(img)*/
                 textureId = Identifier.fromNamespaceAndPath(
-                    com.dreamdisplays.platform.client.Initializer.MOD_ID,
+                    Initializer.MOD_ID,
                     "preview/${ds.uuid}-${UUID.randomUUID()}",
                 )
                 mc.textureManager.register(textureId!!, tex)

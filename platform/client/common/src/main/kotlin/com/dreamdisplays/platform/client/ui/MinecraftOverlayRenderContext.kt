@@ -1,5 +1,7 @@
 package com.dreamdisplays.platform.client.ui
 
+import com.dreamdisplays.platform.client.overlay.Overlay
+import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
 import net.minecraft.client.Minecraft
 //? if >=26 {
@@ -10,7 +12,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 /**
  * Minecraft-backed [OverlayRenderContext]. This is the platform adapter that lets the
- * platform-agnostic [com.dreamdisplays.platform.client.overlay.Overlay] / [com.dreamdisplays.platform.client.overlay.OverlayManager]
+ * platform-agnostic [Overlay] / [OverlayManager]
  * contracts drive the existing Minecraft HUD rendering: the contract methods receive an
  * [OverlayRenderContext], implementations cast it back to this type to reach the live
  * [Minecraft] instance, [graphics] sink, and polled mouse state.

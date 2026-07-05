@@ -11,6 +11,7 @@ import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.playback.TimelineManager
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
@@ -110,7 +111,7 @@ object PacketUtil {
 
     /**
      * Encodes and broadcasts a frozen-v1 `sync` packet. v2 timelines are server-authoritative
-     * (see [com.dreamdisplays.platform.server.playback.TimelineManager]), so this path serves v1 peers only.
+     * (see [TimelineManager]), so this path serves v1 peers only.
      */
     fun sendSync(players: List<Player?>, syncData: SyncData) {
         val id = syncData.id ?: return

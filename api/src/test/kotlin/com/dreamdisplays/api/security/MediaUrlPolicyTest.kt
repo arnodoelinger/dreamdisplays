@@ -1,7 +1,8 @@
-@file:OptIn(com.dreamdisplays.api.DreamDisplaysUnstableApi::class)
+@file:OptIn(DreamDisplaysUnstableApi::class)
 
 package com.dreamdisplays.api.security
 
+import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

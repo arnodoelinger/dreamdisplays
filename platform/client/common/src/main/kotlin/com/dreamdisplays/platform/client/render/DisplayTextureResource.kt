@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -21,7 +22,7 @@ import java.util.UUID
  * three RED8 [VideoPlaneTexture] planes (raw I420 planes converted in the fragment shader, see
  * [DisplayYuvRenderTypes]), plus the [RenderType] that samples them.
  *
- * Pulled out of [com.dreamdisplays.platform.client.displays.DisplayScreen] so the screen no longer mixes Minecraft texture
+ * Pulled out of [DisplayScreen] so the screen no longer mixes Minecraft texture
  * management with playback and sync state. [width]/[height] are the texture's pixel dimensions, derived from the
  * screen's block aspect ratio and target quality.
  *

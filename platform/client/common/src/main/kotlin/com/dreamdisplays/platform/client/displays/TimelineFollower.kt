@@ -1,8 +1,10 @@
 package com.dreamdisplays.platform.client.displays
 
+import com.dreamdisplays.core.protocol.DisplaySync
+
 /**
  * Follows the server-authoritative timeline for a [DisplayScreen]. The server is the single source
- * of truth: every [com.dreamdisplays.core.protocol.DisplaySync] (and watch-party snapshot) reports the
+ * of truth: every [DisplaySync] (and watch-party snapshot) reports the
  * intended position *as of* send time, so the follower matches pause state and re-seeks only when
  * local drift leaves a tolerance band.
  *

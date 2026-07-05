@@ -5,6 +5,7 @@ import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.overlay.Overlay
 import com.dreamdisplays.platform.client.overlay.OverlayBounds
 import com.dreamdisplays.platform.client.overlay.OverlayEvent
+import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
@@ -107,7 +108,7 @@ class PipOverlay(
     val isFinished: Boolean get() = closing && animProgress < 0.01f
     val isDragging: Boolean get() = dragging
 
-    /** Stable identity usable with [Overlay] / [com.dreamdisplays.platform.client.overlay.OverlayManager] contracts. */
+    /** Stable identity usable with [Overlay] / [OverlayManager] contracts. */
     override val displayId: DisplayId get() = DisplayId(displayScreen.uuid)
 
     /** Visible until the close animation has fully played out. */

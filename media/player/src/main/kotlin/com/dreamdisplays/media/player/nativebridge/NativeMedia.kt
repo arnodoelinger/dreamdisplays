@@ -1,5 +1,7 @@
 package com.dreamdisplays.media.player.nativebridge
 
+import com.dreamdisplays.media.player.pipeline.VideoFramePipe
+import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.runtime.OsInfo
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -21,7 +23,7 @@ import java.nio.ByteBuffer
  *
  * Availability is decided once, lazily: requires Java 21+ (FFM API exists since 21),
  * a loadable library for the current platform, and a matching ABI version. When any of
- * that fails the media pipeline silently falls back to the pure-JVM [com.dreamdisplays.media.player.pipeline.VideoFramePipe].
+ * that fails the media pipeline silently falls back to the pure-JVM [VideoFramePipe].
  */
 object NativeMedia {
     private val logger = LoggerFactory.getLogger("DreamDisplays/NativeMedia")
@@ -217,7 +219,7 @@ object NativeMedia {
 
     /**
      * Opens an in-process decode session for [url] at the target [w] x [h], starting at
-     * [startMicros]. [hwAccelCode] is a stable [com.dreamdisplays.media.player.process.HwAccelBackend.lavCode].
+     * [startMicros]. [hwAccelCode] is a stable [HwAccelBackend.lavCode].
      * The native side validates that the decoder actually supports the requested hardware path
      * and falls back to software when it cannot be opened.
      * Returns an opaque handle, or 0 on failure.

@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.net
 
 import com.dreamdisplays.platform.client.managers.ClientPacketManager
+import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.DisplaySync
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.api.protocol.PacketDirection
@@ -10,7 +11,7 @@ import org.slf4j.LoggerFactory
 
 /**
  * Client-side protocol negotiation: speaks v2 only after the server has proven v2 support by
- * answering the blind [com.dreamdisplays.core.protocol.ClientHello] with a [ServerHello].
+ * answering the blind [ClientHello] with a [ServerHello].
  */
 object ProtocolRouter {
     /** Logger for negotiation and decode diagnostics. */
