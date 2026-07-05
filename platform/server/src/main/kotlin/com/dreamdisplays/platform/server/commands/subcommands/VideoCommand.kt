@@ -150,7 +150,7 @@ object VanillaVideoCommand {
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, VanillaDisplayActions.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaDisplayActions.isAdmin(player))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")

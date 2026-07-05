@@ -35,7 +35,7 @@ object CommandRegistrar {
             simple(
                 "delete",
                 DeleteCommand()
-            ) { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.delete) })
+            ) { it.sender is Player })
         .then(
             simple(
                 "info",

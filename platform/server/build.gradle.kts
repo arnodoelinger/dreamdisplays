@@ -124,6 +124,7 @@ dependencies {
 dependencies {
     paperweight.devBundle("io.papermc.paper", scVersion("paper.api.version"))
     compileOnly(libs.jspecify)
+    compileOnly(libs.luckpermsApi)
     compileOnly(project(":core"))
     compileOnly(project(":platform:client:common"))
     compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")

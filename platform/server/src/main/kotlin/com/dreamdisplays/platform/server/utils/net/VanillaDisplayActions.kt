@@ -17,6 +17,7 @@ import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.utils.VersionUtil
 import kotlinx.coroutines.launch
 import net.minecraft.server.MinecraftServer
@@ -48,6 +49,7 @@ object VanillaDisplayActions {
         }
 
         if (config.settings.updatesEnabled &&
+            VanillaPermissions.has(player, config.permissions.updates, VanillaPermissions.Fallback.OP) &&
             !PlayerManager.hasBeenNotifiedAboutPluginUpdate(player.uuid)
         ) {
             val latestPlugin = VersionState.pluginLatestVersion
@@ -95,8 +97,10 @@ object VanillaDisplayActions {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData
             ?: return MessageUtil.sendMessage(player, "noDisplay")
 
-        // No permission-node API on Fabric/NeoForge: own display = always allowed; others' = op-only.
-        if (displayData.ownerId != player.uuid && !isOpLevel2(player)) {
+        val perms = VanillaServerState.config.permissions
+        if (displayData.ownerId != player.uuid &&
+            !VanillaPermissions.has(player, perms.deleteOthers, VanillaPermissions.Fallback.OP)
+        ) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
         }
@@ -128,7 +132,7 @@ object VanillaDisplayActions {
     fun setLocked(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, locked: Boolean) {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData
             ?: return MessageUtil.sendMessage(player, "noDisplay")
-        if (!PlaybackPermissions.canToggleLock(context(displayData, player))) {
+        if (!PlaybackPermissions.canToggleLock(lockContext(displayData, player))) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return
         }
@@ -152,8 +156,10 @@ object VanillaDisplayActions {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
         if (!PlaybackPermissions.canSetMode(context(displayData, player))) return
 
-        // Note: mode-specific permission nodes (dreamdisplays.local/synced/broadcast) are not enforced
-        // here because Fabric/NeoForge have no permission-node API. Enforcement is Paper-only (DisplayActions.kt).
+        if (!canAccessMode(player, mode)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
 
         displayData.mode = mode
         ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
@@ -170,6 +176,11 @@ object VanillaDisplayActions {
     /** Starts a watch-party session with [player] as host. */
     fun watchPartyStart(player: ServerPlayer, displayId: java.util.UUID, url: String, lang: String) {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
+        val perms = VanillaServerState.config.permissions
+        if (!VanillaPermissions.has(player, perms.watchparty, VanillaPermissions.Fallback.EVERYONE)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
         if (!MediaUrlPolicy.isAllowed(url)) return
         WatchPartyManager.start(displayData, player.uuid, url, MediaUrlPolicy.sanitizeLang(lang))
     }
@@ -189,9 +200,37 @@ object VanillaDisplayActions {
 
     /** Builds the permission context for [player] acting on [display]. */
     private fun context(display: VanillaDisplayData, player: ServerPlayer) =
-        PlaybackContexts.of(display, player.uuid, isOpLevel2(player))
+        PlaybackContexts.of(display, player.uuid, isAdmin(player))
 
-    /** Checks if [player] has operator level 2 permissions, which is the threshold for privileged actions. */
+    /** Like [context] but elevates [player] to admin if they hold the lock permission. */
+    private fun lockContext(display: VanillaDisplayData, player: ServerPlayer) =
+        PlaybackContexts.of(
+            display, player.uuid,
+            isAdmin(player) ||
+                VanillaPermissions.has(player, VanillaServerState.config.permissions.lock, VanillaPermissions.Fallback.OP),
+        )
+
+    /** Checks if [player] has permission to access the specified [mode]. */
+    private fun canAccessMode(player: ServerPlayer, mode: PlaybackMode): Boolean {
+        val perms = VanillaServerState.config.permissions
+        val node = when (mode) {
+            PlaybackMode.LOCAL -> perms.local
+            PlaybackMode.SYNCED -> perms.synced
+            PlaybackMode.BROADCAST -> perms.broadcast
+            else -> return true
+        }
+        return VanillaPermissions.has(player, node, VanillaPermissions.Fallback.EVERYONE)
+    }
+
+    /** True if [player] counts as a display admin (the `delete` node, or op level 2 without LuckPerms). */
+    fun isAdmin(player: ServerPlayer): Boolean =
+        VanillaPermissions.has(player, VanillaServerState.config.permissions.delete, VanillaPermissions.Fallback.OP)
+
+    /** True if [player] holds the premium node (op level 2 without LuckPerms, matching legacy behavior). */
+    fun isPremium(player: ServerPlayer): Boolean =
+        VanillaPermissions.has(player, VanillaServerState.config.permissions.premium, VanillaPermissions.Fallback.OP)
+
+    /** Checks if [player] has operator level 2 permissions, the no-LuckPerms fallback for privileged actions. */
     fun isOpLevel2(player: ServerPlayer): Boolean {
         val server =
             //? if >=1.21.11 {

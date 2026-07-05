@@ -101,8 +101,8 @@ object FabricV2Networking {
         send(
             listOf(player),
             ServerHello(
-                isPremium = VanillaDisplayActions.isOpLevel2(player),
-                isAdmin = VanillaDisplayActions.isOpLevel2(player),
+                isPremium = VanillaDisplayActions.isPremium(player),
+                isAdmin = VanillaDisplayActions.isAdmin(player),
                 isReportingEnabled = VanillaServerState.config.settings.webhookUrl.isNotEmpty(),
                 allowedFeatures = ServerFeature.playbackFeatureWires,
                 defaultVolume = VanillaServerState.config.settings.defaultVolume,

@@ -53,7 +53,9 @@ password = "password"
 table_prefix = ""
 
 [permissions]
-# Permission nodes
+# Permission nodes. On Paper they are resolved by your permissions plugin.
+# Note that on Fabric / NeoForge they are resolved through LuckPerms when it's installed.
+# Without LuckPerms, Fabric / NeoForge fall back to the defaults below ("operator" = op level 2).
 create = "dreamdisplays.create"               # Default: everyone
 video = "dreamdisplays.video"                 # Default: everyone
 info = "dreamdisplays.info"                   # Default: everyone
@@ -63,10 +65,10 @@ synced = "dreamdisplays.synced"               # Default: everyone
 broadcast = "dreamdisplays.broadcast"         # Default: everyone
 watchparty = "dreamdisplays.watchparty"       # Default: everyone
 lock = "dreamdisplays.lock"                   # Default: everyone
+delete = "dreamdisplays.delete"               # Default: everyone
 list = "dreamdisplays.list"                   # Default: operator
 stats = "dreamdisplays.stats"                 # Default: operator
 premium = "dreamdisplays.premium"             # Default: operator
-delete = "dreamdisplays.delete"               # Default: everyone
 delete_others = "dreamdisplays.delete.others" # Default: operator
 reload = "dreamdisplays.reload"               # Default: operator
 updates = "dreamdisplays.updates"             # Default: operator

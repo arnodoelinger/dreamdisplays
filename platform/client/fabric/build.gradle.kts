@@ -104,6 +104,7 @@ configurations.register("mappedFabricApiElements") {
 
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
+    compileOnly(libs.luckpermsApi)
     compileOnly("io.papermc.paper:paper-api:${scVersion("paper.api.version")}")
     compileOnly("net.neoforged:neoforge:${scVersion("neoforge.version")}:universal")
     compileOnly("net.neoforged:bus:8.0.5")

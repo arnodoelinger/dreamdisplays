@@ -1,11 +1,12 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.mojang.brigadier.context.CommandContext
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -18,13 +19,13 @@ import org.bukkit.entity.Player
 
 /**
  * Handles the `/display delete` command. Used for deleting displays the player is currently looking at.
- * Used for admin-only deletion of displays.
+ * Players can delete their own displays; deleting others' requires the `delete.others` permission.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
 @PaperOnly
 class DeleteCommand : SubCommand {
     override val name = "delete"
-    override val permission = PaperServer.config.permissions.delete
+    override val permission: String? = null
     override val playerOnly = true
 
     /** Deletes the display the player is currently looking at (within 32 blocks). */
@@ -39,6 +40,13 @@ class DeleteCommand : SubCommand {
 
         val data = DisplayManager.isContains(block.location)
             ?: return MessageUtil.sendMessage(player, "noDisplay")
+
+        if (data.ownerId != player.uniqueId &&
+            !player.hasPermission(PaperServer.config.permissions.deleteOthers)
+        ) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
 
         DisplayManager.delete(data)
         MessageUtil.sendMessage(player, "displayDeleted")
@@ -65,7 +73,9 @@ object VanillaDeleteCommand {
         val data = DisplayManager.isContains(worldKey, targetPos)
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
-        if (data.ownerId != player.uuid && !VanillaDisplayActions.isOpLevel2(player)) {
+        if (data.ownerId != player.uuid &&
+            !VanillaPermissions.has(player, VanillaServerState.config.permissions.deleteOthers, VanillaPermissions.Fallback.OP)
+        ) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0
         }
