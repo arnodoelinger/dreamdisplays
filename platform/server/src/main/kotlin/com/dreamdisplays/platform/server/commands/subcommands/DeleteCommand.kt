@@ -19,13 +19,13 @@ import org.bukkit.entity.Player
 
 /**
  * Handles the `/display delete` command. Used for deleting displays the player is currently looking at.
- * Used for admin-only deletion of displays.
+ * Players can delete their own displays; deleting others' requires the `delete.others` permission.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
 @PaperOnly
 class DeleteCommand : SubCommand {
     override val name = "delete"
-    override val permission = PaperServer.config.permissions.delete
+    override val permission: String? = null
     override val playerOnly = true
 
     /** Deletes the display the player is currently looking at (within 32 blocks). */
@@ -40,6 +40,13 @@ class DeleteCommand : SubCommand {
 
         val data = DisplayManager.isContains(block.location)
             ?: return MessageUtil.sendMessage(player, "noDisplay")
+
+        if (data.ownerId != player.uniqueId &&
+            !player.hasPermission(PaperServer.config.permissions.deleteOthers)
+        ) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
 
         DisplayManager.delete(data)
         MessageUtil.sendMessage(player, "displayDeleted")

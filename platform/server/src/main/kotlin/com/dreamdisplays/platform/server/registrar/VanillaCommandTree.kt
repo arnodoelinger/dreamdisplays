@@ -50,7 +50,6 @@ object VanillaCommandTree {
 
     /** Builds the `/display delete` subcommand. */
     private fun deleteNode() = net.minecraft.commands.Commands.literal("delete")
-        .requires { requiresNode(it, { p -> p.delete }, VanillaPermissions.Fallback.OP) }
         .executes { ctx ->
             VanillaDeleteCommand.execute(ctx)
             Command.SINGLE_SUCCESS
