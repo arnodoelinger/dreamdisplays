@@ -34,6 +34,9 @@ data class ClientDisplaySettings(
 
     /** Language override for the video, or null if not overridden. */
     var langOverride: String? = null,
+
+    /** Last known playback position in nanoseconds, resumed on Local displays after a restart. */
+    var savedTimeNanos: Long = 0,
 ) {
 
     companion object {

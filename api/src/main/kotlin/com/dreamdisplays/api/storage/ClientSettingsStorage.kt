@@ -36,6 +36,9 @@ interface ClientSettingsStorage {
     /** Sets the client-side URL and language override for [displayUuid] and saves. */
     fun setUrlOverride(displayUuid: UUID, url: String?, lang: String?)
 
+    /** Sets the last known playback position for [displayUuid] and saves. */
+    fun setSavedTimeNanos(displayUuid: UUID, nanos: Long)
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     fun remove(displayUuid: UUID): Boolean
 }

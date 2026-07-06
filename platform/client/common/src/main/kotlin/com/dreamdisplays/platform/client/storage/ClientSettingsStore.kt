@@ -82,6 +82,13 @@ object ClientSettingsStore : ClientSettingsStorage {
         save()
     }
 
+    /** Sets the last known playback position for [displayUuid] and saves. */
+    override fun setSavedTimeNanos(displayUuid: UUID, nanos: Long) {
+        val s = getSettings(displayUuid)
+        s.savedTimeNanos = nanos
+        save()
+    }
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     override fun remove(displayUuid: UUID): Boolean {
         val removed = settings.remove(displayUuid) != null
