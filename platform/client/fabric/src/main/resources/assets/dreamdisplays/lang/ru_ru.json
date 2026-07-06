@@ -61,6 +61,8 @@
   "dreamdisplays.ui.error": "Ошибка дисплея",
   "dreamdisplays.ui.new": "Новый",
   "dreamdisplays.ui.likes": "лайков",
+  "dreamdisplays.ui.watching": "зрителей",
+  "dreamdisplays.ui.views_short": "просмотров",
   "dreamdisplays.button.suggestions": "Рекомендации",
   "dreamdisplays.suggestions.search": "Поиск YouTube...",
   "dreamdisplays.suggestions.loading": "Загрузка...",
