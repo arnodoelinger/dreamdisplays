@@ -290,7 +290,13 @@ class SuggestionsPanel(
             )
         }
 
-        if (info.isRecent(7)) {
+        if (info.isTwitch) {
+            val tag = Component.translatable("dreamdisplays.ui.twitch").string
+            val tw = f.width(tag) + 6
+            val tagH = f.lineHeight + 4
+            g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, UiTheme.ACCENT_TWITCH_TAG)
+            g.drawText(f, tag, thumbX + 5, thumbY + 4, UiTheme.TEXT_PRIMARY, true)
+        } else if (info.isRecent(7)) {
             val tag = Component.translatable("dreamdisplays.ui.new").string
             val tw = f.width(tag) + 6
             val tagH = f.lineHeight + 4

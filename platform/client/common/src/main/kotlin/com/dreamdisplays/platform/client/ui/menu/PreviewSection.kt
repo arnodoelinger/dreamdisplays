@@ -173,6 +173,7 @@ class PreviewSection(
         val likes: String,
         val published: String?,
         val isNew: Boolean,
+        val isTwitch: Boolean,
     )
 
     /** Resolves [OverlayInfo] for the current display URL: YouTube via [VideoMetadataCache], Twitch via [TwitchMetadataCache]. */
@@ -193,6 +194,7 @@ class PreviewSection(
                     likes = "",
                     published = meta?.gameName,
                     isNew = false,
+                    isTwitch = true,
                 )
             }
 
@@ -209,6 +211,7 @@ class PreviewSection(
                     likes = meta?.formatLikes() ?: "",
                     published = meta?.publishedText,
                     isNew = meta?.isRecent(7) == true,
+                    isTwitch = false,
                 )
             }
         }
@@ -234,7 +237,14 @@ class PreviewSection(
 
         var titleX = x + padX
         val titleY = boxY + padY
-        if (info.isNew) {
+        if (info.isTwitch) {
+            val tag = Component.translatable("dreamdisplays.ui.twitch").string
+            val tw = font.width(tag) + 6
+            g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_TWITCH_TAG)
+            g.drawText(font, tag, titleX + 3, titleY, UiTheme.TEXT_PRIMARY, false)
+            titleX += tw + 4
+            shown = UiText.trim(font, title, textW - tw - 4)
+        } else if (info.isNew) {
             val tag = Component.translatable("dreamdisplays.ui.new").string
             val tw = font.width(tag) + 6
             g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_NEW_TAG)

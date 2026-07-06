@@ -159,7 +159,8 @@ object TwitchApi {
         }
     }
 
-    private fun queryChannel(login: String): TwitchMetadata? {
+    /** Fetches channel metadata (title, viewers, live status) for [login], or null if the channel doesn't exist. */
+    fun queryChannel(login: String): TwitchMetadata? {
         val user = gql(
             """{user(login:"${escape(login)}"){displayName broadcastSettings{title} """ +
                 """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}}}"""
