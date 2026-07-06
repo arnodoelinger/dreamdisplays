@@ -37,12 +37,12 @@ On the server side, admins can install one of the following options depending on
 
 ### Client
 
-- **Ad-free YouTube video playback, so you can enjoy uninterrupted viewing**
 - **Seamless multiplayer synchronization: local, synced, and broadcast**
-- **Livestreams and premières support**
-- **Direct YouTube search and suggestions**
-- **Vertical display orientation support**
-- **Picture-in-Picture mode**
+- **Ad-free YouTube video playback, so you can enjoy uninterrupted viewing**
+- **Twitch livestreams support**
+- **Direct YouTube / Twitch search and suggestions**
+- Vertical display orientation support
+- Picture-in-Picture mode
 - Adjustable resolutions from 144p up to 4K
 - Volume control from 0% to 200%
 - Brightness control from 0% to 100%
@@ -60,11 +60,12 @@ On the server side, admins can install one of the following options depending on
 - **Fabric server support (1:1 as Paper)**
 - Display commands — manage your in-game screens: create, delete, etc.
 - Fine-grained permissions for admin-only control
+- Full [LuckPerms](https://luckperms.net/) support
 
 ## How to use this mod?
 
 Set up a display using black concrete, select it with a diamond axe, and type `/display create`. After the display is
-created, type `/display video <link to YouTube video> [language]`
+created, type `/display video <video link> [language]`
 
 Done! To customize the display, look at it and press `Shift + RMB`
 
