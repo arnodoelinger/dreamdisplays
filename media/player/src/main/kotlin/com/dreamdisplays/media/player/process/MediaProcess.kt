@@ -94,6 +94,25 @@ object MediaProcess {
     }
 
     /**
+     * Builds an `FFmpeg` process that decodes audio from MPEG-TS piped into its stdin (see
+     * `HlsAudioFeeder`), resampled to [sampleRate] Hz. No network flags: the process never opens a
+     * connection itself, which sidesteps the bundled binary's flaky TLS on live HLS hosts.
+     *
+     * @throws IOException if the process fails to start. The caller is responsible for destroying it.
+     */
+    @Throws(IOException::class)
+    fun buildAudioPiped(ffmpeg: String, sampleRate: Int): Process {
+        val cmd = listOf(
+            ffmpeg,
+            "-hide_banner", "-loglevel", "error", "-nostats",
+            "-probesize", "1M", "-analyzeduration", "1000000",
+            "-f", "mpegts", "-i", "pipe:0",
+            "-vn", "-f", "s16le", "-ar", sampleRate.toString(), "-ac", "2", "-",
+        )
+        return ProcessBuilder(cmd).start()
+    }
+
+    /**
      * Closes the process's output stream and destroys it. Waits up to 1 second for graceful termination, then forcibly destroys if needed.
      * Safe to call multiple times or from any thread. Does nothing if [proc] is null.
      */

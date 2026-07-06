@@ -209,8 +209,7 @@ class SuggestionsPanel(
                         mouseY >= max(cardY, stripTop) && mouseY < min(cardY + ch, stripBottom)
                 if (hover) hoveredCard = i
                 drawCard(g, f, info, cardX, cardY, cw, th, ch, hover)
-                if (Thumbnails.get(info.id, Thumbnails.Quality.LOW) == null)
-                    Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+                if (cardThumbnail(info) == null) requestCardThumbnail(info)
             }
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
@@ -246,6 +245,22 @@ class SuggestionsPanel(
         }
     }
 
+    /**
+     * The registered card thumbnail for [info]. Results carrying a [MediaSearchResult.thumbnailUrlOverride]
+     * (e.g. Twitch) were registered under the raw id via the direct-URL path, so they're read from that
+     * same slot ([Thumbnails.get] defaults to the raw-key HIGH tier); YouTube ids use the id-derived LOW tier.
+     */
+    private fun cardThumbnail(info: MediaSearchResult) =
+        if (info.thumbnailUrlOverride != null) Thumbnails.get(info.id)
+        else Thumbnails.get(info.id, Thumbnails.Quality.LOW)
+
+    /** Requests [info]'s card thumbnail via the path matching [cardThumbnail]'s key, if not already loaded. */
+    private fun requestCardThumbnail(info: MediaSearchResult) {
+        val url = info.thumbnailUrlOverride
+        if (url != null) Thumbnails.request(info.id, url)
+        else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+    }
+
     /** Draws one result card: hover-pulsing background, thumbnail, NEW/duration tags, title, and meta. */
     private fun drawCard(
         g: GuiGraphicsCompat, f: Font, info: MediaSearchResult,
@@ -264,7 +279,7 @@ class SuggestionsPanel(
         val thumbX = x
         val thumbY = y
         val thumbW = w
-        val thumb = Thumbnails.get(info.id, Thumbnails.Quality.LOW)
+        val thumb = cardThumbnail(info)
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
         } else {
@@ -275,7 +290,13 @@ class SuggestionsPanel(
             )
         }
 
-        if (info.isRecent(7)) {
+        if (info.isTwitch) {
+            val tag = Component.translatable("dreamdisplays.ui.twitch").string
+            val tw = f.width(tag) + 6
+            val tagH = f.lineHeight + 4
+            g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, UiTheme.ACCENT_TWITCH_TAG)
+            g.drawText(f, tag, thumbX + 5, thumbY + 4, UiTheme.TEXT_PRIMARY, true)
+        } else if (info.isRecent(7)) {
             val tag = Component.translatable("dreamdisplays.ui.new").string
             val tw = f.width(tag) + 6
             val tagH = f.lineHeight + 4

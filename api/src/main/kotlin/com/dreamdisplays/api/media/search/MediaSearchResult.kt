@@ -9,24 +9,48 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
  */
 @DreamDisplaysUnstableApi
 data class MediaSearchResult(
+    /** Result ID. */
     val id: String,
+
+    /** Video title. */
     val title: String,
+
+    /** Uploader. */
     val uploader: String?,
+
+    /** Video duration. */
     val durationSec: Long?,
+
+    /** View count of video. */
     val viewCount: Long?,
+
+    /** Like count of video. */
     val likeCount: Long? = null,
+
+    /** Published (date format) */
     val publishedText: String? = null,
+
+    /** Published (days format). */
     val publishedDaysAgo: Int? = null,
+
+    /** Overrides [getWatchUrl] for non-YouTube results (e.g. Twitch), which have no derivable watch URL. */
+    val watchUrlOverride: String? = null,
+
+    /** Overrides [getThumbnailUrl] for non-YouTube results, which have no derivable thumbnail URL. */
+    val thumbnailUrlOverride: String? = null,
+
+    /** True when this result comes from Twitch, so the UI can show a "Twitch" tag instead of/alongside "New". */
+    val isTwitch: Boolean = false,
 ) {
     /** Returns true if the video was published within the last [daysWindow] days. */
     fun isRecent(daysWindow: Int): Boolean =
         publishedDaysAgo != null && publishedDaysAgo >= 0 && publishedDaysAgo <= daysWindow
 
-    /** Returns the YouTube watch URL for this video. */
-    fun getWatchUrl(): String = YouTubeUrls.watchUrl(id)
+    /** Returns [watchUrlOverride] if set, else the YouTube watch URL for this video. */
+    fun getWatchUrl(): String = watchUrlOverride ?: YouTubeUrls.watchUrl(id)
 
-    /** Returns the YouTube thumbnail URL for this video. */
-    fun getThumbnailUrl(): String = YouTubeUrls.thumbnailUrl(id)
+    /** Returns [thumbnailUrlOverride] if set, else the YouTube thumbnail URL for this video. */
+    fun getThumbnailUrl(): String? = thumbnailUrlOverride ?: YouTubeUrls.thumbnailUrl(id)
 
     /** Returns a formatted HH:MM:SS duration string, or empty if unavailable. */
     fun formatDuration(): String {

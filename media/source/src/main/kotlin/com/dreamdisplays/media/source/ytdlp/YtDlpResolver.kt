@@ -13,17 +13,17 @@ import kotlin.time.Duration.Companion.nanoseconds
  * only reaches it after the in-process fast path has declined or failed.
  *
  * Unlike [NewPipeResolver], this path can resolve any HTTP(S) URL `yt-dlp`'s extractors understand,
- * not just YouTube. It does not surface rich metadata (title, uploader, thumbnails) since
- * [YtDlp.fetch] only returns playable stream descriptors; only duration and live/seekable flags
- * carried on the streams are reported.
+ * not just YouTube. `yt-dlp`'s generic info-dict schema exposes title / uploader / thumbnail / view
+ * count for every extractor (Twitch included), so those are carried on the streams and surfaced here
+ * too, not just duration and live / seekable flags.
  */
 object YtDlpResolver : MediaResolver {
 
     /** Below [NewPipeResolver] (10) so the in-process path is always tried first. */
     override val priority: Int = 0
 
-    /** Twitch is unsupported by this pipeline; everything else is delegated to `yt-dlp`. */
-    override fun canResolve(source: MediaSource): Boolean = source !is MediaSource.Twitch
+    /** Any source with a resolvable URL is delegated to `yt-dlp`. */
+    override fun canResolve(source: MediaSource): Boolean = true
 
     /** Pre-warms the yt-dlp format cache for [source] on a background thread. */
     override fun prefetch(source: MediaSource) {
@@ -37,13 +37,18 @@ object YtDlpResolver : MediaResolver {
      */
     override fun resolve(source: MediaSource): ResolvedMedia {
         val url = source.toResolvableUrl()
-            ?: throw UnsupportedOperationException("Twitch not supported by YtDlpResolver")
+            ?: throw UnsupportedOperationException("$source has no resolvable URL.")
         val streams = YtDlp.fetch(url)
-        check(streams.isNotEmpty()) { "yt-dlp returned no playable streams for $url" }
+        check(streams.isNotEmpty()) { "yt-dlp returned no playable streams for $url." }
 
         val isLive = streams.any { it.isLive }
         val durationNanos = streams.firstOrNull { it.durationNanos > 0L }?.durationNanos ?: 0L
+        val first = streams.first()
         val metadata = MediaMetadata.UNKNOWN.copy(
+            title = first.title,
+            uploader = first.uploaderName,
+            thumbnailUrl = first.thumbnailUrl,
+            viewCount = first.viewCount,
             duration = durationNanos.takeIf { it > 0L }?.nanoseconds,
         )
         return ResolvedMedia(

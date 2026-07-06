@@ -40,6 +40,13 @@ internal class NativeVideoFramePipe(
         private const val LAV_PTS_ORIGIN_TOLERANCE_NS = 10_000_000_000L
         private const val LAV_PREROLL_MARGIN_NS = 50_000_000L
 
+        /**
+         * A raw LAV PTS step larger than this (either direction) between consecutive frames is a
+         * mid-stream discontinuity — a Twitch ad-break splice resets the PTS base — not normal frame
+         * progression, so the pipe re-anchors the origin bias on it instead of dropping every frame.
+         */
+        private const val LAV_PTS_DISCONTINUITY_NS = 1_000_000_000L
+
         // Rolling packet cache, enabled by default: ~60 s of recent stream. Serves in-window seeks
         // network-free (instant backward scrubbing) and lets a returning display replay locally
         // while the live source re-resolves. Capped by bytes, so the window costs no extra memory
@@ -113,6 +120,15 @@ internal class NativeVideoFramePipe(
         @Volatile var applied = false
         @Volatile var failed = false
     }
+
+    /**
+     * Raw (unbiased) LAV PTS of the first frame of the current session / in-place seek, in nanos,
+     * or [Long.MIN_VALUE] until known. For a shared-segmenter HLS source (Twitch) this is the
+     * stream-clock position the video joined at; paired with the audio feeder's first PES PTS it
+     * gives the exact A/V content offset for pacing.
+     */
+    @Volatile
+    var firstRawPtsNanos: Long = Long.MIN_VALUE; private set
 
     @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
     private val lavSeekMonitor = java.lang.Object()
@@ -369,6 +385,7 @@ internal class NativeVideoFramePipe(
         var currentSeekOffsetNanos = seekOffsetNanos
         var currentOnFirstFrame = onFirstFrame
         var lavPtsBiasNanos: Long? = null
+        var prevRawLavPtsNanos: Long? = null
         var rc = NativeMedia.READ_OK
         var passFirstFrameAfterSeek = true
 
@@ -412,6 +429,8 @@ internal class NativeVideoFramePipe(
             currentOnFirstFrame = seek.onFirstFrame
             videoPts = seek.offsetNanos
             lavPtsBiasNanos = null
+            prevRawLavPtsNanos = null
+            firstRawPtsNanos = Long.MIN_VALUE
             firstFrame = false
             passFirstFrameAfterSeek = true
             lastFrameReceivedNanos.set(System.nanoTime())
@@ -495,8 +514,9 @@ internal class NativeVideoFramePipe(
             lastFrameReceivedNanos.set(System.nanoTime())
 
             val hasLavPts = lav && rawLavPtsNanos != NativeMedia.LAV_NO_PTS_NANOS
+            if (hasLavPts && firstRawPtsNanos == Long.MIN_VALUE) firstRawPtsNanos = rawLavPtsNanos
             val framePts = if (hasLavPts) {
-                val bias = lavPtsBiasNanos ?: run {
+                var bias = lavPtsBiasNanos ?: run {
                     val delta = currentSeekOffsetNanos - rawLavPtsNanos
                     val computed = if (delta > LAV_PTS_ORIGIN_TOLERANCE_NS || delta < -LAV_PTS_ORIGIN_TOLERANCE_NS) {
                         delta
@@ -513,6 +533,21 @@ internal class NativeVideoFramePipe(
                     }
                     computed
                 }
+                val prev = prevRawLavPtsNanos
+                if (prev != null) {
+                    val rawStep = rawLavPtsNanos - prev
+                    if (rawStep > LAV_PTS_DISCONTINUITY_NS || rawStep < -LAV_PTS_DISCONTINUITY_NS) {
+                        bias = videoPts - rawLavPtsNanos
+                        lavPtsBiasNanos = bias
+                        if (MediaPlayer.DEBUG) {
+                            logger.debug(
+                                "$debugLabel LAV PTS discontinuity (rawStep=${"%.1f".format(rawStep / 1_000_000.0)} ms); " +
+                                        "re-anchored video to ${"%.1f".format(videoPts / 1_000_000.0)} ms.",
+                            )
+                        }
+                    }
+                }
+                prevRawLavPtsNanos = rawLavPtsNanos
                 rawLavPtsNanos + bias
             } else {
                 videoPts

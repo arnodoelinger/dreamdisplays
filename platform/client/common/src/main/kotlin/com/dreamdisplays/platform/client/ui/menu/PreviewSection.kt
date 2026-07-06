@@ -19,7 +19,9 @@ import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.platform.client.render.Thumbnails
+import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import com.mojang.blaze3d.platform.NativeImage
@@ -163,15 +165,64 @@ class PreviewSection(
         )
     }
 
-    /** Draws the dark strip with the video title (+NEW tag) and channel/views/likes/date metadata. */
+    /** Generic overlay text resolved for the current display URL, regardless of provider. */
+    private data class OverlayInfo(
+        val title: String?,
+        val uploader: String?,
+        val views: String,
+        val likes: String,
+        val published: String?,
+        val isNew: Boolean,
+        val isTwitch: Boolean,
+    )
+
+    /** Resolves [OverlayInfo] for the current display URL: YouTube via [VideoMetadataCache], Twitch via [TwitchMetadataCache]. */
+    private fun overlayInfo(): OverlayInfo {
+        when (val source = currentSource()) {
+            is MediaSource.Twitch -> {
+                val key = TwitchMetadataCache.cacheKey(source)
+                val meta = key?.let { TwitchMetadataCache.get(it) }
+                if (meta == null) TwitchMetadataCache.requestAsync(source)
+                return OverlayInfo(
+                    title = meta?.title,
+                    uploader = meta?.channelName,
+                    views = meta?.viewCount?.let {
+                        formatCompactCount(it) + " " + Component.translatable(
+                            if (meta.isLive) "dreamdisplays.ui.watching" else "dreamdisplays.ui.views_short"
+                        ).string
+                    } ?: "",
+                    likes = "",
+                    published = meta?.gameName,
+                    isNew = false,
+                    isTwitch = true,
+                )
+            }
+
+            else -> {
+                val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(ds.videoUrl ?: "")
+                val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
+                if (videoId != null && meta == null) VideoMetadataCache.requestAsync(videoId)
+                var title = meta?.title
+                if (title.isNullOrEmpty() && videoId != null) title = VideoTitleCache.get(videoId)
+                return OverlayInfo(
+                    title = title,
+                    uploader = meta?.uploader,
+                    views = meta?.formatViews() ?: "",
+                    likes = meta?.formatLikes() ?: "",
+                    published = meta?.publishedText,
+                    isNew = meta?.isRecent(7) == true,
+                    isTwitch = false,
+                )
+            }
+        }
+    }
+
+    /** Draws the dark strip with the video title (+NEW tag) and channel / views / likes / date metadata. */
     private fun drawTitleOverlay(g: GuiGraphicsCompat, x: Int, y: Int, w: Int) {
         val font = Minecraft.getInstance().font
-        val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(ds.videoUrl ?: "")
-        val meta = if (videoId != null) VideoMetadataCache.get(videoId) else null
-        if (videoId != null && meta == null) VideoMetadataCache.requestAsync(videoId)
+        val info = overlayInfo()
 
-        var title: String? = meta?.title
-        if (title.isNullOrEmpty() && videoId != null) title = VideoTitleCache.get(videoId)
+        var title = info.title
         if (title.isNullOrEmpty()) title = ds.videoUrl
         if (title == null) title = "—"
 
@@ -186,7 +237,14 @@ class PreviewSection(
 
         var titleX = x + padX
         val titleY = boxY + padY
-        if (meta?.isRecent(7) == true) {
+        if (info.isTwitch) {
+            val tag = Component.translatable("dreamdisplays.ui.twitch").string
+            val tw = font.width(tag) + 6
+            g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_TWITCH_TAG)
+            g.drawText(font, tag, titleX + 3, titleY, UiTheme.TEXT_PRIMARY, false)
+            titleX += tw + 4
+            shown = UiText.trim(font, title, textW - tw - 4)
+        } else if (info.isNew) {
             val tag = Component.translatable("dreamdisplays.ui.new").string
             val tw = font.width(tag) + 6
             g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_NEW_TAG)
@@ -197,22 +255,18 @@ class PreviewSection(
         g.drawText(font, shown, titleX, titleY, UiTheme.TEXT_PRIMARY, false)
 
         val parts = StringBuilder()
-        val channel = meta?.uploader
-        val views = meta?.formatViews() ?: ""
-        val likes = meta?.formatLikes() ?: ""
-        val published = meta?.publishedText
-        if (!channel.isNullOrEmpty()) parts.append(channel)
-        if (views.isNotEmpty()) {
+        if (!info.uploader.isNullOrEmpty()) parts.append(info.uploader)
+        if (info.views.isNotEmpty()) {
             if (parts.isNotEmpty()) parts.append(" • ")
-            parts.append(views)
+            parts.append(info.views)
         }
-        if (likes.isNotEmpty()) {
+        if (info.likes.isNotEmpty()) {
             if (parts.isNotEmpty()) parts.append(" • ")
-            parts.append(likes).append(" ").append(Component.translatable("dreamdisplays.ui.likes").string)
+            parts.append(info.likes).append(" ").append(Component.translatable("dreamdisplays.ui.likes").string)
         }
-        if (!published.isNullOrEmpty()) {
+        if (!info.published.isNullOrEmpty()) {
             if (parts.isNotEmpty()) parts.append(" • ")
-            parts.append(published)
+            parts.append(info.published)
         }
         g.drawText(
             font, UiText.trim(font, parts.toString(), textW),
@@ -220,19 +274,49 @@ class PreviewSection(
         )
     }
 
-    /** Video ID of the currently loaded URL, or null when there's none or it isn't a YouTube link. */
-    private fun currentVideoId(): String? {
-        val url = ds.videoUrl ?: return null
-        return DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(url)
+    /** Formats [v] compactly (e.g. "1.2M"), or its plain value below 1000. */
+    private fun formatCompactCount(v: Long): String = when {
+        v >= 1_000_000_000L -> String.format("%.1fB", v / 1_000_000_000.0)
+        v >= 1_000_000L -> String.format("%.1fM", v / 1_000_000.0)
+        v >= 1_000L -> String.format("%.1fK", v / 1_000.0)
+        else -> v.toString()
+    }
+
+    /** The [MediaSource] for the display's current URL, or null when there's none set. */
+    private fun currentSource(): MediaSource? = ds.videoUrl?.takeIf { it.isNotEmpty() }?.let { MediaSource.from(it) }
+
+    /** Cache key for the current source's thumbnail/metadata: a YouTube video id, or a Twitch composite key. */
+    private fun currentThumbnailKey(): String? = when (val source = currentSource()) {
+        is MediaSource.Twitch -> TwitchMetadataCache.cacheKey(source)
+        is MediaSource.YouTube -> source.videoId
+        else -> null
+    }
+
+    /** Requests the thumbnail download for the current source once its metadata (and thumbnail URL) is ready. */
+    private fun requestCurrentThumbnail() {
+        when (val source = currentSource()) {
+            is MediaSource.Twitch -> {
+                val key = TwitchMetadataCache.cacheKey(source) ?: return
+                val meta = TwitchMetadataCache.get(key)
+                if (meta == null) {
+                    TwitchMetadataCache.requestAsync(source)
+                    return
+                }
+                meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
+            }
+
+            is MediaSource.YouTube -> Thumbnails.request(source.videoId)
+            else -> {}
+        }
     }
 
     /** Ambient letterbox tint: the current thumbnail's average color, darkened, or a neutral fallback. */
     private fun ambientColor(): Int {
-        val id = currentVideoId() ?: return UiTheme.AMBIENT_DEFAULT
+        val id = currentThumbnailKey() ?: return UiTheme.AMBIENT_DEFAULT
         val avg = Thumbnails.averageColor(id) ?: run {
             // Warm the thumbnail even while the video plays, so the tint appears once it decodes
             // (request de-dups, so calling it per frame is cheap).
-            Thumbnails.request(id)
+            requestCurrentThumbnail()
             return UiTheme.AMBIENT_DEFAULT
         }
         // Slowly drift the tint over time...
@@ -246,9 +330,9 @@ class PreviewSection(
 
     /** Returns the cached thumbnail for the current video, requesting it asynchronously if absent. */
     private fun currentThumbnail(): Identifier? {
-        val id = currentVideoId() ?: return null
+        val id = currentThumbnailKey() ?: return null
         Thumbnails.get(id)?.let { return it }
-        Thumbnails.request(id)
+        requestCurrentThumbnail()
         return null
     }
 

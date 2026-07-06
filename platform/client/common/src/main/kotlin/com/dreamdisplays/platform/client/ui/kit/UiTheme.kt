@@ -49,5 +49,6 @@ object UiTheme {
     const val TEXT_META = 0xFFB8B8B8.toInt()
     const val TEXT_DIM = 0xFFCCCCCC.toInt()
     const val ACCENT_NEW_TAG = 0xFFE53935.toInt()
+    const val ACCENT_TWITCH_TAG = 0xFF9146FF.toInt()
     const val OVERLAY_SCRIM = 0xC0000000.toInt()
 }

@@ -14,16 +14,26 @@ import javax.sound.sampled.*
 
 /** Manages the `javax.sound` PCM pipeline for one `FFmpeg` audio process. */
 internal class AudioSink(private val debugLabel: String) {
+    /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/AudioSink")
 
     companion object {
+        /** The PCM sample rate used by every session: 44.1 kHz, stereo, signed 16-bit little-endian. */
         const val SAMPLE_RATE = 44100
 
         /** Stereo 16-bit PCM: 4 bytes per frame. One second is SAMPLE_RATE * BYTES_PER_FRAME bytes. */
         const val BYTES_PER_FRAME = 4
+
+        /** Chunk size for each read from the audio process and each write to the line. 1 / 20 s of stereo 16-bit PCM */
         private const val CHUNK_BYTES = SAMPLE_RATE * 2 * 2 / 20
+
+        /** Line buffer size for the PCM line: 10 chunks, ~0.5 s of stereo 16-bit PCM. */
         private const val LINE_BUFFER_BYTES = CHUNK_BYTES * 10
+
+        /** Number of times to retry opening the audio line if it is temporarily unavailable. */
         private const val OPEN_RETRIES = 3
+
+        /** Retry delay between line-open attempts, multiplied by the attempt number (1..OPEN_RETRIES). */
         private const val RETRY_DELAY_MS = 200L
 
         /** ~30 s of stereo 16-bit PCM kept for the reappearance audio bridge. */
@@ -40,15 +50,33 @@ internal class AudioSink(private val debugLabel: String) {
      * sync. The cached prelude played ahead of the live PCM on a bridge line is subtracted so the clock
      * mapping (anchored at the live edge by `rebaseTo`) stays continuous across the cached -> live seam, and
      * video pacing keeps using the wall clock while the prelude is still playing.
+     *
+     * Stays -1 until live PCM has actually been read from the process ([pcmFlowing]): an open, started
+     * line with nothing written reports frame position 0, which is a valid clock value — pacing would
+     * freeze the whole video on it while the audio process is still connecting (or never delivers, as
+     * happens with slow live HLS audio), dropping every frame after the max pacing wait.
      */
     val framePosition: Long
         get() {
             val ln = line ?: return -1L
-            if (!exposeLiveClock) return -1L
+            if (!exposeLiveClock || !pcmFlowing) return -1L
             val live = ln.longFramePosition - preludeFrames
             return if (live < 0L) -1L else live
         }
 
+    /**
+     * Monotonic counter bumped on every [start] / [startBridge], so clock consumers can tell a fresh
+     * audio session (whose line position restarts at 0) from the one they last anchored against.
+     */
+    @Volatile
+    var sessionEpoch = 0
+        private set
+
+    /** True once the current session has read at least one live PCM chunk from its process. */
+    @Volatile
+    private var pcmFlowing = false
+
+    /** Source line for the current session, or null when no line is open. */
     @Volatile
     private var line: SourceDataLine? = null
 
@@ -144,7 +172,7 @@ internal class AudioSink(private val debugLabel: String) {
     /**
      * Starts the audio reading / writing loop.
      * @param onUnexpectedEnd called with the accumulated ffmpeg stderr if the audio process ends on its
-     *   own (crash, broken pipe, EOF) rather than via [stop] — never called for a deliberate teardown.
+     * own (crash, broken pipe, EOF) rather than via [stop] — never called for a deliberate teardown.
      */
     fun start(
         proc: Process,
@@ -156,6 +184,8 @@ internal class AudioSink(private val debugLabel: String) {
         preludeFrames = 0L
         liveGate = null
         exposeLiveClock = true
+        pcmFlowing = false
+        sessionEpoch++
         drainStderr(proc, stopFlag)
         return daemon({ run(proc, terminated, stopFlag, startGate, onUnexpectedEnd) }, "MediaPlayer-audio").also { it.start() }
     }
@@ -177,6 +207,8 @@ internal class AudioSink(private val debugLabel: String) {
         liveProc = null
         liveGate = CountDownLatch(1)
         exposeLiveClock = false
+        pcmFlowing = false
+        sessionEpoch++
         return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
     }
 
@@ -373,17 +405,21 @@ internal class AudioSink(private val debugLabel: String) {
             if (parkIfRequested(ln, terminated, stopFlag)) break
             val n = MediaUtil.readFull(input, chunk, CHUNK_BYTES)
             if (n <= 0) {
+                // A deliberate teardown destroys the process mid-read; that EOF is expected and not
+                // worth a warning (during a session-restart loop it reads as a phantom audio crash).
+                if (terminated.get() || stopFlag.get()) break
                 if (firstChunk) {
                     logger.warn("$debugLabel [audio] no PCM data from ffmpeg (EOF on first read).")
-                } else if (!terminated.get() && !stopFlag.get()) {
+                } else {
                     val seconds = totalBytes / (SAMPLE_RATE * BYTES_PER_FRAME).toDouble()
-                    logger.warn("$debugLabel [audio] PCM stream ended after ${"%.1f".format(seconds)}s.")
+                    logger.warn("$debugLabel [audio] PCM stream ended after ${"%.1f".format(seconds)} s.")
                 }
                 break
             }
             totalBytes += n
             if (firstChunk) {
                 logger.debug("$debugLabel [audio] first PCM chunk received ($n bytes)."); firstChunk = false
+                pcmFlowing = true
             }
             ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
             MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
@@ -399,7 +435,7 @@ internal class AudioSink(private val debugLabel: String) {
     private fun parkIfRequested(ln: SourceDataLine, terminated: AtomicBoolean, stopFlag: AtomicBoolean): Boolean {
         val pk = parked ?: return false
         if (!pk.get()) return false
-        runCatching { ln.stop() } // pause playback, keep the buffered tail and the line open
+        runCatching { ln.stop() } // Pause playback, keep the buffered tail and the line open
         while (pk.get() && !terminated.get() && !stopFlag.get()) {
             try {
                 Thread.sleep(20)
@@ -408,7 +444,7 @@ internal class AudioSink(private val debugLabel: String) {
             }
         }
         if (terminated.get() || stopFlag.get()) return true
-        runCatching { ln.start() } // resume from exactly where it paused (frame position is continuous)
+        runCatching { ln.start() } // Resume from exactly where it paused (frame position is continuous)
         return false
     }
 
