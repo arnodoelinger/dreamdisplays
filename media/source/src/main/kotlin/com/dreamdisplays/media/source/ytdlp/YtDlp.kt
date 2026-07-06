@@ -6,6 +6,8 @@ import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.media.runtime.Processes
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
@@ -65,6 +67,13 @@ object YtDlp {
     private val cookies = YtCookieManager()
 
     private val formatMemo = AsyncMemo<String, List<YtStream>>(200, CACHE_TTL_MS, DreamCoroutines.clientIo, "fetch")
+
+    /**
+     * When each URL's streams were resolved (or disk-promoted), so live entries — whose playlist
+     * URLs carry expiring tokens — can be refreshed after [FormatDiskCache.LIVE_TTL_MS] instead of
+     * sitting in [formatMemo] for the full 5h TTL.
+     */
+    private val fetchedAtMs: Cache<String, Long> = Caffeine.newBuilder().maximumSize(300).build()
     private val searchMemo =
         AsyncMemo<String, List<MediaSearchResult>>(100, INFO_CACHE_TTL_MS, DreamCoroutines.clientIo, "search")
     private val relatedMemo =
@@ -81,12 +90,27 @@ object YtDlp {
             return emptyList()
         }
 
-        val streams = loadFromDisk(videoUrl) ?: formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
+        var streams = loadFromDisk(videoUrl) ?: formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
+        if (isStaleLive(videoUrl, streams)) {
+            invalidateCache(videoUrl)
+            streams = formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
+        }
         if (streams.isNotEmpty() && !offersFullResult(streams)) {
             formatMemo.invalidate(videoUrl)
             FormatDiskCache.deleteEntry(videoUrl)
         }
         return streams
+    }
+
+    /**
+     * Whether a cached live result for [videoUrl] has outlived [FormatDiskCache.LIVE_TTL_MS]: live
+     * playlist URLs carry expiring tokens (Twitch usher, YouTube live manifests), so serving one
+     * from the 5h memo hands the player a dead URL.
+     */
+    private fun isStaleLive(videoUrl: String, streams: List<YtStream>): Boolean {
+        if (streams.none { it.isLive }) return false
+        val at = fetchedAtMs.getIfPresent(videoUrl) ?: return true
+        return System.currentTimeMillis() - at > FormatDiskCache.LIVE_TTL_MS
     }
 
     /**
@@ -114,8 +138,9 @@ object YtDlp {
     fun prefetchFormats(videoUrl: String) {
         if (videoUrl.isBlank()) return
         if (!MediaUrlPolicy.isAllowed(videoUrl)) return
-        if (formatMemo.peekFresh(videoUrl) != null) return
-        if (loadFromDisk(videoUrl) != null) return
+        val cached = formatMemo.peekFresh(videoUrl) ?: loadFromDisk(videoUrl)
+        if (cached != null && !isStaleLive(videoUrl, cached)) return
+        if (cached != null) invalidateCache(videoUrl)
         formatMemo.load(videoUrl) { fetchAndPersist(it) }
     }
 
@@ -125,6 +150,7 @@ object YtDlp {
         val fromDisk = FormatDiskCache.load(videoUrl, CACHE_TTL_MS)?.takeIf { it.isNotEmpty() } ?: return null
         val immutable = fromDisk.toList()
         formatMemo.put(videoUrl, immutable)
+        fetchedAtMs.put(videoUrl, System.currentTimeMillis())
         return immutable
     }
 
@@ -132,6 +158,7 @@ object YtDlp {
     @Throws(IOException::class)
     private suspend fun fetchAndPersist(videoUrl: String): List<YtStream> {
         val streams = fetchUncached(videoUrl).toList()
+        fetchedAtMs.put(videoUrl, System.currentTimeMillis())
         if (streams.isNotEmpty() && offersFullResult(streams)) FormatDiskCache.saveAsync(videoUrl, streams)
         return streams
     }
@@ -172,6 +199,7 @@ object YtDlp {
     /** Removes [videoUrl] from the in-memory format cache, in-flight map, and disk cache. */
     fun invalidateCache(videoUrl: String) {
         formatMemo.invalidate(videoUrl)
+        fetchedAtMs.invalidate(videoUrl)
         FormatDiskCache.deleteEntry(videoUrl)
     }
 

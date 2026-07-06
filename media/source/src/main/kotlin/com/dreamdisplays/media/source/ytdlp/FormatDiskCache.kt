@@ -28,7 +28,14 @@ object FormatDiskCache {
 
     /** Shared 5h format-cache TTL: the on-disk default and [YtDlp]'s in-memory format TTL. */
     const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
-    private const val SCHEMA_VERSION = 3
+
+    /**
+     * Short TTL for live entries: live playlist URLs carry expiring tokens (Twitch usher, YouTube
+     * live manifests), so a stale entry hands the player a dead URL instead of a stream.
+     */
+    const val LIVE_TTL_MS = 5L * 60L * 1_000L
+
+    private const val SCHEMA_VERSION = 4
 
     /** Serialises write/delete coroutines so same-file ops keep their submission order (the single-writer
      *  guarantee the old dedicated writer thread gave). */
@@ -52,7 +59,9 @@ object FormatDiskCache {
                 f.delete()
                 return null
             }
-            if (System.currentTimeMillis() - entry.ts > maxAgeMs) {
+            val effectiveMaxAge =
+                if (entry.streams.any { it.isLive }) minOf(maxAgeMs, LIVE_TTL_MS) else maxAgeMs
+            if (System.currentTimeMillis() - entry.ts > effectiveMaxAge) {
                 f.delete()
                 return null
             }

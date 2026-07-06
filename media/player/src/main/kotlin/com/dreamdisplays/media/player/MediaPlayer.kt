@@ -78,6 +78,10 @@ class MediaPlayer(
         /** Max fetch retries. */
         private const val MAX_FETCH_RETRIES = 3
 
+        /** In-place audio-half restarts allowed per session before a dead live audio escalates to a full
+         *  stall recovery (see [handleAudioFailure]). */
+        private const val MAX_AUDIO_RESTARTS = 3
+
         /** Hwaccel failures show up within the first few seconds, past this window assume the stream is just unreliable. */
         private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
 
@@ -162,6 +166,9 @@ class MediaPlayer(
     @Volatile
     private var lastStallNanos = 0L
 
+    /** In-place audio restarts used by the current session (see [handleAudioFailure]); reset per session. */
+    private val audioRestartAttempts = AtomicInteger(0)
+
     // Watchdog is created before sessionManager but its lambdas reference sessionManager lazily
     private val watchdog = StreamWatchdog(
         debugLabel = debugLabel,
@@ -201,6 +208,14 @@ class MediaPlayer(
     private var durationHintNanos = 0L
     @Volatile
     private var lastQuality = 0
+
+    /**
+     * The last quality target a [changeQuality] call acted on; 0 = none yet. Guards against the
+     * periodic quality refresher re-triggering a switch whose request the selector couldn't satisfy
+     * exactly (see [changeQuality]).
+     */
+    @Volatile
+    private var lastRequestedQuality = 0
     @Volatile
     private var brightness = 1.0
     @Volatile
@@ -514,7 +529,8 @@ class MediaPlayer(
         // (which expects new dimensions) would never match and must be dropped to avoid a frozen frame.
         host.cancelQualityHandoff()
         sessionStartNanos = System.nanoTime()
-        sessionManager.start(streamSet, offsetNanos, lastQuality, currentHwAccel())
+        audioRestartAttempts.set(0)
+        sessionManager.start(streamSet, offsetNanos, lastQuality, currentHwAccel(), live = liveStream)
         if (sessionManager.isPlaying) {
             state.set(PlaybackState.PLAYING)
             watchdog.start()
@@ -677,10 +693,34 @@ class MediaPlayer(
      * Filters an audio-pipe-ended notification before treating it as a stall: within
      * [AUDIO_EOS_NEAR_END_GUARD_NS] of a known VOD duration, the audio side finishing first is expected
      * (see [AUDIO_EOS_NEAR_END_GUARD_NS]), so it's left to the video side's own normal-EOS handling.
+     *
+     * On a live stream the audio process dying (or never delivering PCM — live HLS audio regularly
+     * takes several attempts to come up) is recovered by restarting just the audio half in place,
+     * up to [MAX_AUDIO_RESTARTS] times per session: the video channel is healthy and keeps rendering
+     * on the wall clock meanwhile, so tearing the whole session down and re-resolving — the previous
+     * behavior — only produced an endless blank-and-restart loop. Only when in-place restarts are
+     * exhausted (or impossible) does this escalate to the full stall recovery.
      */
     private fun handleAudioFailure(stderr: String) {
         if (!liveStream && durationHintNanos > 0L && durationHintNanos - clock.currentTime() <= AUDIO_EOS_NEAR_END_GUARD_NS) {
             logger.debug("$debugLabel Audio pipe ended near VOD end (pos=${clock.currentTime()}, dur=$durationHintNanos); deferring to video EOS.")
+            return
+        }
+        val attempt = audioRestartAttempts.incrementAndGet()
+        if (liveStream && sessionManager.isPlaying && attempt <= MAX_AUDIO_RESTARTS) {
+            logger.warn(
+                "$debugLabel Live audio ended (${MediaUtil.truncate(stderr)}); " +
+                        "restarting audio only ($attempt/$MAX_AUDIO_RESTARTS), video keeps playing."
+            )
+            RETRY_SCHEDULER.schedule({
+                safeExecute {
+                    val ss = streams
+                    if (terminated.get() || ss == null) return@safeExecute
+                    if (!sessionManager.restartAudio(ss, 0L)) {
+                        handleSessionStall("audio restart not possible in current session state")
+                    }
+                }
+            }, attempt * 1_000L, TimeUnit.MILLISECONDS)
             return
         }
         handleSessionStall("audio ended: ${MediaUtil.truncate(stderr)}.")
@@ -688,10 +728,14 @@ class MediaPlayer(
 
     /**
      * Recovers from a session that stopped delivering (video watchdog stall, or the audio process dying on
-     * its own while video kept going). A single stall just restarts the same resolved streams — usually a
-     * transient hiccup. A second stall shortly after means the restart didn't help, most likely because the
-     * resolved URL itself is bad (e.g. throttled without cookies), so this escalates to a fresh re-resolve,
-     * priming the current position first so it doesn't jump back to the start.
+     * its own while video kept going). A single VOD stall just restarts the same resolved streams — usually
+     * a transient hiccup. A second stall shortly after means the restart didn't help, most likely because
+     * the resolved URL itself is bad (e.g. throttled without cookies), so this escalates to a fresh
+     * re-resolve, priming the current position first so it doesn't jump back to the start.
+     *
+     * Live stalls escalate immediately: the in-place "seek to 0" retry lands at the start of the live
+     * HLS window (tens of seconds behind the edge), and a stalled live session usually means its
+     * session-bound playlist URL is dying anyway — a fresh resolve is the only restart that helps.
      */
     private fun handleSessionStall(reason: String) {
         if (terminated.get()) return
@@ -699,8 +743,9 @@ class MediaPlayer(
         val now = System.nanoTime()
         val repeated = lastStallNanos != 0L && now - lastStallNanos < REPEATED_STALL_WINDOW_NS
         lastStallNanos = now
-        if (repeated) {
-            logger.warn("$debugLabel Repeated stall ($reason); invalidating cached URLs and re-resolving.")
+        if (repeated || liveStream) {
+            val kind = if (liveStream) "Live stall" else "Repeated stall"
+            logger.warn("$debugLabel $kind ($reason); invalidating cached URLs and re-resolving.")
             env.cacheInvalidator.invalidate(youtubeUrl)
             primedStartPositionNanos.set(if (liveStream) 0L else clock.currentTime())
             state.set(PlaybackState.RESTARTING)
@@ -727,6 +772,14 @@ class MediaPlayer(
         }
         if (sessionManager.isPlaying) return
         val ss = streams ?: return
+        if (liveStream) {
+            logger.debug("$debugLabel Live resume from cold pause; re-resolving playlist URLs.")
+            endedAtEnd.set(false)
+            primedStartPositionNanos.set(0L)
+            state.set(PlaybackState.RESTARTING)
+            initialize()
+            return
+        }
         val offset = if (endedAtEnd.getAndSet(false)) 0L else clock.seekOffsetNanos
         startStreams(ss, offset)
     }
@@ -746,7 +799,11 @@ class MediaPlayer(
             }
         }
         val fp = sessionManager.audioFramePosition
-        clock.seekOffsetNanos = if (fp >= 0) clock.audioClockNanos(fp, AudioSink.SAMPLE_RATE) else clock.currentTime()
+        clock.seekOffsetNanos = when {
+            liveStream -> 0L
+            fp >= 0 -> clock.audioClockNanos(fp, AudioSink.SAMPLE_RATE)
+            else -> clock.currentTime()
+        }
         state.set(PlaybackState.PAUSED)
         stopSession()
     }
@@ -791,8 +848,18 @@ class MediaPlayer(
     private fun changeQuality(desired: VideoQuality) {
         val ss = streams ?: return
         val target = desired.targetHeight ?: return
-        if (target == lastQuality) {
-            if (DEBUG) logger.debug("$debugLabel Quality switch no-op target=$target last=$lastQuality.")
+        if (target == lastQuality || target == lastRequestedQuality) {
+            if (DEBUG) logger.debug(
+                "$debugLabel Quality switch no-op target=$target last=$lastQuality requested=$lastRequestedQuality."
+            )
+            return
+        }
+        lastRequestedQuality = target
+        if (liveStream) {
+            logger.debug("$debugLabel Live quality switch to ${target}p; re-resolving and restarting.")
+            primedStartPositionNanos.set(0L)
+            state.set(PlaybackState.RESTARTING)
+            initialize()
             return
         }
         if (isPausedWarm()) freezePausedWarmSession()

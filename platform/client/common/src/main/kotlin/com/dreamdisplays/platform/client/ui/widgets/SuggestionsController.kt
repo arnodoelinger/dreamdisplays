@@ -5,6 +5,9 @@ import com.dreamdisplays.api.runtime.get
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.media.source.twitch.TwitchMetadata
+import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
@@ -76,6 +79,20 @@ class SuggestionsController {
             }
             return
         }
+        val twitchSource = MediaSource.from(q) as? MediaSource.Twitch
+        if (twitchSource != null) {
+            startLoad()
+            val seq = requestSeq.incrementAndGet()
+            launchLoad {
+                try {
+                    publish(seq, listOf(twitchResult(twitchSource, TwitchMetadataCache.resolveBlocking(twitchSource))), null)
+                } catch (e: Exception) {
+                    logger.warn("Twitch meta fetch failed: ${e.message}.")
+                    publish(seq, listOf(twitchResult(twitchSource, null)), null)
+                }
+            }
+            return
+        }
         startLoad()
         val seq = requestSeq.incrementAndGet()
         launchLoad {
@@ -131,13 +148,32 @@ class SuggestionsController {
             }
             statusKey = null
             cards.addAll(results.subList(0, min(results.size, RESULT_LIMIT)))
-            for (info in cards) Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+            for (info in cards) {
+                val thumbUrl = info.thumbnailUrlOverride
+                if (thumbUrl != null) Thumbnails.request(info.id, thumbUrl)
+                else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+            }
         }
     }
 
     /** Minimal result used when URL metadata could not be fetched. */
     private fun fallbackResult(videoId: String) =
         MediaSearchResult(videoId, YouTubeUrls.watchUrl(videoId), null, null, null)
+
+    /** Builds a single-card result for a pasted Twitch URL, using [meta] when the Helix lookup succeeded. */
+    private fun twitchResult(source: MediaSource.Twitch, meta: TwitchMetadata?): MediaSearchResult {
+        val id = TwitchMetadataCache.cacheKey(source) ?: source.url
+        val fallbackTitle = source.channel ?: source.videoId ?: source.clipSlug ?: source.url
+        return MediaSearchResult(
+            id = id,
+            title = meta?.title ?: fallbackTitle,
+            uploader = meta?.channelName,
+            durationSec = null,
+            viewCount = meta?.viewCount,
+            watchUrlOverride = source.url,
+            thumbnailUrlOverride = meta?.thumbnailUrl,
+        )
+    }
 
     companion object {
         /** Maximum number of results to show in the panel. */

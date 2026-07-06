@@ -107,18 +107,31 @@ object Thumbnails {
         val k = key(videoId, quality)
         if (READY.getIfPresent(k) != null) return
         if (IN_FLIGHT.asMap().putIfAbsent(k, true) != null) return
-        DreamCoroutines.clientIo.launch { download(videoId, quality, loadBytesAsync(videoId, quality)) }
+        DreamCoroutines.clientIo.launch {
+            download(videoId, k, loadBytesAsync(k) { fetchForQuality(videoId, quality) })
+        }
     }
 
-    /** Starts or joins the thumbnail byte load for [videoId] at [quality]. */
-    private fun loadBytesAsync(videoId: String, quality: Quality): Deferred<ByteArray> =
-        BYTES.load(key(videoId, quality)) { loadBytes(videoId, quality) }
+    /**
+     * Schedules a background download of the image at [directUrl], cached / registered under [key]
+     * (e.g. a Twitch composite key) instead of deriving a YouTube thumbnail URL from an id. Used for
+     * sources (like Twitch) whose thumbnail URL is already resolved, not just an id to derive one from.
+     */
+    fun request(key: String, directUrl: String) {
+        if (READY.getIfPresent(key) != null) return
+        if (IN_FLIGHT.asMap().putIfAbsent(key, true) != null) return
+        DreamCoroutines.clientIo.launch { download(key, key, loadBytesAsync(key) { fetch(directUrl) }) }
+    }
 
-    /** Fetches the thumbnail bytes for [videoId] at [quality] from memory, disk, or network. */
-    private fun loadBytes(videoId: String, quality: Quality): ByteArray {
-        readDiskCache(videoId, quality)?.let { return it }
-        val bytes = fetchForQuality(videoId, quality) ?: throw IOException("thumbnail HTTP fetch failed")
-        writeDiskCacheAsync(videoId, quality, bytes)
+    /** Starts or joins the thumbnail byte load under [key], fetching via [fetchBytes] on a cache miss. */
+    private fun loadBytesAsync(key: String, fetchBytes: () -> ByteArray?): Deferred<ByteArray> =
+        BYTES.load(key) { loadBytes(key, fetchBytes) }
+
+    /** Fetches the thumbnail bytes for [key] from memory, disk, or network (via [fetchBytes]). */
+    private fun loadBytes(key: String, fetchBytes: () -> ByteArray?): ByteArray {
+        readDiskCache(key)?.let { return it }
+        val bytes = fetchBytes() ?: throw IOException("thumbnail HTTP fetch failed")
+        writeDiskCacheAsync(key, bytes)
         return bytes
     }
 
@@ -138,21 +151,20 @@ object Thumbnails {
     }
 
     /** Awaits the thumbnail bytes and registers them on the render thread. */
-    private suspend fun download(videoId: String, quality: Quality, bytesDeferred: Deferred<ByteArray>) {
-        val k = key(videoId, quality)
+    private suspend fun download(avgColorKey: String, cacheKey: String, bytesDeferred: Deferred<ByteArray>) {
         try {
             val bytes = bytesDeferred.await()
-            Minecraft.getInstance().execute { register(videoId, k, bytes) }
+            Minecraft.getInstance().execute { register(avgColorKey, cacheKey, bytes) }
         } catch (e: Exception) {
-            logger.warn("Fetch failed for $k: ${e.message}")
-            BYTES.invalidate(k)
-            IN_FLIGHT.invalidate(k)
+            logger.warn("Fetch failed for $cacheKey: ${e.message}")
+            BYTES.invalidate(cacheKey)
+            IN_FLIGHT.invalidate(cacheKey)
         }
     }
 
-    /** Reads the cached thumbnail bytes for ([videoId], [quality]) from disk; returns null if absent or expired. */
-    private fun readDiskCache(videoId: String, quality: Quality): ByteArray? = try {
-        val f = thumbFile(videoId, quality)
+    /** Reads the cached thumbnail bytes for [cacheKey] from disk; returns null if absent or expired. */
+    private fun readDiskCache(cacheKey: String): ByteArray? = try {
+        val f = thumbFile(cacheKey)
         when {
             !f.isFile -> null
             System.currentTimeMillis() - f.lastModified() > THUMB_CACHE_TTL_MS -> {
@@ -165,12 +177,12 @@ object Thumbnails {
         null
     }
 
-    /** Atomically writes [bytes] to the disk cache for ([videoId], [quality]) via a temp-file rename in the background. */
-    private fun writeDiskCacheAsync(videoId: String, quality: Quality, bytes: ByteArray) {
+    /** Atomically writes [bytes] to the disk cache for [cacheKey] via a temp-file rename in the background. */
+    private fun writeDiskCacheAsync(cacheKey: String, bytes: ByteArray) {
         DreamCoroutines.clientIo.launch {
             try {
                 Files.createDirectories(THUMB_CACHE_DIR)
-                val target = thumbFile(videoId, quality)
+                val target = thumbFile(cacheKey)
                 val tmp = File(target.parentFile, target.name + ".tmp")
                 Files.write(tmp.toPath(), bytes)
                 Files.move(
@@ -182,9 +194,9 @@ object Thumbnails {
         }
     }
 
-    /** Returns the cache file for ([videoId], [quality]), hashing the composite key so tiers never collide. */
-    private fun thumbFile(videoId: String, quality: Quality): File =
-        File(THUMB_CACHE_DIR.toFile(), hash(key(videoId, quality)) + ".jpg")
+    /** Returns the cache file for [cacheKey], hashing it so different keys never collide. */
+    private fun thumbFile(cacheKey: String): File =
+        File(THUMB_CACHE_DIR.toFile(), hash(cacheKey) + ".jpg")
 
     /** Returns a SHA-1 hex digest of [s], falling back to `hashCode` if SHA-1 is unavailable. */
     private fun hash(s: String): String = try {
@@ -198,10 +210,11 @@ object Thumbnails {
     private class Decoded(val image: NativeImage, val avgColor: Int)
 
     /**
-     * Decodes [bytes] into a [NativeImage] and registers it under [key] (the composite videoId + quality
-     * key). The average color is stored per [videoId] so both tiers share the one ambient tint.
+     * Decodes [bytes] into a [NativeImage] and registers it under [key] (the composite videoId +
+     * quality key, or a direct-URL request's own key). The average color is stored per
+     * [avgColorKey] so a YouTube video's LOW/HIGH tiers share the one ambient tint.
      */
-    private fun register(videoId: String, key: String, bytes: ByteArray) {
+    private fun register(avgColorKey: String, key: String, bytes: ByteArray) {
         var image: NativeImage? = null
         var tex: DynamicTexture? = null
         try {
@@ -214,7 +227,7 @@ object Thumbnails {
             val id = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb/${hash(key)}")
             Minecraft.getInstance().textureManager.register(id, tex)
             TextureUploadUtil.applyBilinearFilter(tex)
-            AVG_COLOR.put(videoId, decoded.avgColor)
+            AVG_COLOR.put(avgColorKey, decoded.avgColor)
             READY.put(key, id)
         } catch (e: Exception) {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.

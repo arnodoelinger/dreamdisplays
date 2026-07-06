@@ -1,6 +1,6 @@
 [package]
 name = "dreamdisplays-lav"
-version = "1.0.3"
+version = "1.0.4"
 edition = "2024"
 authors = ["arnodoelinger"]
 description = "In-process libav decode backend for Dream Displays."

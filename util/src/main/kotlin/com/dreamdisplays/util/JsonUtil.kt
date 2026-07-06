@@ -45,6 +45,13 @@ fun JsonObject.optInt(key: String): Int? {
     return runCatching { value.jsonPrimitive.intOrNull }.getOrNull()
 }
 
+/** Returns the long value of [key], or null if absent, JSON-null, or not numeric. */
+fun JsonObject.optLong(key: String): Long? {
+    val value = this[key] ?: return null
+    if (value is JsonNull) return null
+    return runCatching { value.jsonPrimitive.longOrNull }.getOrNull()
+}
+
 /** Returns the double value of [key], or null if absent, JSON-null, or not numeric. */
 fun JsonObject.optDouble(key: String): Double? {
     val value = this[key] ?: return null

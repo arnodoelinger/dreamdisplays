@@ -28,6 +28,18 @@ class YtStream(
     val isLive: Boolean,
     val isSeekable: Boolean,
     val durationNanos: Long,
+
+    /** Title, if `yt-dlp` reported one at the top level (generic across every extractor, not just YouTube). */
+    val title: String? = null,
+
+    /** Uploader / channel display name, if reported. */
+    val uploaderName: String? = null,
+
+    /** Thumbnail URL, if reported. */
+    val thumbnailUrl: String? = null,
+
+    /** View (or live viewer) count, if reported. */
+    val viewCount: Long? = null,
 ) {
 
     /** Returns true if the stream has a video track. */

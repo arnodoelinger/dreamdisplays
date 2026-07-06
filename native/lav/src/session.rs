@@ -69,7 +69,6 @@ fn init_ffmpeg() -> Result<()> {
     FFMPEG_LOG_INIT.call_once(|| {
         let level = match log::max_level() {
             LevelFilter::Trace => Level::Debug,
-            LevelFilter::Debug => Level::Verbose,
             _ => Level::Warning,
         };
         ffmpeg::util::log::set_level(level);

@@ -14,6 +14,7 @@ import com.dreamdisplays.platform.client.managers.ClientStateManager
 
 /** Installs the media resolver chain, search service, and stream selector. */
 object MediaResolverModule : DreamDisplaysModule {
+    /** Media resolver module. */
     override val id: String = "dreamdisplays:media_resolver"
 
     /** Installs the media resolver chain, search service, and stream selector. */

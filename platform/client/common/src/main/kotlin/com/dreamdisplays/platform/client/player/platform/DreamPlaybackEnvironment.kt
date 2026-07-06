@@ -15,6 +15,7 @@ import com.dreamdisplays.api.media.player.RenderThreadExecutor
 import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
 import com.dreamdisplays.platform.client.render.GpuFrameUploader
 import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.media.source.twitch.TwitchResolver
 import com.dreamdisplays.media.source.ytdlp.YtDlp
 import net.minecraft.client.Minecraft
 
@@ -46,8 +47,11 @@ object DreamPlaybackEnvironment : PlaybackEnvironment {
     /** Creates per-player GPU frame uploaders. */
     override val uploaderFactory: FrameUploaderFactory = FrameUploaderFactory { GpuFrameUploader() as FrameUploader }
 
-    /** Invalidates the `yt-dlp` URL cache for a stream. */
-    override val cacheInvalidator: CacheInvalidator = CacheInvalidator { url -> YtDlp.invalidateCache(url) }
+    /** Invalidates the resolved-URL caches for a stream (`yt-dlp` and the in-process Twitch path). */
+    override val cacheInvalidator: CacheInvalidator = CacheInvalidator { url ->
+        YtDlp.invalidateCache(url)
+        TwitchResolver.invalidate(url)
+    }
 
     /** The registered media resolver chain. */
     override fun resolverChain(): MediaResolverRegistry = DreamServices.registry.get(MediaServices.RESOLVER_REGISTRY)

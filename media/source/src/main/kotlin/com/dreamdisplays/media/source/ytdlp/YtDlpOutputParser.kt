@@ -3,6 +3,7 @@ package com.dreamdisplays.media.source.ytdlp
 import com.dreamdisplays.util.optBoolean
 import com.dreamdisplays.util.optDouble
 import com.dreamdisplays.util.optInt
+import com.dreamdisplays.util.optLong
 import com.dreamdisplays.util.optString
 import com.dreamdisplays.util.asJsonArrayOrNull
 import com.dreamdisplays.util.asJsonObjectOrNull
@@ -37,6 +38,10 @@ internal object YtDlpOutputParser {
         val live = isLive(obj)
         val durationNanos = durationNanos(obj)
         val seekable = !live && durationNanos > 0L
+        val title = obj.optString("title")
+        val uploaderName = obj.optString("uploader") ?: obj.optString("channel")
+        val thumbnailUrl = obj.optString("thumbnail")
+        val viewCount = obj.optLong("view_count") ?: obj.optLong("concurrent_view_count")
         val formats = obj["formats"].asJsonArrayOrNull() ?: return result
 
         for (el in formats) {
@@ -73,7 +78,8 @@ internal object YtDlpOutputParser {
                     width, height,
                     f.optString("language"), f.optString("format_note"), vcodec, acodec,
                     f.optDouble("fps"), f.optDouble("tbr"),
-                    hasVideo, hasAudio, live, seekable, durationNanos
+                    hasVideo, hasAudio, live, seekable, durationNanos,
+                    title, uploaderName, thumbnailUrl, viewCount,
                 )
             )
         }

@@ -38,9 +38,17 @@ class DefaultStreamSelector : StreamSelector {
         val adaptiveAudio = MediaStreamSelector.pickAudio(audioStreams, lang, video)
             ?: audioStreams.firstOrNull()
 
-        val progressiveAudio = streams.filter { it.type == MediaStreamType.VIDEO_AUDIO }
-            .maxByOrNull { it.bitrate ?: 0 }
-        val audio = if (preferProgressiveAudio && progressiveAudio != null) progressiveAudio else adaptiveAudio
+        val progressiveAudio = video?.takeIf { it.type == MediaStreamType.VIDEO_AUDIO }
+            ?: streams.filter { it.type == MediaStreamType.VIDEO_AUDIO }.maxByOrNull { it.bitrate ?: 0 }
+
+        val muxedHls = video?.type == MediaStreamType.VIDEO_AUDIO &&
+                (video.url.contains(".m3u8") || video.url.contains(".ttvnw.net/"))
+
+        val audio = when {
+            muxedHls && adaptiveAudio != null && !adaptiveAudio.type.hasVideo -> adaptiveAudio
+            preferProgressiveAudio && progressiveAudio != null -> progressiveAudio
+            else -> adaptiveAudio
+        }
 
         if (debug) {
             logger.debug(
