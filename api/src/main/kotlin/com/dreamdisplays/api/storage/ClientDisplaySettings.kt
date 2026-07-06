@@ -37,6 +37,9 @@ data class ClientDisplaySettings(
 
     /** Last known playback position in nanoseconds, resumed on Local displays after a restart. */
     var savedTimeNanos: Long = 0,
+
+    /** Viewer-chosen render distance in blocks, or `0` if never customized (falls back to the config default). */
+    var renderDistance: Int = 0,
 ) {
 
     companion object {

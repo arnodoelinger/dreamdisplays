@@ -89,6 +89,13 @@ object ClientSettingsStore : ClientSettingsStorage {
         save()
     }
 
+    /** Sets the viewer-chosen render distance (in blocks) for [displayUuid] and saves. */
+    override fun setRenderDistance(displayUuid: UUID, blocks: Int) {
+        val s = getSettings(displayUuid)
+        s.renderDistance = blocks
+        save()
+    }
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     override fun remove(displayUuid: UUID): Boolean {
         val removed = settings.remove(displayUuid) != null

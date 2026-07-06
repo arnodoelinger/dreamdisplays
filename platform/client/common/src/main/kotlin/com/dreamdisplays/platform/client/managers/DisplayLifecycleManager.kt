@@ -5,6 +5,7 @@ import com.dreamdisplays.api.display.model.ContentRotation
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.core.storage.DisplayStorage
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.api.storage.FullDisplayData
 import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.core.protocol.DisplayInfo
@@ -48,8 +49,8 @@ object DisplayLifecycleManager {
         val facing = FacingUtil.fromPacket(packet.facing.toByte())
 
         Minecraft.getInstance().player?.let { player ->
-            val renderDistance =
-                DisplayStorage.getDisplayData(packet.id)?.renderDistance ?: ClientStateManager.config.defaultDistance
+            val renderDistance = DisplayStorage.getDisplayData(packet.id)?.renderDistance
+                ?: persistedRenderDistance(packet.id)
             val dist = distanceToScreen(
                 packet.x, packet.y, packet.z,
                 packet.width, packet.height, facing.toDisplayFacing(),
@@ -86,7 +87,7 @@ object DisplayLifecycleManager {
         )
 
         val savedData = DisplayStorage.getDisplayData(uuid)
-        displayScreen.renderDistance = savedData?.renderDistance ?: ClientStateManager.config.defaultDistance
+        displayScreen.renderDistance = savedData?.renderDistance ?: persistedRenderDistance(uuid)
 
         displayScreen.createTexture()
         DisplayRegistry.registerScreen(displayScreen)
@@ -167,4 +168,10 @@ object DisplayLifecycleManager {
     /** True if both dimensions are within `1..`[MAX_DISPLAY_BLOCKS]. */
     private fun isValidDisplaySize(width: Int, height: Int): Boolean =
         width in 1..MAX_DISPLAY_BLOCKS && height in 1..MAX_DISPLAY_BLOCKS
+
+    /** The viewer's disk-persisted render distance for [uuid], or the config default if never customized. */
+    private fun persistedRenderDistance(uuid: UUID): Int {
+        val saved = ClientSettingsStore.getSettings(uuid).renderDistance
+        return if (saved > 0) saved else ClientStateManager.config.defaultDistance
+    }
 }

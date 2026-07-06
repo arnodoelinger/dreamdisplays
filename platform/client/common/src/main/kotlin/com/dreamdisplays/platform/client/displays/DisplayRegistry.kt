@@ -65,7 +65,10 @@ object DisplayRegistry {
         displayScreen.volume = clientSettings.volume
         displayScreen.quality = VideoQuality.parse(clientSettings.quality)
         displayScreen.muted = clientSettings.muted
+        // Disk-persisted fallback (survives a full game restart); overridden below by the
+        // same-session cache when present, which is fresher.
         displayScreen.savedTimeNanos = clientSettings.savedTimeNanos
+        if (clientSettings.renderDistance > 0) displayScreen.renderDistance = clientSettings.renderDistance
 
         DisplayStorage.getDisplayData(displayScreen.uuid)?.let { saved ->
             displayScreen.renderDistance = saved.renderDistance
@@ -80,6 +83,7 @@ object DisplayRegistry {
     fun unregisterScreen(displayScreen: DisplayScreen) {
         unloadedScreens[displayScreen.uuid] = displayScreen.toFullDisplayData()
         ClientSettingsStore.setSavedTimeNanos(displayScreen.uuid, displayScreen.currentTimeNanos)
+        ClientSettingsStore.setRenderDistance(displayScreen.uuid, displayScreen.renderDistance)
         screens.remove(displayScreen.uuid)
         displayScreen.unregister()
         displaySystem?.removeDisplay(DisplayId(displayScreen.uuid))
@@ -97,6 +101,7 @@ object DisplayRegistry {
     fun saveScreenData(displayScreen: DisplayScreen) {
         DisplayStorage.saveDisplayData(displayScreen.uuid, displayScreen.toFullDisplayData())
         ClientSettingsStore.setSavedTimeNanos(displayScreen.uuid, displayScreen.currentTimeNanos)
+        ClientSettingsStore.setRenderDistance(displayScreen.uuid, displayScreen.renderDistance)
     }
 
     /** Restores the display snapshot cached for [serverId] (e.g. saved timecodes) from a prior session. */
