@@ -5,6 +5,7 @@ import com.dreamdisplays.api.playback.PlaybackServices
 import com.dreamdisplays.api.watchparty.WatchPartyServices
 import com.dreamdisplays.api.display.service.DisplayServices
 import com.dreamdisplays.platform.client.popout.PopoutManager
+import com.dreamdisplays.platform.client.render.ScrubPreview
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.get
 import com.dreamdisplays.api.runtime.getOrNull
@@ -241,6 +242,15 @@ class DisplayMenu private constructor(
             SeekBar(
                 current = { ds.currentTimeNanos },
                 duration = { ds.mediaPlayerDurationNanos },
+                previewFrame = { nanos ->
+                    if (ds.isLive) null else {
+                        val key = ds.videoUrl
+                        val rawUrl = ds.scrubPreviewRawUrl
+                        val dur = ds.mediaPlayerDurationNanos
+                        if (key != null && rawUrl != null) ScrubPreview.request(key, rawUrl, dur)
+                        key?.let { ScrubPreview.frameAt(it, nanos) }
+                    }
+                },
             ) { nanos ->
                 if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
                     playback.seek(displayId, (nanos / 1_000_000L).milliseconds)

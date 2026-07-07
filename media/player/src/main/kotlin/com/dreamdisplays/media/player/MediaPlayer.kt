@@ -451,6 +451,14 @@ class MediaPlayer(
     }
 
     /**
+     * Raw (not yet redirect-resolved) URL of the current video's selected stream, for seek-bar
+     * scrub-preview frame extraction. Cheap / no I / O — callers must run it through
+     * `MediaHostGuard.resolveSafeUrl` themselves off the render thread before handing it to `FFmpeg`.
+     * Null for live streams or before the player has resolved a stream.
+     */
+    fun capturedStreamRawUrl(): String? = capturePreparedMedia()?.streamSet?.currentVideo?.url
+
+    /**
      * Updates distance-based volume attenuation. Call every tick from the game thread.
      *
      * @param distance current distance from the player to the screen

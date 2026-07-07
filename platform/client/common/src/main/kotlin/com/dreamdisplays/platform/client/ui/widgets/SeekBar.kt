@@ -1,6 +1,8 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
+import com.dreamdisplays.platform.client.render.ScrubPreview
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
+import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
 //? if >=26 {
@@ -33,10 +35,13 @@ import net.minecraft.util.Mth
  * @param current supplies the current playback position in nanoseconds.
  * @param duration supplies the total duration in nanoseconds (`<= 0` while unknown).
  * @param onSeek invoked with the target position in nanoseconds when a drag is committed.
+ * @param previewFrame optionally supplies a scrub-preview texture for a hovered position in
+ * nanoseconds; returning null (or leaving this unset) shows no preview.
  */
 class SeekBar(
     private val current: () -> Long,
     private val duration: () -> Long,
+    private val previewFrame: ((Long) -> Identifier?)? = null,
     private val onSeek: (Long) -> Unit,
 ) : UiWidget(Component.empty()) {
 
@@ -60,6 +65,56 @@ class SeekBar(
         /*g.blitSprite(handleSprite(), handleX, y, 8, height)*/
 
         drawScrollingLabel(g, timeLabel(cur, dur), 4)
+
+        if (previewFrame != null && active && dur > 0 && (isHovered || dragging)) {
+            val hoverNanos = if (dragging) dragTargetNanos else positionFromMouse(mouseX.toDouble(), dur)
+            previewFrame.invoke(hoverNanos)?.let { drawPreview(g, it, mouseX, hoverNanos, dur) }
+        }
+    }
+
+    /**
+     * Draws the scrub-preview thumbnail above the bar, centered on [mouseX] and clamped to the
+     * screen. The on-screen box stays at [DISPLAY_WIDTH] x [DISPLAY_HEIGHT] regardless of the
+     * texture's actual (larger) resolution — vanilla `blit`'s `(u, v, width, height, textureWidth,
+     * textureHeight)` overload samples 1:1 texel-for-pixel rather than scaling to fit, so shrinking
+     * the box is done with a pose-stack scale around a full-resolution blit instead (GPU bilinear
+     * downsample, keeping the extra source detail instead of just cropping to the box size).
+     */
+    private fun drawPreview(g: GuiGraphicsCompat, texture: Identifier, mouseX: Int, hoverNanos: Long, dur: Long) {
+        val textureW = ScrubPreview.FRAME_WIDTH
+        val textureH = ScrubPreview.FRAME_HEIGHT
+        val boxW = DISPLAY_WIDTH + 4
+        val boxH = DISPLAY_HEIGHT + 14
+        // Clamped to the screen, not the (possibly narrower-than-the-box) widget bounds — coerceIn
+        // over widget bounds alone throws when width < boxW (min > max).
+        val screenW = Minecraft.getInstance().window.guiScaledWidth
+        val minX = 0
+        val maxX = (screenW - boxW).coerceAtLeast(minX)
+        val boxX = (mouseX - boxW / 2).coerceIn(minX, maxX)
+        val boxY = y - boxH - 4
+
+        g.fill(boxX, boxY, boxX + boxW, boxY + boxH, 0xE0101010.toInt())
+
+        val scaleX = DISPLAY_WIDTH.toFloat() / textureW
+        val scaleY = DISPLAY_HEIGHT.toFloat() / textureH
+        val matrices = g.pose()
+        //? if >=1.21.11 {
+        matrices.pushMatrix()
+        matrices.translate((boxX + 2).toFloat(), (boxY + 2).toFloat())
+        matrices.scale(scaleX, scaleY)
+        g.blit(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, textureW, textureH, textureW, textureH)
+        matrices.popMatrix()
+        //?} else
+        /*matrices.pushPose()
+        matrices.translate((boxX + 2).toDouble(), (boxY + 2).toDouble(), 0.0)
+        matrices.scale(scaleX, scaleY, 1f)
+        g.blit(texture, 0, 0, 0f, 0f, textureW, textureH, textureW, textureH)
+        matrices.popPose()*/
+
+        val font = Minecraft.getInstance().font
+        val label = UiText.formatTime(hoverNanos)
+        val labelX = boxX + (boxW - font.width(label)) / 2
+        g.drawText(font, label, labelX, boxY + DISPLAY_HEIGHT + 4, 0xFFFFFFFF.toInt(), false)
     }
 
     /** Formats the current / total time as a colored text component for display on the bar. */
@@ -156,6 +211,9 @@ class SeekBar(
     }
 
     companion object {
+        private const val DISPLAY_WIDTH = 106
+        private const val DISPLAY_HEIGHT = 60
+
         private val TRACK = Identifier.withDefaultNamespace("widget/slider")
         private val TRACK_HIGHLIGHTED = Identifier.withDefaultNamespace("widget/slider_highlighted")
         private val HANDLE = Identifier.withDefaultNamespace("widget/slider_handle")
