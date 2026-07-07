@@ -359,6 +359,12 @@ class DisplayScreen(
     /** Total duration of the current video in nanoseconds, or `0` if unknown / live. */
     val mediaPlayerDurationNanos: Long get() = mediaPlayer?.getDuration() ?: 0L
 
+    /**
+     * Raw (not yet redirect-resolved) URL of the current video's stream, for seek-bar scrub-preview
+     * frame extraction. Cheap to read; null for live streams or before a stream has resolved.
+     */
+    val scrubPreviewRawUrl: String? get() = mediaPlayer?.capturedStreamRawUrl()
+
     /** Pixel heights of the qualities available for the current video. */
     val qualityList: List<Int>
         get() = mediaPlayer?.getAvailableQualities() ?: emptyList()

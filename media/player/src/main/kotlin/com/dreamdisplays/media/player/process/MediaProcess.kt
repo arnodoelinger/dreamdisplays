@@ -82,6 +82,33 @@ object MediaProcess {
                 && FFmpegCapabilities.hasFilter(ffmpeg, "scale_vt")
 
     /**
+     * Builds an `FFmpeg` process that seeks to [offsetNanos] in [url] and writes a single JPEG frame
+     * (letterboxed to exactly [w] x [h], high-ish quality) to stdout. Used to generate seek-bar
+     * scrub-preview thumbnails; the caller reads `process.inputStream` fully after `waitFor()`.
+     *
+     * [url] must already be redirect-resolved / host-checked (via `MediaHostGuard.resolveSafeUrl`) —
+     * this is called once per sample across many short-lived processes for the same video, so
+     * re-resolving here (an extra HTTP round-trip per call) would multiply that cost badly.
+     *
+     * @throws IOException if the process fails to start. The caller is responsible for destroying the process when done.
+     */
+    @Throws(IOException::class)
+    fun buildFrameExtract(ffmpeg: String, url: String, offsetNanos: Long, w: Int, h: Int): Process {
+        val pad = "scale=w=$w:h=$h:force_original_aspect_ratio=decrease:flags=lanczos," +
+                "pad=w=$w:h=$h:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
+        val cmd = baseCommand(ffmpeg, url, offsetNanos, HwAccelBackend.NONE, alreadyResolved = true).apply {
+            addAll(
+                listOf(
+                    "-an", "-frames:v", "1",
+                    "-vf", pad, "-q:v", "3",
+                    "-f", "image2pipe", "-vcodec", "mjpeg", "-",
+                )
+            )
+        }
+        return ProcessBuilder(cmd).start()
+    }
+
+    /**
      * Builds an `FFmpeg` process to read audio samples from [url] at the given [offsetNanos], resampled to [sampleRate] Hz.
      * @throws IOException if the process fails to start. The caller is responsible for destroying the process when done.
      */
@@ -128,15 +155,21 @@ object MediaProcess {
         }
     }
 
-    /** Builds the common part of the `FFmpeg` command line for both video and audio processes. */
+    /**
+     * Builds the common part of the `FFmpeg` command line for both video and audio processes.
+     * [alreadyResolved] skips the `MediaHostGuard.resolveSafeUrl` redirect-chain lookup (an HTTP
+     * round-trip) for callers that resolved [url] themselves — needed when this runs many times per
+     * video (e.g. one scrub-preview sample each) so that cost isn't paid on every single call.
+     */
     @Throws(IOException::class)
     private fun baseCommand(
         ffmpeg: String,
         url: String,
         offsetNanos: Long,
-        hwAccel: HwAccelBackend
+        hwAccel: HwAccelBackend,
+        alreadyResolved: Boolean = false,
     ): MutableList<String> {
-        val safeUrl = MediaHostGuard.resolveSafeUrl(url)
+        val safeUrl = if (alreadyResolved) url else MediaHostGuard.resolveSafeUrl(url)
         return mutableListOf<String>().apply {
             add(ffmpeg)
             addAll(listOf("-hide_banner", "-loglevel", "error", "-nostats"))
