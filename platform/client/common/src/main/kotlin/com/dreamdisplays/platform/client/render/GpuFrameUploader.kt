@@ -51,27 +51,16 @@ class GpuFrameUploader : FrameUploader {
         return true
     }
 
-    /** Uploads the Y / U / V planes packed in [src] into their respective textures. */
+    /** Uploads the Y / U / V planes packed in [src] into their respective textures in one PBO pass. */
     override fun uploadPlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, src: ByteBuffer): Boolean {
         //? if >=1.21.11 {
-        var offset = 0
-        for ((i, ref) in arrayOf(y, u, v).withIndex()) {
-            val texture: GpuTexture = (ref as GpuTextureHandle).texture
-            val planeBytes = texture.getWidth(0) * texture.getHeight(0)
-            val view = src.duplicate()
-            view.position(offset).limit(offset + planeBytes)
-            TextureUploadUtil.upload(
-                texture = texture,
-                src = view,
-                w = texture.getWidth(0),
-                h = texture.getHeight(0),
-                format = UploadPixelFormat.R8,
-                glUploader = { planeUploader(i) },
-                rgbaScratch = null,
-                setRgbaScratch = {},
-            )
-            offset += planeBytes
-        }
+        TextureUploadUtil.uploadPlanar(
+            y = (y as GpuTextureHandle).texture,
+            u = (u as GpuTextureHandle).texture,
+            v = (v as GpuTextureHandle).texture,
+            src = src,
+            glUploader = { planeUploader(0) },
+        )
         return true
         //?} else
         /*return false*/

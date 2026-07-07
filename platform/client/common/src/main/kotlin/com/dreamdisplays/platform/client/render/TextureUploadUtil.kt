@@ -110,6 +110,37 @@ object TextureUploadUtil {
         writeToTexture(texture, rgba, w, h, NativeImage.Format.RGBA)
     }
 
+    /**
+     * Uploads one packed I420 frame from [src] into the three plane textures. On the direct-GL
+     * backend all three planes go through a single PBO pass ([AsyncTextureUploader.uploadPlanar]);
+     * otherwise each plane falls back to the command-encoder write.
+     */
+    fun uploadPlanar(
+        y: GpuTexture, u: GpuTexture, v: GpuTexture,
+        src: ByteBuffer,
+        glUploader: () -> AsyncTextureUploader,
+    ) {
+        if (y.isClosed || u.isClosed || v.isClosed) return
+        if (y is GlTexture && u is GlTexture && v is GlTexture && RenderBackendCompat.canUseDirectOpenGl()) {
+            glUploader().uploadPlanar(
+                y.glId(), y.getWidth(0), y.getHeight(0),
+                u.glId(), u.getWidth(0), u.getHeight(0),
+                v.glId(), v.getWidth(0), v.getHeight(0),
+                src,
+            )
+            return
+        }
+
+        var offset = 0
+        for (texture in arrayOf(y, u, v)) {
+            val planeBytes = texture.getWidth(0) * texture.getHeight(0)
+            val view = src.duplicate()
+            view.position(src.position() + offset).limit(src.position() + offset + planeBytes)
+            writeToTexture(texture, view, texture.getWidth(0), texture.getHeight(0), UploadPixelFormat.R8.nativeImageFormat)
+            offset += planeBytes
+        }
+    }
+
     /** Write to a Minecraft texture using the `writeToTexture` method. */
     private fun writeToTexture(texture: GpuTexture, pixels: ByteBuffer, w: Int, h: Int, format: NativeImage.Format) {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
