@@ -142,6 +142,20 @@ class Client : ClientModInitializer, Mod {
     }
 
     //? if >=26 {
+    /** Cached `SubmitNodeCollector$CustomGeometryRenderer` interface, resolved once. */
+    private val customGeometryRendererClass: Class<*> by lazy {
+        Class.forName("net.minecraft.client.renderer.SubmitNodeCollector\$CustomGeometryRenderer")
+    }
+
+    /** Cached `LevelRenderContext.submitNodeCollector` accessor (the context's runtime class is stable). */
+    private var submitNodeCollectorMethod: java.lang.reflect.Method? = null
+
+    /** Cached `SubmitNodeCollector.submitCustomGeometry(PoseStack, RenderType, CustomGeometryRenderer)`. */
+    private var submitCustomGeometryMethod: java.lang.reflect.Method? = null
+
+    /** Whether the `LevelRenderContext` runtime class exposes `bufferSource` (probed once). */
+    private var hasBufferSourceCache: Boolean? = null
+
     /** Renders the screen using the `submitNodeCollector` API. */
     private fun renderSubmittedScreens(context: LevelRenderContext, mc: Minecraft) {
         val camera = mainCamera(mc)
@@ -150,7 +164,10 @@ class Client : ClientModInitializer, Mod {
         }
 
         val submitNodeCollector = runCatching {
-            context.javaClass.getMethod("submitNodeCollector").invoke(context)
+            val method = submitNodeCollectorMethod
+                ?.takeIf { it.declaringClass.isAssignableFrom(context.javaClass) }
+                ?: context.javaClass.getMethod("submitNodeCollector").also { submitNodeCollectorMethod = it }
+            method.invoke(context)
         }.getOrNull()
 
         if (submitNodeCollector == null || customGeometryUnavailable) {
@@ -179,7 +196,8 @@ class Client : ClientModInitializer, Mod {
 
     /** If the `LevelRenderContext` has a `BufferSource` API, returns true. */
     private fun hasBufferSource(context: LevelRenderContext): Boolean =
-        runCatching { context.javaClass.getMethod("bufferSource") }.isSuccess
+        hasBufferSourceCache
+            ?: runCatching { context.javaClass.getMethod("bufferSource") }.isSuccess.also { hasBufferSourceCache = it }
 
     /** Renders the screen using the `BufferSource` API. */
     private fun renderWithBufferSource(context: LevelRenderContext, camera: Camera) {
@@ -197,23 +215,30 @@ class Client : ClientModInitializer, Mod {
         endBatch.invoke(bufferSource)
     }
 
-    /** Submits custom geometry to the GPU. */
+    /**
+     * Submits custom geometry to the GPU. The renderer proxy is per-quad by design: the collector
+     * renders deferred, so each submission must capture its own [appendVertices] (the generated
+     * proxy class itself is cached by the JDK, so per-call instantiation is just an allocation).
+     */
     private fun submitCustomGeometry(
         stack: PoseStack,
         submitNodeCollector: Any,
         type: RenderType,
         appendVertices: (PoseStack.Pose, VertexConsumer) -> Unit,
     ) {
-        val rendererClass = Class.forName("net.minecraft.client.renderer.SubmitNodeCollector\$CustomGeometryRenderer")
+        val rendererClass = customGeometryRendererClass
         val renderer = Proxy.newProxyInstance(rendererClass.classLoader, arrayOf(rendererClass)) { _, method, args ->
             if (method.name == "render" && args != null && args.size == 2) {
                 appendVertices(args[0] as PoseStack.Pose, args[1] as VertexConsumer)
             }
             null
         }
-        submitNodeCollector.javaClass
-            .getMethod("submitCustomGeometry", PoseStack::class.java, RenderType::class.java, rendererClass)
-            .invoke(submitNodeCollector, stack, type, renderer)
+        val method = submitCustomGeometryMethod
+            ?.takeIf { it.declaringClass.isAssignableFrom(submitNodeCollector.javaClass) }
+            ?: submitNodeCollector.javaClass
+                .getMethod("submitCustomGeometry", PoseStack::class.java, RenderType::class.java, rendererClass)
+                .also { submitCustomGeometryMethod = it }
+        method.invoke(submitNodeCollector, stack, type, renderer)
     }
     //?}
 
