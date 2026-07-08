@@ -184,7 +184,7 @@ class MediaPlayer(
         getTextureSize = { host.textureWidth to host.textureHeight },
         getBrightness = { brightness },
         onStreamEnd = ::handleStreamEnd,
-        onQualitySwitchAborted = { host.cancelQualityHandoff() },
+        onQualitySwitchAborted = { appliedAnyway -> handleQualitySwitchAborted(appliedAnyway) },
         onAudioFailure = { stderr -> handleAudioFailure(stderr) },
         renderExecutor = env.renderExecutor,
         uploaderFactory = env.uploaderFactory,
@@ -216,6 +216,16 @@ class MediaPlayer(
      */
     @Volatile
     private var lastRequestedQuality = 0
+
+    /** Snapshot to restore [streams] / [lastQuality] / [lastRequestedQuality] to if an in-flight
+     *  parallel quality switch genuinely fails (old channel stays live on the old quality) — set right
+     *  before [changeQuality] optimistically applies the new stream set, cleared on success or on a
+     *  failure that still applied the new quality some other way (see [handleQualitySwitchAborted]). */
+    private class QualityRollback(val previousStreams: ActiveStreams, val previousQuality: Int, val target: Int)
+
+    @Volatile
+    private var pendingQualityRollback: QualityRollback? = null
+
     @Volatile
     private var brightness = 1.0
     @Volatile
@@ -389,7 +399,28 @@ class MediaPlayer(
         sessionManager.updateIncomingFramePlanar(y, u, v, w, h)
 
     /** Promotes the warmed-up quality-switch channel to live; returns false if it was already aborted. */
-    fun promoteIncomingVideo(): Boolean = sessionManager.promoteIncoming()
+    fun promoteIncomingVideo(): Boolean {
+        val promoted = sessionManager.promoteIncoming()
+        if (promoted) pendingQualityRollback = null // The staged quality switch committed successfully
+        return promoted
+    }
+
+    /**
+     * Reverts the optimistically-applied quality metadata after a genuine handoff failure (the old
+     * channel/quality stayed live), and unblocks re-requesting the same quality. No-op when the
+     * failure still applied the new quality some other way ([appliedAnyway]), or when there is no
+     * pending switch to roll back (e.g. the abort came from an unrelated reappear-live attach).
+     */
+    private fun handleQualitySwitchAborted(appliedAnyway: Boolean) {
+        host.cancelQualityHandoff()
+        val rollback = pendingQualityRollback
+        pendingQualityRollback = null
+        if (rollback == null || appliedAnyway) return
+        streams = rollback.previousStreams
+        lastQuality = rollback.previousQuality
+        host.videoContentAspect = rollback.previousStreams.currentVideo.contentAspect()
+        if (lastRequestedQuality == rollback.target) lastRequestedQuality = rollback.previousQuality
+    }
 
     /** Sets the user-controlled volume (0.0–2.0). Distance attenuation is applied on top. */
     fun setVolume(volume: Float) = this.volume.setUserVolume(volume)
@@ -872,6 +903,8 @@ class MediaPlayer(
         }
         if (isPausedWarm()) freezePausedWarmSession()
         val newSs = MediaStreamSelector.switchQuality(ss, target, lang) ?: return
+        val previousStreams = ss
+        val previousQuality = lastQuality
         streams = newSs
         lastQuality = MediaStreamSelector.parseQuality(newSs.currentVideo)
         host.videoContentAspect = newSs.currentVideo.contentAspect()
@@ -880,10 +913,14 @@ class MediaPlayer(
                 // Parallel quality switch: stage the new-resolution texture, but the live video keeps
                 // decoding and rendering. The new resolution warms up in a second channel; fitTexture
                 // promotes both (channel + texture) on its first frame, so the picture never freezes.
+                // A genuine handoff failure rolls the metadata above back (see handleQualitySwitchAborted).
+                pendingQualityRollback = QualityRollback(previousStreams, previousQuality, target)
                 host.beginQualityHandoff()
                 safeExecute { beginQualitySwitch(newSs, getCurrentTime()) }
             } else {
-                // Nothing decoding (so, just paused): no frames would arrive to drive a handoff, so swap directly
+                // Nothing decoding (so, just paused): no frames would arrive to drive a handoff, so swap
+                // directly — there's no async attempt in flight to roll back if this fails later.
+                pendingQualityRollback = null
                 host.reloadTexture()
                 safeExecute { clock.seekOffsetNanos = getCurrentTime() }
             }

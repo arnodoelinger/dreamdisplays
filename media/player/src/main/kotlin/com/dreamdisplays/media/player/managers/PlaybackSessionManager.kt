@@ -56,8 +56,13 @@ internal class PlaybackSessionManager(
     /** Invoked by the live video channel when the stream ends or errors. Called on the reader thread. */
     private val onStreamEnd: (stderr: String, normalEos: Boolean) -> Unit,
 
-    /** Invoked when an in-flight quality switch fails before promotion, so the caller can drop the staged texture. */
-    private val onQualitySwitchAborted: () -> Unit = {},
+    /**
+     * Invoked when an in-flight quality switch fails before promotion, so the caller can drop the
+     * staged texture. [appliedAnyway] is true when the target quality still takes effect through a
+     * different path (a full restart using the same new stream set) despite the parallel handoff
+     * itself failing — callers must not roll back quality metadata in that case.
+     */
+    private val onQualitySwitchAborted: (appliedAnyway: Boolean) -> Unit = {},
 
     /**
      * nvoked when the live audio process ends on its own (crash / broken pipe) instead of via a
@@ -670,7 +675,7 @@ internal class PlaybackSessionManager(
                 } else false
             }
             discardChannelBlocking(channel)
-            if (wasCurrent) onQualitySwitchAborted()
+            if (wasCurrent) onQualitySwitchAborted(false)
             false
         }
     }
@@ -873,12 +878,13 @@ internal class PlaybackSessionManager(
      */
     fun beginQualitySwitch(streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend) {
         if (active == null || !isPlaying || terminated.get()) {
-            // Nothing to hand off from: drop the staged texture so the full start uses the live dims
-            onQualitySwitchAborted()
+            // Nothing to hand off from: drop the staged texture, but the target quality still takes
+            // effect below via a full start on the same (new) stream set — not a real failure.
+            onQualitySwitchAborted(true)
             start(streamSet, offsetNanos, lastQuality, hwAccel)
             return
         }
-        val ffmpeg = FFmpegBinary.getPath() ?: run { onQualitySwitchAborted(); return }
+        val ffmpeg = FFmpegBinary.getPath() ?: run { onQualitySwitchAborted(false); return }
 
         // Supersede any in-flight switch (rapid quality changes)
         val channel = VideoChannel()
@@ -954,7 +960,7 @@ internal class PlaybackSessionManager(
                 }
             }
             discardChannelBlocking(channel)
-            if (wasCurrent) onQualitySwitchAborted()
+            if (wasCurrent) onQualitySwitchAborted(false)
         }
     }
 
@@ -986,7 +992,7 @@ internal class PlaybackSessionManager(
         } ?: return
         if (MediaPlayer.DEBUG) logger.debug("$debugLabel Aborted incoming video handoff #$generation ($reason).")
         discardChannelAsync(inc)
-        onQualitySwitchAborted()
+        onQualitySwitchAborted(false)
     }
 
     /** Tears down [channel] (process join) on a background thread, then releases its GL resources on the render thread. */
