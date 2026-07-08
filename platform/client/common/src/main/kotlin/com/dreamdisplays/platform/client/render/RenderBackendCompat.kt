@@ -38,7 +38,10 @@ internal object RenderBackendCompat {
     /** Fingerprint of the active render device. */
     private fun backendFingerprint(): String =
         //? if >=1.21.11 {
+        //? if >=26.2 {
         RenderSystem.getDevice().deviceInfo.backendName().lowercase()
+        //?} else
+        /*RenderSystem.getDevice().backendName.lowercase()*/
         //?} else
         /*RenderSystem.getBackendDescription().lowercase()*/
 
