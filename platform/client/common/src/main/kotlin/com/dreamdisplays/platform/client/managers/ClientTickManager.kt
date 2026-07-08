@@ -116,12 +116,11 @@ object ClientTickManager {
 
             // Already parked warm: wake it when back in range, or tear it down once it has been dormant
             // past the pool TTL (freeing its decoder + texture; the snapshot cache then bridges a return).
+            // demoteAfterNanos is not a second, earlier TTL here — it only makes a display a preferred
+            // eviction victim in reserveWarmSlot once a newer candidate needs its slot (see below).
             if (displayScreen.isDormant) {
-                when {
-                    !shouldUnload -> displayScreen.wake()
-                    displayScreen.dormantExpired(WarmParkPolicy.ttlNanos) -> compressDormant(displayScreen)
-                    displayScreen.dormantExpired(WarmParkPolicy.demoteAfterNanos) -> compressDormant(displayScreen)
-                }
+                if (!shouldUnload) displayScreen.wake()
+                else if (displayScreen.dormantExpired(WarmParkPolicy.ttlNanos)) compressDormant(displayScreen)
                 continue
             }
 
@@ -183,13 +182,21 @@ object ClientTickManager {
         DisplayRegistry.unregisterScreen(displayScreen)
     }
 
-    /** Ensures there is budget for [candidate], evicting oldest parked displays into snapshots when needed. */
+    /**
+     * Ensures there is budget for [candidate], evicting parked displays into snapshots when needed.
+     * Prefers a display already past [WarmParkPolicy.demoteAfterNanos] (a grace period recently-parked
+     * displays get before being sacrificed for a newcomer); falls back to the oldest parked display
+     * overall when none have aged past it yet, so eviction never stalls under pressure.
+     */
     private fun reserveWarmSlot(candidate: DisplayScreen): Boolean {
         if (WarmParkPolicy.maxFullWarmDisplays <= 0) return false
         repeat(WarmParkPolicy.maxFullWarmDisplays + 1) {
             val dormant = DisplayRegistry.dormantScreens()
             if (WarmParkPolicy.fits(dormant, candidate)) return true
-            val victim = dormant.minByOrNull { it.dormantSinceNanos() } ?: return false
+            val victim = dormant.filter { it.dormantExpired(WarmParkPolicy.demoteAfterNanos) }
+                .minByOrNull { it.dormantSinceNanos() }
+                ?: dormant.minByOrNull { it.dormantSinceNanos() }
+                ?: return false
             compressDormant(victim)
         }
         return false
