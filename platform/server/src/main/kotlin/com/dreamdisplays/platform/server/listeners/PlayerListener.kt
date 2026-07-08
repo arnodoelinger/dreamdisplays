@@ -48,6 +48,7 @@ class PlayerListener : Listener {
     fun onPlayerJoin(event: PlayerJoinEvent) {
         val player = event.player
         Scheduler.trackPlayer(player)
+        WatchPartyManager.onPlayerJoin(player.uniqueId)
 
         if (!PlatformUtil.isFolia && !hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
@@ -94,6 +95,7 @@ object VanillaPlayerListener {
      * `modRequired` message for vanilla clients when mod detection is enabled.
      */
     fun onJoin(player: ServerPlayer, server: MinecraftServer) {
+        WatchPartyManager.onPlayerJoin(player.uuid)
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
             VanillaServerScheduler.runLater(server, 40L) {

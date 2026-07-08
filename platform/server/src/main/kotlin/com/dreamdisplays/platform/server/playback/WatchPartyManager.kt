@@ -174,6 +174,19 @@ object WatchPartyManager {
         }
     }
 
+    /**
+     * Clears the host grace timer when the host rejoins within it, so [tick] doesn't force-end the
+     * session out from under a host who reconnected and is simply watching (no host action needed to
+     * "prove" they're back). The session stays paused from the disconnect; the host resumes explicitly.
+     */
+    fun onPlayerJoin(playerId: UUID) {
+        val now = transport.nowMs()
+        sessions.values.filter { it.hostId == playerId && it.hostDisconnectedAt > 0L }.forEach { session ->
+            session.hostDisconnectedAt = 0
+            broadcast(session, now)
+        }
+    }
+
     /** Ends and removes the session on [display], handing the display back to its base mode. */
     fun close(display: DisplayData) {
         val session = sessions.remove(display.id) ?: return
