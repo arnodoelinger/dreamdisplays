@@ -84,7 +84,7 @@ object VanillaDisplayActions {
             } else {
                 val delayTicks = (index * 2).toLong()
                 VanillaServerScheduler.runLater(server, delayTicks) {
-                    if (player.isAlive) {
+                    if (server.playerList.players.contains(player)) {
                         batch.forEach { VanillaPacketUtil.sendDisplayInfo(listOf(player), it) }
                     }
                 }
