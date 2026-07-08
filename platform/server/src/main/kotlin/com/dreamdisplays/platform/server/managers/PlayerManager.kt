@@ -17,17 +17,35 @@ object PlayerManager {
     /** Map of player UUIDs to their reported mod versions. */
     private val versions: MutableMap<UUID, Semver?> = ConcurrentHashMap()
 
-    /** Set of player UUIDs that have been notified about mod updates. */
-    private val modUpdateNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
-
-    /** Set of player UUIDs that have been notified about plugin updates. */
-    private val pluginUpdateNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
-
-    /** Set of player UUIDs that have been notified that the mod is required. */
-    private val modRequiredNotified: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
-
     /** Set of player UUIDs for which displays are disabled. */
     private val displaysDisabled: MutableSet<UUID> = ConcurrentHashMap.newKeySet()
+
+    /**
+     * One-way "already notified this session" bits per player, kept for the server's lifetime (see
+     * [removePlayer]) so a player is told about an update / requirement only once per server session,
+     * not on every re-join.
+     *
+     * Packed into a single bitmask entry instead of three separate `UUID` sets — on a server that sees
+     * hundreds of unique joins in one session, three per-player hash-set nodes each is pure overhead once
+     * you're just tracking three booleans.
+     */
+    private val notifiedFlags: MutableMap<UUID, Int> = ConcurrentHashMap()
+
+    private const val MOD_UPDATE_NOTIFIED = 1
+    private const val PLUGIN_UPDATE_NOTIFIED = 1 shl 1
+    private const val MOD_REQUIRED_NOTIFIED = 1 shl 2
+
+    /** Returns true if [flag] is set for [uuid]. */
+    private fun hasNotifiedFlag(uuid: UUID, flag: Int): Boolean = (notifiedFlags[uuid] ?: 0) and flag != 0
+
+    /** Sets or clears [flag] for [uuid]; drops the map entry entirely once no flags remain set. */
+    private fun setNotifiedFlag(uuid: UUID, flag: Int, notified: Boolean) {
+        notifiedFlags.compute(uuid) { _, bits ->
+            val current = bits ?: 0
+            val updated = if (notified) current or flag else current and flag.inv()
+            updated.takeIf { it != 0 }
+        }
+    }
 
     /** Records the mod [version] reported by [uuid] for compatibility checks. */
     fun setVersion(uuid: UUID, version: Semver?) {
@@ -51,9 +69,6 @@ object PlayerManager {
     fun removePlayer(uuid: UUID) {
         versions.remove(uuid)
         displaysDisabled.remove(uuid)
-        // modUpdateNotified.remove(uuid)
-        // pluginUpdateNotified.remove(uuid)
-        // modRequiredNotified.remove(uuid)
     }
 
     /** Drops all cached per-player state on disconnect. */
@@ -81,7 +96,7 @@ object PlayerManager {
     fun getVersion(player: ServerPlayer): Semver? = getVersion(player.uuid)
 
     /** Returns true if [uuid] has already been informed about a mod update. */
-    fun hasBeenNotifiedAboutModUpdate(uuid: UUID): Boolean = uuid in modUpdateNotified
+    fun hasBeenNotifiedAboutModUpdate(uuid: UUID): Boolean = hasNotifiedFlag(uuid, MOD_UPDATE_NOTIFIED)
 
     /** Returns true if [player] has already been informed about a mod update. */
     @PaperOnly
@@ -95,9 +110,7 @@ object PlayerManager {
         hasBeenNotifiedAboutModUpdate(player.uuid)
 
     /** Marks whether [uuid] has been notified about a mod update. */
-    fun setModUpdateNotified(uuid: UUID, notified: Boolean) {
-        if (notified) modUpdateNotified.add(uuid) else modUpdateNotified.remove(uuid)
-    }
+    fun setModUpdateNotified(uuid: UUID, notified: Boolean) = setNotifiedFlag(uuid, MOD_UPDATE_NOTIFIED, notified)
 
     /** Marks whether [player] has been notified about a mod update. */
     @PaperOnly
@@ -111,7 +124,7 @@ object PlayerManager {
         setModUpdateNotified(player.uuid, notified)
 
     /** Returns true if [uuid] has already been informed about a plugin update. */
-    fun hasBeenNotifiedAboutPluginUpdate(uuid: UUID): Boolean = uuid in pluginUpdateNotified
+    fun hasBeenNotifiedAboutPluginUpdate(uuid: UUID): Boolean = hasNotifiedFlag(uuid, PLUGIN_UPDATE_NOTIFIED)
 
     /** Returns true if [player] has already been informed about a plugin update. */
     @PaperOnly
@@ -125,9 +138,8 @@ object PlayerManager {
         hasBeenNotifiedAboutPluginUpdate(player.uuid)
 
     /** Marks whether [uuid] has been notified about a plugin update. */
-    fun setPluginUpdateNotified(uuid: UUID, notified: Boolean) {
-        if (notified) pluginUpdateNotified.add(uuid) else pluginUpdateNotified.remove(uuid)
-    }
+    fun setPluginUpdateNotified(uuid: UUID, notified: Boolean) =
+        setNotifiedFlag(uuid, PLUGIN_UPDATE_NOTIFIED, notified)
 
     /** Marks whether [player] has been notified about a plugin update. */
     @PaperOnly
@@ -141,7 +153,7 @@ object PlayerManager {
         setPluginUpdateNotified(player.uuid, notified)
 
     /** Returns true if [uuid] has already been informed that the mod is required. */
-    fun hasBeenNotifiedAboutModRequired(uuid: UUID): Boolean = uuid in modRequiredNotified
+    fun hasBeenNotifiedAboutModRequired(uuid: UUID): Boolean = hasNotifiedFlag(uuid, MOD_REQUIRED_NOTIFIED)
 
     /** Returns true if [player] has already been informed that the mod is required. */
     @PaperOnly
@@ -155,9 +167,8 @@ object PlayerManager {
         hasBeenNotifiedAboutModRequired(player.uuid)
 
     /** Marks whether [uuid] has been notified that the mod is required. */
-    fun setModRequiredNotified(uuid: UUID, notified: Boolean) {
-        if (notified) modRequiredNotified.add(uuid) else modRequiredNotified.remove(uuid)
-    }
+    fun setModRequiredNotified(uuid: UUID, notified: Boolean) =
+        setNotifiedFlag(uuid, MOD_REQUIRED_NOTIFIED, notified)
 
     /** Marks whether [player] has been notified that the mod is required. */
     @PaperOnly
