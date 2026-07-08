@@ -7,6 +7,7 @@ import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.playback.WatchPartyAction
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.managers.ActionThrottle
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.managers.StateManager
@@ -36,6 +37,18 @@ import java.util.UUID
 object DisplayActions {
     private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayActions")
 
+    /**
+     * Bounds how often one display's video can be changed — each call persists to disk, broadcasts to
+     * every viewer, and makes every viewer's client re-resolve the new URL, so unlike the cheap
+     * per-packet sync state this genuinely amplifies.
+     */
+    private val setVideoThrottle = ActionThrottle()
+    private const val SET_VIDEO_COOLDOWN_MS = 250L
+
+    /** Bounds how often one player may request a catch-up snapshot for one display. */
+    private val requestSyncThrottle = ActionThrottle()
+    private const val REQUEST_SYNC_COOLDOWN_MS = 250L
+
     /** Handles a client-requested deletion, enforcing owner-or-permission check. */
     fun delete(player: Player, displayId: UUID) {
         val displayData = DisplayManager.getDisplayData(displayId)
@@ -57,6 +70,7 @@ object DisplayActions {
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
         if (!MediaUrlPolicy.isAllowed(url)) return
+        if (!setVideoThrottle.tryAcquire(displayId, SET_VIDEO_COOLDOWN_MS)) return
 
         val wasSync = displayData.isSync
         displayData.url = url
@@ -126,6 +140,7 @@ object DisplayActions {
     /** Replies to a client's catch-up request with the current timeline and any live session. */
     fun requestSync(player: Player, displayId: UUID) {
         val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        if (!requestSyncThrottle.tryAcquire(displayId to player.uniqueId, REQUEST_SYNC_COOLDOWN_MS)) return
         TimelineManager.sendCurrent(displayData, player.uniqueId)
         WatchPartyManager.sendCurrent(displayData, player.uniqueId)
     }
