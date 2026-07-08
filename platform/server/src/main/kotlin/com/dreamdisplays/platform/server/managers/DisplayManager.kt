@@ -34,6 +34,7 @@ import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import org.bukkit.Bukkit
 import org.bukkit.Bukkit.getOfflinePlayer
 import org.bukkit.Location
 import org.bukkit.entity.Player
@@ -304,7 +305,9 @@ object DisplayManager {
 
     /**
      * Scans every display's bounding box for the configured base material; displays with none
-     * are removed from disk and memory. Returns the UUIDs of removed displays.
+     * are removed from disk and memory, and every online player is told to forget them (matching
+     * what a normal [delete] does — [removeDisplays] alone only updates storage and the registry).
+     * Returns the UUIDs of removed displays.
      */
     @PaperOnly
     fun validateDisplaysAndCleanup(): List<UUID> {
@@ -341,9 +344,13 @@ object DisplayManager {
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        return removeDisplays(invalidDisplays) { display ->
+        val removed = removeDisplays(invalidDisplays) { display ->
             runAsync { getInstance().storage.deleteDisplay(display as PaperDisplayData) }
         }
+        if (removed.isNotEmpty()) {
+            PacketUtil.sendClearCache(Bukkit.getOnlinePlayers().toList(), removed)
+        }
+        return removed
     }
 
     /** Returns the first display whose bounding box contains [blockPos] in [worldKey]. */
@@ -447,7 +454,9 @@ object DisplayManager {
 
     /**
      * Scans every display's bounding box for the configured base material; displays with none
-     * are removed from disk and memory. Returns the UUIDs of removed displays.
+     * are removed from disk and memory, and every online player is told to forget them (matching
+     * what a normal [delete] does — [removeDisplays] alone only updates storage and the registry).
+     * Returns the UUIDs of removed displays.
      */
     fun validateDisplaysAndCleanup(server: MinecraftServer): List<UUID> {
         val cfg = VanillaServerState.config
@@ -477,8 +486,12 @@ object DisplayManager {
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        return removeDisplays(invalidDisplays) { display ->
+        val removed = removeDisplays(invalidDisplays) { display ->
             ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(display as VanillaDisplayData) }
         }
+        if (removed.isNotEmpty()) {
+            VanillaPacketUtil.sendClearCache(server.playerList.players, removed)
+        }
+        return removed
     }
 }

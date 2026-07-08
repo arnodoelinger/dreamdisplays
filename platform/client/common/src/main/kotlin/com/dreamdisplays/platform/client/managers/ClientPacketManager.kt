@@ -91,10 +91,11 @@ object ClientPacketManager {
         logger.info("Display deleted and removed from saved data: ${packet.id}.")
     }
 
-    /** Drops the listed displays from the registry, display system, and saved data. */
+    /** Drops the listed displays from the registry (active or unloaded), display system, and saved data. */
     private fun handleClearCache(packet: ClearCache) {
         packet.ids.forEach { uuid ->
-            DisplayRegistry.screens.remove(uuid)?.unregister()
+            DisplayRegistry.screens[uuid]?.let { DisplayRegistry.unregisterScreen(it) }
+            DisplayRegistry.unloadedScreens.remove(uuid)
             DreamServices.registry.getOrNull<DisplaySystem>()?.removeDisplay(DisplayId(uuid))
             DisplayStorage.removeDisplay(uuid)
         }

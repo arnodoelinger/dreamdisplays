@@ -9,9 +9,7 @@ import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.dreamdisplays.platform.server.utils.net.VanillaServerScheduler
-import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
@@ -21,7 +19,6 @@ import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import net.neoforged.bus.api.SubscribeEvent
 import net.neoforged.neoforge.event.entity.player.PlayerEvent
-import org.bukkit.Bukkit
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
@@ -52,13 +49,7 @@ class PlayerListener : Listener {
 
         if (!PlatformUtil.isFolia && !hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
-            Scheduler.runLater(40L) {
-                val removedDisplayUuids = DisplayManager.validateDisplaysAndCleanup()
-                if (removedDisplayUuids.isNotEmpty()) {
-                    @Suppress("UNCHECKED_CAST")
-                    PacketUtil.sendClearCache(Bukkit.getOnlinePlayers().toMutableList(), removedDisplayUuids)
-                }
-            }
+            Scheduler.runLater(40L) { DisplayManager.validateDisplaysAndCleanup() }
         }
 
         if (!config.settings.modDetectionEnabled) return
@@ -98,12 +89,7 @@ object VanillaPlayerListener {
         WatchPartyManager.onPlayerJoin(player.uuid)
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
-            VanillaServerScheduler.runLater(server, 40L) {
-                val removedUuids = DisplayManager.validateDisplaysAndCleanup(server)
-                if (removedUuids.isNotEmpty()) {
-                    VanillaPacketUtil.sendClearCache(server.playerList.players, removedUuids)
-                }
-            }
+            VanillaServerScheduler.runLater(server, 40L) { DisplayManager.validateDisplaysAndCleanup(server) }
         }
 
         if (!VanillaServerState.config.settings.modDetectionEnabled) return
