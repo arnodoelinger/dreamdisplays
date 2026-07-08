@@ -95,13 +95,16 @@ object DisplayManager {
     }
 
     /**
-     * Removes every display in [toRemove] from the in-memory registry, invokes [delete] for each,
-     * and returns the list of removed UUIDs.
+     * Removes every display in [toRemove] from the in-memory registry (and its playback/timeline/
+     * watch-party state, same as [delete]), invokes [delete] for each, and returns the removed UUIDs.
      */
     private fun removeDisplays(toRemove: List<DisplayData>, delete: (DisplayData) -> Unit): List<UUID> {
         return toRemove.map { display ->
             displays.remove(display.id)
             proximityIndex.forgetDisplay(display.id)
+            TimelineManager.remove(display.id)
+            WatchPartyManager.remove(display.id)
+            StateManager.remove(display.id)
             delete(display)
             display.id
         }
@@ -266,6 +269,7 @@ object DisplayManager {
         broadcastDelete(displayData)
         TimelineManager.remove(displayData.id)
         WatchPartyManager.remove(displayData.id)
+        StateManager.remove(displayData.id)
         displays.remove(displayData.id)
         proximityIndex.forgetDisplay(displayData.id)
     }
@@ -410,6 +414,7 @@ object DisplayManager {
         displays.remove(data.id)
         TimelineManager.remove(data.id)
         WatchPartyManager.remove(data.id)
+        StateManager.remove(data.id)
         ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(data) }
     }
 

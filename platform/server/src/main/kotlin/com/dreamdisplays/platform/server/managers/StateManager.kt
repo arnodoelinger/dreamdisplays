@@ -42,6 +42,12 @@ object StateManager {
     /** Minimum interval between rebroadcasts of sync packets for a display, in milliseconds. */
     private const val SYNC_MIN_INTERVAL_MS = 250L
 
+    /** Forgets a removed display's v1 sync state, so [tickBroadcast] stops carrying its dead entry. */
+    fun remove(displayId: UUID) {
+        playStates.remove(displayId)
+        lastSyncBroadcast.remove(displayId)
+    }
+
     /** Interval for periodic sync broadcasts to keep clients in lockstep, in milliseconds. */
     private const val PERIODIC_BROADCAST_INTERVAL_MS = 2000L
 
