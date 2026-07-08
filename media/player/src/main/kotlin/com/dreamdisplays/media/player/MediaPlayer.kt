@@ -169,6 +169,9 @@ class MediaPlayer(
     /** In-place audio restarts used by the current session (see [handleAudioFailure]); reset per session. */
     private val audioRestartAttempts = AtomicInteger(0)
 
+    /** Guards [dispatchInitialize] so at most one resolve is ever in flight for this player. */
+    private val initializing = AtomicBoolean(false)
+
     // Watchdog is created before sessionManager but its lambdas reference sessionManager lazily
     private val watchdog = StreamWatchdog(
         debugLabel = debugLabel,
@@ -241,7 +244,7 @@ class MediaPlayer(
         // Show cached replay video immediately (network-free) so a reappearing display is instant,
         // in parallel with the live stream resolve happening on the init executor.
         replayBootstrap?.let { boot -> safeExecute { startReplayBootstrapVideo(boot) } }
-        INIT_EXECUTOR.submit { initialize() }
+        dispatchInitialize()
     }
 
     /** Resumes playback from the current seek position. No-op if already playing. */
@@ -501,6 +504,21 @@ class MediaPlayer(
     }
 
     /**
+     * Submits [initialize] to [INIT_EXECUTOR], guarded by [initializing] so at most one resolve is ever
+     * in flight for this player.
+     */
+    private fun dispatchInitialize() {
+        if (terminated.get() || !initializing.compareAndSet(false, true)) return
+        INIT_EXECUTOR.submit {
+            try {
+                if (!terminated.get()) initialize()
+            } finally {
+                initializing.set(false)
+            }
+        }
+    }
+
+    /**
      * Runs on [INIT_EXECUTOR]. Delegates to [MediaPreparationService], updates metadata fields,
      * sets state to [PlaybackState.PLAYING], and fires [whenInitialized] callbacks.
      * On failure marks the screen as errored; on success starts playback.
@@ -723,9 +741,7 @@ class MediaPlayer(
         logger.warn("$debugLabel ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in ${delayMs} ms.")
         if (invalidateCache) env.cacheInvalidator.invalidate(youtubeUrl)
         state.set(PlaybackState.RESTARTING)
-        RETRY_SCHEDULER.schedule({
-            if (!terminated.get()) INIT_EXECUTOR.submit { if (!terminated.get()) initialize() }
-        }, delayMs, TimeUnit.MILLISECONDS)
+        RETRY_SCHEDULER.schedule({ dispatchInitialize() }, delayMs, TimeUnit.MILLISECONDS)
     }
 
     /**
@@ -788,7 +804,7 @@ class MediaPlayer(
             env.cacheInvalidator.invalidate(youtubeUrl)
             primedStartPositionNanos.set(if (liveStream) 0L else clock.currentTime())
             state.set(PlaybackState.RESTARTING)
-            safeExecute { if (!terminated.get()) initialize() }
+            dispatchInitialize()
         } else {
             logger.warn("$debugLabel Stream stalled ($reason); restarting.")
             safeExecute {
@@ -816,7 +832,7 @@ class MediaPlayer(
             endedAtEnd.set(false)
             primedStartPositionNanos.set(0L)
             state.set(PlaybackState.RESTARTING)
-            initialize()
+            dispatchInitialize()
             return
         }
         val offset = if (endedAtEnd.getAndSet(false)) 0L else clock.seekOffsetNanos
@@ -898,7 +914,7 @@ class MediaPlayer(
             logger.debug("$debugLabel Live quality switch to ${target}p; re-resolving and restarting.")
             primedStartPositionNanos.set(0L)
             state.set(PlaybackState.RESTARTING)
-            initialize()
+            dispatchInitialize()
             return
         }
         if (isPausedWarm()) freezePausedWarmSession()
