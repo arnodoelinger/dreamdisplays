@@ -60,7 +60,7 @@ object DisplayRegistry {
 
         val clientSettings = ClientSettingsStore.getSettings(
             displayScreen.uuid,
-            DisplayScreen.defaultVolumeFor(displayScreen.mode),
+            DisplayScreen.defaultVolume(),
         )
         displayScreen.volume = clientSettings.volume
         displayScreen.quality = VideoQuality.parse(clientSettings.quality)

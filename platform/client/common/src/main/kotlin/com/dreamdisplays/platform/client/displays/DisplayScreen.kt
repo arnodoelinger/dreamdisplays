@@ -90,7 +90,7 @@ class DisplayScreen(
     var rotation: ContentRotation = ContentRotation.NONE,
 ) {
     /** Per-display client settings (volume, quality, mute, ...) loaded from disk. */
-    private val savedSettings = ClientSettingsStore.getSettings(uuid, defaultVolumeFor(mode))
+    private val savedSettings = ClientSettingsStore.getSettings(uuid, defaultVolume())
 
     /** True if the local player owns this display. */
     var owner: Boolean = Minecraft.getInstance().player?.gameProfile?.id?.toString() == ownerUuid.toString()
@@ -475,9 +475,7 @@ class DisplayScreen(
         } else {
             PlaybackMode.fromWire(packet.mode)
         }
-        val previousMode = mode
         mode = nextMode
-        applyModeVolumeDefault(previousMode, nextMode)
 
         qualityCap = packet.qualityCap
         isLocked = packet.isLocked
@@ -517,13 +515,6 @@ class DisplayScreen(
         Initializer.sendPacket(RequestSync(uuid))
     }
 
-    /** Applies the shared-mode default when a display enters Synced/Broadcast while still on the old local default. */
-    private fun applyModeVolumeDefault(previousMode: PlaybackMode, nextMode: PlaybackMode) {
-        if (previousMode == nextMode) return
-        if (nextMode != PlaybackMode.SYNCED && nextMode != PlaybackMode.BROADCAST) return
-        if (abs(volume - defaultVolumeFor(previousMode)) > VOLUME_DEFAULT_EPSILON) return
-        volume = defaultVolumeFor(nextMode)
-    }
 
     /** Applies the authoritative server timeline: matches pause state and corrects drift. */
     fun updateData(packet: DisplaySync) {
@@ -913,8 +904,8 @@ class DisplayScreen(
         /** Logger for replay-capture and diagnostic messages. */
         private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayScreen")
 
-        /** Initial per-display volume for newly seen displays in [mode]. */
-        internal fun defaultVolumeFor(mode: PlaybackMode): Float {
+        /** Initial per-display volume for newly seen displays. */
+        internal fun defaultVolume(): Float {
             val serverDefault = ClientPacketManager.serverSnapshot.defaultVolume
             if (serverDefault >= 0f) return serverDefault.coerceIn(0f, MAX_SERVER_DEFAULT_VOLUME) // No to bad servers
             return ClientDisplaySettings.DEFAULT_VOLUME
@@ -928,9 +919,6 @@ class DisplayScreen(
 
         /** Duration of the first-frame fade-in (see [appearProgress]). */
         private const val APPEAR_FADE_NANOS = 260_000_000L
-
-        /** Tolerance for recognizing an untouched legacy default volume. */
-        private const val VOLUME_DEFAULT_EPSILON = 0.01f
 
         /** Maximum server-prescribed default volume accepted by the client (200% in the UI). */
         private const val MAX_SERVER_DEFAULT_VOLUME = 1.0f
