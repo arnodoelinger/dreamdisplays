@@ -151,6 +151,7 @@ internal class FramePrebuffer(
 
     /** Drops queued frames and re-primes the same consumer for an in-place decoder seek. */
     fun resetForSeek(onFirstFrame: () -> Unit) {
+        generation.incrementAndGet()
         drainAndRecycle()
         inputClosed = false
         primed = false
@@ -197,6 +198,10 @@ internal class FramePrebuffer(
                 val tf = queue.poll(POLL_MS, TimeUnit.MILLISECONDS)
                 if (tf == null) {
                     if (inputClosed) break // Tail drained
+                    continue
+                }
+                if (tf.generation != generation.get()) {
+                    surface.recycleFrameBuffer(tf.buf)
                     continue
                 }
                 // Bail out of the pacing wait as soon as a seek flush or teardown is requested;
