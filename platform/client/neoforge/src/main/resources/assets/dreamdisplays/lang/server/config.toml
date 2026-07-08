@@ -52,6 +52,7 @@ database = "database"
 username = "username"
 password = "password"
 table_prefix = ""
+use_ssl = false
 
 [permissions]
 # Permission nodes

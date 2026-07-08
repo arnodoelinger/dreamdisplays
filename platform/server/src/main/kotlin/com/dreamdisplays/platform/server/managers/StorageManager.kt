@@ -99,6 +99,7 @@ class StorageManager(
     database: String = "",
     username: String = "",
     password: String = "",
+    useSSL: Boolean = false,
     private val logger: Logger = LoggerFactory.getLogger("DreamDisplays/Storage"),
 ) {
     private val table = DisplaysTable(tablePrefix)
@@ -106,7 +107,7 @@ class StorageManager(
     private val dataSource = HikariDataSource(HikariConfig().apply {
         jdbcUrl = when (backend) {
             StorageBackend.SQLITE -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
-            StorageBackend.MYSQL -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=false&useInformationSchema=false"
+            StorageBackend.MYSQL -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=$useSSL&useInformationSchema=false"
         }
         if (backend != StorageBackend.SQLITE) {
             this.username = username

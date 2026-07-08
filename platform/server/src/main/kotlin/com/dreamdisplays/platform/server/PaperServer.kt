@@ -67,7 +67,7 @@ class PaperServer : JavaPlugin() {
         storage = StorageManager(
             backend = backend, dataDir = dataFolder, tablePrefix = s.tablePrefix,
             host = s.host, port = s.port, database = s.database,
-            username = s.username, password = s.password,
+            username = s.username, password = s.password, useSSL = s.useSSL,
         )
         storage.createSchema()
         DisplayManager.register(storage.loadAllPaperDisplays())

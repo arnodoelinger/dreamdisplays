@@ -29,7 +29,7 @@ object VanillaBootstrap {
             backend = StorageBackend.fromConfig(s.type), dataDir = dataDir,
             tablePrefix = s.tablePrefix,
             host = s.host, port = s.port, database = s.database,
-            username = s.username, password = s.password,
+            username = s.username, password = s.password, useSSL = s.useSSL,
         )
         VanillaServerState.storage = storage
         storage.createSchema()

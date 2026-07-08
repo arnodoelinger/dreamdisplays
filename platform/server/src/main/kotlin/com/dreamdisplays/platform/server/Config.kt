@@ -114,7 +114,8 @@ class Config(private val plugin: PaperServer) {
                 database = t?.getString("storage.database") ?: "my_database",
                 password = t?.getString("storage.password") ?: "veryStrongPassword",
                 username = t?.getString("storage.username") ?: "username",
-                table_prefix = t?.getString("storage.table_prefix") ?: ""
+                table_prefix = t?.getString("storage.table_prefix") ?: "",
+                use_ssl = t?.getBoolean("storage.use_ssl") ?: false,
             )
         )
         permissions = PermissionsSection(
@@ -275,6 +276,7 @@ class Config(private val plugin: PaperServer) {
         val password get() = storage.password
         val username get() = storage.username
         val tablePrefix get() = storage.table_prefix
+        val useSSL get() = storage.use_ssl
 
         data class StorageConfig(
             val type: String = StorageBackend.SQLITE.configToken,
@@ -284,6 +286,7 @@ class Config(private val plugin: PaperServer) {
             val password: String = "veryStrongPassword",
             val username: String = "username",
             val table_prefix: String = "",
+            val use_ssl: Boolean = false,
         )
     }
 
@@ -464,7 +467,8 @@ class VanillaConfig(private val configDir: File) {
                 database = t?.getString("storage.database") ?: "my_database",
                 password = t?.getString("storage.password") ?: "veryStrongPassword",
                 username = t?.getString("storage.username") ?: "username",
-                table_prefix = t?.getString("storage.table_prefix") ?: ""
+                table_prefix = t?.getString("storage.table_prefix") ?: "",
+                use_ssl = t?.getBoolean("storage.use_ssl") ?: false,
             )
         )
         permissions = PermissionsSection(
@@ -633,6 +637,7 @@ class VanillaConfig(private val configDir: File) {
         val password get() = storage.password
         val username get() = storage.username
         val tablePrefix get() = storage.table_prefix
+        val useSSL get() = storage.use_ssl
 
         data class StorageConfig(
             val type: String = StorageBackend.SQLITE.configToken,
@@ -642,6 +647,7 @@ class VanillaConfig(private val configDir: File) {
             val password: String = "veryStrongPassword",
             val username: String = "username",
             val table_prefix: String = "",
+            val use_ssl: Boolean = false,
         )
     }
 
@@ -729,6 +735,7 @@ database = "database"
 username = "username"
 password = "password"
 table_prefix = ""
+use_ssl = false
 
 [permissions]
 create = "dreamdisplays.create"
