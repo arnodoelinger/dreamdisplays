@@ -47,31 +47,59 @@ object DisplayLifecycleManager {
         }
 
         val facing = FacingUtil.fromPacket(packet.facing.toByte())
-
-        Minecraft.getInstance().player?.let { player ->
-            val renderDistance = DisplayStorage.getDisplayData(packet.id)?.renderDistance
-                ?: persistedRenderDistance(packet.id)
-            val dist = distanceToScreen(
-                packet.x, packet.y, packet.z,
-                packet.width, packet.height, facing.toDisplayFacing(),
-                player.blockPosition()
-            )
-            if (dist > renderDistance) return
-        }
-
-        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(packet.url))
-        DisplayRegistry.unloadedScreens.remove(packet.id)
-
         val mode = if (packet.mode == PlaybackMode.LOCAL.wire && packet.isSync) {
             PlaybackMode.SYNCED
         } else {
             PlaybackMode.fromWire(packet.mode)
         }
+        val renderDistance = DisplayStorage.getDisplayData(packet.id)?.renderDistance
+            ?: persistedRenderDistance(packet.id)
+
+        Minecraft.getInstance().player?.let { player ->
+            val dist = distanceToScreen(
+                packet.x, packet.y, packet.z,
+                packet.width, packet.height, facing.toDisplayFacing(),
+                player.blockPosition()
+            )
+            if (dist > renderDistance) {
+                // Too far to build a screen for yet: cache it exactly like unregisterScreen would, so
+                // restoreVisibleUnloadedScreens rebuilds it locally the moment the player walks into
+                // range, instead of the display staying invisible until the server's next periodic
+                // broadcast (which may be a while, or never arrive again if the client's own render
+                // distance is smaller than the server's).
+                cacheUnloadedDisplay(packet, facing, mode, renderDistance)
+                return
+            }
+        }
+
+        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(packet.url))
+        DisplayRegistry.unloadedScreens.remove(packet.id)
 
         createScreen(
             packet.id, packet.ownerId, Vector3i(packet.x, packet.y, packet.z), facing,
             packet.width, packet.height, packet.url, packet.lang,
             mode, packet.qualityCap, ContentRotation.fromQuarterTurns(packet.rotation),
+        )
+    }
+
+    /**
+     * Stashes an out-of-range [packet] as an unloaded-screen snapshot (viewer's saved volume / quality /
+     * etc. merged in, matching a normal [DisplayScreen.toFullDisplayData] capture), so it restores from
+     * the local cache instead of needing another server broadcast once the player is back in range.
+     */
+    private fun cacheUnloadedDisplay(packet: DisplayInfo, facing: FacingUtil, mode: PlaybackMode, renderDistance: Int) {
+        val settings = ClientSettingsStore.getSettings(packet.id, DisplayScreen.defaultVolume())
+        DisplayRegistry.unloadedScreens[packet.id] = FullDisplayData(
+            uuid = packet.id,
+            x = packet.x, y = packet.y, z = packet.z,
+            facing = facing.toDisplayFacing(),
+            width = packet.width, height = packet.height,
+            videoUrl = packet.url, lang = packet.lang,
+            volume = settings.volume, quality = settings.quality, brightness = settings.brightness,
+            muted = settings.muted, mode = mode, ownerUuid = packet.ownerId,
+            renderDistance = renderDistance, currentTimeNanos = settings.savedTimeNanos,
+            rotation = ContentRotation.fromQuarterTurns(packet.rotation).quarterTurns,
+            qualityCap = packet.qualityCap,
         )
     }
 
@@ -94,10 +122,14 @@ object DisplayLifecycleManager {
         if (code != "") displayScreen.loadVideo(code, lang)
     }
 
-    /** Restores any softly-unloaded screens that are back within render distance of [playerPos]. */
+    /**
+     * Restores any softly-unloaded screens that are back within render distance of [playerPos].
+     * Screens with no video (idle, or an out-of-range first sighting) are restored too — restoreScreen
+     * already handles an empty [FullDisplayData.videoUrl] fine — so they don't stay invisible forever.
+     */
     fun restoreVisibleUnloadedScreens(playerPos: BlockPos) {
         DisplayRegistry.unloadedScreens.values
-            .filter { it.videoUrl.isNotEmpty() && distanceToData(it, playerPos) <= it.renderDistance }
+            .filter { distanceToData(it, playerPos) <= it.renderDistance }
             .toList()
             .forEach { data ->
                 DisplayRegistry.unloadedScreens.remove(data.uuid)
