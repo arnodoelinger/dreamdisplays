@@ -134,6 +134,17 @@ internal class AudioSink(private val debugLabel: String) {
     }
 
     /**
+     * Drops all cached PCM. Called at the start of every fresh audio session ([start] / [startBridge])
+     * so a seek or restart can never leave pre-seek samples in the ring.
+     */
+    private fun clearRing() {
+        synchronized(pcmRing) {
+            pcmRing.clear()
+            pcmRingBytes = 0
+        }
+    }
+
+    /**
      * Returns up to the most-recent [maxBytes] of audible cached PCM (oldest-to-newest), or empty when
      * none. PCM still queued in the line (decoded but not yet played) is excluded so the snapshot ends at
      * the heard position — keeping the cached audio aligned with the cached video when replayed.
@@ -186,6 +197,7 @@ internal class AudioSink(private val debugLabel: String) {
         exposeLiveClock = true
         pcmFlowing = false
         sessionEpoch++
+        clearRing()
         drainStderr(proc, stopFlag)
         return daemon({ run(proc, terminated, stopFlag, startGate, onUnexpectedEnd) }, "MediaPlayer-audio").also { it.start() }
     }
@@ -209,6 +221,7 @@ internal class AudioSink(private val debugLabel: String) {
         exposeLiveClock = false
         pcmFlowing = false
         sessionEpoch++
+        clearRing()
         return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
     }
 
