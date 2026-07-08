@@ -411,11 +411,13 @@ object DisplayManager {
 
     /** Removes [data] from storage and the registry. The JDBC delete runs off-thread on [ServerCoroutines.io]. */
     fun delete(data: VanillaDisplayData) {
+        val receivers = VanillaServerState.server?.let { getReceivers(data, it) }.orEmpty()
         displays.remove(data.id)
         TimelineManager.remove(data.id)
         WatchPartyManager.remove(data.id)
         StateManager.remove(data.id)
         ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(data) }
+        if (receivers.isNotEmpty()) VanillaPacketUtil.sendDelete(receivers, data.id)
     }
 
     /**

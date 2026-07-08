@@ -105,9 +105,7 @@ object VanillaDisplayActions {
             return
         }
 
-        val receivers = DisplayManager.getReceivers(displayData, server)
         DisplayManager.delete(displayData)
-        VanillaPacketUtil.sendDelete(receivers, displayId)
         MessageUtil.sendMessage(player, "displayDeleted")
     }
 
