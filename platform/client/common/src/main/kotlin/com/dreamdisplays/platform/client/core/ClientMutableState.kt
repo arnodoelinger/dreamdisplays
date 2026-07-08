@@ -7,10 +7,6 @@ interface ClientMutableState : ClientState {
     /** Whether the client is currently on screen. This may be used to pause or reduce resource usage when the client is not visible. */
     override var isOnScreen: Boolean
 
-    // TODO: implement focus mode
-    /** Whether the client is currently in focus mode. */
-    override var focusMode: Boolean
-
     /** Enables or disables the display. */
     override var displaysEnabled: Boolean
 

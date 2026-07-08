@@ -17,13 +17,11 @@ import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
-import net.minecraft.world.effect.MobEffectInstance
-import net.minecraft.world.effect.MobEffects
 import org.lwjgl.glfw.GLFW
 import java.util.UUID
 
 /**
- * Handles per-tick client display state: level changes, hover, unloading, shortcuts, and focus mode.
+ * Handles per-tick client display state: level changes, hover, unloading, and shortcuts.
  */
 object ClientTickManager {
     /**
@@ -42,9 +40,6 @@ object ClientTickManager {
     @Volatile
     private var lastLevel: ClientLevel? = null
 
-    /** Whether focus-mode blindness was applied last tick. */
-    private var wasFocused = false
-
     /** Counter that throttles the unloaded-screen restore check. */
     private var unloadCheckTick = 0
 
@@ -57,7 +52,7 @@ object ClientTickManager {
     /** Monotonic tick counter emitted with [ClientLifecycleEvent.Tick]. */
     private var tickCount = 0L
 
-    /** Main per-tick update: level changes, hover, render-distance (un)loading, the menu shortcut, and focus mode. */
+    /** Main per-tick update: level changes, hover, render-distance (un)loading, and the menu shortcut. */
     fun tick(minecraft: Minecraft) {
         tickCount++
         DreamServices.registry.getOrNull<ClientApplication>()
@@ -165,15 +160,6 @@ object ClientTickManager {
             )
         }
         wasPressed = pressed
-
-        // TODO: implement focus mode in future
-        if (ClientStateManager.focusMode && hoveredDisplayScreen != null) {
-            player.addEffect(MobEffectInstance(MobEffects.BLINDNESS, 20 * 2, 1, false, false, false))
-            wasFocused = true
-        } else if (!ClientStateManager.focusMode && wasFocused) {
-            player.removeEffect(MobEffects.BLINDNESS)
-            wasFocused = false
-        }
     }
 
     /** Frees a fully warm dormant display, keeping only its cheap replay snapshot for fast reappearance. */
