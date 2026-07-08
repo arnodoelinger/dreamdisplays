@@ -872,7 +872,6 @@ class MediaPlayer(
         }
         if (isPausedWarm()) freezePausedWarmSession()
         val newSs = MediaStreamSelector.switchQuality(ss, target, lang) ?: return
-        val pos = if (liveStream) 0L else getCurrentTime()
         streams = newSs
         lastQuality = MediaStreamSelector.parseQuality(newSs.currentVideo)
         host.videoContentAspect = newSs.currentVideo.contentAspect()
@@ -882,11 +881,11 @@ class MediaPlayer(
                 // decoding and rendering. The new resolution warms up in a second channel; fitTexture
                 // promotes both (channel + texture) on its first frame, so the picture never freezes.
                 host.beginQualityHandoff()
-                safeExecute { beginQualitySwitch(newSs, pos) }
+                safeExecute { beginQualitySwitch(newSs, getCurrentTime()) }
             } else {
                 // Nothing decoding (so, just paused): no frames would arrive to drive a handoff, so swap directly
                 host.reloadTexture()
-                safeExecute { clock.seekOffsetNanos = pos }
+                safeExecute { clock.seekOffsetNanos = getCurrentTime() }
             }
         }
     }
@@ -920,7 +919,7 @@ class MediaPlayer(
      */
     private fun drainInitCallbacks(run: Boolean) {
         if (run) initDrained.set(true)
-        // Remove one at a time by identity so a callback added mid-drain is never wiped without running.
+        // Remove one at a time by identity so a callback added mid-drain is never wiped without running
         while (true) {
             val cb = initCallbacks.firstOrNull() ?: break
             if (initCallbacks.remove(cb) && run) cb()
