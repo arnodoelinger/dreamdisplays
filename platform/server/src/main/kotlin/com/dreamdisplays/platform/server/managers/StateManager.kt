@@ -111,16 +111,13 @@ object StateManager {
         if (PlatformUtil.isFolia) {
             DisplayManager.sendLegacySyncToTrackedNearbyPlayers(
                 data as PaperDisplayData,
-                packet.copy(id = packet.id),
+                packet,
                 excludedPlayerId = player.uniqueId,
             )
             return
         }
         val receivers = getReceivers(data as PaperDisplayData)
-        PacketUtil.sendSync(
-            receivers.filter { it.uniqueId != player.uniqueId }.toMutableList(),
-            packet.copy(id = packet.id)
-        )
+        PacketUtil.sendSync(receivers.filter { it.uniqueId != player.uniqueId }, packet)
     }
 
     /**
@@ -132,7 +129,7 @@ object StateManager {
         val data = getDisplayData(packet.id) ?: return
         val receivers = getReceivers(data as VanillaDisplayData, server)
             .filter { it.uuid != player.uuid }
-        VanillaPacketUtil.sendSync(receivers, packet.copy(id = packet.id))
+        VanillaPacketUtil.sendSync(receivers, packet)
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
@@ -144,7 +141,7 @@ object StateManager {
         val state = playStates[displayId] ?: return
 
         val packet = state.createPacket()
-        PacketUtil.sendSync(mutableListOf(player), packet)
+        PacketUtil.sendSync(listOf(player), packet)
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
@@ -175,7 +172,7 @@ object StateManager {
     @JvmStatic
     fun resetAndBroadcast(displayId: UUID, receivers: List<Player>) {
         val state = resetState(displayId) ?: return
-        PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
+        PacketUtil.sendSync(receivers, state.createPacket())
     }
 
     /** Resets and broadcasts over the correct `Paper` / `Folia` player scheduling path. */
@@ -227,7 +224,7 @@ object StateManager {
     fun tickBroadcast() = forEachBroadcastDue { state, display ->
         val receivers = getReceivers(display as PaperDisplayData)
             .filterNot { V2PlayerTracker.isV2(it.uniqueId) }
-        if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
+        if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers, state.createPacket())
     }
 
     /**

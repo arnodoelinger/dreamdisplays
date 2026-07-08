@@ -175,9 +175,8 @@ object DisplayManager {
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly
     fun sendUpdate(display: PaperDisplayData, players: List<Player>) {
-        @Suppress("UNCHECKED_CAST")
         PacketUtil.sendDisplayInfo(
-            players as MutableList<Player?>,
+            players,
             display.id, display.ownerId, display.box.min, display.width, display.height,
             display.url, display.lang, display.facing, display.isSync, display.isLocked,
             display.mode, display.qualityCap, display.rotation,
@@ -204,8 +203,7 @@ object DisplayManager {
                 if (player.isInRange(display)) sendDelete(listOf(player), display.id)
             }
         } else {
-            @Suppress("UNCHECKED_CAST")
-            sendDelete(getReceivers(display) as MutableList<Player?>, display.id)
+            sendDelete(getReceivers(display), display.id)
         }
     }
 
