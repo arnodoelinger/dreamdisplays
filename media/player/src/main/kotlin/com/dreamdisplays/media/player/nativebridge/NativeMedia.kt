@@ -91,6 +91,17 @@ object NativeMedia {
     /** True once the library has been located, loaded, bound, and ABI-checked. */
     val isAvailable: Boolean by lazy { runCatching { init() }.getOrDefault(false) }
 
+    /**
+     * Short machine-readable cause of [isAvailable] being false (empty when true), e.g.
+     * `disabled_by_config`, `java_too_old`, `library_not_found`, `abi_mismatch`, or
+     * `error_<ExceptionSimpleName>`. Reported in telemetry so unavailability causes can actually be
+     * broken down instead of only seeing the aggregate unavailable percentage.
+     */
+    @Volatile var unavailableReason: String = ""; private set
+
+    /** Same as [unavailableReason] but for [lavAvailable]. */
+    @Volatile var lavUnavailableReason: String = ""; private set
+
     /** Uses native RGBA output so the render thread can upload directly into RGBA8 textures. */
     val rgbaFramesEnabled: Boolean
         get() = isAvailable
@@ -390,6 +401,7 @@ object NativeMedia {
     private fun init(): Boolean {
         if (!System.getProperty("dreamdisplays.native", "true").toBoolean()) {
             logger.info("Native pipeline disabled via -Ddreamdisplays.native=false.")
+            unavailableReason = "disabled_by_config"
             return false
         }
         if (Runtime.version().feature() < 21) {
@@ -398,10 +410,12 @@ object NativeMedia {
                     Runtime.version().feature()
                 }); using JVM pipeline."
             )
+            unavailableReason = "java_too_old"
             return false
         }
         val lib = locateLibrary() ?: run {
             logger.warn("Native library not found; using JVM pipeline.")
+            unavailableReason = "library_not_found"
             return false
         }
         return try {
@@ -439,6 +453,7 @@ object NativeMedia {
             val abi = abiVersion!!.invoke() as Int
             if (abi != ABI_VERSION) {
                 logger.warn("Native library ABI mismatch: found $abi, expected $ABI_VERSION; using JVM pipeline.")
+                unavailableReason = "abi_mismatch"
                 return false
             }
             val rgba = System.getProperty("dreamdisplays.native.rgba", "true").toBoolean()
@@ -451,6 +466,7 @@ object NativeMedia {
         } catch (t: Throwable) {
             // UnsupportedOperationException on Java 21 preview gates, UnsatisfiedLinkError, etc.
             logger.warn("Native pipeline unavailable (${t.javaClass.simpleName}: ${t.message}); using JVM pipeline.")
+            unavailableReason = "error_${t.javaClass.simpleName}"
             false
         }
     }
@@ -463,6 +479,7 @@ object NativeMedia {
     private fun initLav(): Boolean {
         val lib = locateLibrary(LAV_BASE_NAME) ?: run {
             logger.info("In-process libav library not found; in-process decode unavailable.")
+            lavUnavailableReason = "library_not_found"
             return false
         }
         return try {
@@ -487,6 +504,7 @@ object NativeMedia {
             val abi = bind("dd_lav_abi_version", FunctionDescriptor.of(int)).invoke() as Int
             if (abi != LAV_ABI_VERSION) {
                 logger.warn("In-process libav library ABI mismatch: found $abi, expected $LAV_ABI_VERSION.")
+                lavUnavailableReason = "abi_mismatch"
                 return false
             }
             lavOpenHandle = bind("dd_lav_open", FunctionDescriptor.of(long, addr, long, int, int, long, int))
@@ -520,6 +538,7 @@ object NativeMedia {
         } catch (t: Throwable) {
             // Typically UnsatisfiedLinkError when the system FFmpeg dylibs are missing.
             logger.warn("In-process libav backend unavailable (${t.javaClass.simpleName}: ${t.message}).")
+            lavUnavailableReason = "error_${t.javaClass.simpleName}"
             false
         }
     }

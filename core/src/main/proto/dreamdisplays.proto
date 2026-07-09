@@ -60,6 +60,10 @@ message ClientHello {
   optional int32 dedicatedVramMb = 23;
   // WARNING: a default value decoded when value is missing
   optional int32 warmDisplayLimit = 24;
+  // WARNING: a default value decoded when value is missing
+  optional string nativeUnavailableReason = 25;
+  // WARNING: a default value decoded when value is missing
+  optional string lavUnavailableReason = 26;
 }
 
 // serial name 'com.dreamdisplays.core.protocol.ServerHello'

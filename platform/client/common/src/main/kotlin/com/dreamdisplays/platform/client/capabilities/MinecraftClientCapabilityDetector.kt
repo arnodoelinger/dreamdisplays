@@ -57,6 +57,8 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
             lavInProcessEnabled = lavAvailable && safeBool { NativeMedia.lavInProcessEnabled },
             lavSurfaceInteropAvailable = lavAvailable && safeBool { NativeMedia.lavSurfaceInteropAvailable },
             lavZeroCopyEnabled = lavAvailable && safeBool { NativeMedia.lavZeroCopyEnabled },
+            nativeUnavailableReason = if (nativeAvailable) "" else safeString("unknown") { NativeMedia.unavailableReason.ifBlank { "unknown" } },
+            lavUnavailableReason = if (lavAvailable) "" else safeString("unknown") { NativeMedia.lavUnavailableReason.ifBlank { "unknown" } },
             systemRamMb = memory.systemRamMb,
             maxJvmMemoryMb = memory.maxJvmMemoryMb,
             dedicatedVramMb = memory.dedicatedVramMb,
