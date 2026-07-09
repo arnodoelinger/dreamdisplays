@@ -104,7 +104,7 @@ checksum = "d0a5c400df2834b80a4c3327b3aad3a4c4cd4de0629063962b03235697506a28"
 
 [[package]]
 name = "dreamdisplays-lav"
-version = "1.0.4"
+version = "1.1.4"
 dependencies = [
  "anyhow",
  "dreamdisplays-logging",
@@ -121,7 +121,7 @@ dependencies = [
 
 [[package]]
 name = "dreamdisplays-native"
-version = "1.0.4"
+version = "1.1.4"
 dependencies = [
  "anyhow",
  "dreamdisplays-logging",
