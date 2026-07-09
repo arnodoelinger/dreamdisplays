@@ -91,13 +91,9 @@ object YtDlp {
         }
 
         var streams = loadFromDisk(videoUrl) ?: formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
-        if (isStaleLive(videoUrl, streams)) {
+        if (isStaleLive(videoUrl, streams) || isStalePartial(videoUrl, streams)) {
             invalidateCache(videoUrl)
             streams = formatMemo.getBlocking(videoUrl) { fetchAndPersist(it) }
-        }
-        if (streams.isNotEmpty() && !offersFullResult(streams)) {
-            formatMemo.invalidate(videoUrl)
-            FormatDiskCache.deleteEntry(videoUrl)
         }
         return streams
     }
@@ -111,6 +107,17 @@ object YtDlp {
         if (streams.none { it.isLive }) return false
         val at = fetchedAtMs.getIfPresent(videoUrl) ?: return true
         return System.currentTimeMillis() - at > FormatDiskCache.LIVE_TTL_MS
+    }
+
+    /**
+     * Whether a cached partial (non-ladder) result for [videoUrl] has outlived
+     * [FormatDiskCache.PARTIAL_TTL_MS]. Videos hitting the PO-token / SABR wall are re-checked on this
+     * cadence instead of every single call — see [offersFullResult].
+     */
+    private fun isStalePartial(videoUrl: String, streams: List<YtStream>): Boolean {
+        if (streams.isEmpty() || offersFullResult(streams)) return false
+        val at = fetchedAtMs.getIfPresent(videoUrl) ?: return true
+        return System.currentTimeMillis() - at > FormatDiskCache.PARTIAL_TTL_MS
     }
 
     /**
@@ -139,7 +146,7 @@ object YtDlp {
         if (videoUrl.isBlank()) return
         if (!MediaUrlPolicy.isAllowed(videoUrl)) return
         val cached = formatMemo.peekFresh(videoUrl) ?: loadFromDisk(videoUrl)
-        if (cached != null && !isStaleLive(videoUrl, cached)) return
+        if (cached != null && !isStaleLive(videoUrl, cached) && !isStalePartial(videoUrl, cached)) return
         if (cached != null) invalidateCache(videoUrl)
         formatMemo.load(videoUrl) { fetchAndPersist(it) }
     }
@@ -154,12 +161,17 @@ object YtDlp {
         return immutable
     }
 
-    /** Resolves streams for [videoUrl] and mirrors the result into the disk cache. */
+    /**
+     * Resolves streams for [videoUrl] and mirrors the result into the disk cache. Partial (non-ladder)
+     * results are persisted too — [FormatDiskCache.load] caps their effective age at
+     * [FormatDiskCache.PARTIAL_TTL_MS] on its own, so this does not risk serving a stale wall result
+     * past its recheck window.
+     */
     @Throws(IOException::class)
     private suspend fun fetchAndPersist(videoUrl: String): List<YtStream> {
         val streams = fetchUncached(videoUrl).toList()
         fetchedAtMs.put(videoUrl, System.currentTimeMillis())
-        if (streams.isNotEmpty() && offersFullResult(streams)) FormatDiskCache.saveAsync(videoUrl, streams)
+        if (streams.isNotEmpty()) FormatDiskCache.saveAsync(videoUrl, streams)
         return streams
     }
 

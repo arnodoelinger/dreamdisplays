@@ -192,9 +192,11 @@ object MediaProcess {
             )
             addAll(listOf("-rw_timeout", "15000000"))
             // The sources here are plain MP4 / WebM / M4A over HTTPS with stream info in their headers;
-            // the default 5 MB / 5 s probe window only postpones the first frame, so keep it tight and
-            // skip input-side buffering (the playback prebuffer smooths jitter downstream).
-            addAll(listOf("-probesize", "1M", "-analyzeduration", "1000000", "-fflags", "nobuffer"))
+            // the default 5 MB / 5 s probe window only postpones the first frame, so keep it tight.
+            // Deliberately no -fflags nobuffer: it drops the leading GOP on open and on every
+            // in-place seek (see native/lav/src/session.rs, which dropped the same flag for the
+            // same reason).
+            addAll(listOf("-probesize", "1M", "-analyzeduration", "1000000"))
             if (offsetNanos > 0) {
                 addAll(listOf("-ss", String.format(Locale.US, "%.6f", offsetNanos / 1e9)))
             }

@@ -163,6 +163,17 @@ object NativeMedia {
 
     data class LavSurfaceReadResult(val code: Int, val descriptor: LavSurfaceDescriptor?)
 
+    /**
+     * Reusable native out-param slot for [lavReadFrameI420WithPts], one per live session handle so the
+     * per-frame read loop never allocates. Freed in [lavClose].
+     */
+    private class PtsScratch {
+        val arena: Arena = Arena.ofShared()
+        val segment: MemorySegment = arena.allocate(ValueLayout.JAVA_LONG)
+    }
+
+    private val ptsScratches = java.util.concurrent.ConcurrentHashMap<Long, PtsScratch>()
+
     /** Touches [isAvailable] and [lavAvailable] on a background thread to keep first playback latency low. */
     fun prewarmAsync() {
         Thread({ isAvailable; lavAvailable }, "NativeMedia-prewarm").apply { isDaemon = true }.start()
@@ -283,15 +294,11 @@ object NativeMedia {
     /** Blocking in-process decode of the next I420 frame plus its normalized PTS, when exported. */
     fun lavReadFrameI420WithPts(handle: Long, dst: ByteBuffer, frameBytes: Int): LavFrameReadResult {
         val readWithPts = lavReadFramePtsHandle
-        if (readWithPts == null) {
-            return LavFrameReadResult(lavReadFrameI420(handle, dst, frameBytes), LAV_NO_PTS_NANOS)
-        }
-        Arena.ofConfined().use { arena ->
-            val pts = arena.allocate(ValueLayout.JAVA_LONG)
-            pts.set(ValueLayout.JAVA_LONG, 0L, LAV_NO_PTS_NANOS)
-            val rc = readWithPts.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), pts) as Int
-            return LavFrameReadResult(rc, pts.get(ValueLayout.JAVA_LONG, 0L))
-        }
+            ?: return LavFrameReadResult(lavReadFrameI420(handle, dst, frameBytes), LAV_NO_PTS_NANOS)
+        val pts = ptsScratches.getOrPut(handle) { PtsScratch() }.segment
+        pts.set(ValueLayout.JAVA_LONG, 0L, LAV_NO_PTS_NANOS)
+        val rc = readWithPts.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), pts) as Int
+        return LavFrameReadResult(rc, pts.get(ValueLayout.JAVA_LONG, 0L))
     }
 
     /** Seeks a live in-process libav session in place. */
@@ -346,6 +353,7 @@ object NativeMedia {
 
     /** Frees the in-process session. Must not race a [lavReadFrameI420] on the same handle. */
     fun lavClose(handle: Long) {
+        ptsScratches.remove(handle)?.arena?.close()
         lavCloseHandle!!.invoke(handle)
     }
 

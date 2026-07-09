@@ -35,10 +35,16 @@ object FormatDiskCache {
      */
     const val LIVE_TTL_MS = 5L * 60L * 1_000L
 
+    /** TTL for partial (non-ladder) results. */
+    const val PARTIAL_TTL_MS = 15L * 60L * 1_000L
+
+    /** Schema version. */
     private const val SCHEMA_VERSION = 4
 
-    /** Serialises write/delete coroutines so same-file ops keep their submission order (the single-writer
-     *  guarantee the old dedicated writer thread gave). */
+    /**
+     * Serialises write / delete coroutines so same-file ops keep their submission order (the single-writer
+     * guarantee the old dedicated writer thread gave).
+     */
     private val writeMutex = Mutex()
 
     /** Reads the cached streams for [videoUrl] from disk; returns null if absent, expired, or schema-mismatched. */
@@ -59,8 +65,11 @@ object FormatDiskCache {
                 f.delete()
                 return null
             }
-            val effectiveMaxAge =
-                if (entry.streams.any { it.isLive }) minOf(maxAgeMs, LIVE_TTL_MS) else maxAgeMs
+            val effectiveMaxAge = when {
+                entry.streams.any { it.isLive } -> minOf(maxAgeMs, LIVE_TTL_MS)
+                !YtStreams.offersQualityLadder(entry.streams) -> minOf(maxAgeMs, PARTIAL_TTL_MS)
+                else -> maxAgeMs
+            }
             if (System.currentTimeMillis() - entry.ts > effectiveMaxAge) {
                 f.delete()
                 return null

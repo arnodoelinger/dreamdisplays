@@ -38,8 +38,24 @@ object NewPipeResolver : MediaResolver {
 
     private val initialized = AtomicBoolean(false)
 
-    /** How long a resolved (or unresolvable) video is reused before `NewPipeExtractor` is hit again. */
-    private val POSITIVE_TTL_NANOS = 60_000_000_000L
+    /**
+     * How long a resolved video is reused before `NewPipeExtractor` is hit again. Matches
+     * [FormatDiskCache.DEFAULT_TTL_MS] — [YtDlp] trusts the same googlevideo URLs for that long, so
+     * there is no reason for this fast-path cache to expire them sooner and force a redundant
+     * re-extraction (and, via [YtDlp.fetchUncached], a wasted parallel `yt-dlp` race) on every replay.
+     */
+    private val POSITIVE_TTL_NANOS = FormatDiskCache.DEFAULT_TTL_MS * 1_000_000L
+
+    /**
+     * Partial ("walled") resolutions: reused across replays within a viewing session but rechecked
+     * periodically in case YouTube's PO-token/SABR wall lifts for this video. Matches
+     * [FormatDiskCache.PARTIAL_TTL_MS].
+     */
+    private val PARTIAL_TTL_NANOS = FormatDiskCache.PARTIAL_TTL_MS * 1_000_000L
+
+    /** Live playlist URLs carry short-lived tokens, so reuse is capped much lower than VOD. */
+    private val LIVE_TTL_NANOS = 60_000_000_000L
+
     private val NEGATIVE_TTL_NANOS = 20_000_000_000L
     private const val MAX_CACHE_ENTRIES = 256
 
@@ -142,17 +158,22 @@ object NewPipeResolver : MediaResolver {
 
     /**
      * Returns the cached resolution for [url] if still fresh, otherwise resolves it once and caches
-     * the result. A `null` result (`NewPipeExtractor` declined or failed) is cached too, with a shorter TTL, so
-     * the immediate [resolve] -> [fetch] retry for the same video does not pay a second network round.
+     * the result. A `null` result (`NewPipeExtractor` declined or failed) is cached too, with a shorter
+     * TTL, so the immediate [resolve] -> [fetch] retry for the same video does not pay a second network
+     * round. The TTL otherwise depends on what kind of result it is — see [POSITIVE_TTL_NANOS] and
+     * [PARTIAL_TTL_NANOS].
      */
     private fun resolveCached(url: String): Resolved? {
         val key = YouTubeUrls.extractVideoId(url) ?: url
         return cache.get(key) {
             val resolved = doExtract(url)
-            CacheEntry(
-                value = resolved,
-                ttlNanos = if (resolved != null) POSITIVE_TTL_NANOS else NEGATIVE_TTL_NANOS,
-            )
+            val ttl = when {
+                resolved == null -> NEGATIVE_TTL_NANOS
+                resolved.isLive -> LIVE_TTL_NANOS
+                YtStreams.offersQualityLadder(resolved.streams) -> POSITIVE_TTL_NANOS
+                else -> PARTIAL_TTL_NANOS
+            }
+            CacheEntry(value = resolved, ttlNanos = ttl)
         }.value
     }
 
