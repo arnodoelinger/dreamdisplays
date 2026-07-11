@@ -47,8 +47,18 @@ object Thumbnails {
         .expireAfterAccess(6, TimeUnit.HOURS)
         .build()
 
-    /** Average ARGB color of each decoded thumbnail, used as the preview's "ambient" letterbox tint. */
+    /** Average ARGB color of each decoded thumbnail, used for small flat accents (e.g. card hover tint). */
     private val AVG_COLOR: Cache<String, Int> = Caffeine.newBuilder()
+        .maximumSize(1_024)
+        .expireAfterAccess(6, TimeUnit.HOURS)
+        .build()
+
+    /**
+     * The Minecraft texture [Identifier] of a tiny, heavily downsampled copy of each decoded
+     * thumbnail — a YouTube-style blurred "ambient" backdrop rendered by stretching it across the
+     * preview's letterbox area with bilinear filtering, instead of a flat average-color fill.
+     */
+    private val AMBIENT_TEX: Cache<String, Identifier> = Caffeine.newBuilder()
         .maximumSize(1_024)
         .expireAfterAccess(6, TimeUnit.HOURS)
         .build()
@@ -101,6 +111,9 @@ object Thumbnails {
 
     /** Returns the average ARGB color of [videoId]'s thumbnail, or null until it has been decoded. */
     fun averageColor(videoId: String): Int? = AVG_COLOR.getIfPresent(videoId)
+
+    /** Returns the blurred ambient-backdrop texture [Identifier] for [videoId], or null until decoded. */
+    fun ambientTexture(videoId: String): Identifier? = AMBIENT_TEX.getIfPresent(videoId)
 
     /** Schedules a background download of [videoId]'s thumbnail at [quality] if not already in flight or ready. */
     fun request(videoId: String, quality: Quality = Quality.HIGH) {
@@ -206,20 +219,23 @@ object Thumbnails {
         Integer.toHexString(s.hashCode())
     }
 
-    /** A decoded thumbnail: the GPU-ready image plus its average color for the ambient preview tint. */
-    private class Decoded(val image: NativeImage, val avgColor: Int)
+    /** A decoded thumbnail: the full-res GPU image, its average color, and a tiny blurred copy for the ambient backdrop. */
+    private class Decoded(val image: NativeImage, val avgColor: Int, val ambientImage: NativeImage)
 
     /**
      * Decodes [bytes] into a [NativeImage] and registers it under [key] (the composite videoId +
-     * quality key, or a direct-URL request's own key). The average color is stored per
-     * [avgColorKey] so a YouTube video's LOW/HIGH tiers share the one ambient tint.
+     * quality key, or a direct-URL request's own key). The average color and ambient-backdrop
+     * texture are stored per [avgColorKey] so a YouTube video's LOW/HIGH tiers share the one pair.
      */
     private fun register(avgColorKey: String, key: String, bytes: ByteArray) {
         var image: NativeImage? = null
         var tex: DynamicTexture? = null
+        var ambientImage: NativeImage? = null
+        var ambientTex: DynamicTexture? = null
         try {
             val decoded = decode(bytes)
             image = decoded.image
+            ambientImage = decoded.ambientImage
             //? if >=1.21.11 {
             tex = DynamicTexture({ "yt-thumb-$key" }, image)
             //?} else
@@ -229,19 +245,38 @@ object Thumbnails {
             TextureUploadUtil.applyBilinearFilter(tex)
             AVG_COLOR.put(avgColorKey, decoded.avgColor)
             READY.put(key, id)
+
+            if (AMBIENT_TEX.getIfPresent(avgColorKey) == null) {
+                //? if >=1.21.11 {
+                ambientTex = DynamicTexture({ "yt-thumb-ambient-$avgColorKey" }, ambientImage)
+                //?} else
+                /*ambientTex = DynamicTexture(ambientImage)*/
+                val ambientId =
+                    Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "yt_thumb_ambient/${hash(avgColorKey)}")
+                Minecraft.getInstance().textureManager.register(ambientId, ambientTex)
+                TextureUploadUtil.applyBilinearFilter(ambientTex)
+                AMBIENT_TEX.put(avgColorKey, ambientId)
+            } else {
+                ambientImage.close()
+            }
         } catch (e: Exception) {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.
             logger.warn("Decode / register failed for $key: ${e.message}")
             BYTES.invalidate(key)
-            // The texture manager owns the texture only once registration succeeds; closing the
+            // The texture manager owns the image only once registration succeeds; closing the
             // texture also closes its image, so close the bare image only when no texture exists yet.
             runCatching { tex?.close() ?: image?.close() }
+            runCatching { ambientTex?.close() ?: ambientImage?.close() }
         } finally {
             IN_FLIGHT.invalidate(key)
         }
     }
 
-    /** Decodes [bytes] as a JPEG / PNG image into a GPU-ready RGBA [NativeImage] plus its average color. */
+    /**
+     * Decodes [bytes] as a JPEG / PNG image into a GPU-ready RGBA [NativeImage], its average color,
+     * and a tiny blurred [AmbientGrid]-derived copy used as the ambient backdrop — the same technique
+     * YouTube uses for its loading / ambient thumbnail glow, rather than a single flat color.
+     */
     @Throws(IOException::class)
     private fun decode(bytes: ByteArray): Decoded = ByteArrayInputStream(bytes).use { input ->
         val src: BufferedImage = ImageIO.read(input) ?: run {
@@ -258,6 +293,7 @@ object Thumbnails {
         val h = src.height
         val image = NativeImage(NativeImage.Format.RGBA, w, h, false)
         val pixels = src.getRGB(0, 0, w, h, null, 0, w)
+
         var rSum = 0L
         var gSum = 0L
         var bSum = 0L
@@ -266,19 +302,18 @@ object Thumbnails {
             rSum += (argb ushr 16) and 0xFF
             gSum += (argb ushr 8) and 0xFF
             bSum += argb and 0xFF
-            val abgr = (argb and 0xFF00FF00.toInt()) or
-                    ((argb shl 16) and 0x00FF0000) or
-                    ((argb shr 16) and 0xFF)
-            val x = i % w
-            val y = i / w
+            val abgr = AmbientGrid.argbToAbgr(argb)
             //? if >=1.21.11 {
-            image.setPixelABGR(x, y, abgr)
+            image.setPixelABGR(i % w, i / w, abgr)
             //?} else
-            /*image.setPixelRGBA(x, y, abgr)*/
+            /*image.setPixelRGBA(i % w, i / w, abgr)*/
         }
+
+        val ambientImage = AmbientGrid.toNativeImage(AmbientGrid.fromArgbPixels(pixels, w, h))
+
         val n = pixels.size.coerceAtLeast(1)
         val avg = (0xFF shl 24) or (((rSum / n).toInt()) shl 16) or (((gSum / n).toInt()) shl 8) or (bSum / n).toInt()
-        Decoded(image, avg)
+        Decoded(image, avg, ambientImage)
     }
 
     /** Downloads raw image bytes from [url]; returns null on any HTTP or network error. */
