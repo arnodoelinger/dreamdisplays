@@ -127,7 +127,12 @@ object NeoForgeV2Networking {
         }
     }
 
-    /** Marks [player] as a v2 peer, replies with the [ServerHello] and the display batch. */
+    /**
+     * Marks [player] as a v2 peer, replies with the [ServerHello] and the display batch. Fullscreen
+     * re-delivery also has to wait for this point — sending it from the raw join event races the
+     * handshake, since `sendTo` / `sendDisplayInfo` are gated on [V2PlayerTracker.isV2], which isn't
+     * true yet there.
+     */
     private fun handleHello(player: ServerPlayer, server: MinecraftServer, hello: ClientHello) {
         if (V2PlayerTracker.isV2(player.uuid)) return
         V2PlayerTracker.markV2(player.uuid, hello)
@@ -143,5 +148,6 @@ object NeoForgeV2Networking {
         )
         VanillaDisplayActions.recordVersionAndCheckUpdates(player, hello.modVersion)
         VanillaDisplayActions.sendAllDisplays(player, server)
+        FullscreenBroadcastManager.onPlayerJoin(player.uuid)
     }
 }

@@ -107,7 +107,9 @@ object PaperV2Networking : PluginMessageListener {
     /**
      * Marks [player] as a v2 peer, replies with the [ServerHello] and the display batch, and runs
      * the shared version / update bookkeeping. The legacy `version` packet that follows the hello
-     * is then reduced to the update checks only (see [PacketReceiver]).
+     * is then reduced to the update checks only (see [PacketReceiver]). Fullscreen re-delivery also
+     * has to wait for this point — sending it from the raw join event races the handshake, since
+     * `sendTo` / `sendDisplayInfo` are gated on [V2PlayerTracker.isV2], which isn't true yet there.
      */
     private fun handleHello(player: Player, hello: ClientHello) {
         if (V2PlayerTracker.isV2(player.uniqueId)) return
@@ -115,5 +117,6 @@ object PaperV2Networking : PluginMessageListener {
         send(listOf(player), buildServerHello(player))
         DisplayActions.recordVersionAndCheckUpdates(player, hello.modVersion)
         DisplayActions.sendAllDisplays(player)
+        FullscreenBroadcastManager.onPlayerJoin(player.uniqueId)
     }
 }

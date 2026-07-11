@@ -47,7 +47,6 @@ class PlayerListener : Listener {
         val player = event.player
         Scheduler.trackPlayer(player)
         WatchPartyManager.onPlayerJoin(player.uniqueId)
-        FullscreenBroadcastManager.onPlayerJoin(player.uniqueId)
 
         if (!PlatformUtil.isFolia && !hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
@@ -90,7 +89,6 @@ object VanillaPlayerListener {
      */
     fun onJoin(player: ServerPlayer, server: MinecraftServer) {
         WatchPartyManager.onPlayerJoin(player.uuid)
-        FullscreenBroadcastManager.onPlayerJoin(player.uuid)
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
             VanillaServerScheduler.runLater(server, 40L) { DisplayManager.validateDisplaysAndCleanup(server) }
