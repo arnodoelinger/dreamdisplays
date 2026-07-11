@@ -397,7 +397,7 @@ class DisplayMenu private constructor(
     /** Bullet line naming a playback mode ([modeKey], e.g. `dreamdisplays.mode.local`) plus its short [descKey]. */
     private fun tooltipModeBullet(modeKey: String, descKey: String): Component =
         Component.literal("• ").withStyle { it.withColor(ChatFormatting.GRAY) }
-            .append(Component.translatable(modeKey).withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) })
+            .append(Component.translatable(modeKey).withStyle { it.withColor(ChatFormatting.GRAY) })
             .append(Component.literal(": ").withStyle { it.withColor(ChatFormatting.GRAY) })
             .append(Component.translatable(descKey).withStyle { it.withColor(ChatFormatting.GRAY) })
 
