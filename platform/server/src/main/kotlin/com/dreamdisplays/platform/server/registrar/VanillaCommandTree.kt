@@ -202,22 +202,28 @@ object VanillaCommandTree {
         .then(fullscreenListNode())
 
     /**
-     * `/display fullscreen start <id|url> [<flags in any order/combination>]`, flags being
-     * `target <players>`, `radius <blocks> [<x> <y> <z>]`, `mode <standard|immersive>`, `forced`,
-     * `transient`, `volume <0–200>` - every flag is a real literal/argument node with its own
-     * tab-complete, and [fullscreenFlagsNode] lets them appear in any order and any subset.
+     * `/display fullscreen start <id <id>|url <url>> [<flags in any order/combination>]`, flags
+     * being `target <players>`, `radius <blocks> [<x> <y> <z>]`, `mode <standard|immersive>`,
+     * `forced`, `transient`, `volume <0–200>` - every flag is a real literal/argument node with its
+     * own tab-complete, and [fullscreenFlagsNode] lets them appear in any order and any subset.
+     * `id` / `url` are separate literal branches (rather than one argument that guesses which it got)
+     * so both are actually discoverable via tab-complete.
      */
     private fun fullscreenStartNode() = Commands.literal("start")
         .requires { requiresNode(it, { p -> p.fullscreenStart }, VanillaPermissions.Fallback.OP) }
-        .then(
-            Commands.argument("id", BareTokenArgumentType)
-                .suggests { _, builder ->
-                    FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
-                    builder.buildFuture()
-                }
-                .executes { ctx -> runFullscreenStart(ctx) }
-                .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
-        )
+        .then(fullscreenIdOrUrlNode("id"))
+        .then(fullscreenIdOrUrlNode("url"))
+
+    /** Builds the `id <id>` / `url <url>` branch under `/display fullscreen start`, both feeding the same `id` argument. */
+    private fun fullscreenIdOrUrlNode(literalName: String) = Commands.literal(literalName).then(
+        Commands.argument("id", BareTokenArgumentType)
+            .suggests { _, builder ->
+                if (literalName == "id") FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
+                builder.buildFuture()
+            }
+            .executes { ctx -> runFullscreenStart(ctx) }
+            .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
+    )
 
     /**
      * All fullscreen-start flags, each combinable with every other flag remaining in [names], in

@@ -7,17 +7,22 @@ import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.Command
+import com.mojang.brigadier.LiteralMessage
+import com.mojang.brigadier.StringReader
+import com.mojang.brigadier.arguments.ArgumentType
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.builder.ArgumentBuilder
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.CommandNode
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
+import io.papermc.paper.command.brigadier.argument.CustomArgumentType
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
 import java.util.concurrent.CompletableFuture
@@ -165,22 +170,49 @@ object CommandRegistrar {
         )
 
     /**
-     * `/display fullscreen start <id|url> [<flags in any order / combination>]`, flags being
-     * `target <players>`, `radius <blocks> [<x> <y> <z>]`, `mode <standard|immersive>`, `forced`,
-     * `transient`, `volume <0–200>` - every flag is a real literal / argument node with its own
-     * tab-complete, and [fullscreenFlagsNode] lets them appear in any order and any subset.
+     * `/display fullscreen start <id <id>|url <url>> [<flags in any order / combination>]`, flags
+     * being `target <players>`, `radius <blocks> [<x> <y> <z>]`, `mode <standard|immersive>`,
+     * `forced`, `transient`, `volume <0–200>` - every flag is a real literal / argument node with
+     * its own tab-complete, and [fullscreenFlagsNode] lets them appear in any order and any subset.
+     * `id` / `url` are separate literal branches (rather than one argument that guesses which it got)
+     * so both are actually discoverable via tab-complete.
      */
     private fun fullscreenStartSubCommand() = Commands.literal("start")
         .requires { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.fullscreenStart) }
-        .then(
-            Commands.argument("id", BareTokenArgumentType)
-                .suggests { _, builder ->
-                    FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
-                    builder.buildFuture()
-                }
-                .executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
-                .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
-        )
+        .then(fullscreenIdOrUrlNode("id"))
+        .then(fullscreenIdOrUrlNode("url"))
+
+    /** Builds the `id <id>` / `url <url>` branch under `/display fullscreen start`, both feeding the same `id` argument. */
+    private fun fullscreenIdOrUrlNode(literalName: String) = Commands.literal(literalName).then(
+        Commands.argument("id", PaperBareTokenArgumentType)
+            .suggests { _, builder ->
+                if (literalName == "id") FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
+                builder.buildFuture()
+            }
+            .executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
+            .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
+    )
+
+    /**
+     * Bare, space-delimited token wrapped via `Paper`'s `CustomArgumentType` so its real charset
+     * (letters / digits / `@` / `%` / `:` / `/` etc, just not a literal space) can differ from any
+     * vanilla-registered type, while the client only ever sees [getNativeType] (`greedyString`) —
+     * `Paper` substitutes that already-registered native type when building the per-player
+     * command-sync packet (`ApiMirrorRootNode.convertFromPureBrigNode`), so this needs no
+     * `ArgumentTypeInfos` registration and works for un-modded vanilla clients too.
+     */
+    private object PaperBareTokenArgumentType : CustomArgumentType<String, String> {
+        private val MISSING = SimpleCommandExceptionType(LiteralMessage("Expected a value."))
+
+        override fun parse(reader: StringReader): String {
+            val start = reader.cursor
+            while (reader.canRead() && reader.peek() != ' ') reader.skip()
+            if (reader.cursor == start) throw MISSING.create()
+            return reader.string.substring(start, reader.cursor)
+        }
+
+        override fun getNativeType(): ArgumentType<String> = StringArgumentType.greedyString()
+    }
 
     /**
      * All fullscreen-start flags, each combinable with every other flag remaining in [names], in
@@ -214,7 +246,7 @@ object CommandRegistrar {
         when (name) {
             "target" -> Commands.literal("target").then(
                 terminate(
-                    Commands.argument("players", BareTokenArgumentType)
+                    Commands.argument("players", PaperBareTokenArgumentType)
                         .suggests { _, builder -> suggestPlayerNames(builder) },
                     children,
                 )
