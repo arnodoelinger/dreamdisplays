@@ -51,6 +51,8 @@ class SeekBar(
     private var sliderFocused = false
     private var dragging = false
     private var dragTargetNanos = 0L
+    private var hoverFade = 0f
+    private var previewFade = 0f
 
     override fun draw(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {
         val dur = duration()
@@ -67,20 +69,24 @@ class SeekBar(
         //?} else
         /*g.blitSprite(handleSprite(), handleX, y, 8, height)*/
 
-        if (active && !dragging && dur > 0 && isHovered) {
+        val hoverTarget = if (active && !dragging && dur > 0 && isHovered) 1f else 0f
+        hoverFade += (hoverTarget - hoverFade) * FADE_SPEED
+        if (hoverFade > 0.01f) {
             val hoverPct = Mth.clamp((mouseX - (x + 4).toDouble()) / (width - 8).toDouble(), 0.0, 1.0)
             val hoverX = x + (hoverPct * (width - 8)).toInt()
             //? if >=1.21.11 {
-            g.blitSprite(RenderPipelines.GUI_TEXTURED, HANDLE, hoverX, y, 8, height, ARGB.white(GHOST_HANDLE_ALPHA))
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, HANDLE, hoverX, y, 8, height, ARGB.white(GHOST_HANDLE_ALPHA * hoverFade))
             //?} else
             /*g.blitSprite(HANDLE, hoverX, y, 8, height)*/
         }
 
         drawScrollingLabel(g, timeLabel(cur, dur), 4)
 
-        if (previewFrame != null && active && dur > 0 && (isHovered || dragging)) {
+        val previewTarget = if (previewFrame != null && active && dur > 0 && (isHovered || dragging)) 1f else 0f
+        previewFade += (previewTarget - previewFade) * FADE_SPEED
+        if (previewFade > 0.01f) {
             val hoverNanos = if (dragging) dragTargetNanos else positionFromMouse(mouseX.toDouble(), dur)
-            previewFrame.invoke(hoverNanos)?.let { drawPreview(g, it, mouseX, hoverNanos, dur) }
+            previewFrame?.invoke(hoverNanos)?.let { drawPreview(g, it, mouseX, hoverNanos, dur, previewFade) }
         }
     }
 
@@ -92,7 +98,7 @@ class SeekBar(
      * the box is done with a pose-stack scale around a full-resolution blit instead (GPU bilinear
      * downsample, keeping the extra source detail instead of just cropping to the box size).
      */
-    private fun drawPreview(g: GuiGraphicsCompat, texture: Identifier, mouseX: Int, hoverNanos: Long, dur: Long) {
+    private fun drawPreview(g: GuiGraphicsCompat, texture: Identifier, mouseX: Int, hoverNanos: Long, dur: Long, fade: Float) {
         val textureW = ScrubPreview.FRAME_WIDTH
         val textureH = ScrubPreview.FRAME_HEIGHT
         val boxW = DISPLAY_WIDTH + 4
@@ -105,7 +111,8 @@ class SeekBar(
         val boxX = (mouseX - boxW / 2).coerceIn(minX, maxX)
         val boxY = y - boxH - 4
 
-        g.fill(boxX, boxY, boxX + boxW, boxY + boxH, 0xE0101010.toInt())
+        val boxAlpha = (0xE0 * fade).toInt().coerceIn(0, 0xE0)
+        g.fill(boxX, boxY, boxX + boxW, boxY + boxH, (boxAlpha shl 24) or 0x101010)
 
         val scaleX = DISPLAY_WIDTH.toFloat() / textureW
         val scaleY = DISPLAY_HEIGHT.toFloat() / textureH
@@ -114,7 +121,7 @@ class SeekBar(
         matrices.pushMatrix()
         matrices.translate((boxX + 2).toFloat(), (boxY + 2).toFloat())
         matrices.scale(scaleX, scaleY)
-        g.blit(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, textureW, textureH, textureW, textureH)
+        g.blit(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, textureW, textureH, textureW, textureH, ARGB.white(fade))
         matrices.popMatrix()
         //?} else
         /*matrices.pushPose()
@@ -126,7 +133,8 @@ class SeekBar(
         val font = Minecraft.getInstance().font
         val label = UiText.formatTime(hoverNanos)
         val labelX = boxX + (boxW - font.width(label)) / 2
-        g.drawText(font, label, labelX, boxY + DISPLAY_HEIGHT + 4, 0xFFFFFFFF.toInt(), false)
+        val textAlpha = (0xFF * fade).toInt().coerceIn(0, 0xFF)
+        g.drawText(font, label, labelX, boxY + DISPLAY_HEIGHT + 4, (textAlpha shl 24) or 0xFFFFFF, false)
     }
 
     /** Formats the current / total time as a colored text component for display on the bar. */
@@ -226,6 +234,7 @@ class SeekBar(
         private const val DISPLAY_WIDTH = 106
         private const val DISPLAY_HEIGHT = 60
         private const val GHOST_HANDLE_ALPHA = 0.45f
+        private const val FADE_SPEED = 0.35f
 
         private val TRACK = Identifier.withDefaultNamespace("widget/slider")
         private val TRACK_HIGHLIGHTED = Identifier.withDefaultNamespace("widget/slider_highlighted")
