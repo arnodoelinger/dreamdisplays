@@ -43,6 +43,7 @@ class PipOverlay(
     val displayScreen: DisplayScreen,
     initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
     private val interactive: Boolean = true,
+    initialSizeFraction: Float = 0.25f,
 ) : Overlay {
     @Volatile
     private var frontBuf: ByteBuffer = EMPTY_DIRECT
@@ -74,7 +75,7 @@ class PipOverlay(
     private var rgbaUploadBuffer: ByteBuffer? = null
 
     var anchor: PipAnchor = PipAnchor.fromCorner(initialCorner)
-    private var sizeFraction: Float = 0.25f
+    private var sizeFraction: Float = initialSizeFraction.coerceIn(MIN_SIZE_FRAC, MAX_SIZE_FRAC)
 
     private var posX: Float = 0f
     private var posY: Float = 0f

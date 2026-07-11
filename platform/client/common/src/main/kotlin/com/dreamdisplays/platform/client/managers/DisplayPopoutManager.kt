@@ -127,6 +127,7 @@ class DisplayPopoutManager(
         player: MediaPlayer,
         corner: PipCorner = PipCorner.BOTTOM_RIGHT,
         interactive: Boolean = true,
+        initialSizeFraction: Float = 0.25f,
         contentAspect: () -> Double,
     ) {
         currentPlayer = player
@@ -135,7 +136,7 @@ class DisplayPopoutManager(
         windowActive = false
         closeFullscreenOverlay()
         closePipOverlay()
-        val overlay = PipOverlay(displayScreen, corner, interactive)
+        val overlay = PipOverlay(displayScreen, corner, interactive, initialSizeFraction)
         if (PipOverlayManager.add(overlay)) {
             pipOverlay = overlay
             rewireSink()
@@ -171,11 +172,11 @@ class DisplayPopoutManager(
         rewireSink()
     }
 
-    /** Swaps the active fullscreen overlay for a PiP overlay in one step. */
+    /** Swaps the active fullscreen overlay for a PiP overlay in one step, at double the normal PiP size. */
     fun minimizeFullscreenToPip(player: MediaPlayer?, interactive: Boolean = true) {
         val mp = player ?: currentPlayer ?: return
         if (fullscreenOverlay == null) return
-        activatePipMode(mp, PipCorner.BOTTOM_RIGHT, interactive, contentAspect)
+        activatePipMode(mp, PipCorner.BOTTOM_RIGHT, interactive, initialSizeFraction = 0.5f, contentAspect = contentAspect)
     }
 
     /** Closes every popout mode and detaches the frame sink. */
