@@ -25,6 +25,9 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
+//? if >=1.21.11 {
+import net.minecraft.util.ARGB
+//?}
 import net.minecraft.util.Mth
 
 /**
@@ -63,6 +66,15 @@ class SeekBar(
         g.blitSprite(RenderPipelines.GUI_TEXTURED, handleSprite(), handleX, y, 8, height)
         //?} else
         /*g.blitSprite(handleSprite(), handleX, y, 8, height)*/
+
+        if (active && !dragging && dur > 0 && isHovered) {
+            val hoverPct = Mth.clamp((mouseX - (x + 4).toDouble()) / (width - 8).toDouble(), 0.0, 1.0)
+            val hoverX = x + (hoverPct * (width - 8)).toInt()
+            //? if >=1.21.11 {
+            g.blitSprite(RenderPipelines.GUI_TEXTURED, HANDLE, hoverX, y, 8, height, ARGB.white(GHOST_HANDLE_ALPHA))
+            //?} else
+            /*g.blitSprite(HANDLE, hoverX, y, 8, height)*/
+        }
 
         drawScrollingLabel(g, timeLabel(cur, dur), 4)
 
@@ -213,6 +225,7 @@ class SeekBar(
     companion object {
         private const val DISPLAY_WIDTH = 106
         private const val DISPLAY_HEIGHT = 60
+        private const val GHOST_HANDLE_ALPHA = 0.45f
 
         private val TRACK = Identifier.withDefaultNamespace("widget/slider")
         private val TRACK_HIGHLIGHTED = Identifier.withDefaultNamespace("widget/slider_highlighted")
