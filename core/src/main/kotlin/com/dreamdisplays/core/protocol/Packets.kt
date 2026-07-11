@@ -47,6 +47,8 @@ data class ClientHello(
     @ProtoNumber(22) val maxJvmMemoryMb: Int = 0,
     @ProtoNumber(23) val dedicatedVramMb: Int = 0,
     @ProtoNumber(24) val warmDisplayLimit: Int = 0,
+    @ProtoNumber(25) val nativeUnavailableReason: String = "",
+    @ProtoNumber(26) val lavUnavailableReason: String = "",
 ) : DreamPacket
 
 /**

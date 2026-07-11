@@ -1,6 +1,6 @@
 # Native
 
-Optional Rust native layer for hot media paths.
+Rust native kernels.
 
 ## Contents
 

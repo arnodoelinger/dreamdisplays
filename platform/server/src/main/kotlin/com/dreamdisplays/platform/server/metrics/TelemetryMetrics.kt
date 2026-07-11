@@ -49,6 +49,16 @@ object TelemetryMetrics {
         metrics.addCustomChart(AdvancedPie("client_lav_status") {
             helloDistribution(plugin) { lavStatus(it) }
         })
+        metrics.addCustomChart(AdvancedPie("client_native_unavailable_reason") {
+            helloDistribution(plugin) {
+                if (it.nativeBackendAvailable) "available" else it.nativeUnavailableReason.ifBlank { "unknown" }
+            }
+        })
+        metrics.addCustomChart(AdvancedPie("client_lav_unavailable_reason") {
+            helloDistribution(plugin) {
+                if (it.lavAvailable) "available" else it.lavUnavailableReason.ifBlank { "unknown" }
+            }
+        })
         metrics.addCustomChart(AdvancedPie("client_capabilities") {
             capabilityDistribution(plugin)
         })
