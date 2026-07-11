@@ -339,9 +339,8 @@ class DisplayMenu private constructor(
                 listOf(
                     tooltipTitle("dreamdisplays.button.render-distance.tooltip.1"),
                     tooltipBody("dreamdisplays.button.render-distance.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.render-distance.tooltip.3"),
                     Component.literal(""),
-                    tooltipValue("dreamdisplays.button.render-distance.tooltip.8", fractionToChunks(renderD.value)),
+                    tooltipValue("dreamdisplays.button.render-distance.tooltip.7", fractionToChunks(renderD.value)),
                 )
             },
             SettingsSection.Row("dreamdisplays.button.quality", quality, qualityReset) {
