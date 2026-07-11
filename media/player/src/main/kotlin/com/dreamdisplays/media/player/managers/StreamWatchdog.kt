@@ -18,7 +18,7 @@ internal class StreamWatchdog(
     private val debugLabel: String,
     private val isActive: () -> Boolean,
     private val getLastFrameNanos: () -> Long,
-    private val stallThresholdMs: Long = 30_000L,
+    private val stallThresholdMs: Long = 45_000L,
     private val checkIntervalMs: Long = 1_000L,
     private val onStall: () -> Unit,
 ) {
