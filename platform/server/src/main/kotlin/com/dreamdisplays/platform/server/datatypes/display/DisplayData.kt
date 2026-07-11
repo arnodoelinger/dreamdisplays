@@ -27,6 +27,9 @@ interface DisplayData {
     /** Content rotation; only meaningful for floor / ceiling (`UP` / `DOWN`) facings. */
     val rotation: ContentRotation
 
+    /** True for synthetic displays backing a URL-only fullscreen broadcast; the world position is a placeholder. */
+    val virtual: Boolean
+
     /** The display's URL. */
     var url: String
 
@@ -53,7 +56,7 @@ interface DisplayData {
  * Base shared by [PaperDisplayData] and [VanillaDisplayData], holding the mutable playback /
  * content fields common to both so platform subclasses only add their position types.
  */
-abstract class BaseDisplayData : DisplayData {
+abstract class BaseDisplayData(override val virtual: Boolean = false) : DisplayData {
     /** The display's URL. */
     override var url: String = ""
 

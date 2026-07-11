@@ -116,6 +116,10 @@ message DisplayInfo {
   optional int32 qualityCap = 14;
   // WARNING: a default value decoded when value is missing
   optional int32 rotation = 15;
+  // WARNING: a default value decoded when value is missing
+  optional bool virtual = 16;
+  // WARNING: a default value decoded when value is missing
+  optional bool forced = 17;
 }
 
 // serial name 'com.dreamdisplays.core.protocol.DisplayDelete'
@@ -256,6 +260,52 @@ message WatchPartyState {
   optional int64 durationMs = 13;
   // WARNING: a default value decoded when value is missing
   optional bool paused = 14;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.FullscreenState'
+message FullscreenState {
+  // WARNING: a default value decoded when value is missing
+  optional string sessionId = 1;
+  // WARNING: a default value decoded when value is missing
+  optional Uuid displayId = 2;
+  // WARNING: a default value decoded when value is missing
+  optional bool active = 3;
+  // WARNING: a default value decoded when value is missing
+  optional int32 mode = 4;
+  // WARNING: a default value decoded when value is missing
+  optional bool forced = 5;
+  // WARNING: a default value decoded when value is missing
+  optional float volume = 6;
+  // WARNING: a default value decoded when value is missing
+  optional string title = 7;
+  // WARNING: a default value decoded when value is missing
+  optional bool loop = 8;
+  // WARNING: a default value decoded when value is missing
+  optional string quality = 9;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.FullscreenAck'
+message FullscreenAck {
+  // WARNING: a default value decoded when value is missing
+  optional string sessionId = 1;
+  // WARNING: a default value decoded when value is missing
+  optional int32 action = 2;
+}
+
+// serial name 'com.dreamdisplays.core.protocol.RadiusPreview'
+message RadiusPreview {
+  // WARNING: a default value decoded when value is missing
+  optional double x = 1;
+  // WARNING: a default value decoded when value is missing
+  optional double y = 2;
+  // WARNING: a default value decoded when value is missing
+  optional double z = 3;
+  // WARNING: a default value decoded when value is missing
+  optional double radius = 4;
+  // WARNING: a default value decoded when value is missing
+  optional bool show = 5;
+  // WARNING: a default value decoded when value is missing
+  optional int32 colorArgb = 6;
 }
 
 message Uuid {

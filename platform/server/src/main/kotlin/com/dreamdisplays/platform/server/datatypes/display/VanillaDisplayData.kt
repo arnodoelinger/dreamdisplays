@@ -37,7 +37,10 @@ class VanillaDisplayData(
 
     /** Content rotation; only meaningful for floor / ceiling (`UP` / `DOWN`) facings. */
     override val rotation: ContentRotation = ContentRotation.NONE,
-) : BaseDisplayData() {
+
+    /** True for the synthetic display backing a URL-only fullscreen broadcast. */
+    virtual: Boolean = false,
+) : BaseDisplayData(virtual) {
     /** Bounding box of the display area. */
     private val region = RegionUtil.calculateRegion(pos1, pos2)
 

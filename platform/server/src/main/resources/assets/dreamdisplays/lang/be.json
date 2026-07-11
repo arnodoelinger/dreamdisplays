@@ -164,5 +164,14 @@
   "displayInfoUnknownWorld": "Невядома",
   "displayInfoUnknownDuration": "невядома",
   "displayInfoAutoLang": "аўта",
-  "displayInfoUnavailableUrl": "Н/Д"
+  "displayInfoUnavailableUrl": "Н/Д",
+  "fullscreenStarted": "&7D |&f Поўнаэкранная трансляцыя &b{0}&f запушчана (ахоп {1} гулец(-оў))",
+  "fullscreenStopped": "&7D |&f Спынена {0} поўнаэкранных трансляцый",
+  "fullscreenStopFailed": "&7D |&f Адпаведная поўнаэкранная трансляцыя не знойдзена",
+  "fullscreenNoTargets": "&7D |&f Пазначце хаця б target <гульцы> або radius <блокі>",
+  "fullscreenAlreadyRunning": "&7D |&f На гэтым дысплеі ўжо ідзе поўнаэкранная трансляцыя, альбо ID сесіі заняты",
+  "fullscreenForcedDisallowed": "&7D |&f Прымусовыя поўнаэкранныя трансляцыі адключаны ў канфігу",
+  "fullscreenNoDisplay": "&7D |&f Дысплей не знойдзены, і няма загружанага свету для трансляцыі па URL",
+  "fullscreenListEmpty": "&7D |&f Няма актыўных поўнаэкранных трансляцый",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
 }

@@ -17,6 +17,7 @@ import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.Scheduler.runSync
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import kotlinx.coroutines.launch
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -104,6 +105,7 @@ object DisplayManager {
             proximityIndex.forgetDisplay(display.id)
             TimelineManager.remove(display.id)
             WatchPartyManager.remove(display.id)
+            FullscreenBroadcastManager.onDisplayRemoved(display.id)
             StateManager.remove(display.id)
             delete(display)
             display.id
@@ -174,12 +176,13 @@ object DisplayManager {
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly
-    fun sendUpdate(display: PaperDisplayData, players: List<Player>) {
+    fun sendUpdate(display: PaperDisplayData, players: List<Player>, forced: Boolean = false) {
         PacketUtil.sendDisplayInfo(
             players,
             display.id, display.ownerId, display.box.min, display.width, display.height,
             display.url, display.lang, display.facing, display.isSync, display.isLocked,
             display.mode, display.qualityCap, display.rotation,
+            virtual = display.virtual, forced = forced,
         )
     }
 
@@ -267,6 +270,7 @@ object DisplayManager {
         broadcastDelete(displayData)
         TimelineManager.remove(displayData.id)
         WatchPartyManager.remove(displayData.id)
+        FullscreenBroadcastManager.onDisplayRemoved(displayData.id)
         StateManager.remove(displayData.id)
         displays.remove(displayData.id)
         proximityIndex.forgetDisplay(displayData.id)
@@ -413,6 +417,7 @@ object DisplayManager {
         displays.remove(data.id)
         TimelineManager.remove(data.id)
         WatchPartyManager.remove(data.id)
+        FullscreenBroadcastManager.onDisplayRemoved(data.id)
         StateManager.remove(data.id)
         ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(data) }
         if (receivers.isNotEmpty()) VanillaPacketUtil.sendDelete(receivers, data.id)

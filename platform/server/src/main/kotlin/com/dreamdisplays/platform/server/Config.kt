@@ -104,7 +104,12 @@ class Config(private val plugin: PaperServer) {
                 max_height = t?.getLong("display.max_height")?.toInt() ?: 24,
                 max_render_distance = t?.getDouble("display.max_render_distance") ?: 96.0,
                 default_volume = t?.getLong("display.default_volume")?.toInt()?.coerceIn(0, 100) ?: 50,
-            )
+            ),
+            fullscreen = SettingsSection.FullscreenConfig(
+                default_mode = t?.getString("fullscreen.default_mode") ?: "STANDARD",
+                allow_forced = t?.getBoolean("fullscreen.allow_forced") ?: true,
+                quality_cap = t?.getLong("fullscreen.quality_cap")?.toInt() ?: 1080,
+            ),
         ).apply { initMaterials() }
         storage = StorageSection(
             storage = StorageSection.StorageConfig(
@@ -137,7 +142,10 @@ class Config(private val plugin: PaperServer) {
                 watchparty = t?.getString("permissions.watchparty") ?: "dreamdisplays.watchparty",
                 lock = t?.getString("permissions.lock") ?: "dreamdisplays.lock",
                 delete_others = t?.getString("permissions.delete_others") ?: "dreamdisplays.delete.others",
-                create_bypass = t?.getString("permissions.create_bypass") ?: "dreamdisplays.create.bypass"
+                create_bypass = t?.getString("permissions.create_bypass") ?: "dreamdisplays.create.bypass",
+                fullscreen_start = t?.getString("permissions.fullscreen_start") ?: "dreamdisplays.fullscreen.start",
+                fullscreen_stop = t?.getString("permissions.fullscreen_stop") ?: "dreamdisplays.fullscreen.stop",
+                fullscreen_list = t?.getString("permissions.fullscreen_list") ?: "dreamdisplays.fullscreen.list",
             )
         )
     }
@@ -199,6 +207,7 @@ class Config(private val plugin: PaperServer) {
         val reports: ReportsConfig = ReportsConfig(),
         val updates: UpdatesConfig = UpdatesConfig(),
         val display: DisplayConfig = DisplayConfig(),
+        val fullscreen: FullscreenConfig = FullscreenConfig(),
     ) {
         // Reports
         val webhookUrl get() = reports.webhook_url
@@ -228,6 +237,13 @@ class Config(private val plugin: PaperServer) {
         val maxRenderDistance get() = display.max_render_distance
         /** Volume in [0, 1] ready for the wire; config stores 0–100 percent. */
         val defaultVolume get() = display.default_volume / 200f
+
+        // Fullscreen broadcasts
+        val fullscreenAllowForced get() = fullscreen.allow_forced
+        val fullscreenQualityCap get() = fullscreen.quality_cap
+        val fullscreenDefaultMode: com.dreamdisplays.api.playback.FullscreenMode
+            get() = runCatching { com.dreamdisplays.api.playback.FullscreenMode.valueOf(fullscreen.default_mode.uppercase()) }
+                .getOrDefault(com.dreamdisplays.api.playback.FullscreenMode.STANDARD)
 
         /** Resolves [Material] names from the TOML, defaulting to diamond axe and black concrete. */
         internal fun initMaterials() {
@@ -262,6 +278,13 @@ class Config(private val plugin: PaperServer) {
             val max_height: Int = 24,
             val max_render_distance: Double = 96.0,
             val default_volume: Int = 50,
+        )
+
+        /** Fullscreen broadcast section. */
+        data class FullscreenConfig(
+            val default_mode: String = "STANDARD",
+            val allow_forced: Boolean = true,
+            val quality_cap: Int = 1080,
         )
     }
 
@@ -312,6 +335,9 @@ class Config(private val plugin: PaperServer) {
         val lock get() = permissions.lock
         val deleteOthers get() = permissions.delete_others
         val createBypass get() = permissions.create_bypass
+        val fullscreenStart get() = permissions.fullscreen_start
+        val fullscreenStop get() = permissions.fullscreen_stop
+        val fullscreenList get() = permissions.fullscreen_list
 
         data class PermissionsConfig(
             val create: String = "dreamdisplays.create",
@@ -332,6 +358,9 @@ class Config(private val plugin: PaperServer) {
             val lock: String = "dreamdisplays.lock",
             val delete_others: String = "dreamdisplays.delete.others",
             val create_bypass: String = "dreamdisplays.create.bypass",
+            val fullscreen_start: String = "dreamdisplays.fullscreen.start",
+            val fullscreen_stop: String = "dreamdisplays.fullscreen.stop",
+            val fullscreen_list: String = "dreamdisplays.fullscreen.list",
         )
     }
 
@@ -457,7 +486,12 @@ class VanillaConfig(private val configDir: File) {
                 max_height = t?.getLong("display.max_height")?.toInt() ?: 24,
                 max_render_distance = t?.getDouble("display.max_render_distance") ?: 96.0,
                 default_volume = t?.getLong("display.default_volume")?.toInt()?.coerceIn(0, 100) ?: 50,
-            )
+            ),
+            fullscreen = SettingsSection.FullscreenConfig(
+                default_mode = t?.getString("fullscreen.default_mode") ?: "STANDARD",
+                allow_forced = t?.getBoolean("fullscreen.allow_forced") ?: true,
+                quality_cap = t?.getLong("fullscreen.quality_cap")?.toInt() ?: 1080,
+            ),
         )
         storage = StorageSection(
             storage = StorageSection.StorageConfig(
@@ -490,7 +524,10 @@ class VanillaConfig(private val configDir: File) {
                 watchparty = t?.getString("permissions.watchparty") ?: "dreamdisplays.watchparty",
                 lock = t?.getString("permissions.lock") ?: "dreamdisplays.lock",
                 delete_others = t?.getString("permissions.delete_others") ?: "dreamdisplays.delete.others",
-                create_bypass = t?.getString("permissions.create_bypass") ?: "dreamdisplays.create.bypass"
+                create_bypass = t?.getString("permissions.create_bypass") ?: "dreamdisplays.create.bypass",
+                fullscreen_start = t?.getString("permissions.fullscreen_start") ?: "dreamdisplays.fullscreen.start",
+                fullscreen_stop = t?.getString("permissions.fullscreen_stop") ?: "dreamdisplays.fullscreen.stop",
+                fullscreen_list = t?.getString("permissions.fullscreen_list") ?: "dreamdisplays.fullscreen.list",
             )
         )
     }
@@ -573,6 +610,7 @@ class VanillaConfig(private val configDir: File) {
         val reports: ReportsConfig = ReportsConfig(),
         val updates: UpdatesConfig = UpdatesConfig(),
         val display: DisplayConfig = DisplayConfig(),
+        val fullscreen: FullscreenConfig = FullscreenConfig(),
     ) {
         val webhookUrl get() = reports.webhook_url
         val reportCooldown get() = reports.cooldown * 1000L
@@ -600,6 +638,13 @@ class VanillaConfig(private val configDir: File) {
         /** Volume in [0, 1] ready for the wire; config stores 0–100 percent. */
         val defaultVolume get() = display.default_volume / 200f
 
+        // Fullscreen broadcasts
+        val fullscreenAllowForced get() = fullscreen.allow_forced
+        val fullscreenQualityCap get() = fullscreen.quality_cap
+        val fullscreenDefaultMode: com.dreamdisplays.api.playback.FullscreenMode
+            get() = runCatching { com.dreamdisplays.api.playback.FullscreenMode.valueOf(fullscreen.default_mode.uppercase()) }
+                .getOrDefault(com.dreamdisplays.api.playback.FullscreenMode.STANDARD)
+
         data class ReportsConfig(
             val webhook_url: String = "",
             val cooldown: Int = 15,
@@ -624,6 +669,12 @@ class VanillaConfig(private val configDir: File) {
             val max_height: Int = 24,
             val max_render_distance: Double = 96.0,
             val default_volume: Int = 50,
+        )
+
+        data class FullscreenConfig(
+            val default_mode: String = "STANDARD",
+            val allow_forced: Boolean = true,
+            val quality_cap: Int = 1080,
         )
     }
 
@@ -672,6 +723,9 @@ class VanillaConfig(private val configDir: File) {
         val lock get() = permissions.lock
         val deleteOthers get() = permissions.delete_others
         val createBypass get() = permissions.create_bypass
+        val fullscreenStart get() = permissions.fullscreen_start
+        val fullscreenStop get() = permissions.fullscreen_stop
+        val fullscreenList get() = permissions.fullscreen_list
 
         data class PermissionsConfig(
             val create: String = "dreamdisplays.create",
@@ -692,6 +746,9 @@ class VanillaConfig(private val configDir: File) {
             val lock: String = "dreamdisplays.lock",
             val delete_others: String = "dreamdisplays.delete.others",
             val create_bypass: String = "dreamdisplays.create.bypass",
+            val fullscreen_start: String = "dreamdisplays.fullscreen.start",
+            val fullscreen_stop: String = "dreamdisplays.fullscreen.stop",
+            val fullscreen_list: String = "dreamdisplays.fullscreen.list",
         )
     }
 
@@ -722,6 +779,11 @@ particles_color = "#00FFFF"
 mod_detection_enabled = true
 updates = true
 default_volume = 50
+
+[fullscreen]
+default_mode = "STANDARD"
+allow_forced = true
+quality_cap = 1080
 
 [reports]
 webhook_url = ""
@@ -756,6 +818,9 @@ reload = "dreamdisplays.reload"
 updates = "dreamdisplays.updates"
 toggle_others = "dreamdisplays.toggle.others"
 create_bypass = "dreamdisplays.create.bypass"
+fullscreen_start = "dreamdisplays.fullscreen.start"
+fullscreen_stop = "dreamdisplays.fullscreen.stop"
+fullscreen_list = "dreamdisplays.fullscreen.list"
 """.trimIndent()
     }
 }

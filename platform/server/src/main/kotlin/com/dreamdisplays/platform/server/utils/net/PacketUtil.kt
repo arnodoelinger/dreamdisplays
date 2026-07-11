@@ -70,6 +70,8 @@ object PacketUtil {
         mode: PlaybackMode = if (isSync) PlaybackMode.SYNCED else PlaybackMode.LOCAL,
         qualityCap: Int = 0,
         rotation: ContentRotation = ContentRotation.NONE,
+        virtual: Boolean = false,
+        forced: Boolean = false,
     ) {
         val isVertical = facing == BlockFace.UP || facing == BlockFace.DOWN
         val recipients = if (isVertical) players.filterNotNull().filter { supportsVertical(it.uniqueId) } else players
@@ -84,6 +86,7 @@ object PacketUtil {
                 isSync = isSync, lang = lang, isLocked = isLocked,
                 mode = mode.wire, qualityCap = qualityCap,
                 rotation = rotation.quarterTurns,
+                virtual = virtual, forced = forced,
             ),
         )
         if (players.isEmpty()) return

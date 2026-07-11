@@ -11,8 +11,11 @@ import java.util.UUID
  * to its documented `config.toml` default: everyone, or operator level 2.
  */
 object VanillaPermissions {
-    /** Fallback applied when LuckPerms is absent or leaves the node undefined. */
-    enum class Fallback { EVERYONE, OP }
+    /**
+     * Fallback applied when LuckPerms is absent or leaves the node undefined. [NOBODY] is for literal membership checks
+     * (e.g. `group.<x>`) that must not silently default to a broad grant.
+     */
+    enum class Fallback { EVERYONE, OP, NOBODY }
 
     private const val UNKNOWN = 0
     private const val ABSENT = 1
@@ -23,8 +26,11 @@ object VanillaPermissions {
 
     /** True if [player] holds [node], consulting `LuckPerms` first and [fallback] otherwise. */
     fun has(player: ServerPlayer, node: String, fallback: Fallback): Boolean =
-        checkLuckPerms(player.uuid, node)
-            ?: (fallback == Fallback.EVERYONE || VanillaDisplayActions.isOpLevel2(player))
+        checkLuckPerms(player.uuid, node) ?: when (fallback) {
+            Fallback.EVERYONE -> true
+            Fallback.OP -> VanillaDisplayActions.isOpLevel2(player)
+            Fallback.NOBODY -> false
+        }
 
     /** `LuckPerms` verdict for [node], or null when LuckPerms is unavailable or the node is undefined. */
     private fun checkLuckPerms(playerId: UUID, node: String): Boolean? {

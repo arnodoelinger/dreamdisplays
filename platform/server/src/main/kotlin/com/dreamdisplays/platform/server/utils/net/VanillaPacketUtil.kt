@@ -26,7 +26,7 @@ object VanillaPacketUtil {
         players.partition { V2PlayerTracker.isV2(it.uuid) }
 
     /** Encodes and broadcasts a `display_info` packet describing a single display to [players]. */
-    fun sendDisplayInfo(players: List<ServerPlayer>, display: VanillaDisplayData) {
+    fun sendDisplayInfo(players: List<ServerPlayer>, display: VanillaDisplayData, forced: Boolean = false) {
         val isVertical = display.facing == Direction.UP || display.facing == Direction.DOWN
         val recipients = if (isVertical) players.filter { supportsVertical(it.uuid) } else players
         val (v2, legacy) = partition(recipients)
@@ -40,6 +40,7 @@ object VanillaPacketUtil {
                 isSync = display.isSync, lang = display.lang, isLocked = display.isLocked,
                 mode = display.mode.wire, qualityCap = display.qualityCap,
                 rotation = display.rotation.quarterTurns,
+                virtual = display.virtual, forced = forced,
             ),
         )
         if (legacy.isEmpty()) return

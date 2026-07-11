@@ -164,5 +164,14 @@
   "displayInfoUnknownWorld": "Sconosciuto",
   "displayInfoUnknownDuration": "sconosciuto",
   "displayInfoAutoLang": "auto",
-  "displayInfoUnavailableUrl": "N/D"
+  "displayInfoUnavailableUrl": "N/D",
+  "fullscreenStarted": "&7D |&f Trasmissione a schermo intero &b{0}&f avviata (raggiunti {1} giocatore/i)",
+  "fullscreenStopped": "&7D |&f Fermate {0} trasmissioni a schermo intero",
+  "fullscreenStopFailed": "&7D |&f Nessuna trasmissione a schermo intero corrispondente trovata",
+  "fullscreenNoTargets": "&7D |&f Specifica almeno target <giocatori> o radius <blocchi>",
+  "fullscreenAlreadyRunning": "&7D |&f Questo display ospita già una trasmissione a schermo intero, oppure l'ID sessione è già in uso",
+  "fullscreenForcedDisallowed": "&7D |&f Le trasmissioni a schermo intero forzate sono disabilitate nella configurazione",
+  "fullscreenNoDisplay": "&7D |&f Nessun display trovato e nessun mondo caricato per ospitare una trasmissione via URL",
+  "fullscreenListEmpty": "&7D |&f Nessuna trasmissione a schermo intero in corso",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
 }

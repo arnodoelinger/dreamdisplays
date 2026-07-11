@@ -13,6 +13,7 @@ import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
 import com.dreamdisplays.core.protocol.DisplaySync
 import com.dreamdisplays.core.protocol.DreamPacket
+import com.dreamdisplays.core.protocol.FullscreenState
 import com.dreamdisplays.core.protocol.ServerHello
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.core.protocol.WatchPartyState
@@ -60,6 +61,7 @@ object ClientPacketManager {
                 DisplayRegistry.recordScreen(it)
             }
 
+            is FullscreenState -> FullscreenController.handle(packet)
             is DisplayDelete -> handleDelete(packet)
             is ClearCache -> handleClearCache(packet)
             else -> logger.debug("Ignoring non-clientbound packet {}.", packet::class.simpleName)
@@ -104,5 +106,6 @@ object ClientPacketManager {
     /** Resets per-server negotiation state on disconnect. */
     fun reset() {
         serverSnapshot = ServerHello()
+        FullscreenController.reset()
     }
 }

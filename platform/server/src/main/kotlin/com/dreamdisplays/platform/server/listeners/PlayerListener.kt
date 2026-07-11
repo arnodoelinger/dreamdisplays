@@ -5,6 +5,7 @@ import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.meta.Scheduler
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
@@ -46,6 +47,7 @@ class PlayerListener : Listener {
         val player = event.player
         Scheduler.trackPlayer(player)
         WatchPartyManager.onPlayerJoin(player.uniqueId)
+        FullscreenBroadcastManager.onPlayerJoin(player.uniqueId)
 
         if (!PlatformUtil.isFolia && !hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
@@ -69,6 +71,7 @@ class PlayerListener : Listener {
         PlayerManager.removeVersion(event.player)
         V2PlayerTracker.clear(event.player.uniqueId)
         WatchPartyManager.onPlayerQuit(event.player.uniqueId)
+        FullscreenBroadcastManager.onPlayerQuit(event.player.uniqueId)
         DisplayManager.forgetNearbyPlayer(event.player.uniqueId)
         Scheduler.untrackPlayer(event.player)
     }
@@ -87,6 +90,7 @@ object VanillaPlayerListener {
      */
     fun onJoin(player: ServerPlayer, server: MinecraftServer) {
         WatchPartyManager.onPlayerJoin(player.uuid)
+        FullscreenBroadcastManager.onPlayerJoin(player.uuid)
         if (!hasValidatedWorld && DisplayManager.getDisplays().isNotEmpty()) {
             hasValidatedWorld = true
             VanillaServerScheduler.runLater(server, 40L) { DisplayManager.validateDisplaysAndCleanup(server) }
@@ -111,6 +115,7 @@ object VanillaPlayerListener {
         PlayerManager.removePlayer(playerId)
         V2PlayerTracker.clear(playerId)
         WatchPartyManager.onPlayerQuit(playerId)
+        FullscreenBroadcastManager.onPlayerQuit(playerId)
     }
 }
 

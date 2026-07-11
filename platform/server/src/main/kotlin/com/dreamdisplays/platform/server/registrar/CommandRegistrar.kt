@@ -4,14 +4,21 @@ import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.commands.subcommands.*
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.mojang.brigadier.Command
+import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
+import com.mojang.brigadier.builder.ArgumentBuilder
 import com.mojang.brigadier.builder.LiteralArgumentBuilder
+import com.mojang.brigadier.context.CommandContext
+import com.mojang.brigadier.suggestion.Suggestions
+import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
 import org.bukkit.Bukkit
 import org.bukkit.entity.Player
+import java.util.concurrent.CompletableFuture
 
 /**
  * Command registrar. Uses Brigadier to build the `/display` command tree. See
@@ -19,6 +26,12 @@ import org.bukkit.entity.Player
  */
 @PaperOnly
 object CommandRegistrar {
+    /** Suggestion tokens for the fullscreen `quality` flag. */
+    private val QUALITY_SUGGESTIONS = listOf("auto", "360", "480", "720", "1080")
+
+    /** Selector tokens suggested for the fullscreen `target` argument, alongside online player names. */
+    private val TARGET_SELECTORS = listOf("@a", "@p", "@r", "@s", "@e")
+
     /** Builds the full `Brigadier` tree for the `/display` command with all subcommands. */
     fun buildDisplayCommand(): LiteralCommandNode<CommandSourceStack> = Commands.literal("display")
         .executes { ctx ->
@@ -47,6 +60,7 @@ object CommandRegistrar {
         .then(listSubCommand())
         .then(toggleSubCommand("on", OnCommand()))
         .then(toggleSubCommand("off", OffCommand()))
+        .then(fullscreenSubCommand())
         .build()
 
     /** Builds a simple no-argument subcommand node optionally guarded by a permission check. */
@@ -108,6 +122,151 @@ object CommandRegistrar {
                     Command.SINGLE_SUCCESS
                 }
         )
+
+    /**
+     * Builds the `/display fullscreen start|stop|list` subcommand: server-forced fullscreen
+     * broadcasts to players by name selector, radius, or both (combinable).
+     */
+    private fun fullscreenSubCommand(): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal("fullscreen")
+        .then(fullscreenStartSubCommand())
+        .then(
+            Commands.literal("stop")
+                .requires { it.sender.hasPermission(PaperServer.config.permissions.fullscreenStop) }
+                .then(
+                    Commands.argument("id", StringArgumentType.word())
+                        .suggests { _, builder ->
+                            PaperFullscreenCommand.stopSuggestions().forEach { builder.suggest(it) }
+                            builder.buildFuture()
+                        }
+                        .executes { ctx ->
+                            PaperFullscreenCommand.stop(ctx.source.sender, StringArgumentType.getString(ctx, "id"))
+                            Command.SINGLE_SUCCESS
+                        }
+                )
+        )
+        .then(
+            Commands.literal("list")
+                .requires { it.sender.hasPermission(PaperServer.config.permissions.fullscreenList) }
+                .executes { ctx ->
+                    PaperFullscreenCommand.list(ctx.source.sender)
+                    Command.SINGLE_SUCCESS
+                }
+        )
+
+    /**
+     * `/display fullscreen start <id|url> [<flags in any order / combination>]`, flags being
+     * `target <players>`, `radius <blocks> [<x> <y> <z>]`, `mode <standard|immersive>`, `forced`,
+     * `transient`, `volume <0–200>` - every flag is a real literal / argument node with its own
+     * tab-complete, and [fullscreenFlagsNode] lets them appear in any order and any subset.
+     */
+    private fun fullscreenStartSubCommand() = Commands.literal("start")
+        .requires { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.fullscreenStart) }
+        .then(
+            Commands.argument("id", StringArgumentType.string())
+                .suggests { _, builder ->
+                    FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
+                    builder.buildFuture()
+                }
+                .executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
+                .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
+        )
+
+    /** All fullscreen-start flags, each combinable with every other flag remaining in [names], in any order. */
+    private fun fullscreenFlagsNode(
+        names: List<String> = listOf("target", "radius", "mode", "forced", "transient", "volume", "looped", "quality"),
+    ): List<ArgumentBuilder<CommandSourceStack, *>> = names.map { name ->
+        val children = fullscreenFlagsNode(names - name)
+        buildFullscreenFlagNode(name, children)
+    }
+
+    /** Attaches [children] plus a bare `.executes` (this flag alone, nothing further) to every terminal of [node]. */
+    private fun terminate(node: ArgumentBuilder<CommandSourceStack, *>, children: List<ArgumentBuilder<CommandSourceStack, *>>) {
+        node.executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
+        children.forEach { node.then(it) }
+    }
+
+    /** Builds one flag's own literal/argument subtree, attaching [children] (the other remaining flags) at every terminal. */
+    private fun buildFullscreenFlagNode(name: String, children: List<ArgumentBuilder<CommandSourceStack, *>>): ArgumentBuilder<CommandSourceStack, *> =
+        when (name) {
+            "target" -> Commands.literal("target").then(
+                Commands.argument("players", StringArgumentType.string())
+                    .suggests { _, builder -> suggestPlayerNames(builder) }
+                    .also { terminate(it, children) }
+            )
+            "radius" -> Commands.literal("radius").then(
+                Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0))
+                    .also { terminate(it, children) }
+                    .then(
+                        Commands.argument("x", DoubleArgumentType.doubleArg())
+                            .then(
+                                Commands.argument("y", DoubleArgumentType.doubleArg())
+                                    .then(
+                                        Commands.argument("z", DoubleArgumentType.doubleArg())
+                                            .also { terminate(it, children) }
+                                    )
+                            )
+                    )
+            )
+            "mode" -> Commands.literal("mode")
+                .then(Commands.literal("standard").also { terminate(it, children) })
+                .then(Commands.literal("immersive").also { terminate(it, children) })
+            "forced" -> Commands.literal("forced").also { terminate(it, children) }
+            "transient" -> Commands.literal("transient").also { terminate(it, children) }
+            "volume" -> Commands.literal("volume").then(
+                Commands.argument("volume", DoubleArgumentType.doubleArg(0.0, 200.0))
+                    .also { terminate(it, children) }
+            )
+            "looped" -> Commands.literal("looped").also { terminate(it, children) }
+            "quality" -> Commands.literal("quality").then(
+                Commands.argument("quality", StringArgumentType.word())
+                    .suggests { _, builder ->
+                        QUALITY_SUGGESTIONS.forEach { builder.suggest(it) }
+                        builder.buildFuture()
+                    }
+                    .also { terminate(it, children) }
+            )
+            else -> error("Unknown fullscreen flag: $name")
+        }
+
+    /** Reads [name] from [ctx] if that argument was part of the parsed path, else null. */
+    private fun <T : Any> tryArg(ctx: CommandContext<CommandSourceStack>, name: String, type: Class<T>): T? =
+        runCatching { ctx.getArgument(name, type) }.getOrNull()
+
+    /** Gathers every flag argument present on the parsed [ctx] path and delegates to [PaperFullscreenCommand.start]. */
+    private fun runFullscreenStart(ctx: CommandContext<CommandSourceStack>) {
+        val nodeNames = ctx.nodes.map { it.node.name }
+        val mode = when {
+            "standard" in nodeNames -> "standard"
+            "immersive" in nodeNames -> "immersive"
+            else -> null
+        }
+        PaperFullscreenCommand.start(
+            ctx.source.sender,
+            id = StringArgumentType.getString(ctx, "id"),
+            players = tryArg(ctx, "players", String::class.java),
+            radiusBlocks = tryArg(ctx, "blocks", java.lang.Double::class.java)?.toDouble(),
+            radiusX = tryArg(ctx, "x", java.lang.Double::class.java)?.toDouble(),
+            radiusY = tryArg(ctx, "y", java.lang.Double::class.java)?.toDouble(),
+            radiusZ = tryArg(ctx, "z", java.lang.Double::class.java)?.toDouble(),
+            mode = mode,
+            forced = "forced" in nodeNames,
+            transientSession = "transient" in nodeNames,
+            volume = tryArg(ctx, "volume", java.lang.Double::class.java)?.let { (it.toFloat() / 200f) },
+            loop = "looped" in nodeNames,
+            quality = tryArg(ctx, "quality", String::class.java),
+        )
+    }
+
+    /** Suggests online player names for the last comma-separated fragment of the `players` argument. */
+    private fun suggestPlayerNames(builder: SuggestionsBuilder): CompletableFuture<Suggestions> {
+        val remaining = builder.remaining
+        val prefix = remaining.substringAfterLast(',')
+        val before = remaining.substringBeforeLast(',', "").let { if (it.isEmpty()) "" else "$it," }
+        (TARGET_SELECTORS + PaperFullscreenCommand.onlinePlayerNames())
+            .filter { it.startsWith(prefix, ignoreCase = true) }
+            .forEach { builder.suggest(before + it) }
+        return builder.buildFuture()
+    }
 
     /** Builds the `/display list [filter] [value] [page]` subcommand with progressive suggestions. */
     private fun listSubCommand(): LiteralArgumentBuilder<CommandSourceStack> {

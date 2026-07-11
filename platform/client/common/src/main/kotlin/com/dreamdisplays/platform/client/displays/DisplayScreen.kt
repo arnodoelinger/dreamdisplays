@@ -5,6 +5,7 @@ import com.dreamdisplays.api.capability.ServerFeature
 import com.dreamdisplays.api.display.model.DisplayFacing
 import com.dreamdisplays.api.storage.ClientDisplaySettings
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
+import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.ui.PipCorner
 import com.dreamdisplays.platform.client.managers.ClientPacketManager
@@ -281,10 +282,8 @@ class DisplayScreen(
     /** [System.nanoTime] when the display entered warm park; used for TTL eviction. */
     private var dormantSinceNanos = 0L
 
-    /** Manages the PiP / window popout for this display. */
-    private val popoutManager = DisplayPopoutManager(this) {
-        mediaPlayer?.setPopoutSink(null)
-    }
+    /** Manages the PiP / window / fullscreen popout for this display. */
+    private val popoutManager = DisplayPopoutManager(this)
 
     /** The currently loaded video URL, or `null` when idle. */
     var videoUrl: String? = null; private set
@@ -644,6 +643,38 @@ class DisplayScreen(
         popoutManager.deactivate(mediaPlayer)
     }
 
+    /** Whether the active fullscreen overlay should stay open (re-showing) past the video's end instead of auto-closing. */
+    private var fullscreenLoop = false
+
+    /** Shows this display's video as a fullscreen overlay in [mode]. Closes PiP if active. */
+    fun activateFullscreenMode(
+        mode: FullscreenMode = FullscreenMode.STANDARD,
+        forced: Boolean = false,
+        sessionId: String? = null,
+        loop: Boolean = false,
+    ) {
+        if (!canPopoutHere && !forced) return
+        val mp = mediaPlayer ?: return
+        fullscreenLoop = loop
+        popoutManager.activateFullscreenMode(mp, mode, forced, sessionId) { videoContentAspect }
+    }
+
+    /** Closes the fullscreen overlay, keeping other popout surfaces alive. */
+    fun deactivateFullscreen() {
+        popoutManager.deactivateFullscreen(mediaPlayer)
+    }
+
+    /**
+     * Swaps the fullscreen overlay for a PiP corner overlay (forced-broadcast Esc behavior); the resulting PiP can't be
+     * clicked open to reconfigure, since a forced broadcast's settings are the caller's, not the viewer's.
+     */
+    fun minimizeFullscreenToPip() {
+        popoutManager.minimizeFullscreenToPip(mediaPlayer, interactive = false)
+    }
+
+    /** True while this display is shown in the fullscreen overlay. */
+    val isFullscreenActive: Boolean get() = popoutManager.isFullscreenActive
+
     /** Applies volume, brightness, and paused state to the media player, then seeks to the saved position. */
     fun startVideo() = media.start()
 
@@ -675,8 +706,10 @@ class DisplayScreen(
         DisplayRegistry.recordScreen(this)
     }
 
-    /** Marks a local VOD as finished without emitting playback commands upstream. */
+    /** Marks a local VOD as finished without emitting playback commands upstream; also auto-closes a non-looping fullscreen overlay. */
     internal fun onPlaybackEnded(positionNanos: Long) {
+        if (isFullscreenActive && !fullscreenLoop) deactivateFullscreen()
+
         if (effectiveMode != PlaybackMode.LOCAL) return
         savedTimeNanos = positionNanos.coerceAtLeast(0L)
         if (paused) return

@@ -164,5 +164,14 @@
   "displayInfoUnknownWorld": "לא ידוע",
   "displayInfoUnknownDuration": "לא ידוע",
   "displayInfoAutoLang": "אוטומטי",
-  "displayInfoUnavailableUrl": "לא זמין"
+  "displayInfoUnavailableUrl": "לא זמין",
+  "fullscreenStarted": "&7D |&f שידור מסך מלא &b{0}&f החל (הגיע ל-{1} שחקן(ים))",
+  "fullscreenStopped": "&7D |&f נעצרו {0} שידורי מסך מלא",
+  "fullscreenStopFailed": "&7D |&f לא נמצא שידור מסך מלא תואם",
+  "fullscreenNoTargets": "&7D |&f ציין לפחות target <שחקנים> או radius <בלוקים>",
+  "fullscreenAlreadyRunning": "&7D |&f לתצוגה זו כבר יש שידור מסך מלא, או שמזהה הפעלה זה כבר תפוס",
+  "fullscreenForcedDisallowed": "&7D |&f שידורי מסך מלא כפויים מושבתים בתצורה",
+  "fullscreenNoDisplay": "&7D |&f לא נמצאה תצוגה ואין עולם טעון לשידור לפי URL",
+  "fullscreenListEmpty": "&7D |&f אין שידורי מסך מלא פעילים",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
 }

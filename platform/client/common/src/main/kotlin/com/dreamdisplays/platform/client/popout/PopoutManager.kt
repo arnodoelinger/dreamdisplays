@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.popout
 
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.media.sink.VideoFrameSink
+import com.dreamdisplays.api.playback.FullscreenMode
 
 /**
  * Manages popout windows and picture-in-picture (PiP) for displays. Allows opening and closing popout windows and PiP,
@@ -13,6 +14,15 @@ interface PopoutManager {
 
     /** Opens the in-game PiP overlay for the specified display. Returns the created sink, or null if a PiP for that display already exists. */
     fun openPip(displayId: DisplayId): VideoFrameSink?
+
+    /** Shows the specified display as a fullscreen overlay in [mode]. */
+    fun openFullscreen(displayId: DisplayId, mode: FullscreenMode = FullscreenMode.STANDARD)
+
+    /** Closes the fullscreen overlay of the specified display, keeping other popout surfaces alive. */
+    fun closeFullscreen(displayId: DisplayId)
+
+    /** True if the specified display is currently shown in the fullscreen overlay. */
+    fun isFullscreenOpen(displayId: DisplayId): Boolean
 
     /** Closes whichever popout mode is active for the specified display. If no popout is active, does nothing. */
     fun close(displayId: DisplayId)

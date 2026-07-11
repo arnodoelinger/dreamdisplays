@@ -1,10 +1,12 @@
 package com.dreamdisplays.platform.server.utils.net
 
 import com.dreamdisplays.api.capability.ServerFeature
+import com.dreamdisplays.api.playback.FullscreenAckAction
 import com.dreamdisplays.platform.client.net.V2Payload
 import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DreamPacket
+import com.dreamdisplays.core.protocol.FullscreenAck
 import com.dreamdisplays.api.protocol.PacketDirection
 import com.dreamdisplays.core.protocol.PacketRegistry
 import com.dreamdisplays.api.playback.PlaybackAction
@@ -23,6 +25,7 @@ import com.dreamdisplays.core.protocol.WatchPartyStart
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
@@ -90,6 +93,10 @@ object FabricV2Networking {
             }
 
             is SetDisplaysEnabled -> PlayerManager.setDisplaysEnabled(player, packet.enabled)
+            is FullscreenAck -> FullscreenBroadcastManager.handleAck(
+                packet.sessionId, player.uuid, FullscreenAckAction.fromWire(packet.action),
+            )
+
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }
     }

@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.mixins
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import net.minecraft.client.Minecraft
 //? if >=26 {
@@ -20,6 +21,38 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo
 @Suppress("UNUSED", "NonJavaMixin")
 @Mixin(Screen::class)
 open class ScreenOverlay {
+    //? if >=26 {
+    @Inject(
+        method = ["extractRenderStateWithTooltipAndSubtitles"],
+        at = [At("HEAD")]
+    )
+    open fun onRenderHead(
+        graphics: GuiGraphicsExtractor,
+        mouseX: Int,
+        mouseY: Int,
+        partialTick: Float,
+        ci: CallbackInfo
+    ) {
+        //?} else
+        /*@Inject(
+            //? if >=1.21.11 {
+            method = ["renderWithTooltipAndSubtitles"],
+            //?}
+            //? if <1.21.11 {
+            method = ["renderWithTooltip"],
+            //?}
+            at = [At("HEAD")],
+            require = 0
+        )
+        open fun onRenderHead(graphics: GuiGraphics, mouseX: Int, mouseY: Int, partialTick: Float, ci: CallbackInfo) {*/
+        if (FullscreenOverlayManager.isEmpty) return
+        val mc = Minecraft.getInstance()
+        if (mc.level == null || mc.player == null) return
+        FullscreenOverlayManager.onClientTick(mc)
+        if (FullscreenOverlayManager.isEmpty) return
+        FullscreenOverlayManager.renderAll(mc, graphics, partialTick)
+    }
+
     // Renders all active PiP overlays on top of the current screen after the normal render pass
     //? if >=26 {
     @Inject(
