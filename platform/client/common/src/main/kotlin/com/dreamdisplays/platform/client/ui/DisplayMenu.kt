@@ -371,7 +371,10 @@ class DisplayMenu private constructor(
                 listOf(
                     tooltipTitle("dreamdisplays.button.synchronization.tooltip.1"),
                     tooltipBody("dreamdisplays.button.synchronization.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.synchronization.tooltip.3"),
+                    Component.literal(""),
+                    tooltipModeBullet("dreamdisplays.mode.local", "dreamdisplays.button.synchronization.tooltip.3"),
+                    tooltipModeBullet("dreamdisplays.mode.synced", "dreamdisplays.button.synchronization.tooltip.4"),
+                    tooltipModeBullet("dreamdisplays.mode.broadcast", "dreamdisplays.button.synchronization.tooltip.6"),
                     Component.literal(""),
                     tooltipValue(
                         "dreamdisplays.button.synchronization.tooltip.5",
@@ -390,6 +393,13 @@ class DisplayMenu private constructor(
 
     private fun tooltipValue(key: String, arg: Any): Component =
         Component.translatable(key, arg).withStyle { it.withColor(ChatFormatting.GOLD) }
+
+    /** Bullet line naming a playback mode ([modeKey], e.g. `dreamdisplays.mode.local`) plus its short [descKey]. */
+    private fun tooltipModeBullet(modeKey: String, descKey: String): Component =
+        Component.literal("• ").withStyle { it.withColor(ChatFormatting.GRAY) }
+            .append(Component.translatable(modeKey).withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) })
+            .append(Component.literal(": ").withStyle { it.withColor(ChatFormatting.GRAY) })
+            .append(Component.translatable(descKey).withStyle { it.withColor(ChatFormatting.GRAY) })
 
     /** Two-line white/gray tooltip used by the delete and report buttons. */
     private fun buttonTooltip(prefix: String): List<Component> = listOf(
