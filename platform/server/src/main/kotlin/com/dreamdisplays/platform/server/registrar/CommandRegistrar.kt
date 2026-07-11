@@ -13,6 +13,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder
 import com.mojang.brigadier.context.CommandContext
 import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
+import com.mojang.brigadier.tree.CommandNode
 import com.mojang.brigadier.tree.LiteralCommandNode
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
@@ -21,7 +22,7 @@ import org.bukkit.entity.Player
 import java.util.concurrent.CompletableFuture
 
 /**
- * Command registrar. Uses Brigadier to build the `/display` command tree. See
+ * Command registrar. Uses `Brigadier` to build the `/display` command tree. See
  * `VanillaCommandTree.kt` for the shared `Fabric` / `NeoForge` equivalent.
  */
 @PaperOnly
@@ -162,7 +163,7 @@ object CommandRegistrar {
     private fun fullscreenStartSubCommand() = Commands.literal("start")
         .requires { it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.fullscreenStart) }
         .then(
-            Commands.argument("id", StringArgumentType.string())
+            Commands.argument("id", BareTokenArgumentType)
                 .suggests { _, builder ->
                     FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
                     builder.buildFuture()
@@ -171,60 +172,75 @@ object CommandRegistrar {
                 .also { idArg -> fullscreenFlagsNode().forEach { idArg.then(it) } }
         )
 
-    /** All fullscreen-start flags, each combinable with every other flag remaining in [names], in any order. */
+    /**
+     * All fullscreen-start flags, each combinable with every other flag remaining in [names], in
+     * any order.
+     *
+     * Warning: built bottom-up and memoized per remaining-flag-set: naively rebuilding every
+     * flag's whole subtree at every recursion step (one call per permutation of the 8 flags)
+     * blew up to ~110,000 `Brigadier` nodes and stalled server startup for minutes; memoizing by
+     * the set of remaining flags (order doesn't affect the subtree's shape) collapses that to
+     * ~1,000 builds since equal remaining-sets now share one already-built node instance.
+     */
     private fun fullscreenFlagsNode(
-        names: List<String> = listOf("target", "radius", "mode", "forced", "transient", "volume", "looped", "quality"),
-    ): List<ArgumentBuilder<CommandSourceStack, *>> = names.map { name ->
-        val children = fullscreenFlagsNode(names - name)
-        buildFullscreenFlagNode(name, children)
+        names: Set<String> = setOf("target", "radius", "mode", "forced", "transient", "volume", "looped", "quality"),
+        cache: MutableMap<Set<String>, List<CommandNode<CommandSourceStack>>> = HashMap(),
+    ): List<CommandNode<CommandSourceStack>> = cache.getOrPut(names) {
+        names.map { name -> buildFullscreenFlagNode(name, fullscreenFlagsNode(names - name, cache)) }
     }
 
-    /** Attaches [children] plus a bare `.executes` (this flag alone, nothing further) to every terminal of [node]. */
-    private fun terminate(node: ArgumentBuilder<CommandSourceStack, *>, children: List<ArgumentBuilder<CommandSourceStack, *>>) {
+    /** Attaches [children] plus a bare `.executes` (this flag alone, nothing further) to [node], then builds it. */
+    private fun terminate(
+        node: ArgumentBuilder<CommandSourceStack, *>,
+        children: List<CommandNode<CommandSourceStack>>,
+    ): CommandNode<CommandSourceStack> {
         node.executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
         children.forEach { node.then(it) }
+        return node.build()
     }
 
-    /** Builds one flag's own literal/argument subtree, attaching [children] (the other remaining flags) at every terminal. */
-    private fun buildFullscreenFlagNode(name: String, children: List<ArgumentBuilder<CommandSourceStack, *>>): ArgumentBuilder<CommandSourceStack, *> =
+    /** Builds one flag's own literal / argument subtree, attaching the already-built [children] at every terminal. */
+    private fun buildFullscreenFlagNode(name: String, children: List<CommandNode<CommandSourceStack>>): CommandNode<CommandSourceStack> =
         when (name) {
             "target" -> Commands.literal("target").then(
-                Commands.argument("players", StringArgumentType.string())
-                    .suggests { _, builder -> suggestPlayerNames(builder) }
-                    .also { terminate(it, children) }
-            )
+                terminate(
+                    Commands.argument("players", BareTokenArgumentType)
+                        .suggests { _, builder -> suggestPlayerNames(builder) },
+                    children,
+                )
+            ).build()
             "radius" -> Commands.literal("radius").then(
-                Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0))
-                    .also { terminate(it, children) }
-                    .then(
+                terminate(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0)), children).also { blocks ->
+                    blocks.addChild(
                         Commands.argument("x", DoubleArgumentType.doubleArg())
                             .then(
                                 Commands.argument("y", DoubleArgumentType.doubleArg())
-                                    .then(
-                                        Commands.argument("z", DoubleArgumentType.doubleArg())
-                                            .also { terminate(it, children) }
-                                    )
+                                    .then(terminate(Commands.argument("z", DoubleArgumentType.doubleArg()), children))
                             )
+                            .build()
                     )
-            )
+                }
+            ).build()
             "mode" -> Commands.literal("mode")
-                .then(Commands.literal("standard").also { terminate(it, children) })
-                .then(Commands.literal("immersive").also { terminate(it, children) })
-            "forced" -> Commands.literal("forced").also { terminate(it, children) }
-            "transient" -> Commands.literal("transient").also { terminate(it, children) }
+                .then(terminate(Commands.literal("standard"), children))
+                .then(terminate(Commands.literal("immersive"), children))
+                .build()
+            "forced" -> terminate(Commands.literal("forced"), children)
+            "transient" -> terminate(Commands.literal("transient"), children)
             "volume" -> Commands.literal("volume").then(
-                Commands.argument("volume", DoubleArgumentType.doubleArg(0.0, 200.0))
-                    .also { terminate(it, children) }
-            )
-            "looped" -> Commands.literal("looped").also { terminate(it, children) }
+                terminate(Commands.argument("volume", DoubleArgumentType.doubleArg(0.0, 200.0)), children)
+            ).build()
+            "looped" -> terminate(Commands.literal("looped"), children)
             "quality" -> Commands.literal("quality").then(
-                Commands.argument("quality", StringArgumentType.word())
-                    .suggests { _, builder ->
-                        QUALITY_SUGGESTIONS.forEach { builder.suggest(it) }
-                        builder.buildFuture()
-                    }
-                    .also { terminate(it, children) }
-            )
+                terminate(
+                    Commands.argument("quality", StringArgumentType.word())
+                        .suggests { _, builder ->
+                            QUALITY_SUGGESTIONS.forEach { builder.suggest(it) }
+                            builder.buildFuture()
+                        },
+                    children,
+                )
+            ).build()
             else -> error("Unknown fullscreen flag: $name")
         }
 
