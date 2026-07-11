@@ -162,7 +162,6 @@ jobs:
           display_mc = "1.21.1" if base_mc.startswith("1.21.") else base_mc
           curseforge_publishable = (
               re.fullmatch(r"\d+(?:\.\d+)*", minecraft_version) is not None
-              and minecraft_version != "1.21.11"
           )
 
           paper_1_21 = ["1.21"] + [f"1.21.{p}" for p in range(1, 12)]
