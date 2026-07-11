@@ -176,7 +176,7 @@ class DisplayPopoutManager(
     fun minimizeFullscreenToPip(player: MediaPlayer?, interactive: Boolean = true) {
         val mp = player ?: currentPlayer ?: return
         if (fullscreenOverlay == null) return
-        activatePipMode(mp, PipCorner.BOTTOM_RIGHT, interactive, initialSizeFraction = 0.5f, contentAspect = contentAspect)
+        activatePipMode(mp, PipCorner.BOTTOM_RIGHT, interactive, initialSizeFraction = 0.33f, contentAspect = contentAspect)
     }
 
     /** Closes every popout mode and detaches the frame sink. */
