@@ -43,6 +43,7 @@ class HelpCommand : SubCommand {
         line("displayHelpInfo")
         line("displayHelpDelete")
         line("displayHelpList")
+        line("displayHelpFullscreen")
         line("displayHelpStats")
         line("displayHelpReload")
         line("displayHelpOn")
@@ -81,6 +82,7 @@ object VanillaHelpCommand {
         line("displayHelpReload")
         line("displayHelpOn")
         line("displayHelpOff")
+        line("displayHelpFullscreen")
         line("displayHelpHelp")
         return 1
     }

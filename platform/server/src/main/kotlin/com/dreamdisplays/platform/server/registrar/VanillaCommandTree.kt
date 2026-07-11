@@ -4,6 +4,7 @@ import com.dreamdisplays.platform.server.VanillaConfig
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.DoubleArgumentType
@@ -191,6 +192,11 @@ object VanillaCommandTree {
      * broadcasts to players by name selector, radius, or both (combinable).
      */
     private fun fullscreenNode() = Commands.literal("fullscreen")
+        .executes { ctx ->
+            val player = ctx.source.entity as? ServerPlayer
+            MessageUtil.sendColoredMessage(player, VanillaServerState.config.getMessageForPlayer(player, "displayHelpFullscreen"))
+            Command.SINGLE_SUCCESS
+        }
         .then(fullscreenStartNode())
         .then(fullscreenStopNode())
         .then(fullscreenListNode())

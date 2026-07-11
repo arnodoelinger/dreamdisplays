@@ -5,6 +5,7 @@ import io.github.arnodoelinger.platformweaver.PaperOnly
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.arguments.DoubleArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
@@ -129,6 +130,15 @@ object CommandRegistrar {
      * broadcasts to players by name selector, radius, or both (combinable).
      */
     private fun fullscreenSubCommand(): LiteralArgumentBuilder<CommandSourceStack> = Commands.literal("fullscreen")
+        .executes { ctx ->
+            (ctx.source.sender as? Player)?.let { player ->
+                MessageUtil.sendColoredMessage(
+                    ctx.source.sender,
+                    "&f ${PaperServer.config.getMessageForPlayer(player, "displayHelpFullscreen")}"
+                )
+            }
+            Command.SINGLE_SUCCESS
+        }
         .then(fullscreenStartSubCommand())
         .then(
             Commands.literal("stop")
