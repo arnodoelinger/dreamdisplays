@@ -6,6 +6,7 @@ import com.dreamdisplays.platform.server.managers.StorageManager
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.VanillaPlaybackTransport
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -40,6 +41,8 @@ object VanillaBootstrap {
         TimelineManager.init(VanillaPlaybackTransport)
         FullscreenBroadcastManager.init(VanillaPlaybackTransport)
         FullscreenBroadcastManager.restore()
+        PipPinManager.init(VanillaPlaybackTransport)
+        PipPinManager.restore()
         startRepeatingTasks(server)
     }
 

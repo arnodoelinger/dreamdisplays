@@ -18,6 +18,7 @@ import com.dreamdisplays.platform.server.meta.Scheduler.runSync
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import kotlinx.coroutines.launch
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -106,6 +107,7 @@ object DisplayManager {
             TimelineManager.remove(display.id)
             WatchPartyManager.remove(display.id)
             FullscreenBroadcastManager.onDisplayRemoved(display.id)
+            PipPinManager.onDisplayRemoved(display.id)
             StateManager.remove(display.id)
             delete(display)
             display.id
@@ -271,6 +273,7 @@ object DisplayManager {
         TimelineManager.remove(displayData.id)
         WatchPartyManager.remove(displayData.id)
         FullscreenBroadcastManager.onDisplayRemoved(displayData.id)
+        PipPinManager.onDisplayRemoved(displayData.id)
         StateManager.remove(displayData.id)
         displays.remove(displayData.id)
         proximityIndex.forgetDisplay(displayData.id)
@@ -418,6 +421,7 @@ object DisplayManager {
         TimelineManager.remove(data.id)
         WatchPartyManager.remove(data.id)
         FullscreenBroadcastManager.onDisplayRemoved(data.id)
+        PipPinManager.onDisplayRemoved(data.id)
         StateManager.remove(data.id)
         ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(data) }
         if (receivers.isNotEmpty()) VanillaPacketUtil.sendDelete(receivers, data.id)

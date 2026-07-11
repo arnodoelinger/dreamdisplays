@@ -40,6 +40,9 @@ data class ClientDisplaySettings(
 
     /** Viewer-chosen render distance in blocks, or `0` if never customized (falls back to the config default). */
     var renderDistance: Int = 0,
+
+    /** Whether the viewer pinned this display to a Picture-in-Picture overlay; re-opened on rejoin regardless of render distance. */
+    var pipOpen: Boolean = false,
 ) {
 
     companion object {

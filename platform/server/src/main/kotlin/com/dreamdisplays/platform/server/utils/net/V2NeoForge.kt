@@ -8,6 +8,7 @@ import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.core.protocol.FullscreenAck
+import com.dreamdisplays.core.protocol.PipPin
 import com.dreamdisplays.api.protocol.PacketDirection
 import com.dreamdisplays.core.protocol.PacketRegistry
 import com.dreamdisplays.api.playback.PlaybackAction
@@ -27,6 +28,7 @@ import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import net.minecraft.server.MinecraftServer
@@ -122,6 +124,11 @@ object NeoForgeV2Networking {
             is FullscreenAck -> FullscreenBroadcastManager.handleAck(
                 packet.sessionId, player.uuid, FullscreenAckAction.fromWire(packet.action),
             )
+            is PipPin -> if (packet.pinned) {
+                PipPinManager.pin(player.uuid, packet.id)
+            } else {
+                PipPinManager.unpin(player.uuid, packet.id)
+            }
 
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }
@@ -149,5 +156,6 @@ object NeoForgeV2Networking {
         VanillaDisplayActions.recordVersionAndCheckUpdates(player, hello.modVersion)
         VanillaDisplayActions.sendAllDisplays(player, server)
         FullscreenBroadcastManager.onPlayerJoin(player.uuid)
+        PipPinManager.onPlayerJoin(player.uuid)
     }
 }

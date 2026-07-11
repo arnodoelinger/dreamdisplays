@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.metrics.TelemetryMetrics
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
 import com.dreamdisplays.platform.server.playback.PaperPlaybackTransport
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -77,6 +78,8 @@ class PaperServer : JavaPlugin() {
         TimelineManager.init(PaperPlaybackTransport)
         FullscreenBroadcastManager.init(PaperPlaybackTransport)
         FullscreenBroadcastManager.restore()
+        PipPinManager.init(PaperPlaybackTransport)
+        PipPinManager.restore()
 
         ListenerRegistrar.registerListeners(this)
         ChannelRegistrar.registerChannels(this)

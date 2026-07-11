@@ -4,6 +4,7 @@ import com.dreamdisplays.api.playback.FullscreenAckAction
 import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.Timeline
+import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.FullscreenState
 import com.dreamdisplays.core.protocol.toSync
@@ -79,15 +80,17 @@ object FullscreenBroadcastManager {
     /**
      * Resolves the `/display fullscreen start` target argument: a full display id, an unambiguous id
      * prefix (matching `/display list`'s 8-char short id column), or only when [idOrUrl] looks like
-     * a URL - a synthetic virtual display for [ownerId] backed by it. Returns null when nothing
-     * matches a display and the input isn't URL-shaped (never silently treats a mistyped id as a URL),
-     * or when a virtual display is needed but no world is loaded yet.
+     * a URL - a synthetic virtual display for [ownerId] backed by it. The URL is normalized the same
+     * way `/display video` normalizes its argument ([MediaSource.from]), so `youtu.be/xyz` or a bare
+     * `youtube.com/watch?v=...` (no scheme) work exactly like they do there. Returns null when
+     * nothing matches a display and the input isn't URL-shaped (never silently treats a mistyped id
+     * as a URL), or when a virtual display is needed but no world is loaded yet.
      */
     fun resolveOrCreateDisplay(idOrUrl: String, ownerId: UUID): Pair<DisplayData, Boolean>? {
         resolveDisplayByIdOrPrefix(idOrUrl)?.let { return it to false }
         if (!looksLikeUrl(idOrUrl)) return null
         val virtual = transport.createVirtualDisplay(UUID.randomUUID(), ownerId) ?: return null
-        virtual.url = idOrUrl
+        virtual.url = MediaSource.from(idOrUrl).toResolvableUrl() ?: idOrUrl
         return virtual to true
     }
 
@@ -101,8 +104,16 @@ object FullscreenBroadcastManager {
         return matches.singleOrNull()
     }
 
-    /** True if [value] looks like an absolute URL, so a failed id lookup should fall back to a virtual display instead of erroring. */
-    private fun looksLikeUrl(value: String): Boolean = Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(value)
+    /**
+     * True if [value] looks like a URL / link a viewer would paste — an absolute URL (`scheme://...`)
+     * or a bare domain (`youtu.be/xyz`, `youtube.com/watch?v=...`, no scheme), so a failed id lookup
+     * falls back to a virtual display instead of erroring. Deliberately excludes plain words/ids
+     * (no dot), so a mistyped id is never silently treated as a URL.
+     */
+    private fun looksLikeUrl(value: String): Boolean =
+        Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(value) ||
+            Regex("""^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+(?:[/?#].*)?$""")
+                .matches(value.trim())
 
     /** Display id short-id suggestions (the same 8-char prefix `/display list` shows) for the `target` argument. */
     fun displayIdSuggestions(): List<String> = DisplayManager.getDisplays().map { it.id.toString().take(8) }

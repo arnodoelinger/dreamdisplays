@@ -96,6 +96,13 @@ object ClientSettingsStore : ClientSettingsStorage {
         save()
     }
 
+    /** Sets whether [displayUuid] is pinned to a Picture-in-Picture overlay and saves. */
+    override fun setPipOpen(displayUuid: UUID, open: Boolean) {
+        val s = getSettings(displayUuid)
+        s.pipOpen = open
+        save()
+    }
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     override fun remove(displayUuid: UUID): Boolean {
         val removed = settings.remove(displayUuid) != null

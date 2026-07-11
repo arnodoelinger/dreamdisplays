@@ -117,6 +117,10 @@ object DisplayLifecycleManager {
         displayScreen.createTexture()
         DisplayRegistry.registerScreen(displayScreen)
         if (code != "") displayScreen.loadVideo(code, lang)
+
+        if (ClientSettingsStore.getSettings(uuid, DisplayScreen.defaultVolume()).pipOpen) {
+            displayScreen.activatePipMode()
+        }
     }
 
     /**

@@ -42,6 +42,9 @@ interface ClientSettingsStorage {
     /** Sets the viewer-chosen render distance (in blocks) for [displayUuid] and saves. */
     fun setRenderDistance(displayUuid: UUID, blocks: Int)
 
+    /** Sets whether [displayUuid] is pinned to a Picture-in-Picture overlay and saves. */
+    fun setPipOpen(displayUuid: UUID, open: Boolean)
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     fun remove(displayUuid: UUID): Boolean
 }

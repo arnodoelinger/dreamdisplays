@@ -251,6 +251,18 @@ data class FullscreenAck(
 ) : DreamPacket
 
 /**
+ * Client pins (or unpins) a display to its Picture-in-Picture overlay. The server persists this per
+ * player so a pinned display's [DisplayInfo] gets re-sent (bypassing render distance, like a forced
+ * fullscreen broadcast) on the next [ClientHello] handshake, letting the client re-open the overlay
+ * even if the display is far outside normal render distance - otherwise PiP is lost on every rejoin.
+ */
+@Serializable
+data class PipPin(
+    @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
+    @ProtoNumber(2) val pinned: Boolean = true,
+) : DreamPacket
+
+/**
  * Server asks the issuing admin's client to render (or hide) a translucent radius-preview dome at
  * a world position, visualizing a fullscreen-broadcast radius while it is being configured.
  */

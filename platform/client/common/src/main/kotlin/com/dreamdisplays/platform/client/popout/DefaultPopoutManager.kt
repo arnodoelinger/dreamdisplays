@@ -2,12 +2,15 @@ package com.dreamdisplays.platform.client.popout
 
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.playback.FullscreenMode
+import com.dreamdisplays.core.protocol.PipPin
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.DisplayPopoutManager
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.api.media.sink.VideoFrameSink
 import java.util.concurrent.CopyOnWriteArrayList
 
@@ -29,15 +32,26 @@ class DefaultPopoutManager : PopoutManager {
         return null
     }
 
-    /** Opens the in-game PiP overlay for [displayId]. Returns null, the sink is managed internally. */
+    /**
+     * Opens the in-game PiP overlay for [displayId] and pins it server-side so it re-opens on the
+     * next join even if the display is then outside normal render distance. Returns null, the sink
+     * is managed internally.
+     */
     override fun openPip(displayId: DisplayId): VideoFrameSink? {
         DisplayRegistry.screens[displayId.uuid]?.activatePipMode()
+        ClientSettingsStore.setPipOpen(displayId.uuid, true)
+        Initializer.sendPacket(PipPin(displayId.uuid, pinned = true))
         return null
     }
 
-    /** Closes whichever popout mode is active for [displayId]. */
+    /** Closes whichever popout mode is active for [displayId], unpinning it if it was PiP. */
     override fun close(displayId: DisplayId) {
+        val wasPip = isPipOpen(displayId)
         DisplayRegistry.screens[displayId.uuid]?.deactivatePopout()
+        if (wasPip) {
+            ClientSettingsStore.setPipOpen(displayId.uuid, false)
+            Initializer.sendPacket(PipPin(displayId.uuid, pinned = false))
+        }
     }
 
     /** Shows [displayId] as a fullscreen overlay in [mode]. */

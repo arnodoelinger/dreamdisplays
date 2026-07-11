@@ -308,6 +308,14 @@ message RadiusPreview {
   optional int32 colorArgb = 6;
 }
 
+// serial name 'com.dreamdisplays.core.protocol.PipPin'
+message PipPin {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional bool pinned = 2;
+}
+
 message Uuid {
   // WARNING: a default value decoded when value is missing
   optional fixed64 msb = 1;

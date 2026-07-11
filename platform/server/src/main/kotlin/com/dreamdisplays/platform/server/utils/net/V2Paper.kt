@@ -6,6 +6,7 @@ import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.core.protocol.FullscreenAck
+import com.dreamdisplays.core.protocol.PipPin
 import com.dreamdisplays.api.protocol.PacketDirection
 import com.dreamdisplays.core.protocol.PacketRegistry
 import com.dreamdisplays.api.playback.PlaybackAction
@@ -25,6 +26,7 @@ import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
@@ -99,6 +101,11 @@ object PaperV2Networking : PluginMessageListener {
             is FullscreenAck -> FullscreenBroadcastManager.handleAck(
                 packet.sessionId, player.uniqueId, FullscreenAckAction.fromWire(packet.action),
             )
+            is PipPin -> if (packet.pinned) {
+                PipPinManager.pin(player.uniqueId, packet.id)
+            } else {
+                PipPinManager.unpin(player.uniqueId, packet.id)
+            }
 
             else -> logger.debug("Ignoring non-serverbound v2 packet {}.", packet::class.simpleName)
         }
@@ -118,5 +125,6 @@ object PaperV2Networking : PluginMessageListener {
         DisplayActions.recordVersionAndCheckUpdates(player, hello.modVersion)
         DisplayActions.sendAllDisplays(player)
         FullscreenBroadcastManager.onPlayerJoin(player.uniqueId)
+        PipPinManager.onPlayerJoin(player.uniqueId)
     }
 }
