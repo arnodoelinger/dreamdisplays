@@ -1,3 +1,44 @@
+# 1.9.0 Preview 2
+
+## Highlights
+
+- Hotfix: fixed an issue that could significantly increase world loading times for all players
+- Brought back `NeoForge` 1.21.11 releases to the [corporate ad dispenser](https://www.curseforge.com/)
+- Now you can set video URL in `/display fullscreen` command
+- Some other minor improvements
+
+## Client
+
+### Features
+
+- Brought back `NeoForge` 1.21.11 releases to the [corporate ad dispenser](https://www.curseforge.com/)
+
+### Improvements
+
+- Renamed the `Synchronization` setting to `Playback mode` and its tooltip now briefly explains each mode
+- (`Local`, `Synced`, `Broadcast`)
+- Fullscreen displays in Picture-in-Picture mode are now 33% bigger
+- Now fullscreen and Picture-in-Picture displays survive rejoins
+- Updated messages mentioning `YouTube` to also reflect `Twitch` support
+
+## Server
+
+### Improvements
+
+- Enhanced target selector format for `/display fullscreen` (e.g. `@a` no longer needs quotes)
+- Added `url` option for `/display fullscreen`
+- Added `/display fullscreen` to `/display help`, and incomplete `/display fullscreen` commands now show its usage
+  instead of a generic error
+- Updated messages mentioning `YouTube` to also reflect `Twitch` support
+- Added hover and preview fade effects to seekbar
+- Added ghost handle when seeking
+
+### Fixes
+
+- Fixed an issue that could significantly increase world loading times
+- Fixed players being unable to join at all right after the previous fix, caused by the new `/display fullscreen`
+  selector format
+
 # 1.9.0 Preview 1
 
 ## Highlights
