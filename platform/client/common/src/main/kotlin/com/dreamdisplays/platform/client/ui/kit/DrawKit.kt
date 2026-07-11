@@ -37,22 +37,26 @@ fun GuiGraphicsCompat.fillVGradient(x1: Int, y1: Int, x2: Int, y2: Int, top: Int
 }
 
 /**
- * Draws an animated loading shimmer inside [x1,y1)-[x2,y2): a flat [base] fill with a soft [highlight]
- * band sweeping left-to-right. Time-driven, so it animates on its own each frame with no state to keep.
+ * Draws an animated loading shimmer inside [x1, y1) - [x2, y2): a subtle top-to-bottom [base] gradient
+ * (so the card doesn't read as dead flat) with a soft [highlight] band sweeping left-to-right, eased
+ * in and out like a glare rather than a hard-edged triangle. Time-driven, so it animates on its own
+ * each frame with no state to keep.
  */
 fun GuiGraphicsCompat.drawShimmer(x1: Int, y1: Int, x2: Int, y2: Int, base: Int, highlight: Int) {
-    fill(x1, y1, x2, y2, base)
     val w = x2 - x1
-    if (w <= 0 || y2 <= y1) return
-    val period = 1400L
+    val h = y2 - y1
+    if (w <= 0 || h <= 0) return
+    fillVGradient(x1, y1, x2, y2, lightenRgb(base, 0.06f), base)
+
+    val period = 1600L
     val phase = (System.currentTimeMillis() % period) / period.toFloat()
-    // Sweep the band centre from just off the left edge to just off the right edge.
-    val centre = x1 - w * 0.4f + (w * 1.8f) * phase
-    val half = (w * 0.22f).coerceAtLeast(4f)
+    val centre = x1 - w * 0.5f + (w * 2f) * phase
+    val half = (w * 0.3f).coerceAtLeast(6f)
     for (i in 0 until w) {
-        val d = kotlin.math.abs((x1 + i) + 0.5f - centre)
-        if (d >= half) continue
-        val a = 1f - d / half
+        val d = (kotlin.math.abs((x1 + i) + 0.5f - centre) / half).coerceIn(0f, 1f)
+        if (d >= 1f) continue
+        val e = 1f - d
+        val a = e * e * (3f - 2f * e)
         fill(x1 + i, y1, x1 + i + 1, y2, scaleAlpha(highlight, a))
     }
 }

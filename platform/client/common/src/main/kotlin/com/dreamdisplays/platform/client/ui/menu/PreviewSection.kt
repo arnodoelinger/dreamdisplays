@@ -8,13 +8,12 @@ import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
-import com.dreamdisplays.platform.client.ui.kit.darkenRgb
 import com.dreamdisplays.platform.client.ui.kit.drawShimmer
-import com.dreamdisplays.platform.client.ui.kit.fillVGradient
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.render.AmbientGrid
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
@@ -55,6 +54,9 @@ class PreviewSection(
     private val dropdown: PopoutDropdown,
 ) {
     private val yuvPreview = PreviewFrameTexture(ds)
+    private val ambientSampler = AmbientFrameSampler(ds)
+    private var frameSinkAttached = false
+    private var lastVideoUrl: String? = null
 
     companion object {
         /** Aspect ratio of a YouTube thumbnail image, independent of the screen's own block shape. */
@@ -95,11 +97,17 @@ class PreviewSection(
     /** Draws the letterboxed video frame, or the dimmed thumbnail + waiting text while loading. */
     private fun drawVideoArea(g: GuiGraphicsCompat, x: Int, y: Int, w: Int, h: Int) {
         val font = Minecraft.getInstance().font
-        // Ambient letterbox tinted to the current thumbnail's colors (YouTube-style) instead of a
-        // flat black box, so the bars around the video blend with its palette. Preview-only — the
-        // in-world displays are rendered elsewhere and keep their plain background.
-        val ambient = ambientColor()
-        g.fillVGradient(x, y, x + w, y + h, ambient, darkenRgb(ambient, 0.55f))
+
+        if (ds.videoUrl != lastVideoUrl) {
+            lastVideoUrl = ds.videoUrl
+            ambientSampler.reset()
+        }
+
+        if (currentSource() != null) {
+            drawAmbientBackdrop(g, x, y, w, h)
+        } else {
+            g.fill(x, y, x + w, y + h, 0xFF000000.toInt())
+        }
 
         val area = UiRect(x, y, w, h)
         // The decoded video frame is already server-side letterboxed to the screen's own block
@@ -108,8 +116,14 @@ class PreviewSection(
         val screenRatio = ds.width / max(1f, ds.height.toFloat())
         val video = fitRatio(area, screenRatio)
 
+        if (ds.isVideoStarted) {
+            attachFrameSink()
+            ambientSampler.uploadFrame()
+        } else {
+            detachFrameSink()
+        }
+
         if (ds.isVideoStarted && ds.texture != null && ds.textureId != null) {
-            yuvPreview.detach()
             ds.fitTexture()
             // fitTexture() may promote a staged quality-handoff texture, which releases and
             // unregisters the previous one. Re-read the id afterwards so we never blit a
@@ -119,7 +133,6 @@ class PreviewSection(
                 blitTexture(g, texId, video.x, video.y, video.w, video.h)
             }
         } else if (ds.isVideoStarted && ds.isYuvTexture) {
-            yuvPreview.attach()
             yuvPreview.uploadFrame()
             val previewId = yuvPreview.textureId
             if (previewId != null) {
@@ -128,9 +141,28 @@ class PreviewSection(
                 drawWaiting(g, font, area)
             }
         } else {
-            yuvPreview.detach()
             drawWaiting(g, font, area)
         }
+    }
+
+    /**
+     * Attaches the single preview-frame sink shared by the full YUV preview texture (only relevant
+     * while [DisplayScreen.isYuvTexture]) and the ambient sampler (relevant for every playing video,
+     * regardless of which texture path is actually rendered on screen).
+     */
+    private fun attachFrameSink() {
+        if (frameSinkAttached) return
+        frameSinkAttached = true
+        ds.setPreviewFrameSink { buf, w, h, format ->
+            if (ds.isYuvTexture) yuvPreview.updateFrame(buf, w, h, format)
+            ambientSampler.onFrame(buf, w, h, format)
+        }
+    }
+
+    private fun detachFrameSink() {
+        if (!frameSinkAttached) return
+        frameSinkAttached = false
+        ds.setPreviewFrameSink(null)
     }
 
     /** Returns the largest box with aspect ratio [ratio] that fits inside [area], centered. */
@@ -149,12 +181,16 @@ class PreviewSection(
         // YouTube thumbnails are always 16:9, regardless of the screen's own block shape.
         val box = fitRatio(area, THUMBNAIL_RATIO)
         val thumb = currentThumbnail()
-        if (thumb != null) {
-            blitTexture(g, thumb, box.x, box.y, box.w, box.h)
-            g.fill(box.x, box.y, box.right, box.bottom, 0x80000000.toInt())
-        } else {
-            // No thumbnail yet: a neat shimmer in the video area instead of an empty box.
-            g.drawShimmer(box.x, box.y, box.right, box.bottom, UiTheme.PLACEHOLDER_BG, UiTheme.PLACEHOLDER_SHIMMER)
+        when {
+            thumb != null -> {
+                blitTexture(g, thumb, box.x, box.y, box.w, box.h)
+                g.fill(box.x, box.y, box.right, box.bottom, 0x80000000.toInt())
+            }
+            // Something is assigned and loading, just no thumbnail decoded yet: a neat shimmer
+            currentSource() != null ->
+                g.drawShimmer(box.x, box.y, box.right, box.bottom, UiTheme.PLACEHOLDER_BG, UiTheme.PLACEHOLDER_SHIMMER)
+            // Nothing assigned to this display: leave the plain black backdrop from drawVideoArea
+            else -> {}
         }
         val waiting = Component.translatable("dreamdisplays.ui.waiting").string
         g.drawText(
@@ -310,22 +346,19 @@ class PreviewSection(
         }
     }
 
-    /** Ambient letterbox tint: the current thumbnail's average color, darkened, or a neutral fallback. */
-    private fun ambientColor(): Int {
-        val id = currentThumbnailKey() ?: return UiTheme.AMBIENT_DEFAULT
-        val avg = Thumbnails.averageColor(id) ?: run {
-            // Warm the thumbnail even while the video plays, so the tint appears once it decodes
+    private fun drawAmbientBackdrop(g: GuiGraphicsCompat, x: Int, y: Int, w: Int, h: Int) {
+        val live = ambientSampler.textureId
+        val id = currentThumbnailKey()
+        val ambient = live ?: id?.let { Thumbnails.ambientTexture(it) }
+        if (ambient != null) {
+            blitTexture(g, ambient, x, y, w, h)
+            g.fill(x, y, x + w, y + h, 0x50000000)
+        } else {
+            // Warm the thumbnail even while the video plays, so the backdrop appears once it decodes
             // (request de-dups, so calling it per frame is cheap).
             requestCurrentThumbnail()
-            return UiTheme.AMBIENT_DEFAULT
+            g.fill(x, y, x + w, y + h, UiTheme.AMBIENT_DEFAULT)
         }
-        // Slowly drift the tint over time...
-        // TODO: enhance in 1.9.0
-        val base = darkenRgb(avg, 0.30f)
-        val t = System.currentTimeMillis() / 1000.0
-        fun drift(shift: Int, phase: Double): Int =
-            (((base ushr shift) and 0xFF) * (1.0 + 0.15 * kotlin.math.sin(t * 0.38 + phase))).toInt().coerceIn(0, 255)
-        return (0xFF shl 24) or (drift(16, 0.0) shl 16) or (drift(8, 2.1) shl 8) or drift(0, 4.2)
     }
 
     /** Returns the cached thumbnail for the current video, requesting it asynchronously if absent. */
@@ -344,7 +377,9 @@ class PreviewSection(
     }
 
     fun close() {
+        detachFrameSink()
         yuvPreview.close()
+        ambientSampler.close()
     }
 
     private class PreviewFrameTexture(private val ds: DisplayScreen) {
@@ -372,23 +407,10 @@ class PreviewSection(
             private set
         private var texW = 0
         private var texH = 0
-        private var attached = false
         private var uploader: AsyncTextureUploader? = null
         private var rgbaUploadBuffer: ByteBuffer? = null
 
-        fun attach() {
-            if (attached) return
-            attached = true
-            ds.setPreviewFrameSink(::updateFrame)
-        }
-
-        fun detach() {
-            if (!attached) return
-            attached = false
-            ds.setPreviewFrameSink(null)
-        }
-
-        private fun updateFrame(buf: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat) {
+        fun updateFrame(buf: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat) {
             val size = w * h * format.bytesPerPixel
             if (size <= 0 || buf.remaining() < size) return
             var back = backBuf
@@ -459,7 +481,6 @@ class PreviewSection(
         }
 
         fun close() {
-            detach()
             uploader?.close()
             uploader = null
             val mc = Minecraft.getInstance()
@@ -471,6 +492,125 @@ class PreviewSection(
 
         companion object {
             private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+        }
+    }
+
+    private class AmbientFrameSampler(private val ds: DisplayScreen) {
+        @Volatile
+        private var target: AmbientGrid.Grid? = null
+        private var lastSampleNanos = 0L
+
+        private var currentR: FloatArray? = null
+        private var currentG: FloatArray? = null
+        private var currentB: FloatArray? = null
+        private var lastUploadNanos = 0L
+
+        private var rgbaBuf: ByteBuffer = EMPTY_DIRECT
+        private var dynamicTexture: DynamicTexture? = null
+        var textureId: Identifier? = null
+            private set
+        private var uploader: AsyncTextureUploader? = null
+        private var rgbaUploadBuffer: ByteBuffer? = null
+
+        fun onFrame(buf: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat) {
+            val now = System.nanoTime()
+            if (now - lastSampleNanos < SAMPLE_INTERVAL_NS) return
+            lastSampleNanos = now
+            target = AmbientGrid.fromFrameBuffer(buf, w, h, format.bytesPerPixel)
+        }
+
+        fun uploadFrame() {
+            val t = target ?: return
+            val gw = AmbientGrid.GRID_W
+            val gh = AmbientGrid.GRID_H
+            val n = gw * gh
+
+            var cr = currentR
+            var cg = currentG
+            var cb = currentB
+            val now = System.nanoTime()
+            if (cr == null || cg == null || cb == null) {
+                cr = FloatArray(n) { t.r[it].toFloat() }
+                cg = FloatArray(n) { t.g[it].toFloat() }
+                cb = FloatArray(n) { t.b[it].toFloat() }
+                currentR = cr; currentG = cg; currentB = cb
+            } else if (lastUploadNanos != 0L) {
+                val dtSeconds = ((now - lastUploadNanos).coerceAtLeast(0)) / 1_000_000_000f
+                val alpha = 1f - kotlin.math.exp(-dtSeconds / SMOOTH_TAU_SECONDS)
+                for (i in 0 until n) {
+                    cr[i] += (t.r[i] - cr[i]) * alpha
+                    cg[i] += (t.g[i] - cg[i]) * alpha
+                    cb[i] += (t.b[i] - cb[i]) * alpha
+                }
+            }
+            lastUploadNanos = now
+
+            val size = n * 4
+            var out = rgbaBuf
+            if (out.capacity() < size) out = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+            out.clear()
+            for (i in 0 until n) {
+                out.put(cr[i].toInt().coerceIn(0, 255).toByte())
+                out.put(cg[i].toInt().coerceIn(0, 255).toByte())
+                out.put(cb[i].toInt().coerceIn(0, 255).toByte())
+                out.put(0xFF.toByte())
+            }
+            out.flip()
+            rgbaBuf = out
+
+            val mc = Minecraft.getInstance()
+            var tex = dynamicTexture
+            if (tex == null) {
+                val img = NativeImage(NativeImage.Format.RGBA, gw, gh, false)
+                //? if >=1.21.11 {
+                tex = DynamicTexture({ "dreamdisplays:ambient" }, img)
+                //?} else
+                /*tex = DynamicTexture(img)*/
+                textureId = Identifier.fromNamespaceAndPath(
+                    Initializer.MOD_ID,
+                    "ambient/${ds.uuid}-${UUID.randomUUID()}",
+                )
+                mc.textureManager.register(textureId!!, tex)
+                TextureUploadUtil.applyBilinearFilter(tex)
+                dynamicTexture = tex
+            }
+
+            TextureUploadUtil.uploadDynamicTexture(
+                texture = tex,
+                src = rgbaBuf,
+                w = gw,
+                h = gh,
+                format = UploadPixelFormat.RGBA32,
+                glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
+                rgbaScratch = rgbaUploadBuffer,
+                setRgbaScratch = { rgbaUploadBuffer = it },
+            )
+        }
+
+        fun reset() {
+            target = null
+            lastSampleNanos = 0
+            currentR = null; currentG = null; currentB = null
+            lastUploadNanos = 0
+            val mc = Minecraft.getInstance()
+            dynamicTexture?.close()
+            textureId?.let { mc.textureManager.release(it) }
+            dynamicTexture = null
+            textureId = null
+        }
+
+        fun close() {
+            uploader?.close()
+            uploader = null
+            reset()
+        }
+
+        companion object {
+            private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+            private const val SAMPLE_INTERVAL_NS = 1_500_000_000L
+
+            /** Time constant of the exponential ease toward each newly sampled target — bigger = slower, calmer drift. */
+            private const val SMOOTH_TAU_SECONDS = 2.5f
         }
     }
 }
