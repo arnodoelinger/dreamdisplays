@@ -110,11 +110,8 @@ class PreviewSection(
         }
 
         val area = UiRect(x, y, w, h)
-        // The decoded video frame is already server-side letterboxed to the screen's own block
-        // shape, so it's fit to that ratio here too. The idle thumbnail is a raw 16:9 YouTube
-        // image and gets its own fit box in drawWaiting() below instead.
-        val screenRatio = ds.width / max(1f, ds.height.toFloat())
-        val video = fitRatio(area, screenRatio)
+        val contentRatio = ds.videoContentAspect.toFloat().takeIf { it > 0f } ?: THUMBNAIL_RATIO
+        val video = fitRatio(area, contentRatio)
 
         if (ds.isVideoStarted) {
             attachFrameSink()
@@ -130,13 +127,13 @@ class PreviewSection(
             // just-freed texture (otherwise: "Missing resource" + GL_INVALID_OPERATION).
             val texId = ds.textureId
             if (texId != null) {
-                blitTexture(g, texId, video.x, video.y, video.w, video.h)
+                blitVideoTexture(g, texId, video.x, video.y, video.w, video.h, ds.textureWidth, ds.textureHeight)
             }
         } else if (ds.isVideoStarted && ds.isYuvTexture) {
             yuvPreview.uploadFrame()
             val previewId = yuvPreview.textureId
             if (previewId != null) {
-                blitTexture(g, previewId, video.x, video.y, video.w, video.h)
+                blitVideoTexture(g, previewId, video.x, video.y, video.w, video.h, yuvPreview.texW, yuvPreview.texH)
             } else {
                 drawWaiting(g, font, area)
             }
@@ -175,6 +172,34 @@ class PreviewSection(
             w = area.w; h = (w / ratio).toInt()
         }
         return area.centered(w, h)
+    }
+
+    /**
+     * The decode pipeline pads every frame to the display's own block aspect ratio (its GPU texture
+     * is allocated at that shape), so a wide / narrow block display bakes black bars into the texture
+     * pixels themselves.
+     */
+    private fun contentRect(frameW: Int, frameH: Int, contentAspect: Double): UiRect {
+        if (frameW <= 0 || frameH <= 0 || contentAspect <= 0.0 || !contentAspect.isFinite()) {
+            return UiRect(0, 0, frameW, frameH)
+        }
+        val frameAspect = frameW / frameH.toDouble()
+        return if (contentAspect > frameAspect) {
+            val contentH = (frameW / contentAspect).toInt().coerceIn(1, frameH)
+            UiRect(0, (frameH - contentH) / 2, frameW, contentH)
+        } else {
+            val contentW = (frameH * contentAspect).toInt().coerceIn(1, frameW)
+            UiRect((frameW - contentW) / 2, 0, contentW, frameH)
+        }
+    }
+
+    /** Like [blitTexture], but crops the block-shape padding out of a [texW] x [texH] decode texture first. */
+    private fun blitVideoTexture(g: GuiGraphicsCompat, id: Identifier, x: Int, y: Int, w: Int, h: Int, texW: Int, texH: Int) {
+        val content = contentRect(texW, texH, ds.videoContentAspect)
+        //? if >=1.21.11 {
+        g.blit(RenderPipelines.GUI_TEXTURED, id, x, y, content.x.toFloat(), content.y.toFloat(), w, h, content.w, content.h, texW, texH)
+        //?} else
+        /*g.blit(id, x, y, w, h, content.x.toFloat(), content.y.toFloat(), content.w, content.h, texW, texH)*/
     }
 
     private fun drawWaiting(g: GuiGraphicsCompat, font: net.minecraft.client.gui.Font, area: UiRect) {
@@ -405,8 +430,10 @@ class PreviewSection(
         private var dynamicTexture: DynamicTexture? = null
         var textureId: Identifier? = null
             private set
-        private var texW = 0
-        private var texH = 0
+        var texW = 0
+            private set
+        var texH = 0
+            private set
         private var uploader: AsyncTextureUploader? = null
         private var rgbaUploadBuffer: ByteBuffer? = null
 
