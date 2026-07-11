@@ -13,6 +13,7 @@ import com.dreamdisplays.platform.client.input.InputAction
 import com.dreamdisplays.platform.client.input.InputHandler
 import com.dreamdisplays.platform.client.input.KeyBindingRegistry
 import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import net.minecraft.client.Minecraft
@@ -58,6 +59,9 @@ object ClientTickManager {
         DreamServices.registry.getOrNull<ClientApplication>()
             ?.emit(ClientLifecycleEvent.Tick(tickCount))
 
+        FullscreenOverlayManager.onClientTick(minecraft)
+        FullscreenController.onClientTick()
+
         val level = minecraft.level
         if (level != null && (minecraft.currentServer != null || minecraft.isLocalServer)) {
             if (lastLevel == null) {
@@ -68,6 +72,7 @@ object ClientTickManager {
                 lastLevel = level
                 DisplayRegistry.unloadAll()
                 DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
+                FullscreenOverlayManager.closeAll()
                 hoveredDisplayScreen = null
                 checkVersionAndSendPacket()
             }
@@ -77,6 +82,7 @@ object ClientTickManager {
                 wasInMultiplayer = false
                 DisplayRegistry.unloadAll()
                 DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
+                FullscreenOverlayManager.closeAll()
                 hoveredDisplayScreen = null
                 lastLevel = null
                 return

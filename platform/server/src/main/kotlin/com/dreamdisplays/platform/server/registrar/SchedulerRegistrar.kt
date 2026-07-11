@@ -6,6 +6,7 @@ import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Updater
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
@@ -44,6 +45,7 @@ object SchedulerRegistrar {
             }
             TimelineManager.tick()
             WatchPartyManager.tick()
+            FullscreenBroadcastManager.tick()
         }
         val settings = PaperServer.config.settings
         if (settings.updatesEnabled) {

@@ -42,6 +42,7 @@ import java.util.UUID
 class PipOverlay(
     val displayScreen: DisplayScreen,
     initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
+    private val interactive: Boolean = true,
 ) : Overlay {
     @Volatile
     private var frontBuf: ByteBuffer = EMPTY_DIRECT
@@ -393,7 +394,7 @@ class PipOverlay(
                 }
 
                 resizing -> resizing = false
-                pressedInBody -> DisplayMenu.open(displayScreen)
+                pressedInBody -> if (interactive) DisplayMenu.open(displayScreen)
             }
             pressed = false
             pressedInBody = false

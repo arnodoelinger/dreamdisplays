@@ -84,8 +84,9 @@ data class DisplayInfo(
     @ProtoNumber(12) val isLocked: Boolean = true,
     @ProtoNumber(13) val mode: Int = 0,
     @ProtoNumber(14) val qualityCap: Int = 0,
-    /** Content quarter-turn rotation (0-3), only meaningful for `UP`/`DOWN` facings. */
     @ProtoNumber(15) val rotation: Int = 0,
+    @ProtoNumber(16) val virtual: Boolean = false,
+    @ProtoNumber(17) val forced: Boolean = false,
 ) : DreamPacket
 
 /** Removes a display (server broadcast) or requests its deletion (client action). */
@@ -216,4 +217,49 @@ data class WatchPartyState(
     @ProtoNumber(12) val serverTimeMs: Long = 0,
     @ProtoNumber(13) val durationMs: Long = 0,
     @ProtoNumber(14) val paused: Boolean = true,
+) : DreamPacket
+
+/**
+ * Server snapshot of a fullscreen broadcast targeting the receiving player. Idempotent: re-sent in
+ * full on reconnect / target-set changes; [active] = false tears the overlay down. [displayId]
+ * references a [DisplayInfo] the server has already delivered (a world display or a virtual one).
+ * [mode] is a [FullscreenMode] wire ordinal (0 standard, 1 immersive); [volume] < 0 keeps the
+ * client's own volume.
+ */
+@Serializable
+data class FullscreenState(
+    @ProtoNumber(1) val sessionId: String = "",
+    @ProtoNumber(2) val displayId: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
+    @ProtoNumber(3) val active: Boolean = false,
+    @ProtoNumber(4) val mode: Int = 0,
+    @ProtoNumber(5) val forced: Boolean = false,
+    @ProtoNumber(6) val volume: Float = -1f,
+    @ProtoNumber(7) val title: String = "",
+    @ProtoNumber(8) val loop: Boolean = false,
+    @ProtoNumber(9) val quality: String = "",
+) : DreamPacket
+
+/**
+ * Client acknowledges a [FullscreenState] transition: 0 = shown, 1 = dismissed (unforced close),
+ * 2 = minimized to PiP. Lets the server report broadcast reach and stop re-sending to players who
+ * dismissed an unforced broadcast.
+ */
+@Serializable
+data class FullscreenAck(
+    @ProtoNumber(1) val sessionId: String = "",
+    @ProtoNumber(2) val action: Int = 0,
+) : DreamPacket
+
+/**
+ * Server asks the issuing admin's client to render (or hide) a translucent radius-preview dome at
+ * a world position, visualizing a fullscreen-broadcast radius while it is being configured.
+ */
+@Serializable
+data class RadiusPreview(
+    @ProtoNumber(1) val x: Double = 0.0,
+    @ProtoNumber(2) val y: Double = 0.0,
+    @ProtoNumber(3) val z: Double = 0.0,
+    @ProtoNumber(4) val radius: Double = 0.0,
+    @ProtoNumber(5) val show: Boolean = false,
+    @ProtoNumber(6) val colorArgb: Int = 0,
 ) : DreamPacket

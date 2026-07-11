@@ -61,4 +61,31 @@ object PaperPlaybackTransport : PlaybackTransport {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerIsAdmin(playerId)
         return PaperServer.getInstance().server.getPlayer(playerId)?.hasPermission(PaperServer.config.permissions.delete) == true
     }
+
+    /** UUIDs of every online player. */
+    override fun onlinePlayerIds(): List<UUID> = PaperServer.getInstance().server.onlinePlayers.map { it.uniqueId }
+
+    /** Squared distance from [playerId] to (`x`, `y`, `z`) in [world], or null when offline or in a different world. */
+    override fun playerDistanceSq(playerId: UUID, world: String, x: Double, y: Double, z: Double): Double? {
+        val loc = PaperServer.getInstance().server.getPlayer(playerId)?.location ?: return null
+        if (loc.world?.name != world) return null
+        val dx = loc.x - x
+        val dy = loc.y - y
+        val dz = loc.z - z
+        return dx * dx + dy * dy + dz * dz
+    }
+
+    /** Sends [display]'s `DisplayInfo` to one [playerId], regardless of render distance. */
+    override fun sendDisplayInfo(playerId: UUID, display: DisplayData, forced: Boolean) {
+        val paper = display as? PaperDisplayData ?: return
+        val player = PaperServer.getInstance().server.getPlayer(playerId) ?: return
+        DisplayManager.sendUpdate(paper, listOf(player), forced)
+    }
+
+    /** Builds a synthetic 1x1 [PaperDisplayData] at the origin of the first loaded world. */
+    override fun createVirtualDisplay(id: UUID, ownerId: UUID): DisplayData? {
+        val world = PaperServer.getInstance().server.worlds.firstOrNull() ?: return null
+        val loc = org.bukkit.Location(world, 0.0, 0.0, 0.0)
+        return PaperDisplayData(id, ownerId, loc, loc, 1, 1, virtual = true)
+    }
 }

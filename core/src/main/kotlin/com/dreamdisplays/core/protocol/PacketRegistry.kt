@@ -59,6 +59,9 @@ object PacketRegistry {
         Entry(ProtocolPacketType.WATCH_PARTY_START, WatchPartyStart::class, WatchPartyStart.serializer()),
         Entry(ProtocolPacketType.WATCH_PARTY_CONTROL, WatchPartyControl::class, WatchPartyControl.serializer()),
         Entry(ProtocolPacketType.WATCH_PARTY_STATE, WatchPartyState::class, WatchPartyState.serializer()),
+        Entry(ProtocolPacketType.FULLSCREEN_STATE, FullscreenState::class, FullscreenState.serializer()),
+        Entry(ProtocolPacketType.FULLSCREEN_ACK, FullscreenAck::class, FullscreenAck.serializer()),
+        Entry(ProtocolPacketType.RADIUS_PREVIEW, RadiusPreview::class, RadiusPreview.serializer()),
     )
 
     private val byId = entries.associateBy { it.id }

@@ -8,6 +8,7 @@ import com.dreamdisplays.platform.client.overlay.CrosshairPolicy
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.popout.DefaultPopoutManager
 import com.dreamdisplays.platform.client.popout.PopoutManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.PipOverlayManager
 
 /** Installs overlay, crosshair, and popout services. */
@@ -19,7 +20,9 @@ object ClientOverlayModule : DreamDisplaysModule {
     override fun install(context: ModuleContext) {
         val services = context.services
         services.register<OverlayManager>(PipOverlayManager)
-        services.register<CrosshairPolicy>(CrosshairPolicy { ClientStateManager.isOnScreen })
+        services.register<CrosshairPolicy>(CrosshairPolicy {
+            ClientStateManager.isOnScreen || FullscreenOverlayManager.isImmersiveActive
+        })
         services.register<PopoutManager>(DefaultPopoutManager())
     }
 }

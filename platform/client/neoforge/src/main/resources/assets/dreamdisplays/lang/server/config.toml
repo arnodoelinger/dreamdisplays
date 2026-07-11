@@ -35,6 +35,16 @@ updates = true
 # Default volume for new players in percent (0 to 100, default 50)
 default_volume = 50
 
+[fullscreen]
+# Default visual sub-mode when /display fullscreen start omits one: "STANDARD" or "IMMERSIVE"
+default_mode = "STANDARD"
+
+# Whether forced (un-closeable, only minimizable) broadcasts are allowed
+allow_forced = true
+
+# Quality cap in pixels of height; clamped down further to the source's own max
+quality_cap = 1080
+
 [reports]
 # Report settings
 # webhook_url is a discord webhook URL for sending reports
@@ -56,21 +66,24 @@ use_ssl = false
 
 [permissions]
 # Permission nodes
-create = "dreamdisplays.create"               # Default: everyone
-video = "dreamdisplays.video"                 # Default: everyone
-info = "dreamdisplays.info"                   # Default: everyone
-help = "dreamdisplays.help"                   # Default: everyone
-local = "dreamdisplays.local"                 # Default: everyone
-synced = "dreamdisplays.synced"               # Default: everyone
-broadcast = "dreamdisplays.broadcast"         # Default: everyone
-watchparty = "dreamdisplays.watchparty"       # Default: everyone
-lock = "dreamdisplays.lock"                   # Default: everyone
-list = "dreamdisplays.list"                   # Default: operator
-stats = "dreamdisplays.stats"                 # Default: operator
-premium = "dreamdisplays.premium"             # Default: operator
-delete = "dreamdisplays.delete"               # Default: everyone
-delete_others = "dreamdisplays.delete.others" # Default: operator
-reload = "dreamdisplays.reload"               # Default: operator
-updates = "dreamdisplays.updates"             # Default: operator
-toggle_others = "dreamdisplays.toggle.others" # Default: operator
-create_bypass = "dreamdisplays.create.bypass" # Default: operator
+create = "dreamdisplays.create"                     # Default: everyone
+video = "dreamdisplays.video"                       # Default: everyone
+info = "dreamdisplays.info"                         # Default: everyone
+help = "dreamdisplays.help"                         # Default: everyone
+local = "dreamdisplays.local"                       # Default: everyone
+synced = "dreamdisplays.synced"                     # Default: everyone
+broadcast = "dreamdisplays.broadcast"               # Default: everyone
+watchparty = "dreamdisplays.watchparty"             # Default: everyone
+lock = "dreamdisplays.lock"                         # Default: everyone
+delete = "dreamdisplays.delete"                     # Default: everyone
+delete_others = "dreamdisplays.delete.others"       # Default: operator
+list = "dreamdisplays.list"                         # Default: operator
+stats = "dreamdisplays.stats"                       # Default: operator
+premium = "dreamdisplays.premium"                   # Default: operator
+reload = "dreamdisplays.reload"                     # Default: operator
+updates = "dreamdisplays.updates"                   # Default: operator
+toggle_others = "dreamdisplays.toggle.others"       # Default: operator
+create_bypass = "dreamdisplays.create.bypass"       # Default: operator
+fullscreen_start = "dreamdisplays.fullscreen.start" # Default: operator
+fullscreen_stop = "dreamdisplays.fullscreen.stop"   # Default: operator
+fullscreen_list = "dreamdisplays.fullscreen.list"   # Default: operator

@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.popout
 
 import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
@@ -39,6 +40,20 @@ class DefaultPopoutManager : PopoutManager {
         DisplayRegistry.screens[displayId.uuid]?.deactivatePopout()
     }
 
+    /** Shows [displayId] as a fullscreen overlay in [mode]. */
+    override fun openFullscreen(displayId: DisplayId, mode: FullscreenMode) {
+        DisplayRegistry.screens[displayId.uuid]?.activateFullscreenMode(mode)
+    }
+
+    /** Closes the fullscreen overlay of [displayId]. */
+    override fun closeFullscreen(displayId: DisplayId) {
+        DisplayRegistry.screens[displayId.uuid]?.deactivateFullscreen()
+    }
+
+    /** True if [displayId] is currently shown in the fullscreen overlay. */
+    override fun isFullscreenOpen(displayId: DisplayId): Boolean =
+        DisplayRegistry.screens[displayId.uuid]?.isFullscreenActive == true
+
     /** Deactivates all popouts on all loaded displays, then triggers a full [OverlayManager.closeAll]. */
     override fun closeAll() {
         DisplayRegistry.getScreens().forEach { it.deactivatePopout() }
@@ -51,7 +66,7 @@ class DefaultPopoutManager : PopoutManager {
      */
     override fun isWindowOpen(displayId: DisplayId): Boolean {
         val screen = DisplayRegistry.screens[displayId.uuid] ?: return false
-        return screen.isPopoutActive && !isPipOpen(displayId)
+        return screen.isPopoutActive && !isPipOpen(displayId) && !isFullscreenOpen(displayId)
     }
 
     /** True if [displayId] has an active PiP overlay registered with the [OverlayManager]. */

@@ -6,7 +6,11 @@ import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.RegionUtil
+import net.minecraft.core.BlockPos
+import net.minecraft.core.Direction
 import net.minecraft.server.MinecraftServer
 import java.util.UUID
 
@@ -56,5 +60,33 @@ object VanillaPlaybackTransport : PlaybackTransport {
     override fun isAdmin(playerId: UUID): Boolean {
         val player = server?.playerList?.getPlayer(playerId) ?: return false
         return VanillaDisplayActions.isAdmin(player)
+    }
+
+    /** UUIDs of every online player. */
+    override fun onlinePlayerIds(): List<UUID> = server?.playerList?.players?.map { it.uuid } ?: emptyList()
+
+    /** Squared distance from [playerId] to (`x`, `y`, `z`) in [world], or null when offline or in a different world. */
+    override fun playerDistanceSq(playerId: UUID, world: String, x: Double, y: Double, z: Double): Double? {
+        val player = server?.playerList?.getPlayer(playerId) ?: return null
+        if (RegionUtil.getPlayerLevelKey(player) != world) return null
+        val dx = player.x - x
+        val dy = player.y - y
+        val dz = player.z - z
+        return dx * dx + dy * dy + dz * dz
+    }
+
+    /** Sends [display]'s `DisplayInfo` to one [playerId], regardless of render distance. */
+    override fun sendDisplayInfo(playerId: UUID, display: DisplayData, forced: Boolean) {
+        val vanilla = display as? VanillaDisplayData ?: return
+        val player = server?.playerList?.getPlayer(playerId) ?: return
+        VanillaPacketUtil.sendDisplayInfo(listOf(player), vanilla, forced)
+    }
+
+    /** Builds a synthetic 1x1 [VanillaDisplayData] at the origin of the first loaded level. */
+    override fun createVirtualDisplay(id: UUID, ownerId: UUID): DisplayData? {
+        val s = server ?: return null
+        val worldKey = RegionUtil.getLevelKey(s.overworld())
+        val pos = BlockPos(0, 0, 0)
+        return VanillaDisplayData(id, ownerId, worldKey, pos, pos, 1, 1, Direction.NORTH, virtual = true)
     }
 }

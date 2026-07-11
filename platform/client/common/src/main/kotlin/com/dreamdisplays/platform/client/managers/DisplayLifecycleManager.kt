@@ -55,20 +55,17 @@ object DisplayLifecycleManager {
         val renderDistance = DisplayStorage.getDisplayData(packet.id)?.renderDistance
             ?: persistedRenderDistance(packet.id)
 
-        Minecraft.getInstance().player?.let { player ->
-            val dist = distanceToScreen(
-                packet.x, packet.y, packet.z,
-                packet.width, packet.height, facing.toDisplayFacing(),
-                player.blockPosition()
-            )
-            if (dist > renderDistance) {
-                // Too far to build a screen for yet: cache it exactly like unregisterScreen would, so
-                // restoreVisibleUnloadedScreens rebuilds it locally the moment the player walks into
-                // range, instead of the display staying invisible until the server's next periodic
-                // broadcast (which may be a while, or never arrive again if the client's own render
-                // distance is smaller than the server's).
-                cacheUnloadedDisplay(packet, facing, mode, renderDistance)
-                return
+        if (!packet.forced && !packet.virtual) {
+            Minecraft.getInstance().player?.let { player ->
+                val dist = distanceToScreen(
+                    packet.x, packet.y, packet.z,
+                    packet.width, packet.height, facing.toDisplayFacing(),
+                    player.blockPosition()
+                )
+                if (dist > renderDistance) {
+                    cacheUnloadedDisplay(packet, facing, mode, renderDistance)
+                    return
+                }
             }
         }
 

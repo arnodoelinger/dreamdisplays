@@ -5,6 +5,7 @@ import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.managers.ClientPacketManager
@@ -95,7 +96,7 @@ object Initializer {
         ClientTickManager.tick(minecraft)
     }
 
-    /** Renders all active PiP overlays on the HUD when the player is in-world and no screen is open. */
+    /** Renders the fullscreen and PiP overlays on the HUD when the player is in-world and no screen is open. */
     //? if >=26 {
     fun onRenderHud(mc: Minecraft, graphics: GuiGraphicsExtractor, partialTick: Float) {
         //?} else
@@ -105,6 +106,7 @@ object Initializer {
         //? if >=1.21.11 {
         graphics.nextStratum()
         //?}
+        FullscreenOverlayManager.renderAll(mc, graphics, partialTick)
         DreamServices.registry.getOrNull<OverlayManager>()
             ?.renderAll(MinecraftOverlayRenderContext(mc, graphics, -1, -1, false, partialTick))
     }

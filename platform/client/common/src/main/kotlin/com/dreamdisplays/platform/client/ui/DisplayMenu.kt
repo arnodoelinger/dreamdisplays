@@ -4,6 +4,7 @@ import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.playback.PlaybackServices
 import com.dreamdisplays.api.watchparty.WatchPartyServices
 import com.dreamdisplays.api.display.service.DisplayServices
+import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.popout.PopoutManager
 import com.dreamdisplays.platform.client.render.ScrubPreview
 import com.dreamdisplays.platform.client.core.DreamServices
@@ -59,6 +60,8 @@ class DisplayMenu private constructor(
     private val dropdown = PopoutDropdown(
         onWindow = { popout.openWindow(DisplayId(displayScreen.uuid)) },
         onPip = { popout.openPip(DisplayId(displayScreen.uuid)) },
+        onFullscreen = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.STANDARD); onClose() },
+        onBorderless = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.IMMERSIVE); onClose() },
     )
 
     private lateinit var volume: ValueSlider
