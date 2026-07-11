@@ -1,3 +1,84 @@
+# 1.9.0 Preview 1
+
+## Highlights
+
+- `NeoForge` server support, including single-player
+- Full Twitch support alongside YouTube
+- New `/display fullscreen` command, great for events and presentations
+- Scrubbing preview on the seek bar
+- Full `LuckPerms` integration
+- UI, resolving, codebase improvements and some bugfixes
+
+## Client
+
+### Features
+
+- `NeoForge` server support (including single-player) ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- Full Twitch support ([#129](https://github.com/arnodoelinger/dreamdisplays/pull/129))
+- New Borderless and Fullscreen display modes ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- New command: `/display fullscreen` for events and presentations ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- Added support for saving and restoring the last known playback position everywhere
+- Added support for saving and restoring each display's custom render distance across game restarts
+
+### Improvements
+
+- Enhanced UI components
+- Now all sliders have snap behavior and fixed subdivisions for better precision
+- Improved displays performance ([#131](https://github.com/arnodoelinger/dreamdisplays/pull/131))
+- Added scrubbing preview on the seek bar (frame preview on hover)
+- Reduced native decode-path overhead on every frame, for smoother in-process playback
+- Increased stall watchdog threshold from 30 to 45 seconds to avoid false positives on slow networks
+- Enhanced ambient grid ([#136](https://github.com/arnodoelinger/dreamdisplays/pull/136))
+- Codebase improvements
+
+### Fixes
+
+- Fixed restoring display snapshots from prior sessions
+- Fixed the background quality refresher endlessly restarting a live stream when the closest available rendition didn't
+  exactly match the requested quality
+- Fixed the display menu's video preview being fit to the display's own block shape instead of the video's aspect ratio
+- Fixed video getting stuck when seeking right after changing quality
+  ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
+- Fixed a stale pre-seek frame occasionally slipping through and briefly rewinding the picture right after a seek
+- Fixed a failed quality switch permanently blocking re-selecting that same quality
+- Fixed the reappearance bridge occasionally playing audio from just before a seek instead of the resumed position
+- Fixed live resume, live quality switches, and stall recovery blocking every other play / pause / seek / etc. action on
+  the display for the whole network re-resolve
+- Fixed a display first sighted outside the client's render distance staying invisible until the server's next periodic
+  broadcast
+- Fixed audio diagnostics from a just-ended session occasionally being spliced into the next one's error report
+- Fixed occasional stutter and dropped opening frames right after opening or seeking a video, caused by a leftover
+  `FFmpeg` buffering flag
+- Fixed the warm-park pool TTL being too short
+
+## Server
+
+### Features
+
+- `NeoForge` server support ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- Full `LuckPerms` support on `Fabric` / `NeoForge` servers
+  ([#128](https://github.com/arnodoelinger/dreamdisplays/pull/128))
+- New command: `/display fullscreen` for events and presentations ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+
+### Improvements
+
+- `/display delete` is now available to everyone for their own displays
+- Codebase improvements: more modularization and cleanup
+  ([#127](https://github.com/arnodoelinger/dreamdisplays/pull/127))
+- `Fabric` / `NeoForge` server display deletion now notifies nearby clients itself, matching `Paper`, so a future caller
+  can't forget to broadcast
+- Added a `storage.use_ssl` option in `config.toml` to enable TLS on the `MySQL` connection (was hardcoded off)
+- Reduced per-player memory overhead on long-running servers with many unique joins
+- Dream Displays security improvements
+- Codebase improvements
+
+### Fixes
+
+- Fixed displays removed by the startup material-validation sweep not telling online players to forget them, leaving
+  ghost displays until reconnect
+- Fixed deleted displays leaking their legacy v1 sync state, which kept being carried by the periodic broadcast
+- Fixed the staggered display list send to a joining player not stopping when the player disconnected mid-send
+
 # 1.8.8 Release
 
 ## Highlights
@@ -17,7 +98,8 @@
 ### Improvements
 
 - Pausing now keeps the decoder warm on every pipeline, so resume is instant instead of restarting the stream
-- Seeking no longer tears the whole session down before reconnecting: the picture holds its last frame while the target position warms up in the background, then jumps — including the loop wrap-around in synced / broadcast modes
+- Seeking no longer tears the whole session down before reconnecting: the picture holds its last frame while the target
+  position warms up in the background, then jumps — including the loop wrap-around in synced / broadcast modes
 - The first decoded frame is now shown immediately on start and seek instead of waiting for the playback cushion to fill
 - Stream startup got faster: `FFmpeg` no longer probes the container with its default 5 MB / 5 s window
 - Stall recovery now reconnects in the background while the picture holds its last frame instead of blanking
@@ -30,7 +112,7 @@
 
 ### Fixes
 
-- Fixed `Fabric` 1.21.1 display rendering 
+- Fixed `Fabric` 1.21.1 display rendering
 - Fixed two different videos sharing the same thumbnail when their IDs differed only by letter case
 - Fixed a failed thumbnail registration being able to crash the game
 - Fixed a rare race during quality switches that could destroy the live display textures and leave the screen rendering
@@ -67,7 +149,8 @@
 ### Fixes
 
 - Fixed default volume protocol that was not working
-- Fixed video freezing / losing audio after seeking or pausing when the selected quality isn't actually available ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
+- Fixed video freezing / losing audio after seeking or pausing when the selected quality isn't actually available
+  ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
 - Fixed video restarting right at the end of a video when the audio track finished a moment before the video did
 - Fixed z-fighting when player is very far away from the display
 
@@ -307,6 +390,7 @@ No changes.
 ## Client
 
 ### Features
+
 - Added support for Minecraft 26.2
 - Brought back Minecraft 1.21.11 support ([#91](https://github.com/arnodoelinger/dreamdisplays/pull/91))
 - Added a new packet protocol v2
@@ -414,7 +498,8 @@ No changes.
 - Added Java 21 support for Minecraft 1.21.11 servers
 - Added a new packet protocol v2
 - Added fallback support for protocol v1, but v1 is now deprecated and will be removed in the future
-- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`, `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
+- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`,
+  `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
 - Added more anonymous telemetry data to improve development, compatibility, and stability
 
 ### Improvements
@@ -475,11 +560,13 @@ No changes.
 - Hardware-accelerated `FFmpeg` video decoding
 - Show max 72 recommended videos based on the current video instead of 24
 - Switch from RGBA to RGB24 for improved rendering performance
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
+- Fix the "You have to look at the display block" error when there is actually display
+  ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
 
 ## Client
 
 ### Features
+
 - Support 26.1.2 version and Java 25
 - Support `Fabric` servers
 - Support YouTube shorts
@@ -488,6 +575,7 @@ No changes.
 - Show max 72 recommended videos based on the current video instead of 24
 
 ### Improvements
+
 - Switch from RGBA to RGB24 for improved rendering performance
 - Videos now stop rendering (but still play) when Minecraft is minimized
 - Enhance watchdog logic for low-connection networks and stability
@@ -500,10 +588,12 @@ No changes.
 - Update dependencies and replace some of them with better alternatives
 
 ### Fixes
+
 - Fix cropping at display edges
 - Fix mute logic and allow players to mute displays in sync mode
 - Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
+- Fix the "You have to look at the display block" error when there is actually display
+  ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
 - Fix a strange version number in the menu ([#81](https://github.com/arnodoelinger/dreamdisplays/issues/81))
 - Fix version semantic versioning parsing for mod updates
 - Fix tiled thumbnail rendering in the menu
@@ -515,11 +605,13 @@ No changes.
 ## Server
 
 ### Features
+
 - Support `Fabric` servers
 - Follow client's feature of lock / unlock displays
 - Deprecate `/display` command (will be replaced by direct interaction with displays in future versions)
 
 ### Improvements
+
 - Preserve sync mode when switching videos
 - Broadcast synced display state every 2 seconds
 - Add dynamic material messages
@@ -564,7 +656,8 @@ No changes.
 - Fix some edge cases of audio desynchronization after long playback
 - Fix suggestion scroller not showing up when in large menu mode
 - Fix language selector ([#73](https://github.com/arnodoelinger/dreamdisplays/issues/73))
-- Fix volume reset after leaving active display distance ([#76](https://github.com/arnodoelinger/dreamdisplays/issues/76))
+- Fix volume reset after leaving active display distance
+  ([#76](https://github.com/arnodoelinger/dreamdisplays/issues/76))
 - Enhance project structure and code quality in some places
 
 ## Server
@@ -578,7 +671,9 @@ No changes.
 ## Mod
 
 - Correct suggestion translations
-- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as errored
+- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically
+  invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as
+  errored
 - Reduce format URL cache TTL from 5 hours to 2 hours to avoid serving near-expired YouTube CDN links
 - Improve error handling and timeout management in `yt-dlp` process execution
 
@@ -676,8 +771,8 @@ No changes.
 
 ## Server
 
-- Improved `/display video` URL parsing: now accepts direct video IDs and more YouTube link formats (
-  watch/shorts/embed/live/youtu.be).
+- Improved `/display video` URL parsing: now accepts direct video IDs and more YouTube link formats
+  (watch/shorts/embed/live/youtu.be).
 - Add paginated display listing with improved formatting
 - Improved tab-completion: now it's case-insensitive
 - Language suggestions for `/display video` when typing language parameter
