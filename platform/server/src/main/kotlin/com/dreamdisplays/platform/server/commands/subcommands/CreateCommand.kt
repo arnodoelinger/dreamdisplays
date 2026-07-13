@@ -2,6 +2,10 @@ package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.selectionMaterial
+import com.dreamdisplays.platform.server.baseMaterial
+import com.dreamdisplays.platform.server.selectionMaterialId
+import com.dreamdisplays.platform.server.baseMaterialId
 import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -153,7 +157,7 @@ object VanillaCreateCommand {
         val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                VanillaServerState.config.settings.selectionMaterial, VanillaServerState.config.settings.baseMaterial
+                VanillaServerState.config.settings.selectionMaterialId, VanillaServerState.config.settings.baseMaterialId
             ).let { 0 }
 
         validate(
@@ -163,8 +167,8 @@ object VanillaCreateCommand {
                     MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
-                        VanillaServerState.config.settings.selectionMaterial,
-                        VanillaServerState.config.settings.baseMaterial
+                        VanillaServerState.config.settings.selectionMaterialId,
+                        VanillaServerState.config.settings.baseMaterialId
                     )
                 else
                     MessageUtil.sendMessage(player, key, *args)
@@ -173,7 +177,7 @@ object VanillaCreateCommand {
                 MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
-                    VanillaServerState.config.settings.baseMaterial
+                    VanillaServerState.config.settings.baseMaterialId
                 )
             }
         ) ?: return 0
@@ -249,7 +253,7 @@ object VanillaCreateCommand {
                         for (z in region.minZ..region.maxZ) {
                             val blockState = level.getBlockState(BlockPos(x, y, z))
                             val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-                            if (blockKey != VanillaServerState.config.settings.baseMaterial) {
+                            if (blockKey != VanillaServerState.config.settings.baseMaterialId) {
                                 return@validateRegion false
                             }
                         }

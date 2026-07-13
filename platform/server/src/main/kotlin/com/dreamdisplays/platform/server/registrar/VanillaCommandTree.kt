@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.server.registrar
 
 import com.dreamdisplays.platform.server.VanillaConfig
 import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.PermissionsSection
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -360,7 +361,7 @@ object VanillaCommandTree {
     /** Permission gate shared by every node: console always passes, players are checked against [node]. */
     private fun requiresNode(
         source: CommandSourceStack,
-        node: (VanillaConfig.PermissionsSection) -> String,
+        node: (PermissionsSection) -> String,
         fallback: VanillaPermissions.Fallback,
     ): Boolean {
         val player = source.entity as? ServerPlayer

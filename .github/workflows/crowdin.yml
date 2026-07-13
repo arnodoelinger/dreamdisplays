@@ -1,0 +1,39 @@
+name: Crowdin
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "platform/shared/src/main/resources/assets/dreamdisplays/lang/client/en_us.json"
+      - "platform/shared/src/main/resources/assets/dreamdisplays/lang/server/en.json"
+      - "crowdin.yml"
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  synchronize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: crowdin action
+        uses: crowdin/github-action@v2
+        with:
+          upload_sources: true
+          upload_translations: false
+          download_translations: true
+          localization_branch_name: l10n_crowdin_translations
+          create_pull_request: true
+          pull_request_title: "chore: sync translations from Crowdin"
+          pull_request_body: "Pulled the latest translations from Crowdin. Review before merging."
+          pull_request_base_branch_name: main
+          config: "crowdin.yml"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
+          CROWDIN_PERSONAL_TOKEN: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}

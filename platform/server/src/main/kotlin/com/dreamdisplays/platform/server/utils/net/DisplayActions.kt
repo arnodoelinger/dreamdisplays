@@ -149,7 +149,7 @@ object DisplayActions {
     private fun context(display: PaperDisplayData, player: Player) =
         PlaybackContexts.of(display, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))
 
-    /** Like [context] but elevates [player] to admin if they hold the [lock][Config.PermissionsSection.lock] permission. */
+    /** Like [context] but elevates [player] to admin if they hold the [lock][PermissionsSection.lock] permission. */
     private fun lockContext(display: PaperDisplayData, player: Player) =
         PlaybackContexts.of(
             display, player.uniqueId,

@@ -154,7 +154,17 @@ dependencies {
     implementation(libs.caffeine)
 }
 
+sourceSets.main {
+    // Translations live once in :platform:shared and are pulled in here instead of being duplicated per platform.
+    // Only the server-message strings are needed here; client (Minecraft GUI) translations don't apply to Paper.
+    resources.srcDir(project(":platform:shared").file("src/main/resources"))
+    resources.exclude("assets/dreamdisplays/lang/client/**")
+}
+
 tasks.processResources {
+    // Paper's plugin.getResource("config.toml") looks up the resource root, unlike Fabric / NeoForge's
+    // classloader lookup under assets/dreamdisplays/lang/server/; both read the same shared template.
+    from(project(":platform:shared").file("src/main/resources/assets/dreamdisplays/lang/server/config.toml"))
     val projectVersion = version.toString()
     val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
     val stonecutterVersions = Properties().apply {

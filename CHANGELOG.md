@@ -1,3 +1,29 @@
+# 1.9.0 Preview 3
+
+## Highlights
+
+- Fixed crash on `Fabric` 1.21.11
+
+## Client
+
+### Features
+
+- Added [Crowdin integration]()
+
+### Improvements
+
+### Fixes
+
+## Server
+
+### Features
+
+### Improvements
+
+### Fixes
+
+- Fixed crash on `Fabric` 1.21.11 caused by invalid `BareTokenArgumentType` registration
+
 # 1.9.0 Preview 2
 
 ## Highlights

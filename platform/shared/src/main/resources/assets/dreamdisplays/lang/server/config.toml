@@ -1,5 +1,4 @@
 # Dream Displays configuration
-# Fabric server implementation
 # Support: https://discord.gg/uwMMZ2KWk6
 
 [language]
@@ -66,6 +65,7 @@ use_ssl = false
 
 [permissions]
 # Permission nodes
+# LuckPerms suppor is available for all platforms
 create = "dreamdisplays.create"                     # Default: everyone
 video = "dreamdisplays.video"                       # Default: everyone
 info = "dreamdisplays.info"                         # Default: everyone

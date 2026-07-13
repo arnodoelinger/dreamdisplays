@@ -6,6 +6,8 @@ import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.PaperServer.Companion.config
 import com.dreamdisplays.platform.server.PaperServer.Companion.getInstance
 import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.baseMaterial
+import com.dreamdisplays.platform.server.baseMaterialId
 import com.dreamdisplays.platform.server.datatypes.display.DisplayData
 import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
@@ -474,7 +476,7 @@ object DisplayManager {
      */
     fun validateDisplaysAndCleanup(server: MinecraftServer): List<UUID> {
         val cfg = VanillaServerState.config
-        val baseMaterialKey = cfg.settings.baseMaterial
+        val baseMaterialKey = cfg.settings.baseMaterialId
         val invalidDisplays = mutableListOf<VanillaDisplayData>()
 
         displays.values.filterIsInstance<VanillaDisplayData>().forEach { display ->

@@ -1,11 +1,6 @@
-If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arnodoelinger). Every contribution helps keep the project alive!
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/arnodoelinger)
-
-- - -
-
 [![Latest release](https://img.shields.io/github/release/arnodoelinger/dreamdisplays.svg)](https://github.com/arnodoelinger/dreamdisplays/releases/latest)
 [![License](https://img.shields.io/github/license/arnodoelinger/dreamdisplays)](https://github.com/arnodoelinger/dreamdisplays/blob/master/LICENSE)
+[![Crowdin](https://badges.crowdin.net/dreamdisplays/localized.svg)](https://crowdin.com/project/dreamdisplays)
 [![Discord](http://img.shields.io/discord/1456716690879676501?label=Discord&style=flat&logo=discord)](https://discord.gg/uwMMZ2KWk6)
 
 <div align="center">
@@ -72,3 +67,9 @@ Done! To customize the display, look at it and press `Shift + RMB`
 [Read more in our wiki](https://github.com/arnodoelinger/dreamdisplays/wiki).
 
 ![Display](https://i.imgur.com/yyIKdp8.png)
+
+## Support this project
+
+If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arnodoelinger). Every contribution helps keep the project alive!
+
+[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/arnodoelinger)
