@@ -5,7 +5,7 @@ import com.dreamdisplays.platform.server.listeners.NeoForgePlayerListener
 import com.dreamdisplays.platform.server.listeners.NeoForgeProtectionListener
 import com.dreamdisplays.platform.server.listeners.NeoForgeSelectionListener
 import com.dreamdisplays.platform.server.managers.StorageManager
-import com.dreamdisplays.platform.server.registrar.BareTokenArgumentType
+import com.dreamdisplays.platform.server.registrar.NeoForgeBareTokenArgumentType
 import com.dreamdisplays.platform.server.registrar.NeoForgeCommandRegistrar
 import com.dreamdisplays.platform.server.utils.net.NeoForgeNetworkingAdapter
 import com.dreamdisplays.platform.server.utils.net.NeoForgeV2Networking
@@ -39,7 +39,7 @@ class NeoForgeServer(modEventBus: IEventBus) {
         VanillaServerState.serverVersion = serverVersion
         VanillaNetworking.adapter = NeoForgeNetworkingAdapter
 
-        BareTokenArgumentType.register()
+        NeoForgeBareTokenArgumentType.register()
 
         modEventBus.addListener(::registerPayloads)
         NeoForge.EVENT_BUS.register(this)
