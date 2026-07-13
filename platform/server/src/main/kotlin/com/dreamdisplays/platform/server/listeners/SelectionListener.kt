@@ -2,6 +2,10 @@ package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.selectionMaterial
+import com.dreamdisplays.platform.server.baseMaterial
+import com.dreamdisplays.platform.server.selectionMaterialId
+import com.dreamdisplays.platform.server.baseMaterialId
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -83,12 +87,12 @@ object VanillaSelectionListener {
     /** Left-click: sets pos1 if holding the selection tool over the base material. Returns true if handled. */
     fun handleLeftClick(player: ServerPlayer, world: ServerLevel, pos: BlockPos): Boolean {
         val config = VanillaServerState.config
-        val selMaterialKey = config.settings.selectionMaterial
+        val selMaterialKey = config.settings.selectionMaterialId
         val heldItem = player.mainHandItem
         val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
         if (heldItemKey != selMaterialKey) return false
 
-        val baseMaterialKey = config.settings.baseMaterial
+        val baseMaterialKey = config.settings.baseMaterialId
         val blockState = world.getBlockState(pos)
         val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
         if (blockKey != baseMaterialKey) return false
@@ -102,7 +106,7 @@ object VanillaSelectionListener {
     /** Right-click: sets pos2, or resets when sneaking. Returns true if handled. */
     fun handleRightClick(player: ServerPlayer, world: ServerLevel, pos: BlockPos): Boolean {
         val config = VanillaServerState.config
-        val selMaterialKey = config.settings.selectionMaterial
+        val selMaterialKey = config.settings.selectionMaterialId
         val heldItem = player.mainHandItem
         val heldItemKey = BuiltInRegistries.ITEM.getKey(heldItem.item).toString()
         if (heldItemKey != selMaterialKey) return false
@@ -117,7 +121,7 @@ object VanillaSelectionListener {
             return true
         }
 
-        val baseMaterialKey = config.settings.baseMaterial
+        val baseMaterialKey = config.settings.baseMaterialId
         val blockState = world.getBlockState(pos)
         val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
         if (blockKey != baseMaterialKey) return false

@@ -22,6 +22,11 @@ repositories {
 
 sourceSets.main {
     kotlin.srcDir(project(":platform:server").layout.buildDirectory.dir("generated/chisel/main/kotlin"))
+    // Translations live once in :platform:shared and are pulled in here instead of being duplicated per platform.
+    // The lang/client/ split is source-tree organization only; vanilla's language system requires the actual
+    // jar to have client lang files directly under assets/dreamdisplays/lang/, so processResources flattens it back.
+    resources.srcDir(project(":platform:shared").file("src/main/resources"))
+    resources.exclude("assets/dreamdisplays/lang/client/**")
 }
 
 platformweaver {
@@ -169,6 +174,9 @@ neoForge {
 }
 
 tasks.processResources {
+    from(project(":platform:shared").file("src/main/resources/assets/dreamdisplays/lang/client")) {
+        into("assets/dreamdisplays/lang")
+    }
     val projectVersion = project.version.toString()
     val neoForgeLoaderRange = scVersion("neoforge.loader.range")
     val minecraftRange = scVersion("neoforge.minecraft.range")

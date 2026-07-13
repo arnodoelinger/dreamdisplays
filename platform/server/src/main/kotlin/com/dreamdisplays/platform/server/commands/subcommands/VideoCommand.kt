@@ -5,6 +5,7 @@ import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.security.LanguageTag
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.baseMaterial
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync

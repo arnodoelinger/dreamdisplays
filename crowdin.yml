@@ -1,0 +1,28 @@
+"project_id": "${CROWDIN_PROJECT_ID}"
+"api_token": "${CROWDIN_PERSONAL_TOKEN}"
+"preserve_hierarchy": true
+
+"files": [
+  {
+    "source": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/client/en_us.json",
+    "translation": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/client/%locale%.json",
+    "languages_mapping": {
+      "locale": {
+        "de": "de_de",
+        "ru": "ru_ru",
+        "uk": "uk_ua",
+        "pl": "pl_pl",
+        "cs": "cs_cz",
+        "be": "be_by",
+        "he": "he_il",
+        "es": "es_es",
+        "fr": "fr_fr",
+        "it": "it_it"
+      }
+    }
+  },
+  {
+    "source": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/server/en.json",
+    "translation": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/server/%two_letters_code%.json"
+  }
+]
