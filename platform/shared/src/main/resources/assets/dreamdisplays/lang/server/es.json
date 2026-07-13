@@ -1,32 +1,32 @@
 {
-  "noDisplayTerritories": "&7D |&f ¡Aún no has seleccionado territorios de pantalla! Selecciona dos puntos con {0} en {1}",
-  "createDisplayCommand": "&7D |&f Ahora escribe /display create para crear una pantalla",
-  "secondPointNotSelected": "&7D |&f ¡Aún no has seleccionado el segundo punto!",
-  "displayOverlap": "&7D |&f ¡Ya hay una pantalla en esta zona!",
-  "structureTooLarge": "&7D |&f No puedes crear una pantalla mayor de %d × %d bloques",
-  "structureTooSmall": "&7D |&f No puedes crear una pantalla menor de %d × %d bloques",
-  "firstPointSelected": "&7D |&f ¡Primer punto seleccionado! Ahora selecciona el segundo punto",
-  "secondPointSelected": "&7D |&f ¡Segundo punto seleccionado!",
-  "structureWrongDepth": "&7D |&f La selección debe tener al menos 1 bloque de profundidad",
-  "wrongStructure": "&7D |&f Solo se puede usar {0} para las pantallas",
-  "displayTooHigh": "&7D |&f La altura de la pantalla es demasiado alta (máx. %d)",
-  "displayTooLow": "&7D |&f La pantalla está demasiado baja (mín. %d)",
-  "selectionClear": "&7D |&f ¡La selección ha sido limpiada!",
-  "displayWrongCommand": "&7D |&f ¡Has introducido algo incorrecto!",
-  "displayCommandMissingPermission": "&7D |&f ¡No tienes permiso para usar este comando!",
-  "commandPlayersOnly": "&7D |&f Este comando solo puede ser usado por un jugador dentro del juego",
-  "successfulCreation": "&7D |&f ¡La pantalla ha sido creada! Ahora mírala y escribe /display video <video_url> [lang] para establecer un video",
-  "noDisplay": "&7D |&f ¡No se encontró la pantalla!",
-  "settedURL": "&7D |&f ¡El video ha sido cargado!",
-  "invalidURL": "&7D |&f ¡Tu URL no es válida! Usa un enlace de vídeo válido (YouTube, Twitch, etc.)",
-  "displayVideoWrongTargetBlock": "&7D |&f ¡Debes mirar un bloque de pantalla para usar este comando!",
-  "displayVideoNotOwner": "&7D |&f ¡No eres el propietario de esta pantalla!",
-  "reportTooQuickly": "&7D |&f ¡Estás enviando reportes demasiado rápido! Espera antes de enviar otro reporte",
-  "reportSent": "&7D |&f ¡El reporte ha sido enviado!",
-  "reportFailed": "&7D |&f No se pudo enviar el reporte. Inténtalo de nuevo más tarde",
-  "displayDeleted": "&7D |&f ¡La pantalla ha sido eliminada!",
-  "displayReported": "&7D |&f ¡La pantalla ha sido reportada!",
-  "reportNotConfigured": "&7D |&f ¡El sistema de reportes está desactivado en este servidor!",
+  "noDisplayTerritories": "&7D |&f You haven't selected any display territories yet! Please select two points using {0} on {1}",
+  "createDisplayCommand": "&7D |&f Now type /display create to create a display",
+  "secondPointNotSelected": "&7D |&f You haven't selected the second point yet!",
+  "displayOverlap": "&7D |&f There is already a display in this area!",
+  "structureTooLarge": "&7D |&f You can't create a display larger than %d × %d blocks",
+  "structureTooSmall": "&7D |&f You can't create a display smaller than %d × %d blocks",
+  "firstPointSelected": "&7D |&f First point selected! Now select the second point",
+  "secondPointSelected": "&7D |&f Second point selected!",
+  "structureWrongDepth": "&7D |&f Selection must be at least 1 block long",
+  "wrongStructure": "&7D |&f Only {0} blocks can be used for displays",
+  "displayTooHigh": "&7D |&f Display height is too high (max. %d)",
+  "displayTooLow": "&7D |&f Display is too low (min. %d)",
+  "selectionClear": "&7D |&f Selection has been cleared!",
+  "displayWrongCommand": "&7D |&f You entered something wrong!",
+  "displayCommandMissingPermission": "&7D |&f You don't have permission to use this command!",
+  "commandPlayersOnly": "&7D |&f This command can only be used by a player in-game",
+  "successfulCreation": "&7D |&f Display has been created! Now focus on it and type /display video <video_url> [lang] to set a video",
+  "noDisplay": "&7D |&f Display has not been found!",
+  "settedURL": "&7D |&f Video has been loaded!",
+  "invalidURL": "&7D |&f Your URL is invalid! Please use a valid video link (YouTube, Twitch, etc.)",
+  "displayVideoWrongTargetBlock": "&7D |&f You must look at a display block to use this command!",
+  "displayVideoNotOwner": "&7D |&f You are not the owner of this display!",
+  "reportTooQuickly": "&7D |&f You are sending reports too quickly! Please wait before sending another report",
+  "reportSent": "&7D |&f Report has been sent!",
+  "reportFailed": "&7D |&f Failed to send report. Please try again later",
+  "displayDeleted": "&7D |&f Display has been deleted!",
+  "displayReported": "&7D |&f Display has been reported!",
+  "reportNotConfigured": "&7D |&f Report system is disabled on this server!",
   "newVersion": {
     "text": "",
     "extra": [
@@ -35,11 +35,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "¡Hay disponible una nueva versión %s de Dream Displays! Por favor ",
+        "text": "New version %s of Dream Displays is available! Please ",
         "color": "#FFFFFF"
       },
       {
-        "text": "actualiza tu mod",
+        "text": "update your mod",
         "color": "#023EB6",
         "underlined": true,
         "clickEvent": {
@@ -48,7 +48,7 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Haz clic para descargar la nueva versión"
+          "value": "Click to download new version"
         }
       },
       {
@@ -57,18 +57,18 @@
       }
     ]
   },
-  "newPluginVersion": "&7D |&f ¡Hay disponible una nueva versión del plugin Dream Displays (%s)! ¡Actualiza el plugin del servidor!",
-  "configReloaded": "&7D | &f¡Dream Displays se ha recargado!",
-  "configReloadFailed": "&7D |&f No se pudo recargar Dream Displays. Revisa la consola para ver errores",
-  "configReloadSummary": "&7D |&f Recargado: configuración, mensajes de idioma, permisos de comandos",
-  "noDisplaysFound": "&7D |&f No se encontraron pantallas",
-  "displayListHeader": "&7D |&f Pantallas:",
-  "displayListEntry": "&7D |&f {0}. Propietario: {1}, Ubicación: [{2}, {3}, {4}], URL: {5}",
-  "displayListPageLine": "&7D |&7 página=&f{0}/{1} &8| &7total=&f{2}",
-  "displayListDetails": " &8| &7mundo=&f{0} &8| &7tamaño=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
-  "displayListUnknownOwner": "Desconocido",
-  "displayListUnknownWorld": "desconocido",
-  "displayListUnavailableUrl": "N/D",
+  "newPluginVersion": "&7D |&f New version of Dream Displays plugin (%s) is available! Please update the server plugin!",
+  "configReloaded": "&7D | &fDream Displays has been reloaded!",
+  "configReloadFailed": "&7D |&f Failed to reload Dream Displays. Please check the console for errors",
+  "configReloadSummary": "&7D |&f Reloaded: config, language messages, command permissions",
+  "noDisplaysFound": "&7D |&f No displays found",
+  "displayListHeader": "&7D |&f Displays:",
+  "displayListEntry": "&7D |&f {0}. Owner: {1}, Location: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 page=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7world=&f{0} &8| &7size=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Unknown",
+  "displayListUnknownWorld": "unknown",
+  "displayListUnavailableUrl": "N/A",
   "displayListTpButton": " [TP]",
   "displayListUrlButton": " [URL]",
   "displayBlockBreak": {
@@ -79,11 +79,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Este es un bloque de pantalla. Instala el mod ",
+        "text": "This is a display block. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -92,11 +92,11 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Haz clic para descargar Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " para interactuar con él!",
+        "text": " mod to interact with it!",
         "color": "#FFFFFF"
       }
     ]
@@ -109,11 +109,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Este servidor usa pantallas dentro del juego. ",
+        "text": "This server uses in-game displays. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "Descarga Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -122,57 +122,57 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Haz clic para descargar Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " para verlas!",
+        "text": " to see them!",
         "color": "#FFFFFF"
       }
     ]
   },
-  "display.enabled": "&7D |&f Pantallas activadas. Espera un momento...",
-  "display.disabled": "&7D |&f Pantallas desactivadas",
-  "display.already-disabled": "&7D |&f Las pantallas ya están desactivadas",
-  "display.already-enabled": "&7D |&f Las pantallas ya están activadas",
-  "displayTargetNotFound": "&7D |&f ¡El jugador '%s' no está conectado!",
-  "display.enabled.target": "&7D |&f Pantallas activadas para %s",
-  "display.disabled.target": "&7D |&f Pantallas desactivadas para %s",
-  "display.already-enabled.target": "&7D |&f Las pantallas ya están activadas para %s",
-  "display.already-disabled.target": "&7D |&f Las pantallas ya están desactivadas para %s",
-  "displayStatsHeader": "&7D |&f Estadísticas de uso del mod:",
-  "displayStatsEntry": "&7D |&f Versión %s: %d jugadores",
-  "displayStatsTotal": "&7D |&f Total de jugadores con el mod: %d",
-  "displayHelpHeader": "Comandos disponibles:",
-  "displayHelpCreate": "– /display create: crear una nueva pantalla",
-  "displayHelpVideo": "– /display video <url>: establecer video para tu pantalla",
-  "displayHelpInfo": "– /display info: mostrar detalles de la pantalla que estás mirando",
-  "displayHelpDelete": "– /display delete: eliminar la pantalla que estás mirando",
-  "displayHelpList": "– /display list: listar todas las pantallas",
-  "displayHelpStats": "– /display stats: mostrar estadísticas de uso del mod",
-  "displayHelpReload": "– /display reload: recargar la configuración",
-  "displayHelpOn": "– /display on [jugador]: activar pantallas para ti o un jugador objetivo",
-  "displayHelpOff": "– /display off [jugador]: desactivar pantallas para ti o un jugador objetivo",
-  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: fuerza una transmisión a pantalla completa a los jugadores",
-  "displayHelpHelp": "– /display help: mostrar esta ayuda",
-  "displayInfoHeader": "&7D |&f Información de la pantalla:",
-  "displayInfoOwnerLine": "&7D |&7 propietario=&f{0} &8| &7uuid=&f{1}",
-  "displayInfoUuidLine": "&7D |&7 id-pantalla=&f{0}",
-  "displayInfoPositionLine": "&7D |&7 mundo=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
-  "displayInfoStateLine": "&7D |&7 tamaño=&f{0}x{1} &8| &7frente=&f{2} &8| &7sync=&f{3}",
-  "displayInfoMediaLine": "&7D |&7 idioma=&f{0} &8| &7duración=&f{1} &8| &7url=&f{2}",
-  "displayInfoUnknownOwner": "Desconocido",
-  "displayInfoUnknownWorld": "Desconocido",
-  "displayInfoUnknownDuration": "desconocido",
+  "display.enabled": "&7D |&f Displays enabled. Please wait for a moment...",
+  "display.disabled": "&7D |&f Displays disabled",
+  "display.already-disabled": "&7D |&f Displays are already disabled",
+  "display.already-enabled": "&7D |&f Displays are already enabled",
+  "displayTargetNotFound": "&7D |&f Player '%s' was not found online!",
+  "display.enabled.target": "&7D |&f Displays enabled for %s",
+  "display.disabled.target": "&7D |&f Displays disabled for %s",
+  "display.already-enabled.target": "&7D |&f Displays are already enabled for %s",
+  "display.already-disabled.target": "&7D |&f Displays are already disabled for %s",
+  "displayStatsHeader": "&7D |&f Mod usage statistics:",
+  "displayStatsEntry": "&7D |&f Version %s: %d players",
+  "displayStatsTotal": "&7D |&f Total players with mod: %d",
+  "displayHelpHeader": "Available commands:",
+  "displayHelpCreate": "– /display create: create a new display",
+  "displayHelpVideo": "– /display video <url>: set video for your display",
+  "displayHelpInfo": "– /display info: show details of the display you're looking at",
+  "displayHelpDelete": "– /display delete: delete the display you're looking at",
+  "displayHelpList": "– /display list: list all displays",
+  "displayHelpStats": "– /display stats: show mod usage statistics",
+  "displayHelpReload": "– /display reload: reload the configuration",
+  "displayHelpOn": "– /display on [player]: enable displays for yourself or a target player",
+  "displayHelpOff": "– /display off [player]: disable displays for yourself or a target player",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: force a fullscreen broadcast to players",
+  "displayHelpHelp": "– /display help: show this help",
+  "displayInfoHeader": "&7D |&f Display info:",
+  "displayInfoOwnerLine": "&7D |&7 owner=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 display-id=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 world=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 size=&f{0}x{1} &8| &7facing=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 lang=&f{0} &8| &7duration=&f{1} &8| &7url=&f{2}",
+  "displayInfoUnknownOwner": "Unknown",
+  "displayInfoUnknownWorld": "Unknown",
+  "displayInfoUnknownDuration": "unknown",
   "displayInfoAutoLang": "auto",
-  "displayInfoUnavailableUrl": "N/D",
-  "fullscreenStarted": "&7D |&f Transmisión a pantalla completa &b{0}&f iniciada (alcanzó {1} jugador(es))",
-  "fullscreenStopped": "&7D |&f Se detuvieron {0} transmisión(es) a pantalla completa",
-  "fullscreenStopFailed": "&7D |&f No se encontró ninguna transmisión a pantalla completa coincidente",
-  "fullscreenNoTargets": "&7D |&f Especifica al menos target <jugadores> o radius <bloques>",
-  "fullscreenAlreadyRunning": "&7D |&f Esa pantalla ya tiene una transmisión a pantalla completa, o el ID de sesión ya está en uso",
-  "fullscreenForcedDisallowed": "&7D |&f Las transmisiones a pantalla completa forzadas están desactivadas en la configuración",
-  "fullscreenNoDisplay": "&7D |&f No se encontró ninguna pantalla ni hay un mundo cargado para transmitir una URL",
-  "fullscreenListEmpty": "&7D |&f No hay transmisiones a pantalla completa activas",
+  "displayInfoUnavailableUrl": "N/A",
+  "fullscreenStarted": "&7D |&f Fullscreen broadcast &b{0}&f started (reached {1} player(s))",
+  "fullscreenStopped": "&7D |&f Stopped {0} fullscreen broadcast(s)",
+  "fullscreenStopFailed": "&7D |&f No matching fullscreen broadcast found",
+  "fullscreenNoTargets": "&7D |&f Specify at least one of target <players> or radius <blocks>",
+  "fullscreenAlreadyRunning": "&7D |&f That display already hosts a fullscreen broadcast, or the session ID is taken",
+  "fullscreenForcedDisallowed": "&7D |&f Forced fullscreen broadcasts are disabled in the config",
+  "fullscreenNoDisplay": "&7D |&f No display found and no world is loaded to host a URL broadcast",
+  "fullscreenListEmpty": "&7D |&f No fullscreen broadcasts are running",
   "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
 }

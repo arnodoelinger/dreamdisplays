@@ -1,29 +1,32 @@
 {
-  "noDisplayTerritories": "&7D |&f Ви ще не вибрали території дисплея! Виберіть дві точки з {0} на {1}",
-  "createDisplayCommand": "&7D |&f Тепер введіть /display create щоб створити дисплей",
-  "secondPointNotSelected": "&7D |&f Ви ще не вибрали другу точку!",
-  "displayOverlap": "&7D |&f У цій області вже є дисплей!",
-  "structureTooLarge": "&7D |&f Ви не можете створити дисплей більше %d × %d блоків",
-  "structureTooSmall": "&7D |&f Ви не можете створити дисплей менше %d × %d блоків",
-  "firstPointSelected": "&7D |&f Перша точка вибрана! Тепер виберіть другу точку",
-  "secondPointSelected": "&7D |&f Друга точка вибрана!",
-  "structureWrongDepth": "&7D |&f Вибір повинен бути хоча б 1 блок у довжину",
-  "wrongStructure": "&7D |&f Для дисплеїв можна використовувати тільки {0}",
-  "displayTooHigh": "&7D |&f Висота дисплея занадто висока (макс. %d)",
-  "displayTooLow": "&7D |&f Висота дисплея занадто низька (мин. %d)",
-  "selectionClear": "&7D |&f Вибір очищено!",
-  "successfulCreation": "&7D |&f Дисплей створено! Тепер сфокусуйтеся на ньому і введіть /display video <video_url> [lang], щоб встановити відео",
-  "noDisplay": "&7D |&f Дисплей не знайдено!",
-  "settedURL": "&7D |&f Відео завантажено!",
-  "invalidURL": "&7D |&f Ваше посилання недійсне! Будь ласка, використовуйте дійсне посилання на відео (YouTube, Twitch тощо)",
-  "displayVideoWrongTargetBlock": "&7D |&f Щоб використати цю команду, дивіться на блок дисплея!",
-  "displayVideoNotOwner": "&7D |&f Ви не власник цього дисплея!",
-  "reportTooQuickly": "&7D |&f Ви надсилаєте скарги занадто швидко! Зачекайте перед надсиланням наступної",
-  "reportSent": "&7D |&f Скаргу надіслано!",
-  "reportFailed": "&7D |&f Не вдалося надіслати скаргу. Будь ласка, спробуйте пізніше",
-  "displayDeleted": "&7D |&f Дисплей видалено!",
-  "displayReported": "&7D |&f Скаргу на дисплей надіслано!",
-  "reportNotConfigured": "&7D |&f Систему скарг не налаштовано на цьому сервері!",
+  "noDisplayTerritories": "&7D |&f You haven't selected any display territories yet! Please select two points using {0} on {1}",
+  "createDisplayCommand": "&7D |&f Now type /display create to create a display",
+  "secondPointNotSelected": "&7D |&f You haven't selected the second point yet!",
+  "displayOverlap": "&7D |&f There is already a display in this area!",
+  "structureTooLarge": "&7D |&f You can't create a display larger than %d × %d blocks",
+  "structureTooSmall": "&7D |&f You can't create a display smaller than %d × %d blocks",
+  "firstPointSelected": "&7D |&f First point selected! Now select the second point",
+  "secondPointSelected": "&7D |&f Second point selected!",
+  "structureWrongDepth": "&7D |&f Selection must be at least 1 block long",
+  "wrongStructure": "&7D |&f Only {0} blocks can be used for displays",
+  "displayTooHigh": "&7D |&f Display height is too high (max. %d)",
+  "displayTooLow": "&7D |&f Display is too low (min. %d)",
+  "selectionClear": "&7D |&f Selection has been cleared!",
+  "displayWrongCommand": "&7D |&f You entered something wrong!",
+  "displayCommandMissingPermission": "&7D |&f You don't have permission to use this command!",
+  "commandPlayersOnly": "&7D |&f This command can only be used by a player in-game",
+  "successfulCreation": "&7D |&f Display has been created! Now focus on it and type /display video <video_url> [lang] to set a video",
+  "noDisplay": "&7D |&f Display has not been found!",
+  "settedURL": "&7D |&f Video has been loaded!",
+  "invalidURL": "&7D |&f Your URL is invalid! Please use a valid video link (YouTube, Twitch, etc.)",
+  "displayVideoWrongTargetBlock": "&7D |&f You must look at a display block to use this command!",
+  "displayVideoNotOwner": "&7D |&f You are not the owner of this display!",
+  "reportTooQuickly": "&7D |&f You are sending reports too quickly! Please wait before sending another report",
+  "reportSent": "&7D |&f Report has been sent!",
+  "reportFailed": "&7D |&f Failed to send report. Please try again later",
+  "displayDeleted": "&7D |&f Display has been deleted!",
+  "displayReported": "&7D |&f Display has been reported!",
+  "reportNotConfigured": "&7D |&f Report system is disabled on this server!",
   "newVersion": {
     "text": "",
     "extra": [
@@ -32,11 +35,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Нова версія %s Dream Displays! Будь ласка, ",
+        "text": "New version %s of Dream Displays is available! Please ",
         "color": "#FFFFFF"
       },
       {
-        "text": "оновіть ваш мод",
+        "text": "update your mod",
         "color": "#023EB6",
         "underlined": true,
         "clickEvent": {
@@ -45,7 +48,7 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Клікніть, щоб завантажити нову версію"
+          "value": "Click to download new version"
         }
       },
       {
@@ -54,19 +57,19 @@
       }
     ]
   },
-  "newPluginVersion": "&7D |&f Доступна нова версія плагіна Dream Displays (%s)! Будь ласка, оновіть плагін на сервері!",
-  "configReloaded": "&7D | &fDream Displays перезавантажено!",
-  "configReloadFailed": "&7D |&f Не вдалося перезавантажити Dream Displays. Будь ласка, перевірте консоль на наявність помилок",
-  "configReloadSummary": "&7D |&f Перезавантажено: конфіг, мовні повідомлення, права команд",
-  "noDisplaysFound": "&7D |&f Дисплеї не знайдені",
-  "displayListHeader": "&7D |&f Дисплеї:",
-  "displayListEntry": "&7D |&f {0}. Власник: {1}, Розташування: [{2}, {3}, {4}], URL: {5}",
-  "displayListPageLine": "&7D |&7 сторінка=&f{0}/{1} &8| &7всього=&f{2}",
-  "displayListDetails": " &8| &7світ=&f{0} &8| &7розмір=&f{1}x{2} &8| &7синхр=&f{3} &8| &7id=&f{4}",
-  "displayListUnknownOwner": "Невідомо",
-  "displayListUnknownWorld": "невідомо",
-  "displayListUnavailableUrl": "Н/Д",
-  "displayListTpButton": " [ТП]",
+  "newPluginVersion": "&7D |&f New version of Dream Displays plugin (%s) is available! Please update the server plugin!",
+  "configReloaded": "&7D | &fDream Displays has been reloaded!",
+  "configReloadFailed": "&7D |&f Failed to reload Dream Displays. Please check the console for errors",
+  "configReloadSummary": "&7D |&f Reloaded: config, language messages, command permissions",
+  "noDisplaysFound": "&7D |&f No displays found",
+  "displayListHeader": "&7D |&f Displays:",
+  "displayListEntry": "&7D |&f {0}. Owner: {1}, Location: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 page=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7world=&f{0} &8| &7size=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Unknown",
+  "displayListUnknownWorld": "unknown",
+  "displayListUnavailableUrl": "N/A",
+  "displayListTpButton": " [TP]",
   "displayListUrlButton": " [URL]",
   "displayBlockBreak": {
     "text": "",
@@ -76,11 +79,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Це блок дисплея. Встановіть мод ",
+        "text": "This is a display block. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -89,11 +92,11 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Клiкнiть, щоб встановити Dream Displays!"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": ", щоб взаємодіяти з ним!",
+        "text": " mod to interact with it!",
         "color": "#FFFFFF"
       }
     ]
@@ -106,11 +109,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Мод Dream Displays необхідний для відображення дисплеїв на сервері. Будь ласка, ",
+        "text": "This server uses in-game displays. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "завантажте Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -119,60 +122,57 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Клікніть, щоб завантажити Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": ", щоб побачити їх!",
+        "text": " to see them!",
         "color": "#FFFFFF"
       }
     ]
   },
-  "display.enabled": "&7D |&f Дисплеї увімкнено. Зачекайте хвильку...",
-  "display.disabled": "&7D |&f Дисплеї вимкнено",
-  "display.already-disabled": "&7D |&f Дисплеї вже вимкнено",
-  "display.already-enabled": "&7D |&f Дисплеї вже увімкнено",
-  "displayTargetNotFound": "&7D |&f Гравця '%s' не знайдено онлайн!",
-  "display.enabled.target": "&7D |&f Дисплеї увімкнено для %s",
-  "display.disabled.target": "&7D |&f Дисплеї вимкнено для %s",
-  "display.already-enabled.target": "&7D |&f У %s дисплеї вже увімкнено",
-  "display.already-disabled.target": "&7D |&f У %s дисплеї вже вимкнено",
-  "displayWrongCommand": "&7D |&f Ви ввели щось неправильно!",
-  "displayCommandMissingPermission": "&7D |&f У вас немає дозволу на використання цієї команди!",
-  "commandPlayersOnly": "&7D |&f Цю команду може використовувати лише гравець у грі",
-  "displayStatsHeader": "&7D |&f Статистика використання моду:",
-  "displayStatsEntry": "&7D |&f Версія %s: %d гравців",
-  "displayStatsTotal": "&7D |&f Загалом гравців з модом: %d",
-  "displayHelpHeader": "Доступні команди:",
-  "displayHelpCreate": "– /display create: створити новий дисплей",
-  "displayHelpVideo": "– /display video <url>: встановити відео для вашого дисплея",
-  "displayHelpInfo": "– /display info: показати деталі дисплея, на який ви дивитеся",
-  "displayHelpDelete": "– /display delete: видалити дисплей, на який ви дивитеся",
-  "displayHelpList": "– /display list: список всіх дисплеїв",
-  "displayHelpStats": "– /display stats: показати статистику використання моду",
-  "displayHelpReload": "– /display reload: перезавантажити конфігурацію",
-  "displayHelpOn": "– /display on [гравець]: увімкнути дисплеї собі або вибраному гравцю",
-  "displayHelpOff": "– /display off [гравець]: вимкнути дисплеї собі або вибраному гравцю",
-  "displayHelpFullscreen": "– /display fullscreen start <id|url> [прапори]: примусово запустити повноекранну трансляцію гравцям",
-  "displayHelpHelp": "– /display help: показати цю довідку",
-  "displayInfoHeader": "&7D |&f Інформація про дисплей:",
-  "displayInfoOwnerLine": "&7D |&7 власник=&f{0} &8| &7uuid=&f{1}",
-  "displayInfoUuidLine": "&7D |&7 id-дисплея=&f{0}",
-  "displayInfoPositionLine": "&7D |&7 світ=&f{0} &8| &7точка1=&f[{1}, {2}, {3}] &8| &7точка2=&f[{4}, {5}, {6}]",
-  "displayInfoStateLine": "&7D |&7 розмір=&f{0}x{1} &8| &7сторона=&f{2} &8| &7синхр=&f{3}",
-  "displayInfoMediaLine": "&7D |&7 мова=&f{0} &8| &7тривалість=&f{1} &8| &7url=&f{2}",
-  "displayInfoUnknownOwner": "Невідомо",
-  "displayInfoUnknownWorld": "Невідомо",
-  "displayInfoUnknownDuration": "невідомо",
-  "displayInfoAutoLang": "авто",
-  "displayInfoUnavailableUrl": "Н/Д",
-  "fullscreenStarted": "&7D |&f Повноекранну трансляцію &b{0}&f розпочато (охоплено {1} гравець(ів))",
-  "fullscreenStopped": "&7D |&f Зупинено {0} повноекранних трансляцій",
-  "fullscreenStopFailed": "&7D |&f Відповідну повноекранну трансляцію не знайдено",
-  "fullscreenNoTargets": "&7D |&f Вкажіть принаймні target <гравці> або radius <блоки>",
-  "fullscreenAlreadyRunning": "&7D |&f На цьому дисплеї вже триває повноекранна трансляція, або ID сесії зайнято",
-  "fullscreenForcedDisallowed": "&7D |&f Примусові повноекранні трансляції вимкнено в конфігурації",
-  "fullscreenNoDisplay": "&7D |&f Дисплей не знайдено, і немає завантаженого світу для трансляції за URL",
-  "fullscreenListEmpty": "&7D |&f Немає активних повноекранних трансляцій",
+  "display.enabled": "&7D |&f Displays enabled. Please wait for a moment...",
+  "display.disabled": "&7D |&f Displays disabled",
+  "display.already-disabled": "&7D |&f Displays are already disabled",
+  "display.already-enabled": "&7D |&f Displays are already enabled",
+  "displayTargetNotFound": "&7D |&f Player '%s' was not found online!",
+  "display.enabled.target": "&7D |&f Displays enabled for %s",
+  "display.disabled.target": "&7D |&f Displays disabled for %s",
+  "display.already-enabled.target": "&7D |&f Displays are already enabled for %s",
+  "display.already-disabled.target": "&7D |&f Displays are already disabled for %s",
+  "displayStatsHeader": "&7D |&f Mod usage statistics:",
+  "displayStatsEntry": "&7D |&f Version %s: %d players",
+  "displayStatsTotal": "&7D |&f Total players with mod: %d",
+  "displayHelpHeader": "Available commands:",
+  "displayHelpCreate": "– /display create: create a new display",
+  "displayHelpVideo": "– /display video <url>: set video for your display",
+  "displayHelpInfo": "– /display info: show details of the display you're looking at",
+  "displayHelpDelete": "– /display delete: delete the display you're looking at",
+  "displayHelpList": "– /display list: list all displays",
+  "displayHelpStats": "– /display stats: show mod usage statistics",
+  "displayHelpReload": "– /display reload: reload the configuration",
+  "displayHelpOn": "– /display on [player]: enable displays for yourself or a target player",
+  "displayHelpOff": "– /display off [player]: disable displays for yourself or a target player",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: force a fullscreen broadcast to players",
+  "displayHelpHelp": "– /display help: show this help",
+  "displayInfoHeader": "&7D |&f Display info:",
+  "displayInfoOwnerLine": "&7D |&7 owner=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 display-id=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 world=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 size=&f{0}x{1} &8| &7facing=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 lang=&f{0} &8| &7duration=&f{1} &8| &7url=&f{2}",
+  "displayInfoUnknownOwner": "Unknown",
+  "displayInfoUnknownWorld": "Unknown",
+  "displayInfoUnknownDuration": "unknown",
+  "displayInfoAutoLang": "auto",
+  "displayInfoUnavailableUrl": "N/A",
+  "fullscreenStarted": "&7D |&f Fullscreen broadcast &b{0}&f started (reached {1} player(s))",
+  "fullscreenStopped": "&7D |&f Stopped {0} fullscreen broadcast(s)",
+  "fullscreenStopFailed": "&7D |&f No matching fullscreen broadcast found",
+  "fullscreenNoTargets": "&7D |&f Specify at least one of target <players> or radius <blocks>",
+  "fullscreenAlreadyRunning": "&7D |&f That display already hosts a fullscreen broadcast, or the session ID is taken",
+  "fullscreenForcedDisallowed": "&7D |&f Forced fullscreen broadcasts are disabled in the config",
+  "fullscreenNoDisplay": "&7D |&f No display found and no world is loaded to host a URL broadcast",
+  "fullscreenListEmpty": "&7D |&f No fullscreen broadcasts are running",
   "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
 }
