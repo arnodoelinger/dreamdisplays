@@ -1,14 +1,6 @@
 name: Crowdin
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "platform/shared/src/main/resources/assets/dreamdisplays/lang/client/en_us.json"
-      - "platform/shared/src/main/resources/assets/dreamdisplays/lang/server/en.json"
-      - "crowdin.yml"
-  schedule:
-    - cron: "0 6 * * 1"
   workflow_dispatch:
 
 permissions:
