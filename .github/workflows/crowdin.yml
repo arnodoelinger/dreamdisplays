@@ -55,6 +55,8 @@ jobs:
           base: main
           title: "chore: sync translations"
           body: "Pulled the latest translations from Crowdin. Review before merging."
-          commit-message: "New Crowdin translations by GitHub Action"
+          commit-message: "chore(i18n): sync translations from Crowdin"
+          author: "${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"
+          committer: "${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"
           add-paths: platform/shared/src/main/resources/assets/dreamdisplays/lang/**
           delete-branch: true
