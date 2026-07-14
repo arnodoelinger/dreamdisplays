@@ -19,14 +19,42 @@ jobs:
           upload_sources: true
           upload_translations: false
           download_translations: true
-          download_language: "de,ru,uk,pl,cs,be,he,es-ES,fr,it"
-          localization_branch_name: crowdin-translations
-          create_pull_request: true
-          pull_request_title: "chore: sync translations"
-          pull_request_body: "Pulled the latest translations from Crowdin. Review before merging."
-          pull_request_base_branch_name: main
+          push_translations: false
+          create_pull_request: false
           config: "crowdin.yml"
           project_id: ${{ secrets.CROWDIN_PROJECT_ID }}
           token: ${{ secrets.CROWDIN_PERSONAL_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Drop languages we don't ship yet
+        run: |
+          shopt -s nullglob
+          keep_client="en_us de_de ru_ru uk_ua pl_pl cs_cz be_by he_il es_es fr_fr it_it"
+          keep_server="en de ru uk pl cs be he es fr it"
+
+          for f in platform/shared/src/main/resources/assets/dreamdisplays/lang/client/*.json; do
+            name="$(basename "$f" .json)"
+            if ! grep -qw "$name" <<< "$keep_client"; then
+              rm -f "$f"
+            fi
+          done
+
+          for f in platform/shared/src/main/resources/assets/dreamdisplays/lang/server/*.json; do
+            name="$(basename "$f" .json)"
+            if ! grep -qw "$name" <<< "$keep_server"; then
+              rm -f "$f"
+            fi
+          done
+
+      - name: Open pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: crowdin-translations
+          base: main
+          title: "chore: sync translations"
+          body: "Pulled the latest translations from Crowdin. Review before merging."
+          commit-message: "New Crowdin translations by GitHub Action"
+          add-paths: platform/shared/src/main/resources/assets/dreamdisplays/lang/**
+          delete-branch: true
