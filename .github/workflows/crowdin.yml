@@ -17,9 +17,8 @@ jobs:
         uses: crowdin/github-action@v2
         with:
           upload_sources: true
-          upload_translations: true
-          auto_approve_imported: true
-          download_translations: false
+          upload_translations: false
+          download_translations: true
           localization_branch_name: crowdin-translations
           create_pull_request: true
           pull_request_title: "chore: sync translations"
