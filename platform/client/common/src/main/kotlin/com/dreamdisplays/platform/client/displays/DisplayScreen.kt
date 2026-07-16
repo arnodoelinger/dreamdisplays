@@ -315,11 +315,34 @@ class DisplayScreen(
     @Volatile
     private var waitingForInitialTimeline = false
 
+    /**
+     * [System.nanoTime] [waitingForInitialTimeline] was last set; `0` while not waiting. Backs the
+     * self-heal timeout below — a [TimelineFollower] packet that never lands (dropped, superseded by a
+     * stale-generation guard, or simply never sent for this display) must not strand the picture behind
+     * "Waiting for video..." forever once decode is actually healthy.
+     */
+    @Transient
+    @Volatile
+    private var waitingSinceNanos = 0L
+
+    /**
+     * Re-checks [waitingForInitialTimeline], self-clearing it once it has outlasted the periodic
+     * server broadcast interval by a wide margin — see [waitingSinceNanos].
+     */
+    private fun stillWaitingForInitialTimeline(): Boolean {
+        if (waitingForInitialTimeline && waitingSinceNanos != 0L &&
+            System.nanoTime() - waitingSinceNanos > WAITING_FOR_TIMELINE_TIMEOUT_NANOS
+        ) {
+            markInitialTimelineReady()
+        }
+        return waitingForInitialTimeline
+    }
+
     /** Audio track / language of the current video, or `null` when idle. */
     var lang: String? = null; private set
 
     /** True once the video is effectively playing: not awaiting the initial timeline and a frame has filled. */
-    val isVideoStarted: Boolean get() = !waitingForInitialTimeline && (hasEverRendered || mediaPlayer?.textureFilled() == true)
+    val isVideoStarted: Boolean get() = !stillWaitingForInitialTimeline() && (hasEverRendered || mediaPlayer?.textureFilled() == true)
 
     /** Marks that a frame has rendered, stamping the first-frame time so the appear fade-in can run. */
     private fun markRendered() {
@@ -415,14 +438,16 @@ class DisplayScreen(
         this.videoUrl = videoUrl
         this.lang = lang
         waitingForInitialTimeline = requiresServerTimeline()
+        waitingSinceNanos = if (waitingForInitialTimeline) System.nanoTime() else 0L
     }
 
     /** True while the screen is holding back the picture until the server's first timeline arrives. */
-    internal val isWaitingForInitialTimeline: Boolean get() = waitingForInitialTimeline
+    internal val isWaitingForInitialTimeline: Boolean get() = stillWaitingForInitialTimeline()
 
     /** Clears the initial-timeline gate so the video may render. */
     internal fun markInitialTimelineReady() {
         waitingForInitialTimeline = false
+        waitingSinceNanos = 0L
     }
 
     /** Primes the player to begin at [positionNanos] so the first frame lands on the synced position. */
@@ -952,6 +977,14 @@ class DisplayScreen(
 
         /** Duration of the first-frame fade-in (see [appearProgress]). */
         private const val APPEAR_FADE_NANOS = 260_000_000L
+
+        /**
+         * Self-heal timeout for [waitingForInitialTimeline] (see [stillWaitingForInitialTimeline]):
+         * well over the server's periodic timeline-broadcast interval, so it never fires in the
+         * healthy case, but guarantees the picture isn't stranded forever behind "Waiting for video..."
+         * if that first packet is ever dropped, superseded, or simply never arrives.
+         */
+        private const val WAITING_FOR_TIMELINE_TIMEOUT_NANOS = 5_000_000_000L
 
         /** Maximum server-prescribed default volume accepted by the client (200% in the UI). */
         private const val MAX_SERVER_DEFAULT_VOLUME = 1.0f
