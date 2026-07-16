@@ -2,7 +2,6 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-import com.dreamdisplays.api.playback.PlaybackMode
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -16,26 +15,31 @@ import net.minecraft.resources.Identifier
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 
 /**
- * Discrete playback-mode selector styled like the existing sliders. Unlike [ValueSlider], this
- * ignores drag updates, so transient pointer movement cannot start multiple watch-party requests.
- * A click snaps directly to whichever mode's notch it lands closest to, like a real slider, instead
- * of always advancing one step.
+ * Discrete-mode selector styled like the existing sliders, generic over any small fixed [modes] list
+ * (playback mode, acoustics tier, ...). Unlike [ValueSlider], this ignores drag updates, so transient
+ * pointer movement cannot repeatedly re-trigger [onApply]. A click snaps directly to whichever mode's
+ * notch it lands closest to, like a real slider, instead of always advancing one step.
  */
-class SyncModeSlider(
-    initial: PlaybackMode,
-    private val current: () -> PlaybackMode,
-    private val enabledFor: (PlaybackMode) -> Boolean,
-    private val label: (PlaybackMode) -> Component,
-    private val onApply: (PlaybackMode) -> Unit,
+class ModeSlider<T : Any>(
+    private val modes: List<T>,
+    initial: T,
+    private val current: () -> T,
+    private val enabledFor: (T) -> Boolean,
+    private val label: (T) -> Component,
+    private val onApply: (T) -> Unit,
 ) : UiWidget(Component.empty()) {
 
-    var mode: PlaybackMode = initial
+    var mode: T = initial
         private set
 
     private var sliderFocused: Boolean = false
-    private var pendingMode: PlaybackMode? = null
+    private var pendingMode: T? = null
     private var pendingUntilNanos: Long = 0L
 
+    /**
+     * Re-syncs [mode] with [current], honoring a still-pending [onApply] (e.g. one still awaiting a
+     * server echo) until it either lands or [PENDING_TIMEOUT_NANOS] elapses.
+     */
     fun syncToCurrent() {
         val actual = current()
         val pending = pendingMode
@@ -93,8 +97,9 @@ class SyncModeSlider(
         playDownSound(Minecraft.getInstance().soundManager)
     }
 
-    // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
-    // (1.21.1) branch overrides mouseClicked itself so the mode cycle fires on both platforms.
+    // NeoForge deprecates the 2-arg onClick and reroutes mouseClicked to a Neo-only 3-arg overload
+    // that Fabric lacks, so the legacy (1.21.1) branch overrides mouseClicked itself so the mode
+    // cycle fires on both platforms.
     //? if >=1.21.11 {
     override fun onClick(event: MouseButtonEvent, doubleClick: Boolean) {
         trySelect(event.x())
@@ -126,21 +131,13 @@ class SyncModeSlider(
     }
 
     /** Maps a click's x position to the mode whose notch it's closest to (mirrors the [draw] layout). */
-    private fun modeFromMouse(mouseX: Double): PlaybackMode {
+    private fun modeFromMouse(mouseX: Double): T {
         val fraction = (mouseX - x) / (width - 8).toDouble()
         val idx = Math.round(fraction * (modes.size - 1)).toInt().coerceIn(0, modes.size - 1)
         return modes[idx]
     }
 
     companion object {
-        // TODO: Watch party mode is implemented but not shipped for 1.8.0, so the slider exposes only the three
-        //  base modes. The mode and all its code paths stay intact; it's just not selectable here.
-        val modes = listOf(
-            PlaybackMode.LOCAL,
-            PlaybackMode.SYNCED,
-            PlaybackMode.BROADCAST,
-        )
-
         private val TRACK = Identifier.withDefaultNamespace("widget/slider")
         private val TRACK_HIGHLIGHTED = Identifier.withDefaultNamespace("widget/slider_highlighted")
         private val HANDLE = Identifier.withDefaultNamespace("widget/slider_handle")

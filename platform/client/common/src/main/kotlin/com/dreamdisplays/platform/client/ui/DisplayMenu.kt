@@ -21,14 +21,16 @@ import com.dreamdisplays.platform.client.ui.menu.PopoutDropdown
 import com.dreamdisplays.platform.client.ui.menu.PreviewSection
 import com.dreamdisplays.platform.client.ui.menu.SettingsSection
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
+import com.dreamdisplays.platform.client.ui.widgets.ModeSlider
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.SuggestionsPanel
-import com.dreamdisplays.platform.client.ui.widgets.SyncModeSlider
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.audio.AcousticQuality
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
@@ -68,7 +70,8 @@ class DisplayMenu private constructor(
     private lateinit var renderD: ValueSlider
     private lateinit var quality: ValueSlider
     private lateinit var brightness: ValueSlider
-    private lateinit var sync: SyncModeSlider
+    private lateinit var audio3d: ModeSlider<AcousticQuality>
+    private lateinit var sync: ModeSlider<PlaybackMode>
     private lateinit var progress: SeekBar
     private lateinit var suggestions: SuggestionsPanel
     private lateinit var preview: PreviewSection
@@ -156,8 +159,23 @@ class DisplayMenu private constructor(
         brightness.enabledWhen = { videoReady() && (!ds.isSync || ds.canEdit) }
         brightness.visibleWhen = notErrored
 
+        audio3d = addUi(
+            ModeSlider(
+                modes = AUDIO_3D_MODES,
+                initial = ClientStateManager.config.audioAcoustics,
+                current = { ClientStateManager.config.audioAcoustics },
+                enabledFor = { true },
+                label = { Component.translatable(audio3dModeLabel(it)) },
+            ) { quality ->
+                ClientStateManager.config.audioAcoustics = quality
+                ClientStateManager.config.save()
+                DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.setGlobalQuality(quality)
+            })
+        audio3d.visibleWhen = notErrored
+
         sync = addUi(
-            SyncModeSlider(
+            ModeSlider(
+                modes = SYNC_MODES,
                 initial = ds.effectiveMode,
                 current = { ds.effectiveMode },
                 enabledFor = {
@@ -209,6 +227,14 @@ class DisplayMenu private constructor(
         })
         brightnessReset.enabledWhen = { videoReady() && abs(brightness.value - 1.0) > 0.01 }
         brightnessReset.visibleWhen = notErrored
+
+        val audio3dReset = addUi(IconButton("refresh") {
+            ClientStateManager.config.audioAcoustics = AUDIO_3D_DEFAULT
+            ClientStateManager.config.save()
+            DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.setGlobalQuality(AUDIO_3D_DEFAULT)
+        })
+        audio3dReset.enabledWhen = { ClientStateManager.config.audioAcoustics != AUDIO_3D_DEFAULT }
+        audio3dReset.visibleWhen = notErrored
 
         val syncReset = addUi(IconButton("refresh") {
             if (ds.canSetModeHere) playback.setMode(displayId, PlaybackMode.LOCAL)
@@ -308,7 +334,7 @@ class DisplayMenu private constructor(
         preview =
             PreviewSection(ds, muteButton, volume, popoutButton, pauseButton, progress, dropdown)
         settings = SettingsSection(
-            rows = settingsRows(renderDReset, qualityReset, brightnessReset, syncReset),
+            rows = settingsRows(renderDReset, qualityReset, brightnessReset, audio3dReset, syncReset),
             ownerActions = listOf(reportButton, deleteButton, lockButton),
             buttonTooltips = listOf(
                 lockButton to {
@@ -328,10 +354,10 @@ class DisplayMenu private constructor(
         errorPanel = ErrorPanel(retryButton, deleteButton, reportButton) { ds.mediaError }
     }
 
-    /** Builds the four settings rows with their tooltip content. */
+    /** Builds the settings rows with their tooltip content. */
     private fun settingsRows(
         renderDReset: IconButton, qualityReset: IconButton,
-        brightnessReset: IconButton, syncReset: IconButton,
+        brightnessReset: IconButton, audio3dReset: IconButton, syncReset: IconButton,
     ): List<SettingsSection.Row> {
         val ds = displayScreen
         return listOf(
@@ -364,6 +390,21 @@ class DisplayMenu private constructor(
                     tooltipBody("dreamdisplays.button.brightness.tooltip.2"),
                     Component.literal(""),
                     tooltipValue("dreamdisplays.button.brightness.tooltip.3", floor(brightness.value * 100).toInt()),
+                )
+            },
+            SettingsSection.Row("dreamdisplays.button.audio3d", audio3d, audio3dReset) {
+                listOf(
+                    tooltipTitle("dreamdisplays.button.audio3d.tooltip.1"),
+                    tooltipBody("dreamdisplays.button.audio3d.tooltip.2"),
+                    Component.literal(""),
+                    tooltipModeBullet("dreamdisplays.mode.audio_off", "dreamdisplays.button.audio3d.tooltip.3"),
+                    tooltipModeBullet("dreamdisplays.mode.audio_enhanced", "dreamdisplays.button.audio3d.tooltip.4"),
+                    tooltipModeBullet("dreamdisplays.mode.audio_advanced", "dreamdisplays.button.audio3d.tooltip.5"),
+                    Component.literal(""),
+                    tooltipValue(
+                        "dreamdisplays.button.audio3d.tooltip.6",
+                        Component.translatable(audio3dModeLabel(audio3d.mode)),
+                    ),
                 )
             },
             SettingsSection.Row("dreamdisplays.button.synchronization", sync, syncReset, extraGapBefore = 6) {
@@ -424,6 +465,7 @@ class DisplayMenu private constructor(
         modLabel.draw(g, UiTheme.SCREEN_PADDING, 6)
         resyncQualitySlider()
         resyncModeSlider()
+        audio3d.syncToCurrent()
 
         if (ds.errored) {
             dropdown.hide()
@@ -552,7 +594,7 @@ class DisplayMenu private constructor(
     companion object {
         /** Minimum logical canvas the normal layout is comfortable in; smaller windows scale down. */
         private const val MIN_CONTENT_W = 640
-        private const val MIN_CONTENT_H = 380
+        private const val MIN_CONTENT_H = 410
 
         private const val CHUNK_BLOCKS = 16
         private const val MIN_CHUNKS = 2
@@ -574,6 +616,22 @@ class DisplayMenu private constructor(
             PlaybackMode.WATCH_PARTY -> "dreamdisplays.mode.watch_party"
             PlaybackMode.BROADCAST -> "dreamdisplays.mode.broadcast"
         }
+
+        /** The three tiers exposed by the 3D audio slider; BASIC stays an internal-only engine step. */
+        private val AUDIO_3D_MODES = listOf(AcousticQuality.OFF, AcousticQuality.ADVANCED, AcousticQuality.ULTRA)
+
+        /** Factory default the 3D audio row's reset button restores. */
+        private val AUDIO_3D_DEFAULT = AcousticQuality.ADVANCED
+
+        /** Translation key for the compact mode label shown inside the 3D audio slider. */
+        private fun audio3dModeLabel(quality: AcousticQuality): String = when (quality) {
+            AcousticQuality.OFF -> "dreamdisplays.mode.audio_off"
+            AcousticQuality.ULTRA -> "dreamdisplays.mode.audio_advanced"
+            else -> "dreamdisplays.mode.audio_enhanced"
+        }
+
+        /** The three sync-mode notches exposed by the playback-mode slider. */
+        private val SYNC_MODES = listOf(PlaybackMode.LOCAL, PlaybackMode.SYNCED, PlaybackMode.BROADCAST)
 
         /** Opens the menu for [displayScreen]. */
         fun open(displayScreen: DisplayScreen) {
