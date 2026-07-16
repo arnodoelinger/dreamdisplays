@@ -28,6 +28,7 @@ object MediaUtil {
         "Network is unreachable",
         "Operation timed out",
         "Server returned",
+        "Not all references are available",
     )
 
     /** Returns true if [line] is not a known benign `FFmpeg` error that can be safely ignored. */
