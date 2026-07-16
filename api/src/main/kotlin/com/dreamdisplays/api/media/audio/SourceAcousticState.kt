@@ -26,4 +26,11 @@ data class SourceAcousticState(
 
     /** Per-display opt-out; false forces the [AcousticQuality.OFF] legacy path for this source. */
     val acousticsEnabled: Boolean = true,
+
+    /**
+     * Latest raytraced acoustic space between this source and the listener (occlusion + reverb).
+     * Defaults to [AcousticEnvironment.OPEN_AIR], so a platform that never runs the voxel probe keeps
+     * the pure-spatialization behavior with no environmental coloring.
+     */
+    val environment: AcousticEnvironment = AcousticEnvironment.OPEN_AIR,
 )

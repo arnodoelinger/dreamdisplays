@@ -17,7 +17,7 @@ object EmitterLayout {
      * 1.0 inside [refDistance] (the screen's own footprint, so a huge display never blows up when the
      * listener stands close to it), rolling off past it.
      */
-    fun distanceGain(distance: Double, refDistance: Double, rolloff: Double = 1.0): Double {
+    fun distanceGain(distance: Double, refDistance: Double, rolloff: Double = 0.7): Double {
         val ref = max(refDistance, 0.1)
         return ref / (ref + rolloff * max(0.0, distance - ref))
     }
@@ -26,7 +26,7 @@ object EmitterLayout {
      * Broadband directivity gain from the angle between the plane's outward [normal] and the unit
      * [toListenerDir]: near 1 in front of the screen, floored at [backFloor] directly behind it.
      */
-    fun directivityGain(normal: Vec3, toListenerDir: Vec3, backFloor: Double = 0.35, exponent: Double = 1.5): Double {
+    fun directivityGain(normal: Vec3, toListenerDir: Vec3, backFloor: Double = 0.6, exponent: Double = 1.0): Double {
         val cosTheta = (normal dot toListenerDir).coerceIn(-1.0, 1.0)
         val front = ((cosTheta + 1.0) / 2.0).pow(exponent)
         return backFloor + (1.0 - backFloor) * front

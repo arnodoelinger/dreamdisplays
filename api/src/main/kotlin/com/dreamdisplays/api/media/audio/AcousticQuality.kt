@@ -15,7 +15,10 @@ enum class AcousticQuality {
     /** Area-source distance + directivity + constant-power stereo pan, no filtering. */
     BASIC,
 
-    /** Adds loudness normalization, a dynamic limiter, and parametric binaural rendering. */
+    /**
+     * Adds loudness normalization, a dynamic limiter, parametric binaural rendering, and the full
+     * environmental chain: raytraced occlusion, distance air absorption, and algorithmic reverb.
+     */
     ADVANCED,
 
     /** Adds true HRIR convolution and emitter-grid LOD (not yet implemented; behaves as [ADVANCED]). */

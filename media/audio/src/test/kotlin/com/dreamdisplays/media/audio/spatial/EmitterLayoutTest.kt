@@ -26,7 +26,7 @@ class EmitterLayoutTest {
         val front = EmitterLayout.directivityGain(normal, Vec3(0.0, 0.0, -1.0))
         val behind = EmitterLayout.directivityGain(normal, Vec3(0.0, 0.0, 1.0))
         assertTrue(front > 0.95, "Expected near-full gain directly in front, got $front.")
-        assertEquals(0.35, behind, 1e-6, "Expected the back floor directly behind the screen.")
+        assertEquals(0.6, behind, 1e-6, "Expected the back floor directly behind the screen.")
         assertTrue(front > behind)
     }
 }
