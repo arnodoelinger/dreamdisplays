@@ -5,7 +5,6 @@ import com.dreamdisplays.api.media.audio.AcousticMaterial
 import com.dreamdisplays.api.media.audio.ListenerPose
 import com.dreamdisplays.api.media.audio.SourcePlane
 import net.minecraft.client.Minecraft
-import net.minecraft.core.BlockPos
 import net.minecraft.tags.BlockTags
 import net.minecraft.tags.TagKey
 import net.minecraft.world.entity.Entity
@@ -122,8 +121,11 @@ object VoxelAcousticsProbe {
             if (hit.type != HitResult.Type.BLOCK) break // Reached the screen unobstructed from here
             val at = hit.location
             if (at.distanceTo(target) < 0.6) break // The hit is the screen's own block; nothing between us
-            accum += materialAt(level, hit.blockPos).occlusion
-            if (accum >= MAX_OCCLUSION) return MAX_OCCLUSION
+            val hitState = level.getBlockState(hit.blockPos)
+            if (!isTransparent(hitState)) {
+                accum += materialFor(hitState).occlusion
+                if (accum >= MAX_OCCLUSION) return MAX_OCCLUSION
+            }
             val dir = target.subtract(start).normalize()
             start = at.add(dir.scale(OCCLUSION_STEP_EPSILON)) // Step just past this wall and look for the next
         }
@@ -139,12 +141,11 @@ object VoxelAcousticsProbe {
         var pathSum = 0.0
         var reflSum = 0.0
         for (dir in RAY_DIRECTIONS) {
-            val end = center.add(dir.scale(REVERB_MAX_DISTANCE))
-            val hit = level.clip(ClipContext(center, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity))
-            if (hit.type == HitResult.Type.BLOCK) {
+            val result = castReverbRay(level, entity, center, dir)
+            if (result != null) {
                 hits++
-                pathSum += hit.location.distanceTo(center)
-                reflSum += materialAt(level, hit.blockPos).reflectivity
+                pathSum += result.first
+                reflSum += result.second
             } else {
                 pathSum += REVERB_MAX_DISTANCE // energy escaped to open air along this direction
             }
@@ -162,10 +163,37 @@ object VoxelAcousticsProbe {
         return Triple(decay, wet, damping)
     }
 
-    /** Looks up the [AcousticMaterial] of the block at [pos], defaulting when the sound type is unknown. */
+    /**
+     * Casts one reverb ray from [origin] along unit [dir], passing straight through any acoustically
+     * transparent block (see [TRANSPARENT_TAGS]) instead of stopping there — so a leafy canopy doesn't
+     * read as a wall. Returns `(distanceFromOrigin, reflectivity)` of the first solid hit, or null if the
+     * ray escaped to open air within [REVERB_MAX_DISTANCE] (or pierced too many transparent blocks).
+     */
+    private fun castReverbRay(level: Level, entity: Entity, origin: Vec3, dir: Vec3): Pair<Double, Float>? {
+        var start = origin
+        var traveled = 0.0
+        for (step in 0 until MAX_REVERB_PIERCE_STEPS) {
+            val remaining = REVERB_MAX_DISTANCE - traveled
+            if (remaining <= 0.0) return null
+            val end = start.add(dir.scale(remaining))
+            val hit = level.clip(ClipContext(start, end, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, entity))
+            if (hit.type != HitResult.Type.BLOCK) return null
+            val segment = hit.location.distanceTo(start)
+            val hitState = level.getBlockState(hit.blockPos)
+            if (isTransparent(hitState)) {
+                traveled += segment + OCCLUSION_STEP_EPSILON
+                start = hit.location.add(dir.scale(OCCLUSION_STEP_EPSILON))
+                continue
+            }
+            return (traveled + segment) to materialFor(hitState).reflectivity
+        }
+        return null
+    }
+
+    /** Looks up the [AcousticMaterial] for [state], defaulting when the sound type is unknown. */
     @Suppress("DEPRECATION")
-    private fun materialAt(level: Level, pos: BlockPos): AcousticMaterial {
-        val soundType = runCatching { level.getBlockState(pos).soundType }.getOrNull() ?: return AcousticMaterial.DEFAULT
+    private fun materialFor(state: BlockState): AcousticMaterial {
+        val soundType = runCatching { state.soundType }.getOrNull() ?: return AcousticMaterial.DEFAULT
         return MATERIALS[soundType] ?: AcousticMaterial.DEFAULT
     }
 
