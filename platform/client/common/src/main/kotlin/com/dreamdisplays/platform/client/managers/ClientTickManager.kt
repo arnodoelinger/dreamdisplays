@@ -1,6 +1,8 @@
 package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
+import com.dreamdisplays.platform.client.audio.ListenerPoseTracker
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
@@ -98,6 +100,8 @@ object ClientTickManager {
         ClientStateManager.isOnScreen = false
         val player = minecraft.player ?: return
         val playerPos = player.blockPosition()
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)
+            ?.updateListener(ListenerPoseTracker.currentPose(minecraft))
 
         unloadCheckTick++
         if (unloadCheckTick >= 10 && ClientStateManager.displaysEnabled && DisplayRegistry.unloadedScreens.isNotEmpty()) {

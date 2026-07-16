@@ -45,6 +45,9 @@ interface ClientSettingsStorage {
     /** Sets whether [displayUuid] is pinned to a Picture-in-Picture overlay and saves. */
     fun setPipOpen(displayUuid: UUID, open: Boolean)
 
+    /** Sets whether the 3D acoustics engine applies to [displayUuid] and saves. */
+    fun setAcousticsEnabled(displayUuid: UUID, enabled: Boolean)
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     fun remove(displayUuid: UUID): Boolean
 }

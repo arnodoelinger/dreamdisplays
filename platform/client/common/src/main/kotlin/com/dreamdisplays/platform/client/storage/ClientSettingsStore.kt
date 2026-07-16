@@ -103,6 +103,13 @@ object ClientSettingsStore : ClientSettingsStorage {
         save()
     }
 
+    /** Sets whether the 3D acoustics engine applies to [displayUuid] and saves. */
+    override fun setAcousticsEnabled(displayUuid: UUID, enabled: Boolean) {
+        val s = getSettings(displayUuid)
+        s.acousticsEnabled = enabled
+        save()
+    }
+
     /** Removes the settings for [displayUuid], persisting only if an entry existed. Returns whether anything was removed. */
     override fun remove(displayUuid: UUID): Boolean {
         val removed = settings.remove(displayUuid) != null

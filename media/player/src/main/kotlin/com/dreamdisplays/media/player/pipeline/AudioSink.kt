@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.pipeline
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.util.MediaBufferEffects
 import com.dreamdisplays.media.player.util.MediaUtil
@@ -43,6 +44,19 @@ internal class AudioSink(private val debugLabel: String) {
     /** Current volume multiplier applied to each audio chunk. */
     @Volatile
     var currentVolume: Double = 1.0
+
+    /**
+     * Optional per-source acoustics DSP stage; when set it replaces [MediaBufferEffects.applyVolumeS16LE]
+     * for every chunk (including the bridge prelude), receiving [currentVolume] as its bypass gain.
+     */
+    @Volatile
+    private var dspStage: AudioDspStage? = null
+
+    /** Installs (or clears) the acoustics DSP stage for this session; resets its state immediately. */
+    fun setDspStage(stage: AudioDspStage?) {
+        dspStage = stage
+        stage?.reset()
+    }
 
     /**
      * Live-relative frame position of the open audio line, or -1 when no line is active (or the line is
@@ -198,6 +212,7 @@ internal class AudioSink(private val debugLabel: String) {
         pcmFlowing = false
         sessionEpoch++
         clearRing()
+        dspStage?.reset()
         val stderrBuf = drainStderr(proc, stopFlag)
         return daemon(
             { run(proc, terminated, stopFlag, startGate, stderrBuf, onUnexpectedEnd) }, "MediaPlayer-audio",
@@ -224,6 +239,7 @@ internal class AudioSink(private val debugLabel: String) {
         pcmFlowing = false
         sessionEpoch++
         clearRing()
+        dspStage?.reset()
         return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
     }
 
@@ -396,7 +412,7 @@ internal class AudioSink(private val debugLabel: String) {
         while (off < prelude.size && !terminated.get() && !stopFlag.get()) {
             val n = minOf(CHUNK_BYTES, prelude.size - off)
             System.arraycopy(prelude, off, chunk, 0, n)
-            MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
+            dspStage?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
             writeFully(ln, chunk, n, terminated, stopFlag)
             off += n
         }
@@ -441,7 +457,7 @@ internal class AudioSink(private val debugLabel: String) {
                 pcmFlowing = true
             }
             ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
-            MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
+            dspStage?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
             writeFully(ln, chunk, n, terminated, stopFlag)
         }
     }

@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.api.media.player.PlaybackHost
 import com.dreamdisplays.api.media.player.PlaybackEnvironment
 import com.dreamdisplays.media.player.events.PlayerEvents
@@ -39,6 +40,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @param lang language code (e.g. "en", "ja")
  * @param host the display this player drives
  * @param env cross-cutting platform services (config, render thread, GPU upload, resolver)
+ * @param audioStage optional per-display acoustics DSP stage; null keeps the legacy distance-gain pipeline
  */
 class MediaPlayer(
     private val youtubeUrl: String,
@@ -46,6 +48,7 @@ class MediaPlayer(
     private val host: PlaybackHost,
     private val env: PlaybackEnvironment,
     private val replayBootstrap: ReplayBootstrap? = null,
+    private val audioStage: AudioDspStage? = null,
 ) {
     /** One-shot native packet-cache bootstrap used when a local display reappears.
      *  [audioPcm] is the cached raw PCM for the same window, played during the bridge (null = silent bridge). */
@@ -192,6 +195,7 @@ class MediaPlayer(
         renderExecutor = env.renderExecutor,
         uploaderFactory = env.uploaderFactory,
         gpuYuvActive = env.config.gpuYuvActive,
+        audioStage = audioStage,
     )
 
     private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }

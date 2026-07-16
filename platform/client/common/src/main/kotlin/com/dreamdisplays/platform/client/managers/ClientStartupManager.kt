@@ -8,6 +8,7 @@ import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.DefaultClientApplication
 import com.dreamdisplays.platform.client.core.DefaultClientContext
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.platform.client.core.modules.ClientAudioModule
 import com.dreamdisplays.platform.client.core.modules.ClientCapabilityModule
 import com.dreamdisplays.platform.client.core.modules.ClientInputModule
 import com.dreamdisplays.platform.client.core.modules.ClientOverlayModule
@@ -62,6 +63,7 @@ object ClientStartupManager {
         ClientStorageModule,
         CoreDisplayModule,
         CorePlaybackModule,
+        ClientAudioModule,
         MediaResolverModule,
         ClientOverlayModule,
         ClientInputModule,

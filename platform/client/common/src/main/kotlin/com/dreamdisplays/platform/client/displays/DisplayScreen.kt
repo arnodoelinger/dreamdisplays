@@ -37,6 +37,11 @@ import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
+import com.dreamdisplays.api.media.audio.SourceAcousticState
+import com.dreamdisplays.api.media.audio.SourcePlane
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -114,6 +119,12 @@ class DisplayScreen(
 
     /** Whether the user has muted this display. */
     var muted: Boolean = savedSettings.muted
+
+    /**
+     * Whether the 3D acoustics engine (directivity, occlusion, reverb, binaural) applies to this
+     * display; false forces the legacy distance-gain-only path.
+     */
+    var acousticsEnabled: Boolean = savedSettings.acousticsEnabled
 
     /** Legacy mirror of [mode]; true only for [PlaybackMode.SYNCED]. */
     val isSync: Boolean get() = mode == PlaybackMode.SYNCED
@@ -621,6 +632,18 @@ class DisplayScreen(
     fun getDistanceToScreen(pos: BlockPos): Double =
         DisplayGeometry.distanceTo(pos, x, y, z, width, height, facing)
 
+    /** Builds the world-space planar sound source fed to the acoustics engine (see [tick]). */
+    private fun toSourcePlane(): SourcePlane {
+        val pose = DisplayGeometry.worldPose(x, y, z, width, height, facing)
+        return SourcePlane(
+            pose.centerX, pose.centerY, pose.centerZ,
+            pose.normalX, pose.normalY, pose.normalZ,
+            pose.uAxisX, pose.uAxisY, pose.uAxisZ,
+            pose.vAxisX, pose.vAxisY, pose.vAxisZ,
+            width.toDouble(), height.toDouble(),
+        )
+    }
+
     /** Uploads the latest decoded frame to the GPU texture(s). Called on the render thread once per frame. */
     fun fitTexture() {
         val mp = mediaPlayer ?: return
@@ -823,6 +846,13 @@ class DisplayScreen(
         DisplayRegistry.recordScreen(this)
     }
 
+    /** Enables or disables the 3D acoustics engine for this display; no-op if already in that state. */
+    fun setAcoustics(enabled: Boolean) {
+        if (acousticsEnabled == enabled) return
+        acousticsEnabled = enabled
+        ClientSettingsStore.setAcousticsEnabled(uuid, enabled)
+    }
+
     /** Applies temporary focus mute without changing the user's persisted mute setting. */
     fun setFocusMuted(status: Boolean) {
         if (focusMuted == status) return
@@ -950,6 +980,16 @@ class DisplayScreen(
     fun tick(pos: BlockPos) {
         val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
         mediaPlayer?.tick(getDistanceToScreen(pos), maxRadius)
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.updateSource(
+            uuid,
+            SourceAcousticState(
+                plane = toSourcePlane(),
+                userVolume = volume,
+                muted = muted || focusMuted,
+                bypassSpatial = isPopoutActive,
+                acousticsEnabled = acousticsEnabled,
+            ),
+        )
     }
 
     /** Called after a user-initiated seek completes; emits the seek intent upstream per mode. */
