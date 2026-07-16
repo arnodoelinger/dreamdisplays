@@ -64,7 +64,8 @@ object MediaProcess {
         } else {
             val swPrefix = if (hwAccel.hwOutputFormat != null) "hwdownload,format=nv12," else ""
             val scaleExtra = if (transport == VideoTransport.RAW_NV12) ":out_color_matrix=bt709" else ""
-            "${swPrefix}scale=w=$w:h=$h:force_original_aspect_ratio=decrease:flags=bilinear$scaleExtra,$pad"
+            val fitSw = "min($w/iw\\,$h/ih)"
+            "${swPrefix}scale=w=min($w\\,iw*$fitSw):h=min($h\\,ih*$fitSw):flags=bilinear$scaleExtra,$pad"
         }
         return baseCommand(ffmpeg, url, offsetNanos, hwAccel).apply {
             addAll(listOf("-an", "-vf", vf))
@@ -94,7 +95,8 @@ object MediaProcess {
      */
     @Throws(IOException::class)
     fun buildFrameExtract(ffmpeg: String, url: String, offsetNanos: Long, w: Int, h: Int): Process {
-        val pad = "scale=w=$w:h=$h:force_original_aspect_ratio=decrease:flags=lanczos," +
+        val fitSw = "min($w/iw\\,$h/ih)"
+        val pad = "scale=w=min($w\\,iw*$fitSw):h=min($h\\,ih*$fitSw):flags=lanczos," +
                 "pad=w=$w:h=$h:x=(ow-iw)/2:y=(oh-ih)/2:color=black"
         val cmd = baseCommand(ffmpeg, url, offsetNanos, HwAccelBackend.NONE, alreadyResolved = true).apply {
             addAll(
