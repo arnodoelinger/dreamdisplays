@@ -35,6 +35,7 @@ import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 /**
  * Scrollable search / related-videos panel: a search row (edit box + clear + search buttons) above a
@@ -57,6 +58,18 @@ class SuggestionsPanel(
 
     private var scrollOffset: Int = 0
     private var hoveredCard: Int = -1
+
+    /** Scrollbar geometry captured in [drawScrollbar] so the mouse handlers can drag the thumb. */
+    private var sbActive = false
+    private var sbVertical = true
+    private var sbStart = 0        // track origin along the scroll axis (stripTop / stripLeft)
+    private var sbViewport = 0     // track length along the scroll axis
+    private var sbThumbLen = 0
+    private var sbMaxOff = 0
+    private var sbCross = 0        // the bar's fixed cross-axis coordinate (barX / barY)
+
+    /** True while the user is dragging the scrollbar thumb. */
+    private var draggingScrollbar = false
     private var vertical: Boolean = false
     private var compactCards: Boolean = false
     private var lastStripH: Int = CARD_H
@@ -219,6 +232,11 @@ class SuggestionsPanel(
         //?}
 
         drawScrollbar(g, stripLeft, stripTop, stripRight, stripBottom, maxOff, viewportW, viewportH)
+        //? if >=1.21.11 {
+        if (draggingScrollbar || overScrollbar(mouseX.toDouble(), mouseY.toDouble())) {
+            g.requestCursor(if (sbVertical) CursorTypes.RESIZE_NS else CursorTypes.RESIZE_EW)
+        }
+        //?}
     }
 
     /** Draws the thin scrollbar along the scroll axis when content overflows. */
@@ -227,7 +245,13 @@ class SuggestionsPanel(
         stripLeft: Int, stripTop: Int, stripRight: Int, stripBottom: Int,
         maxOff: Int, viewportW: Int, viewportH: Int,
     ) {
-        if (maxOff <= 0) return
+        if (maxOff <= 0) {
+            sbActive = false
+            return
+        }
+        sbActive = true
+        sbVertical = vertical
+        sbMaxOff = maxOff
         if (vertical) {
             val content = maxOff + viewportH
             val barX = stripRight + 1
@@ -235,6 +259,7 @@ class SuggestionsPanel(
             val barH = max(20, (viewportH.toFloat() / content * viewportH).toInt())
             val barY = stripTop + (scrollOffset.toFloat() / maxOff * (viewportH - barH)).toInt()
             g.fill(barX, barY, barX + 2, barY + barH, UiTheme.SCROLLBAR_THUMB)
+            sbStart = stripTop; sbViewport = viewportH; sbThumbLen = barH; sbCross = barX
         } else {
             val content = maxOff + viewportW
             val barY = stripBottom + 1
@@ -242,7 +267,28 @@ class SuggestionsPanel(
             val barW = max(20, (viewportW.toFloat() / content * viewportW).toInt())
             val barX = stripLeft + (scrollOffset.toFloat() / maxOff * (viewportW - barW)).toInt()
             g.fill(barX, barY, barX + barW, barY + 2, UiTheme.SCROLLBAR_THUMB)
+            sbStart = stripLeft; sbViewport = viewportW; sbThumbLen = barW; sbCross = barY
         }
+    }
+
+    /** True when ([mx], [my]) is over the (thin) scrollbar column / row, within a forgiving grab margin. */
+    private fun overScrollbar(mx: Double, my: Double): Boolean {
+        if (!sbActive) return false
+        val along = if (sbVertical) my else mx
+        val cross = if (sbVertical) mx else my
+        return along >= sbStart && along <= sbStart + sbViewport &&
+            cross >= sbCross - SB_GRAB && cross <= sbCross + 2 + SB_GRAB
+    }
+
+    /** Maps a cursor position along the scroll axis to [scrollOffset], centering the thumb on it. */
+    private fun scrollFromPos(pos: Double) {
+        val travel = sbViewport - sbThumbLen
+        if (travel <= 0) {
+            scrollOffset = 0
+            return
+        }
+        val rel = (pos - sbStart - sbThumbLen / 2.0).coerceIn(0.0, travel.toDouble())
+        scrollOffset = ((rel / travel) * sbMaxOff).roundToInt().coerceIn(0, sbMaxOff)
     }
 
     /**
@@ -377,6 +423,11 @@ class SuggestionsPanel(
             return handled
         }
         searchBox.isFocused = false
+        if (event.button() == 0 && overScrollbar(mouseX, mouseY)) {
+            draggingScrollbar = true
+            scrollFromPos(if (sbVertical) mouseY else mouseX)
+            return true
+        }
         val card = if (event.button() == 0) cardAt(mouseX, mouseY) else -1
         if (card in controller.cards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
@@ -385,6 +436,22 @@ class SuggestionsPanel(
             return true
         }
         return false
+    }
+
+    override fun mouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean {
+        if (draggingScrollbar) {
+            scrollFromPos(if (sbVertical) event.y() else event.x())
+            return true
+        }
+        return super.mouseDragged(event, dragX, dragY)
+    }
+
+    override fun mouseReleased(event: MouseButtonEvent): Boolean {
+        if (draggingScrollbar) {
+            draggingScrollbar = false
+            return true
+        }
+        return super.mouseReleased(event)
     }
     //?} else
     /*override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
@@ -397,6 +464,11 @@ class SuggestionsPanel(
             return handled
         }
         searchBox.isFocused = false
+        if (button == 0 && overScrollbar(mouseX, mouseY)) {
+            draggingScrollbar = true
+            scrollFromPos(if (sbVertical) mouseY else mouseX)
+            return true
+        }
         val card = if (button == 0) cardAt(mouseX, mouseY) else -1
         if (card in controller.cards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
@@ -405,6 +477,22 @@ class SuggestionsPanel(
             return true
         }
         return false
+    }
+
+    override fun mouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean {
+        if (draggingScrollbar) {
+            scrollFromPos(if (sbVertical) mouseY else mouseX)
+            return true
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY)
+    }
+
+    override fun mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        if (draggingScrollbar) {
+            draggingScrollbar = false
+            return true
+        }
+        return super.mouseReleased(mouseX, mouseY, button)
     }*/
 
     private fun cardAt(mouseX: Double, mouseY: Double): Int {
@@ -473,6 +561,9 @@ class SuggestionsPanel(
 
     companion object {
         private const val HEADER_H = 14
+
+        /** Extra px around the thin scrollbar that still grabs it (a forgiving drag target). */
+        private const val SB_GRAB = 4
         private const val CARD_GAP = 6
         private const val CARD_W = 152
         private const val CARD_TEXT_H = 32

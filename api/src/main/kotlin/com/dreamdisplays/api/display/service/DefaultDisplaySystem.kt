@@ -128,6 +128,11 @@ class DefaultDisplaySystem(
         apply(commands.setQuality(displayId, quality))
     }
 
+    /** Set the active audio track for a display. */
+    override fun setAudioTrack(displayId: DisplayId, trackUrl: String) {
+        apply(commands.setAudioTrack(displayId, trackUrl))
+    }
+
     /** Set the brightness multiplier for a display. */
     override fun setBrightness(displayId: DisplayId, brightness: Float) {
         apply(commands.setBrightness(displayId, brightness))

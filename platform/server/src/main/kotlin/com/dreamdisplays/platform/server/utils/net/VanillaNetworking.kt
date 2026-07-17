@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.utils.net
 
 import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.scheduler.ProviderScheduler
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 
@@ -16,7 +15,7 @@ import net.neoforged.neoforge.network.PacketDistributor
  * wire.
  *
  * [VanillaPacketUtil] and other shared vanilla code call through [VanillaNetworking.adapter]
- * instead of hardcoding either loader's send API, mirroring [ProviderScheduler].
+ * instead of hardcoding either loader's send API, mirroring `ProviderScheduler`'s loader-select pattern.
  */
 interface VanillaNetworkingAdapter {
     /** Sends a v2 envelope [packet] to [players] via this loader's v2 channel. */

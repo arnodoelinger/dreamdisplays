@@ -14,6 +14,7 @@ import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.render.DisplayGeometry
 import com.dreamdisplays.platform.client.render.DisplayTextureResource
+import com.dreamdisplays.platform.client.render.PreviewFrameTexture
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.render.toUploadFormat
 import com.dreamdisplays.api.watchparty.WatchPartySession
@@ -37,6 +38,7 @@ import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.audio.AcousticEnvironment
 import com.dreamdisplays.api.media.audio.AcousticQuality
 import com.dreamdisplays.api.media.audio.AudioAcousticsServices
@@ -242,6 +244,17 @@ class DisplayScreen(
         }
 
     /**
+     * Requested audio track, identified by its resolved stream URL; writes push the choice to the
+     * player, which respawns only the audio line. Not persisted — track URLs are re-resolved per
+     * video, so there's nothing stable to save across sessions.
+     */
+    var audioTrack: String = ""
+        set(value) {
+            field = value
+            mediaPlayer?.setAudioTrack(value)
+        }
+
+    /**
      * In Broadcast ([qualityCap] > 0) every client is pinned to the highest allowed quality (the
      * cap, e.g. 360p) regardless of the user's saved setting; otherwise the user's [requested]
      * quality is used unchanged.
@@ -406,6 +419,14 @@ class DisplayScreen(
     val qualityList: List<Int>
         get() = mediaPlayer?.getAvailableQualities() ?: emptyList()
 
+    /** Audio tracks available for the current video (more than one only when the provider exposes dubs). */
+    val audioTrackList: List<MediaStream>
+        get() = mediaPlayer?.getAvailableAudioTracks() ?: emptyList()
+
+    /** Resolved URL of the audio track currently playing, or empty before a stream has resolved. */
+    val currentAudioTrackUrl: String
+        get() = mediaPlayer?.getCurrentAudioTrack() ?: ""
+
     init {
         // Ask the server for the current timeline / session; it replies only if it has one
         sendRequestSyncPacket()
@@ -497,6 +518,14 @@ class DisplayScreen(
             if (sink == null) null else { buf, w, h, fmt -> sink(buf, w, h, fmt.toUploadFormat()) },
         )
     }
+
+    /** Lazily created menu-preview texture, kept alive across menu close/reopen (see [PreviewFrameTexture]). */
+    @Transient
+    private var previewFrameCache: PreviewFrameTexture? = null
+
+    /** The display's persistent preview texture, created on first use and released in [unregister]. */
+    internal fun previewFrameTexture(): PreviewFrameTexture =
+        previewFrameCache ?: PreviewFrameTexture(uuid).also { previewFrameCache = it }
 
     /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
     fun updateData(packet: DisplayInfo) {
@@ -817,6 +846,8 @@ class DisplayScreen(
         currentPlayer?.stop()
 
         textureResource.releaseAsync()
+        previewFrameCache?.closeAsync()
+        previewFrameCache = null
 
         val mc = Minecraft.getInstance()
         val screen = MinecraftScreenUtil.currentScreen(mc)

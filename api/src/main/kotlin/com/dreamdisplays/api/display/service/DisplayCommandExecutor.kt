@@ -51,6 +51,9 @@ interface DisplayCommandExecutor {
     /** Set the preferred video quality. */
     fun setQuality(displayId: DisplayId, quality: VideoQuality): Display? = null
 
+    /** Set the active audio track, identified by its resolved stream URL. */
+    fun setAudioTrack(displayId: DisplayId, trackUrl: String): Display? = null
+
     /** Set the brightness multiplier. */
     fun setBrightness(displayId: DisplayId, brightness: Float): Display? = null
 

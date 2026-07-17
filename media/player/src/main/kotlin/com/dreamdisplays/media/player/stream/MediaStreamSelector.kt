@@ -60,6 +60,18 @@ object MediaStreamSelector {
         return streams.copy(currentVideo = best, currentAudio = streams.currentAudio)
     }
 
+    /**
+     * Switches the active audio track to the one whose URL equals [targetUrl], leaving the video
+     * selection untouched.
+     *
+     * @return the updated set, or null when there's no matching track or it's already current.
+     */
+    internal fun switchAudioTrack(streams: ActiveStreams, targetUrl: String): ActiveStreams? {
+        val best = streams.availableAudio.firstOrNull { it.url == targetUrl }
+            ?.takeIf { it.url != streams.currentAudio.url } ?: return null
+        return streams.copy(currentAudio = best)
+    }
+
     /** Pick the best video stream closest to [target] quality (height in pixels). */
     fun pickVideo(streams: List<MediaStream>?, target: Int, preferFps60: Boolean = defaultPreferFps60): MediaStream? {
         if (streams.isNullOrEmpty()) return null

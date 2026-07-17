@@ -459,6 +459,38 @@ class MediaPlayer(
     /** Switches to the closest available stream for [quality]. */
     fun setQuality(quality: VideoQuality) = safeExecute { changeQuality(quality) }
 
+    /**
+     * Returns the selectable audio tracks for the current stream — one entry per distinct track
+     * (dub). Resolvers emit a separate stream per audio itag, so a single-language video carries
+     * several audio-only streams (different bitrates / codecs) plus muxed video+audio streams; those
+     * are collapsed by track identity ([MediaStream.audioTrackLang] / [MediaStream.audioTrackName])
+     * to the highest-bitrate representative, and muxed streams are excluded. The result therefore
+     * has more than one entry only when the provider genuinely exposes multiple audio tracks.
+     */
+    fun getAvailableAudioTracks(): List<MediaStream> {
+        val audio = streams?.availableAudio?.filter { !it.type.hasVideo } ?: return emptyList()
+        return audio
+            .groupBy { it.audioTrackLang ?: it.audioTrackName }
+            .values
+            .map { group -> group.maxByOrNull { it.bitrate ?: 0 } ?: group.first() }
+    }
+
+    /**
+     * URL of the currently-playing audio track as it appears in [getAvailableAudioTracks] (the
+     * deduped representative for the playing track), so the UI can highlight it by URL. Null before
+     * a stream has resolved.
+     */
+    fun getCurrentAudioTrack(): String? {
+        val current = streams?.currentAudio ?: return null
+        val key = current.audioTrackLang ?: current.audioTrackName
+        return getAvailableAudioTracks()
+            .firstOrNull { (it.audioTrackLang ?: it.audioTrackName) == key }?.url
+            ?: current.url
+    }
+
+    /** Switches the active audio track to the one identified by [trackUrl]. */
+    fun setAudioTrack(trackUrl: String) = safeExecute { changeAudioTrack(trackUrl) }
+
     /** Reopens the current stream without changing URL/quality; used when render backend requirements change. */
     fun restartVideoPipeline() = safeExecute {
         val ss = streams ?: return@safeExecute
@@ -929,6 +961,26 @@ class MediaPlayer(
                 host.reloadTexture()
                 safeExecute { clock.seekOffsetNanos = getCurrentTime() }
             }
+        }
+    }
+
+    /**
+     * Swaps only the audio channel to the track identified by [trackUrl], leaving the video, clock,
+     * and picture untouched. The seamless path ([PlaybackSessionManager.beginAudioTrackSwitch]) warms
+     * the replacement in the background while the old track keeps playing, then swaps with a PCM
+     * catch-up skip so the new language joins already lip-synced — no silence gap, no drift. When the
+     * session state can't support that (paused / parked / mid-handoff) it falls back to a plain
+     * [PlaybackSessionManager.restartAudio]. [streams] is updated regardless, so a no-op live swap
+     * still takes effect on the next fresh session start.
+     */
+    private fun changeAudioTrack(trackUrl: String) {
+        val ss = streams ?: return
+        if (trackUrl == ss.currentAudio.url) return
+        val newSs = MediaStreamSelector.switchAudioTrack(ss, trackUrl) ?: return
+        streams = newSs
+        if (sessionManager.beginAudioTrackSwitch(newSs)) return
+        env.renderExecutor.execute {
+            safeExecute { sessionManager.restartAudio(newSs, getCurrentTime()) }
         }
     }
 
