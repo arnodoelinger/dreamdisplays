@@ -10,10 +10,14 @@ import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.drawPanelSprite
 import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
+//? if >=1.21.11 {
+import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * The popup that opens above the audio-track button, listing the current video's selectable audio
@@ -47,6 +51,16 @@ class AudioTrackDropdown(
     /** Number of rows currently on screen (`min(items.size, MAX_VISIBLE)`), used by hit-testing. */
     private var visibleCount = 0
 
+    /** Scrollbar geometry captured during [draw] so mouse handlers can hit-test the thumb / track. */
+    private var sbPaged = false
+    private var sbColLeft = 0
+    private var sbColRight = 0
+    private var sbTrackTop = 0
+    private var sbTrackBottom = 0
+
+    /** True while the user is dragging the scrollbar thumb (set on a thumb / track mouse-down). */
+    private var draggingScrollbar = false
+
     /** Toggles visibility; snapshots the current track list and centers the page on the active track. */
     fun toggle() {
         visible = !visible
@@ -60,6 +74,7 @@ class AudioTrackDropdown(
     /** Hides the dropdown. */
     fun hide() {
         visible = false
+        draggingScrollbar = false
     }
 
     /** Highest valid [scrollIndex] for the current item count. */
@@ -142,7 +157,21 @@ class AudioTrackDropdown(
             g.drawText(font, UiText.trim(font, label(stream, i), textW), innerLeft + 4, fy + ITEM_H * row, color, false)
         }
 
-        if (paged) drawScrollbar(g, animProgress, scrollbarRight, rowTop, rowBottom)
+        sbPaged = paged
+        if (paged) {
+            sbColLeft = scrollbarRight - SCROLLBAR_W
+            sbColRight = scrollbarRight
+            sbTrackTop = rowTop
+            sbTrackBottom = rowBottom
+            drawScrollbar(g, animProgress, scrollbarRight, rowTop, rowBottom)
+        }
+
+        //? if >=1.21.11 {
+        if (visible && hovered >= 0 && animProgress > 0.5f) g.requestCursor(CursorTypes.POINTING_HAND)
+        val overScrollbar = sbPaged && mouseX in (sbColLeft - SB_GRAB)..(sbColRight + 1) &&
+            mouseY in sbTrackTop..sbTrackBottom
+        if (visible && (draggingScrollbar || overScrollbar) && animProgress > 0.5f) g.requestCursor(CursorTypes.RESIZE_NS)
+        //?}
 
         //? if >=1.21.11 {
         matrices.popMatrix()
@@ -169,6 +198,12 @@ class AudioTrackDropdown(
      */
     fun handleClick(mx: Int, my: Int): Boolean {
         if (!visible) return false
+        // Scrollbar thumb / track: begin a drag rather than selecting a row or closing the menu.
+        if (sbPaged && mx in (sbColLeft - SB_GRAB)..(sbColRight + 1) && my in sbTrackTop..sbTrackBottom) {
+            draggingScrollbar = true
+            scrollToY(my)
+            return true
+        }
         val inside = mx in rect.x..rect.right && my in rect.y..rect.bottom
         visible = false
         if (!inside || items.isEmpty()) return false
@@ -193,6 +228,38 @@ class AudioTrackDropdown(
         return true
     }
 
+    /** Continues a scrollbar drag started in [handleClick]: maps the cursor Y to [scrollIndex]. */
+    fun handleDrag(my: Int): Boolean {
+        if (!draggingScrollbar) return false
+        scrollToY(my)
+        return true
+    }
+
+    /** Ends any in-progress scrollbar drag. Returns true if one was active (so the click is consumed). */
+    fun handleRelease(): Boolean {
+        val was = draggingScrollbar
+        draggingScrollbar = false
+        return was
+    }
+
+    /** Positions [scrollIndex] so the thumb centers on cursor [my] within the captured track bounds. */
+    private fun scrollToY(my: Int) {
+        val maxIndex = maxScrollIndex()
+        if (maxIndex <= 0) {
+            scrollIndex = 0
+            return
+        }
+        val trackH = sbTrackBottom - sbTrackTop
+        val thumbH = max(MIN_THUMB_H, trackH * visibleCount / items.size)
+        val travel = trackH - thumbH
+        if (travel <= 0) {
+            scrollIndex = 0
+            return
+        }
+        val rel = (my - sbTrackTop - thumbH / 2).coerceIn(0, travel)
+        scrollIndex = ((rel.toFloat() / travel) * maxIndex).roundToInt().coerceIn(0, maxIndex)
+    }
+
     companion object {
         private const val WIDTH = 90
         private const val ITEM_H = 18
@@ -202,6 +269,9 @@ class AudioTrackDropdown(
         private const val SCROLLBAR_W = 5
         private const val MIN_THUMB_H = 6
         private const val SCROLLBAR_MARGIN = 0
+
+        /** Extra px to the left of the scrollbar column that still grabs the thumb (a forgiving hit target). */
+        private const val SB_GRAB = 3
         private const val ACTIVE_FILL = 0x334A90E2
     }
 }

@@ -118,8 +118,15 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
         return onMouseReleased(e) || super.mouseReleased(e)
     }
 
-    final override fun mouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean =
-        super.mouseDragged(toVirtual(event), dragX / uiScale, dragY / uiScale)
+    /** Screen-specific drag handling, in virtual coordinates. Return true to consume. */
+    protected open fun onMouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean = false
+
+    final override fun mouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean {
+        val e = toVirtual(event)
+        val dx = dragX / uiScale
+        val dy = dragY / uiScale
+        return onMouseDragged(e, dx, dy) || super.mouseDragged(e, dx, dy)
+    }
     //?} else
     /*protected open fun onMouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = false
 
@@ -137,8 +144,14 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
         return onMouseReleased(mx, my, button) || super.mouseReleased(mx, my, button)
     }
 
-    final override fun mouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean =
-        super.mouseDragged(mouseX / uiScale, mouseY / uiScale, button, dragX / uiScale, dragY / uiScale)*/
+    protected open fun onMouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean = false
+
+    final override fun mouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseDragged(mx, my, button, dragX / uiScale, dragY / uiScale) ||
+            super.mouseDragged(mx, my, button, dragX / uiScale, dragY / uiScale)
+    }*/
 
     /** Screen-specific scroll handling, in virtual coordinates. Return true to consume. */
     protected open fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = false

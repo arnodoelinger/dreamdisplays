@@ -563,7 +563,11 @@ class DisplayMenu private constructor(
         return modLabel.handleClick(mx, my)
     }
 
-    override fun onMouseReleased(event: MouseButtonEvent): Boolean = progress.commitDragIfActive()
+    override fun onMouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean =
+        audioTrackDropdown.handleDrag(event.y().toInt())
+
+    override fun onMouseReleased(event: MouseButtonEvent): Boolean =
+        audioTrackDropdown.handleRelease() || progress.commitDragIfActive()
     //?} else
     /*override fun onMouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         val mx = mouseX.toInt()
@@ -575,7 +579,11 @@ class DisplayMenu private constructor(
         return modLabel.handleClick(mx, my)
     }
 
-    override fun onMouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = progress.commitDragIfActive()*/
+    override fun onMouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean =
+        audioTrackDropdown.handleDrag(mouseY.toInt())
+
+    override fun onMouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean =
+        audioTrackDropdown.handleRelease() || progress.commitDragIfActive()*/
 
     override fun isPauseScreen(): Boolean = false
 
