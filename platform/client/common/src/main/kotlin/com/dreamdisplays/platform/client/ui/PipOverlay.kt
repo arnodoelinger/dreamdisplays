@@ -15,6 +15,7 @@ import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.mojang.blaze3d.platform.NativeImage
 //? if >=1.21.11 {
 //?} else
@@ -28,10 +29,12 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 import net.minecraft.client.renderer.RenderPipelines
 //?}
 import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
 //? if >=1.21.11 {
 import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
+import net.minecraft.sounds.SoundEvents
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
@@ -42,6 +45,8 @@ import java.util.UUID
  *  - Click on body (no drag) – `DisplayMenu`
  *  - Click + drag the body – free move; on release snaps smoothly to nearest free anchor
  *  - Click + drag the resize grip – resize (grip is in the corner of the PiP facing screen center)
+ *  - Click the close ("cross") button – closes this PiP directly (grip is in the outer corner,
+ *    opposite the resize grip)
  */
 class PipOverlay(
     val displayScreen: DisplayScreen,
@@ -100,6 +105,7 @@ class PipOverlay(
     private var pressed = false
     private var pressedInBody = false
     private var pressedInResize = false
+    private var pressedInClose = false
     private var dragging = false
     private var resizing = false
     private var pressMouseX = 0
@@ -110,6 +116,7 @@ class PipOverlay(
 
     private var hovering = false
     private var hoveringResize = false
+    private var hoveringClose = false
 
     val isFinished: Boolean get() = closing && animProgress < 0.01f
     val isDragging: Boolean get() = dragging
@@ -280,11 +287,15 @@ class PipOverlay(
         lastPipX = cx; lastPipY = cy; lastPipW = pipW; lastPipH = pipH
 
         val (handleX, handleY) = handlePixelPos(pipW, pipH)
+        val (closeX, closeY) = closeButtonPixelPos(pipW, pipH)
 
         hovering = mouseX in cx..(cx + pipW) && mouseY in cy..(cy + pipH) && animProgress > 0.6f
         hoveringResize = hovering &&
                 mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
                 mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
+        hoveringClose = hovering &&
+                mouseX in (cx + closeX)..(cx + closeX + CLOSE_SZ) &&
+                mouseY in (cy + closeY)..(cy + closeY + CLOSE_SZ)
 
         val scale = 0.94f + 0.06f * animProgress
         val alpha = animProgress
@@ -332,6 +343,9 @@ class PipOverlay(
         if (hovering || resizing) {
             renderResizeHandle(g, handleX, handleY, alpha)
         }
+        if (hovering) {
+            renderCloseButton(g, closeX, closeY, alpha)
+        }
 
         //? if >=1.21.11 {
         matrices.popMatrix()
@@ -355,9 +369,13 @@ class PipOverlay(
                 pressed = true
                 pressMouseX = mx; pressMouseY = my
                 val (hx, hy) = handlePixelPos(pipW, pipH)
+                val (clx, cly) = closeButtonPixelPos(pipW, pipH)
                 pressedInResize = mx in (cx + hx)..(cx + hx + RESIZE_SZ) &&
                         my in (cy + hy)..(cy + hy + RESIZE_SZ)
-                pressedInBody = !pressedInResize
+                pressedInClose = !pressedInResize &&
+                        mx in (cx + clx)..(cx + clx + CLOSE_SZ) &&
+                        my in (cy + cly)..(cy + cly + CLOSE_SZ)
+                pressedInBody = !pressedInResize && !pressedInClose
                 dragOffsetX = mx - cx
                 dragOffsetY = my - cy
                 resizeStartFrac = sizeFraction
@@ -399,11 +417,17 @@ class PipOverlay(
                 }
 
                 resizing -> resizing = false
+                pressedInClose -> {
+                    val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
+                    Minecraft.getInstance().soundManager.play(s)
+                    displayScreen.deactivatePopout()
+                }
                 pressedInBody -> if (interactive) DisplayMenu.open(displayScreen)
             }
             pressed = false
             pressedInBody = false
             pressedInResize = false
+            pressedInClose = false
         }
 
         wasLeftPressed = leftPressed
@@ -455,6 +479,37 @@ class PipOverlay(
             else -> (pipH - RESIZE_SZ) / 2
         }
         return x to y
+    }
+
+    /** Returns the (x, y) top-left position of the close button, in the corner opposite the resize handle. */
+    private fun closeButtonPixelPos(pipW: Int, pipH: Int): Pair<Int, Int> {
+        val (cfx, cfy) = anchor.centerFacingCorner()
+        val sx = -cfx
+        val sy = -cfy
+        val x = when {
+            sx > 0 -> pipW - CLOSE_SZ - RESIZE_INSET
+            sx < 0 -> RESIZE_INSET
+            else -> (pipW - CLOSE_SZ) / 2
+        }
+        val y = when {
+            sy > 0 -> pipH - CLOSE_SZ - RESIZE_INSET
+            sy < 0 -> RESIZE_INSET
+            else -> (pipH - CLOSE_SZ) / 2
+        }
+        return x to y
+    }
+
+    /** Draws the close ("cross") icon at ([hx], [hy]), tinted red on hover. */
+    private fun renderCloseButton(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
+        val tint = scaleAlpha(if (hoveringClose) UiTheme.ACCENT_UPDATE else 0xFFFFFFFF.toInt(), alpha)
+        val margin = 2
+        //? if >=1.21.11 {
+        g.blitSprite(
+            RenderPipelines.GUI_TEXTURED, IconButton.modIcon("cross"),
+            hx + margin, hy + margin, CLOSE_SZ - margin * 2, CLOSE_SZ - margin * 2, tint,
+        )
+        //?} else
+        /*g.blitSprite(IconButton.modIcon("cross"), hx + margin, hy + margin, CLOSE_SZ - margin * 2, CLOSE_SZ - margin * 2)*/
     }
 
     private fun renderResizeHandle(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
@@ -521,6 +576,7 @@ class PipOverlay(
         private const val MAX_SIZE_FRAC = 0.6f
         private const val RESIZE_SZ = 14
         private const val RESIZE_INSET = 6
+        private const val CLOSE_SZ = 14
         private const val SNAP_LERP_SPEED = 8f
         private const val PIP_Z = 1_000.0
     }

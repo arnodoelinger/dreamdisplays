@@ -12,6 +12,7 @@ import net.minecraft.client.gui.components.AbstractWidget
 //? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.resources.Identifier
+import net.minecraft.util.ARGB
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 
@@ -109,10 +110,13 @@ val PANEL_SPRITE: Identifier = Identifier.fromNamespaceAndPath(Initializer.MOD_I
 /** Nine-slice dropdown background sprite; see textures/gui/sprites/widgets/dropdown.png. */
 val DROPDOWN_SPRITE: Identifier = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/dropdown")
 
-/** Draws a nine-slice textured panel background filling [r]. */
-fun GuiGraphicsCompat.drawPanelSprite(r: UiRect, sprite: Identifier = PANEL_SPRITE) {
+/**
+ * Draws a nine-slice textured panel background filling [r], additionally faded by [alpha] (1 = the
+ * sprite's own baked-in translucency, unchanged).
+ */
+fun GuiGraphicsCompat.drawPanelSprite(r: UiRect, sprite: Identifier = PANEL_SPRITE, alpha: Float = 1f) {
     //? if >=1.21.11 {
-    blitSprite(RenderPipelines.GUI_TEXTURED, sprite, r.x, r.y, r.w, r.h)
+    blitSprite(RenderPipelines.GUI_TEXTURED, sprite, r.x, r.y, r.w, r.h, ARGB.white(alpha))
     //?} else
     /*blitSprite(sprite, r.x, r.y, r.w, r.h)*/
 }

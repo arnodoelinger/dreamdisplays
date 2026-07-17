@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.drawPanelSprite
+import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
@@ -39,6 +40,10 @@ class PopoutDropdown(
 
     private var rect = UiRect(0, 0, WIDTH, ITEM_H * items.size)
 
+    /** Appear / disappear progress in 0..1, eased the same way as [com.dreamdisplays.platform.client.ui.PipOverlay]. */
+    private var animProgress = 0f
+    private var lastFrameNanos = 0L
+
     /** Toggles dropdown visibility (popout button behavior when no popout is active). */
     fun toggle() {
         visible = !visible
@@ -49,26 +54,55 @@ class PopoutDropdown(
         visible = false
     }
 
-    /** Draws the dropdown anchored above the rect at ([anchorX], [anchorY]) when visible. */
+    /** Draws the dropdown anchored above the rect at ([anchorX], [anchorY]), easing in / out of [visible]. */
     fun draw(g: GuiGraphicsCompat, anchorX: Int, anchorY: Int, mouseX: Int, mouseY: Int) {
-        if (!visible) return
+        val now = System.nanoTime()
+        val dt = if (lastFrameNanos == 0L) 0.016f else ((now - lastFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
+        lastFrameNanos = now
+
+        val target = if (visible) 1f else 0f
+        animProgress += (target - animProgress) * minOf(1f, dt * 12f)
+        if (animProgress < 0.01f) {
+            animProgress = 0f
+            return
+        }
+
         val height = ITEM_H * items.size
         rect = UiRect(anchorX, anchorY - height - 2, WIDTH, height)
-        g.drawPanelSprite(rect, DROPDOWN_SPRITE)
 
-        val hovered = if (rect.contains(mouseX, mouseY)) (mouseY - rect.y) / ITEM_H else -1
+        val scale = 0.85f + 0.15f * animProgress
+        val matrices = g.pose()
+        //? if >=1.21.11 {
+        matrices.pushMatrix()
+        matrices.translate(rect.centerX.toFloat(), rect.centerY.toFloat())
+        matrices.scale(scale, scale)
+        matrices.translate(-rect.centerX.toFloat(), -rect.centerY.toFloat())
+        //?} else
+        /*matrices.pushPose()
+        matrices.translate(rect.centerX.toDouble(), rect.centerY.toDouble(), 0.0)
+        matrices.scale(scale, scale, 1f)
+        matrices.translate(-rect.centerX.toDouble(), -rect.centerY.toDouble(), 0.0)*/
+
+        g.drawPanelSprite(rect, DROPDOWN_SPRITE, animProgress)
+
+        val hovered = if (visible && rect.contains(mouseX, mouseY)) (mouseY - rect.y) / ITEM_H else -1
 
         val font = Minecraft.getInstance().font
         val fy = rect.y + (ITEM_H - font.lineHeight) / 2
         items.forEachIndexed { i, (label, _) ->
             val itemY = rect.y + ITEM_H * i
             if (i == hovered) {
-                g.fill(rect.x + 1, itemY, rect.x + WIDTH - 1, itemY + ITEM_H, UiTheme.HOVER_FILL)
-                g.drawOutline(UiRect(rect.x + 1, itemY, WIDTH - 2, ITEM_H), UiTheme.CARD_BORDER_HOVER)
+                g.fill(rect.x + 1, itemY, rect.x + WIDTH - 1, itemY + ITEM_H, scaleAlpha(UiTheme.HOVER_FILL, animProgress))
+                g.drawOutline(UiRect(rect.x + 1, itemY, WIDTH - 2, ITEM_H), scaleAlpha(UiTheme.CARD_BORDER_HOVER, animProgress))
             }
-            val color = if (i == hovered) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM
+            val color = scaleAlpha(if (i == hovered) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM, animProgress)
             g.drawText(font, label, rect.x + 6, fy + ITEM_H * i, color, false)
         }
+
+        //? if >=1.21.11 {
+        matrices.popMatrix()
+        //?} else
+        /*matrices.popPose()*/
     }
 
     /**

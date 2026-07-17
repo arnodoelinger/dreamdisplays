@@ -77,6 +77,7 @@ class DisplayMenu private constructor(
     private lateinit var preview: PreviewSection
     private lateinit var settings: SettingsSection
     private lateinit var errorPanel: ErrorPanel
+    private lateinit var popoutButton: IconButton
 
     private var lastSuggestedVideoId: String? = null
     private var prevQualityListSize = 0
@@ -249,7 +250,7 @@ class DisplayMenu private constructor(
         muteButton.enabledWhen = videoReady
         muteButton.visibleWhen = notErrored
 
-        val popoutButton = addUi(IconButton("popout") {
+        popoutButton = addUi(IconButton("popout") {
             if (ds.isPopoutActive) {
                 popout.close(displayId)
                 dropdown.hide()
@@ -531,11 +532,10 @@ class DisplayMenu private constructor(
 
     //? if >=1.21.11 {
     override fun onMouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        // Coordinates are already in virtual space (UiScreenBase converted them); dropdown and mod
-        // label are laid out in that same space, so hit-testing matches what's drawn at any GUI scale.
         val mx = event.x().toInt()
         val my = event.y().toInt()
-        if (dropdown.visible && event.button() == 0 && dropdown.handleClick(mx, my)) return true
+        val onPopoutButton = popoutButton.isMouseOver(mx.toDouble(), my.toDouble())
+        if (dropdown.visible && event.button() == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 
@@ -544,7 +544,8 @@ class DisplayMenu private constructor(
     /*override fun onMouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         val mx = mouseX.toInt()
         val my = mouseY.toInt()
-        if (dropdown.visible && button == 0 && dropdown.handleClick(mx, my)) return true
+        val onPopoutButton = popoutButton.isMouseOver(mouseX, mouseY)
+        if (dropdown.visible && button == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 
