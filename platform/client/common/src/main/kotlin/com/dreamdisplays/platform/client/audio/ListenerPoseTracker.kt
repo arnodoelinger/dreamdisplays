@@ -4,9 +4,11 @@ import com.dreamdisplays.api.media.audio.ListenerPose
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
 import org.joml.Vector3f
+import java.lang.reflect.Method
 
 /** Reads the current game camera pose for the acoustics engine's shared listener state. */
 internal object ListenerPoseTracker {
+    private var cachedMainCameraMethod: Method? = null
     /** Returns the current camera pose, or [ListenerPose.IDENTITY] before a camera exists. */
     fun currentPose(minecraft: Minecraft): ListenerPose {
         val camera = runCatching { mainCameraOf(minecraft) }.getOrNull() ?: return ListenerPose.IDENTITY
@@ -31,8 +33,12 @@ internal object ListenerPoseTracker {
      */
     private fun mainCameraOf(minecraft: Minecraft): Camera {
         val gameRenderer = minecraft.gameRenderer
-        val method = runCatching { gameRenderer.javaClass.getMethod("mainCamera") }
-            .getOrElse { gameRenderer.javaClass.getMethod("getMainCamera") }
+        val method = cachedMainCameraMethod ?: run {
+            val m = runCatching { gameRenderer.javaClass.getMethod("mainCamera") }
+                .getOrElse { gameRenderer.javaClass.getMethod("getMainCamera") }
+            cachedMainCameraMethod = m
+            m
+        }
         return method.invoke(gameRenderer) as Camera
     }
 }
