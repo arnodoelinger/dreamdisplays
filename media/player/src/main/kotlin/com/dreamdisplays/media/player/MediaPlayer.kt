@@ -966,17 +966,19 @@ class MediaPlayer(
 
     /**
      * Swaps only the audio channel to the track identified by [trackUrl], leaving the video, clock,
-     * and picture untouched (via [PlaybackSessionManager.restartAudio]). Unlike [changeQuality] there's
-     * no dual-texture handoff — only the audio line respawns. [streams] is updated even when the live
-     * swap no-ops (paused / parked / mid-handoff), so the new track takes effect on the next fresh
-     * session start; [restartAudio] itself picks HLS vs. direct-URL from the new track's URL, so live
-     * multi-language audio is covered without a separate live / VOD branch.
+     * and picture untouched. The seamless path ([PlaybackSessionManager.beginAudioTrackSwitch]) warms
+     * the replacement in the background while the old track keeps playing, then swaps with a PCM
+     * catch-up skip so the new language joins already lip-synced — no silence gap, no drift. When the
+     * session state can't support that (paused / parked / mid-handoff) it falls back to a plain
+     * [PlaybackSessionManager.restartAudio]. [streams] is updated regardless, so a no-op live swap
+     * still takes effect on the next fresh session start.
      */
     private fun changeAudioTrack(trackUrl: String) {
         val ss = streams ?: return
         if (trackUrl == ss.currentAudio.url) return
         val newSs = MediaStreamSelector.switchAudioTrack(ss, trackUrl) ?: return
         streams = newSs
+        if (sessionManager.beginAudioTrackSwitch(newSs)) return
         env.renderExecutor.execute {
             safeExecute { sessionManager.restartAudio(newSs, getCurrentTime()) }
         }

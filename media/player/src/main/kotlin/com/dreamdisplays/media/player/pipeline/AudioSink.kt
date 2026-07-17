@@ -56,7 +56,22 @@ internal class AudioSink(private val debugLabel: String) {
 
         /** ~30 s of stereo 16-bit PCM kept for the reappearance audio bridge. */
         private const val PCM_RING_MAX_BYTES = SAMPLE_RATE * BYTES_PER_FRAME * 30
+
+        /** Content gaps below this (~1 video frame) aren't worth a catch-up skip — inaudible as lip sync. */
+        private const val CATCHUP_MIN_NANOS = 40_000_000L
+
+        /** Max refine passes of the catch-up skip; each pass shrinks the residual by the decode-speed factor. */
+        private const val CATCHUP_MAX_PASSES = 4
     }
+
+    /**
+     * Content catch-up spec for an in-place audio restart (e.g. an audio-track switch): the new
+     * process was seeked to [contentStartNanos], but by the time its PCM starts flowing the playback
+     * clock ([playbackClock]) has moved on — the sink discards exactly that span of leading PCM before
+     * playing, so the audible audio joins already aligned with the video instead of permanently
+     * lagging by the process spawn + connect latency.
+     */
+    class CatchUp(val contentStartNanos: Long, val playbackClock: () -> Long)
 
     /** Current volume multiplier applied to each audio chunk. */
     @Volatile
@@ -224,6 +239,8 @@ internal class AudioSink(private val debugLabel: String) {
      * Starts the audio reading / writing loop.
      * @param onUnexpectedEnd called with the accumulated ffmpeg stderr if the audio process ends on its
      * own (crash, broken pipe, EOF) rather than via [stop] — never called for a deliberate teardown.
+     * @param catchUp when set, leading PCM between the process's seek target and the live playback
+     * clock is discarded before playback starts (see [CatchUp]).
      */
     fun start(
         proc: Process,
@@ -231,6 +248,7 @@ internal class AudioSink(private val debugLabel: String) {
         stopFlag: AtomicBoolean,
         startGate: CountDownLatch? = null,
         onUnexpectedEnd: (String) -> Unit = {},
+        catchUp: CatchUp? = null,
     ): Thread {
         preludeFrames = 0L
         liveGate = null
@@ -241,8 +259,133 @@ internal class AudioSink(private val debugLabel: String) {
         dspStage?.reset()
         val stderrBuf = drainStderr(proc, stopFlag)
         return daemon(
-            { run(proc, terminated, stopFlag, startGate, stderrBuf, onUnexpectedEnd) }, "MediaPlayer-audio",
+            { run(proc, terminated, stopFlag, startGate, stderrBuf, onUnexpectedEnd, catchUp) }, "MediaPlayer-audio",
         ).also { it.start() }
+    }
+
+    /**
+     * Prewarms a replacement line for a seamless in-place audio-track switch and, once it is primed,
+     * flips it in for the currently playing line with no audible gap. Runs entirely on a background
+     * thread; the live line is left untouched until the flip, so its clock, ring and pacing stay
+     * valid while the replacement opens, applies its [catchUp] skip and pre-buffers leading PCM
+     * (silent — not yet started). At the flip the old line is stopped and closed and the new one is
+     * promoted and started from its primed buffer (instant sound), then [onPromoted] fires so the
+     * caller can tear down the old half's process.
+     *
+     * The prime window carries volume only (no acoustics DSP) and is not ring-cached, to avoid racing
+     * the still-live old session's shared DSP / ring state; both resume once the line is promoted.
+     *
+     * @param shouldPromote re-checked once the line is primed, right before the flip; when it returns
+     * false (e.g. a newer switch has superseded this one) the flip is skipped and [onAborted] fires.
+     * @param onPromoted invoked on the switch thread right after the flip (old line stopped, new one
+     * playing) — the caller swaps ownership to the new half here.
+     * @param onAborted invoked if the replacement never promotes (line open / prime failed, superseded,
+     * or a stop fired first) so the caller can discard the new process and keep the current track.
+     * @param onUnexpectedEnd see [start]; armed only once the promoted line begins its normal pump.
+     */
+    fun startSwitch(
+        proc: Process,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean,
+        catchUp: CatchUp?,
+        shouldPromote: () -> Boolean = { true },
+        onPromoted: () -> Unit,
+        onAborted: () -> Unit = {},
+        onUnexpectedEnd: (String) -> Unit = {},
+    ): Thread {
+        val stderrBuf = drainStderr(proc, stopFlag)
+        return daemon(
+            { runSwitch(proc, terminated, stopFlag, catchUp, shouldPromote, onPromoted, onAborted, stderrBuf, onUnexpectedEnd) },
+            "MediaPlayer-audio-switch-line",
+        ).also { it.start() }
+    }
+
+    /**
+     * Background body of [startSwitch]: open + skip + pre-buffer the replacement line while the old
+     * one plays, then atomically flip and continue as a normal live pump. See [startSwitch] for the
+     * DSP / ring caveats on the prime window.
+     */
+    private fun runSwitch(
+        proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean, catchUp: CatchUp?,
+        shouldPromote: () -> Boolean, onPromoted: () -> Unit, onAborted: () -> Unit, stderrBuf: StringBuilder,
+        onUnexpectedEnd: (String) -> Unit,
+    ) {
+        var newLine: SourceDataLine? = null
+        var promoted = false
+        var pumped = false
+        try {
+            proc.inputStream.use { input ->
+                val fmt = pcmFormat()
+                val info = DataLine.Info(SourceDataLine::class.java, fmt)
+                if (!AudioSystem.isLineSupported(info)) {
+                    logger.warn("$debugLabel PCM line not supported (switch)."); return
+                }
+                val ln = openLine(info, fmt) ?: run {
+                    logger.warn("$debugLabel [audio] switch line failed to open."); return
+                }
+                newLine = ln
+                if (terminated.get() || stopFlag.get()) return
+                // Old line keeps playing while we skip the catch-up span and pre-buffer the new line
+                catchUp?.let { skipCatchUp(input, it, terminated, stopFlag) }
+                if (terminated.get() || stopFlag.get()) return
+                if (!primeSwitchLine(input, ln, terminated, stopFlag)) return
+                if (terminated.get() || stopFlag.get() || !shouldPromote()) return
+                // Flip: silence the old line, promote the primed one, start it (plays instantly from
+                // its pre-buffered PCM), then tear down the old line. Gap between the two is microseconds.
+                val old = line
+                old?.let { runCatching { it.stop() }; runCatching { it.flush() } }
+                sessionEpoch++
+                clearRing()
+                dspStage?.reset()
+                preludeFrames = 0L
+                exposeLiveClock = true
+                pcmFlowing = true
+                line = ln
+                ln.start()
+                old?.let { runCatching { it.close() } }
+                promoted = true
+                logger.debug("$debugLabel [audio] switch line promoted — new track playing.")
+                onPromoted()
+                pumpLive(input, ln, terminated, stopFlag)
+                pumped = true
+            }
+        } catch (e: IOException) {
+            if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) logger.warn("$debugLabel Switch read: ${e.message}.")
+        } catch (e: Exception) {
+            if (!terminated.get() && !stopFlag.get()) logger.warn("$debugLabel Switch pipeline: ${e.message}.")
+        } finally {
+            newLine?.let {
+                if (line === it) line = null
+                runCatching { it.flush() }; runCatching { it.stop() }; runCatching { it.close() }
+            }
+            if (!promoted) onAborted()
+        }
+        if (pumped && !terminated.get() && !stopFlag.get()) {
+            onUnexpectedEnd(synchronized(stderrBuf) { stderrBuf.toString() })
+        }
+    }
+
+    /**
+     * Pre-buffers the replacement switch line with leading PCM before it is started (silent). Volume
+     * is applied but not acoustics DSP, and nothing is ring-cached — the old session still owns that
+     * shared state until the flip. Fills up to the pacer's learned backlog (clamped) so the promoted
+     * line starts with a healthy buffer and no open-latency dropout. Returns false only when no PCM
+     * arrived at all (immediate EOF) or a stop fired before anything was buffered.
+     */
+    private fun primeSwitchLine(
+        input: InputStream, ln: SourceDataLine, terminated: AtomicBoolean, stopFlag: AtomicBoolean,
+    ): Boolean {
+        val chunk = ByteArray(CHUNK_BYTES)
+        val primeTarget = paceTargetBytes.coerceIn(CHUNK_BYTES * 3, LINE_BUFFER_BYTES - CHUNK_BYTES)
+        var buffered = 0
+        while (buffered < primeTarget && !terminated.get() && !stopFlag.get()) {
+            val n = MediaUtil.readFull(input, chunk, CHUNK_BYTES)
+            if (n <= 0) return buffered > 0
+            MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
+            writeFully(ln, chunk, n, terminated, stopFlag)
+            buffered += n
+        }
+        return buffered > 0
     }
 
     /**
@@ -311,7 +454,7 @@ internal class AudioSink(private val debugLabel: String) {
      */
     private fun run(
         proc: Process, terminated: AtomicBoolean, stopFlag: AtomicBoolean, startGate: CountDownLatch?,
-        stderrBuf: StringBuilder, onUnexpectedEnd: (String) -> Unit,
+        stderrBuf: StringBuilder, onUnexpectedEnd: (String) -> Unit, catchUp: CatchUp? = null,
     ) {
         var ln: SourceDataLine? = null
         var pumped = false
@@ -333,6 +476,8 @@ internal class AudioSink(private val debugLabel: String) {
                     logger.debug("$debugLabel [audio] aborted before start gate opened (terminated / stopped).")
                     return
                 }
+                catchUp?.let { skipCatchUp(input, it, terminated, stopFlag) }
+                if (terminated.get() || stopFlag.get()) return
                 ln.start()
                 line = ln
                 logger.debug("$debugLabel [audio] start gate passed, line started — audio is now playing.")
@@ -455,6 +600,38 @@ internal class AudioSink(private val debugLabel: String) {
             }
         }
         return null
+    }
+
+    /**
+     * Discards the leading PCM span between [CatchUp.contentStartNanos] and the live playback clock,
+     * so the first sample actually played matches the video's current position. Runs before the line
+     * starts playing (nothing here is audible, and none of it is ring-cached — it is never heard).
+     * Iterative: each skip pass takes real time to read (the process decodes faster than realtime, so
+     * passes converge), and the residual is re-measured against the clock until it is inaudible.
+     */
+    private fun skipCatchUp(input: InputStream, catchUp: CatchUp, terminated: AtomicBoolean, stopFlag: AtomicBoolean) {
+        val scratch = ByteArray(CHUNK_BYTES)
+        var skippedBytes = 0L
+        repeat(CATCHUP_MAX_PASSES) {
+            val contentNow = catchUp.contentStartNanos +
+                    skippedBytes / BYTES_PER_FRAME * 1_000_000_000L / SAMPLE_RATE
+            val gapNanos = catchUp.playbackClock() - contentNow
+            if (gapNanos < CATCHUP_MIN_NANOS) {
+                if (skippedBytes > 0L) {
+                    val ms = skippedBytes / BYTES_PER_FRAME * 1000 / SAMPLE_RATE
+                    logger.debug("$debugLabel [audio] catch-up skipped $ms ms of PCM to join in sync.")
+                }
+                return
+            }
+            var toSkip = gapNanos * SAMPLE_RATE / 1_000_000_000L * BYTES_PER_FRAME
+            while (toSkip > 0 && !terminated.get() && !stopFlag.get()) {
+                val n = MediaUtil.readFull(input, scratch, minOf(CHUNK_BYTES.toLong(), toSkip).toInt())
+                if (n <= 0) return // EOF mid-skip: pump loop will report it
+                skippedBytes += n
+                toSkip -= n
+            }
+            if (terminated.get() || stopFlag.get()) return
+        }
     }
 
     /** Reads live PCM from [input] and writes it to [ln], ring-caching each chunk for the next bridge. */

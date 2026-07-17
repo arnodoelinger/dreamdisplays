@@ -25,6 +25,7 @@ import com.dreamdisplays.api.media.player.GpuTextureRef
 import com.dreamdisplays.api.media.player.RenderThreadExecutor
 import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import org.slf4j.LoggerFactory
+import kotlin.math.abs
 import java.io.IOException
 import java.nio.ByteBuffer
 import java.util.concurrent.CountDownLatch
@@ -512,11 +513,116 @@ internal class PlaybackSessionManager(
             discardHalvesAsync(null, oldAudio)
             return false
         }
+        wallAnchorNextAudioSession = true
         val at = audio.start(ap, terminated, aStop, startGate = null, onUnexpectedEnd = onAudioFailure)
         audioHalf = AudioHalf(ap, at, aStop)
         discardHalvesAsync(null, oldAudio)
         logger.debug("$debugLabel Audio half restarted in place at ${offsetNanos / 1_000_000} ms.")
         return true
+    }
+
+    /** Warm-up budget for a replacement audio-track process before the switch gives up and keeps the
+     *  current track (better a stale language than indefinite silence on a dead URL). */
+    private val audioSwitchWarmupTimeoutNanos = 15_000_000_000L
+
+    /** Generation counter for in-flight audio-track switches: only the newest may complete its swap,
+     *  so rapid re-picks and a session [stop] (which bumps it) safely orphan older warm-ups. */
+    private val audioSwitchGeneration = AtomicLong()
+
+    /**
+     * Seamless audio-track switch for seekable content: spawns the new track's `FFmpeg` on a background
+     * thread and lets the current line keep playing through the whole spawn + connect + seek latency —
+     * the swap happens only once the replacement's first PCM is ready (the audio analogue of the
+     * parallel video quality switch). At the swap, the sink discards the PCM span the new track is
+     * behind the live clock ([AudioSink.CatchUp]), so the new language joins already lip-synced instead
+     * of permanently lagging by the warm-up time. Returns false when the session state only supports a
+     * plain restart (paused / parked / bridging / mid-quality-handoff) — callers then rely on the
+     * updated stream set taking effect on the next fresh session, same as [restartAudio].
+     */
+    fun beginAudioTrackSwitch(streamSet: ActiveStreams): Boolean {
+        if (!isPlaying || terminated.get() || parkFlag.get()) return false
+        if (bridgeCeilingNanos != Long.MAX_VALUE || bridgeAudio != null) return false
+        synchronized(switchLock) { if (incoming != null) return false }
+        val ffmpeg = FFmpegBinary.getPath() ?: return false
+        val generation = audioSwitchGeneration.incrementAndGet()
+        daemon({ runAudioTrackSwitch(ffmpeg, streamSet, generation) }, "MediaPlayer-audio-switch").start()
+        return true
+    }
+
+    /** True while [generation] is still the newest audio switch and the session can still take it. */
+    private fun audioSwitchStillCurrent(generation: Long): Boolean =
+        audioSwitchGeneration.get() == generation && !terminated.get() && isPlaying && !parkFlag.get()
+
+    /** Background body of [beginAudioTrackSwitch]: warm up the replacement, then swap lines. */
+    private fun runAudioTrackSwitch(ffmpeg: String, streamSet: ActiveStreams, generation: Long) {
+        val seekNanos = clock.currentTime().coerceAtLeast(0L)
+        val aStop = AtomicBoolean()
+        val ap = try {
+            buildAudioProcess(ffmpeg, streamSet, seekNanos, aStop)
+        } catch (e: IOException) {
+            logger.error("$debugLabel Failed to start replacement audio-track process.", e)
+            return
+        }
+        // Old track keeps playing while the replacement warms up; wait for its first stdout bytes
+        val deadline = System.nanoTime() + audioSwitchWarmupTimeoutNanos
+        var ready = false
+        while (System.nanoTime() < deadline && audioSwitchStillCurrent(generation)) {
+            try {
+                if (ap.inputStream.available() > 0) {
+                    ready = true
+                    break
+                }
+            } catch (_: IOException) {
+                break
+            }
+            if (!ap.isAlive) break
+            try {
+                Thread.sleep(15)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                break
+            }
+        }
+        if (!ready || !audioSwitchStillCurrent(generation)) {
+            aStop.set(true)
+            MediaProcess.gracefulDestroy(ap)
+            if (!ready && audioSwitchGeneration.get() == generation) {
+                logger.warn("$debugLabel Audio-track switch delivered no PCM in time; keeping the current track.")
+            }
+            return
+        }
+        // Seamless swap: the replacement line pre-buffers (silent) while the OLD one keeps playing,
+        // then flips in with no audible gap (see [AudioSink.startSwitch]) — this removes the silence
+        // the old stop-then-start swap left while the new line opened and filled. A catch-up skip
+        // drops the span the new track fell behind the live clock so it joins already lip-synced. The
+        // HLS-feeder path (live) carries its own exact PES-PTS anchor instead, so no byte skip there.
+        val catchUp = if (audioFeeder == null) AudioSink.CatchUp(seekNanos) { clock.currentTime() } else null
+        val oldAudio = audioHalf
+        audio.startSwitch(
+            ap, terminated, aStop, catchUp,
+            shouldPromote = { audioSwitchStillCurrent(generation) },
+            onPromoted = {
+                // Runs on the switch thread the instant the new line goes live: take ownership and
+                // retire the old half. wallAnchor pins the new line's clock rate to the wall clock.
+                wallAnchorNextAudioSession = true
+                audioHalf = AudioHalf(ap, Thread.currentThread(), aStop)
+                oldAudio?.stop?.set(true)
+                discardHalvesAsync(null, oldAudio)
+                logger.debug("$debugLabel Audio track switched seamlessly at ${seekNanos / 1_000_000} ms.")
+                // A stop() that raced the warm-up couldn't know this half yet: honor it retroactively
+                if (terminated.get() || !isPlaying) {
+                    aStop.set(true)
+                    audio.stop()
+                    MediaProcess.gracefulDestroy(ap)
+                }
+            },
+            onAborted = {
+                // The replacement never went live; keep the current track and drop the new process
+                aStop.set(true)
+                MediaProcess.gracefulDestroy(ap)
+            },
+            onUnexpectedEnd = onAudioFailure,
+        )
     }
 
     /** Dismantles a superseded video channel and / or audio half on a background thread. */
@@ -771,9 +877,21 @@ internal class PlaybackSessionManager(
      * the audio started late (live HLS audio can take many seconds to deliver its first PCM while video
      * already plays on the wall clock). Pacing then anchors the audio clock forward to the wall position
      * instead of letting the whole video timeline snap back — which would make every queued frame read
-     * as seconds "ahead" and be dropped as a stale timeline.
+     * as seconds "ahead" and be dropped as a stale timeline. Below the threshold, no bias is applied and
+     * pacing follows the audio clock absolutely, so small start offsets self-correct through video
+     * holds / drops into true content sync.
      */
     private val lateAudioToleranceNanos = 500_000_000L
+
+    /**
+     * One-shot: the next fresh audio session must anchor its pacing clock to the wall clock exactly,
+     * whatever the delta. Set for in-place audio restarts (track switch, live audio recovery), whose
+     * line restarts at frame 0 while [PlaybackClock.seekOffsetNanos] still holds the original session's
+     * seek — the absolute value of `audioClockNanos` is meaningless there and must not be trusted the
+     * way a fresh full session's is. Content-level sync is handled separately ([AudioSink.CatchUp]).
+     */
+    @Volatile
+    private var wallAnchorNextAudioSession = false
 
     /**
      * How far behind the current wall position an exact PTS anchor may pull the pacing clock: a
@@ -803,7 +921,7 @@ internal class PlaybackSessionManager(
             return audioNanos + audioAnchorBiasNanos
         }
         if (!clock.isRunning) return -1L
-        // While a replay->live bridge is active the wall clock is clamped to the live edge so it never
+        // While a replay -> live bridge is active the wall clock is clamped to the live edge so it never
         // overruns the handoff point (otherwise the live channel's first frame arrives "late" and is
         // dropped instead of presented, and the audio gate never opens).
         return clock.currentTime().coerceAtMost(bridgeCeilingNanos)
@@ -817,12 +935,18 @@ internal class PlaybackSessionManager(
      * segmenter's shared 90 kHz clock. That pins video frame X to the audio sample carrying the
      * same stream time — real lip sync, not an approximation ([exactAvBiasNanos]).
      *
-     * Without it (direct-URL audio, no LAV PTS) the fallback anchors a late-starting audio clock
-     * to the wall clock so pacing continues seamlessly instead of snapping the timeline back; a
-     * near-zero delta means a normal start and audio drives pacing absolutely, as always.
+     * Without it (direct-URL audio, no LAV PTS) the fallback depends on the session kind:
+     * - A restarted line ([wallAnchorNextAudioSession]) anchors to the wall clock exactly, in either
+     *   direction — its `audioClockNanos` absolute value is built on a stale seek offset, so only the
+     *   line's *rate* is meaningful; content alignment is handled separately ([AudioSink.CatchUp]).
+     * - A fresh full session applies a bias only for a pathologically late start (past
+     *   [lateAudioToleranceNanos]); small deltas keep bias 0 so pacing follows the audio clock
+     *   absolutely and start offsets self-correct into true content sync via video holds / drops.
      */
     private fun anchorAudioClock(audioNanos: Long) {
         val wallNow = if (clock.isRunning) clock.currentTime().coerceAtMost(bridgeCeilingNanos) else 0L
+        val wallAnchor = wallAnchorNextAudioSession
+        wallAnchorNextAudioSession = false
         val exact = exactAvBiasNanos()
         if (exact != null) {
             val floor = wallNow - audioNanos - maxBackwardAnchorNanos
@@ -837,6 +961,14 @@ internal class PlaybackSessionManager(
             return
         }
         val delta = wallNow - audioNanos
+        if (wallAnchor) {
+            audioAnchorBiasNanos = delta
+            logger.debug(
+                "$debugLabel Restarted audio line wall-anchored (raw clock ${abs(delta) / 1_000_000} ms " +
+                        "${if (delta >= 0) "behind" else "ahead of"} the wall)."
+            )
+            return
+        }
         audioAnchorBiasNanos = if (delta > lateAudioToleranceNanos) delta else 0L
         if (audioAnchorBiasNanos != 0L) {
             logger.warn(
