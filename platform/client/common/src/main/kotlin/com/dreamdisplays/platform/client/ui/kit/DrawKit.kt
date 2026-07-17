@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.client.ui.kit
 
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import net.minecraft.client.gui.Font
@@ -8,6 +9,11 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.components.AbstractWidget
+//? if >=1.21.11 {
+import net.minecraft.client.renderer.RenderPipelines
+import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 
 /**
  * Version-neutral drawing helpers built on [GuiGraphicsCompat]: bordered panels, 1px outlines, and
@@ -97,13 +103,23 @@ fun lightenRgb(color: Int, factor: Float): Int {
     return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
 }
 
-/** Fills [r] with [bg], outlines it with [border], and draws [title] in the top-left padding corner. */
-fun GuiGraphicsCompat.drawPanel(
-    font: Font, r: UiRect, title: String,
-    bg: Int = UiTheme.PANEL_BG, border: Int = UiTheme.PANEL_BORDER,
-) {
-    fill(r.x, r.y, r.right, r.bottom, bg)
-    drawOutline(r, border)
+/** Nine-slice panel background sprite; see textures/gui/sprites/widgets/panel.png. */
+val PANEL_SPRITE: Identifier = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/panel")
+
+/** Nine-slice dropdown background sprite; see textures/gui/sprites/widgets/dropdown.png. */
+val DROPDOWN_SPRITE: Identifier = Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "widgets/dropdown")
+
+/** Draws a nine-slice textured panel background filling [r]. */
+fun GuiGraphicsCompat.drawPanelSprite(r: UiRect, sprite: Identifier = PANEL_SPRITE) {
+    //? if >=1.21.11 {
+    blitSprite(RenderPipelines.GUI_TEXTURED, sprite, r.x, r.y, r.w, r.h)
+    //?} else
+    /*blitSprite(sprite, r.x, r.y, r.w, r.h)*/
+}
+
+/** Draws a nine-slice panel background filling [r] and [title] in the top-left padding corner. */
+fun GuiGraphicsCompat.drawPanel(font: Font, r: UiRect, title: String) {
+    drawPanelSprite(r)
     drawText(font, title, r.x + UiTheme.PANEL_PADDING_X, r.y + UiTheme.PANEL_PADDING_Y, UiTheme.TEXT_PRIMARY, false)
 }
 

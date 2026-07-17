@@ -2,8 +2,14 @@ package com.dreamdisplays.platform.client.ui.menu
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
+import com.dreamdisplays.platform.client.ui.kit.DROPDOWN_SPRITE
 import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.drawPanelSprite
 import net.minecraft.client.Minecraft
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
+import net.minecraft.sounds.SoundEvents
 
 /**
  * The small popup ("Window" / "In-game" / "Fullscreen" / "Borderless") that opens above the popout
@@ -44,24 +50,24 @@ class PopoutDropdown(
     }
 
     /** Draws the dropdown anchored above the rect at ([anchorX], [anchorY]) when visible. */
-    fun draw(g: GuiGraphicsCompat, anchorX: Int, anchorY: Int) {
+    fun draw(g: GuiGraphicsCompat, anchorX: Int, anchorY: Int, mouseX: Int, mouseY: Int) {
         if (!visible) return
         val height = ITEM_H * items.size
         rect = UiRect(anchorX, anchorY - height - 2, WIDTH, height)
-        val (x, y) = rect.x to rect.y
-        g.fill(x, y, x + WIDTH, y + height, 0xFF1C1C1C.toInt())
-        g.fill(x, y, x + WIDTH, y + 1, 0xFF555555.toInt())
-        for (i in 1 until items.size) {
-            g.fill(x, y + ITEM_H * i, x + WIDTH, y + ITEM_H * i + 1, 0xFF333333.toInt())
-        }
-        g.fill(x, y + height - 1, x + WIDTH, y + height, 0xFF555555.toInt())
-        g.fill(x, y, x + 1, y + height, 0xFF555555.toInt())
-        g.fill(x + WIDTH - 1, y, x + WIDTH, y + height, 0xFF555555.toInt())
+        g.drawPanelSprite(rect, DROPDOWN_SPRITE)
+
+        val hovered = if (rect.contains(mouseX, mouseY)) (mouseY - rect.y) / ITEM_H else -1
+
         val font = Minecraft.getInstance().font
-        val fy = y + (ITEM_H - font.lineHeight) / 2
+        val fy = rect.y + (ITEM_H - font.lineHeight) / 2
         items.forEachIndexed { i, (label, _) ->
-            val color = if (i == 0) 0xFFFFFFFF.toInt() else 0xFFDDDDDD.toInt()
-            g.drawText(font, label, x + 6, fy + ITEM_H * i, color, false)
+            val itemY = rect.y + ITEM_H * i
+            if (i == hovered) {
+                g.fill(rect.x + 1, itemY, rect.x + WIDTH - 1, itemY + ITEM_H, UiTheme.HOVER_FILL)
+                g.drawOutline(UiRect(rect.x + 1, itemY, WIDTH - 2, ITEM_H), UiTheme.CARD_BORDER_HOVER)
+            }
+            val color = if (i == hovered) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM
+            g.drawText(font, label, rect.x + 6, fy + ITEM_H * i, color, false)
         }
     }
 
@@ -75,6 +81,8 @@ class PopoutDropdown(
         visible = false
         if (!inside) return false
         val index = ((my - rect.y) / ITEM_H).coerceIn(0, items.size - 1)
+        val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
+        Minecraft.getInstance().soundManager.play(s)
         items[index].second()
         return true
     }

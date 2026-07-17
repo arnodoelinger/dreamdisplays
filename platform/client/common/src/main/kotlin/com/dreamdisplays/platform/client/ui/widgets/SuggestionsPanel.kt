@@ -8,6 +8,7 @@ import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
 import com.dreamdisplays.platform.client.ui.kit.darkenRgb
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.drawPanelSprite
 import com.dreamdisplays.platform.client.ui.kit.drawShimmer
 import com.dreamdisplays.platform.client.ui.kit.fillVGradient
 import com.dreamdisplays.platform.client.ui.kit.lightenRgb
@@ -147,8 +148,7 @@ class SuggestionsPanel(
 
     override fun draw(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {
         val r = UiRect(x, y, width, height)
-        g.fill(r.x, r.y, r.right, r.bottom, UiTheme.SUGGESTIONS_BG)
-        g.drawOutline(r, UiTheme.SUGGESTIONS_BORDER)
+        g.drawPanelSprite(r)
 
         val f = Minecraft.getInstance().font
         g.drawText(f, message, x + 10, y + 10, UiTheme.TEXT_PRIMARY, false)
@@ -231,17 +231,17 @@ class SuggestionsPanel(
         if (vertical) {
             val content = maxOff + viewportH
             val barX = stripRight + 1
-            g.fill(barX, stripTop, barX + 2, stripBottom, 0xFF202020.toInt())
+            g.fill(barX, stripTop, barX + 2, stripBottom, UiTheme.SCROLLBAR_TRACK)
             val barH = max(20, (viewportH.toFloat() / content * viewportH).toInt())
             val barY = stripTop + (scrollOffset.toFloat() / maxOff * (viewportH - barH)).toInt()
-            g.fill(barX, barY, barX + 2, barY + barH, 0xFF808080.toInt())
+            g.fill(barX, barY, barX + 2, barY + barH, UiTheme.SCROLLBAR_THUMB)
         } else {
             val content = maxOff + viewportW
             val barY = stripBottom + 1
-            g.fill(stripLeft, barY, stripRight, barY + 2, 0xFF202020.toInt())
+            g.fill(stripLeft, barY, stripRight, barY + 2, UiTheme.SCROLLBAR_TRACK)
             val barW = max(20, (viewportW.toFloat() / content * viewportW).toInt())
             val barX = stripLeft + (scrollOffset.toFloat() / maxOff * (viewportW - barW)).toInt()
-            g.fill(barX, barY, barX + barW, barY + 2, 0xFF808080.toInt())
+            g.fill(barX, barY, barX + barW, barY + 2, UiTheme.SCROLLBAR_THUMB)
         }
     }
 

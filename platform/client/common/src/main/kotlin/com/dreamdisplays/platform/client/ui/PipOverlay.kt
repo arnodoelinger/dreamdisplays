@@ -9,6 +9,10 @@ import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.mojang.blaze3d.platform.NativeImage
@@ -315,15 +319,15 @@ class PipOverlay(
             content.h,
             fw,
             fh,
-            blendColor(0xFFFFFFFF.toInt(), alpha),
+            scaleAlpha(0xFFFFFFFF.toInt(), alpha),
         )
         //?} else
         /*RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc(); g.setColor(1f, 1f, 1f, alpha); g.blit(id, 0, 0, pipW, pipH, content.x.toFloat(), content.y.toFloat(), content.w, content.h, fw, fh); g.setColor(1f, 1f, 1f, 1f)*/
 
         // Border
         val active = hovering || dragging || resizing
-        val borderColor = blendColor(if (active) ACCENT else PANEL_BORDER, alpha)
-        outline(g, 0, 0, pipW, pipH, borderColor)
+        val borderColor = scaleAlpha(if (active) UiTheme.ACCENT else UiTheme.PANEL_BORDER, alpha)
+        g.drawOutline(UiRect(0, 0, pipW, pipH), borderColor)
 
         if (hovering || resizing) {
             renderResizeHandle(g, handleX, handleY, alpha)
@@ -455,16 +459,13 @@ class PipOverlay(
 
     private fun renderResizeHandle(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
         val (sx, sy) = anchor.centerFacingCorner()
-        val color = blendColor(if (hoveringResize) ACCENT else 0xFFFFFFFF.toInt(), alpha)
+        val color = scaleAlpha(if (hoveringResize) UiTheme.ACCENT else 0xFFFFFFFF.toInt(), alpha)
         drawCornerBracket(g, hx, hy, sx, sy, 8, 0, color)
         drawCornerBracket(g, hx, hy, sx, sy, 5, 4, color)
     }
 
     private fun drawCornerBracket(
-        //? if >=26 {
-        g: GuiGraphicsExtractor,
-        //?} else
-        /*g: GuiGraphics,*/
+        g: GuiGraphicsCompat,
         baseX: Int, baseY: Int,
         sx: Int, sy: Int,
         len: Int,
@@ -522,21 +523,6 @@ class PipOverlay(
         private const val RESIZE_INSET = 6
         private const val SNAP_LERP_SPEED = 8f
         private const val PIP_Z = 1_000.0
-
-        private const val PANEL_BORDER = 0xFF606060.toInt()
-        private const val ACCENT = 0xFF4A90E2.toInt()
-
-        private fun outline(g: GuiGraphicsCompat, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
-            g.fill(x1, y1, x2, y1 + 1, color)
-            g.fill(x1, y2 - 1, x2, y2, color)
-            g.fill(x1, y1, x1 + 1, y2, color)
-            g.fill(x2 - 1, y1, x2, y2, color)
-        }
-
-        private fun blendColor(color: Int, alpha: Float): Int {
-            val a = ((color ushr 24 and 0xFF) * alpha).toInt().coerceIn(0, 255)
-            return (a shl 24) or (color and 0x00FFFFFF)
-        }
     }
 
     private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)

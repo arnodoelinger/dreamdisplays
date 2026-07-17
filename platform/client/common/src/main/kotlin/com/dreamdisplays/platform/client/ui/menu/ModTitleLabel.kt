@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.ui.menu
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.util.GeneralUtil
 import com.dreamdisplays.util.UpdateCheck
 import net.minecraft.client.Minecraft
@@ -25,9 +26,9 @@ class ModTitleLabel {
         val font = Minecraft.getInstance().font
         val name = Component.literal("Dream Displays")
         val ver = Component.literal(" ${GeneralUtil.getPrettyModVersion()}")
-            .withStyle(Style.EMPTY.withColor(0xFF6AB7FF.toInt()))
+            .withStyle(Style.EMPTY.withColor(UiTheme.ACCENT_VERSION))
         val label = name.copy().append(ver)
-        g.drawText(font, label, x, y, 0xFFFFFFFF.toInt(), true)
+        g.drawText(font, label, x, y, UiTheme.TEXT_PRIMARY, true)
 
         val textW = font.width(label)
         var totalW = textW
@@ -39,8 +40,8 @@ class ModTitleLabel {
                 arrowYOffset = (-sin(p * Math.PI) * 3.0).toInt()
             }
             val arrow = Component.literal(" ▲")
-                .withStyle(Style.EMPTY.withColor(0xFFFF4040.toInt()))
-            g.drawText(font, arrow, x + textW, y + arrowYOffset, 0xFFFFFFFF.toInt(), true)
+                .withStyle(Style.EMPTY.withColor(UiTheme.ACCENT_UPDATE))
+            g.drawText(font, arrow, x + textW, y + arrowYOffset, UiTheme.TEXT_PRIMARY, true)
             totalW += font.width(arrow)
         }
         hoverArea = UiRect(x, y - 1, totalW, font.lineHeight + 2)

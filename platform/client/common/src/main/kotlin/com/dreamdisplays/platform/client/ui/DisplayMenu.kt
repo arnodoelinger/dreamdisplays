@@ -480,7 +480,7 @@ class DisplayMenu private constructor(
 
         g.drawPanel(font, layout.preview, Component.translatable("dreamdisplays.ui.preview").string)
         g.drawPanel(font, layout.settings, Component.translatable("dreamdisplays.ui.settings").string)
-        preview.render(g, layout.preview)
+        preview.render(g, layout.preview, mouseX, mouseY)
         settings.render(g, layout.settings)
 
         val suggestionsArea = layout.suggestions
