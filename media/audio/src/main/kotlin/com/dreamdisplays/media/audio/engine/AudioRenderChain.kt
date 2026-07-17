@@ -147,7 +147,7 @@ internal class AudioRenderChain(
 
         val reverbTargetWet = if (advanced) env.reverbWetGain.coerceIn(0f, 1f) else 0f
         val wetGain = reverbWet.next(reverbTargetWet, dtBlock)
-        val reverbActive = wetGain > 1e-4f || reverbTargetWet > 1e-4f
+        val reverbActive = wetGain > 1e-3f || reverbTargetWet > 1e-3f // -60 dB threshold
         if (reverbActive) {
             reverb.updateParams((env.reverbDecaySeconds / REVERB_MAX_DECAY_SECONDS).coerceIn(0f, 1f), env.reverbDamping)
         }
