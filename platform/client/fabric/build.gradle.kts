@@ -61,10 +61,10 @@ sourceSets.main {
     // Consume :platform:server's chiseled output (version directives already resolved) rather than its raw
     // source, so the active Minecraft version's branch is compiled here too.
     kotlin.srcDir(project(":platform:server").layout.buildDirectory.dir("generated/chisel/main/kotlin"))
-    // Translations live once in :platform:shared and are pulled in here instead of being duplicated per platform.
+    // Translations live once in :platform:resources and are pulled in here instead of being duplicated per platform.
     // The lang/client/ split is source-tree organization only; vanilla's language system requires the actual
     // jar to have client lang files directly under assets/dreamdisplays/lang/, so processResources flattens it back.
-    resources.srcDir(project(":platform:shared").file("src/main/resources"))
+    resources.srcDir(project(":platform:resources").file("src/main/resources"))
     resources.exclude("assets/dreamdisplays/lang/client/**")
 }
 
@@ -167,7 +167,7 @@ dependencies {
 
 tasks.processResources {
     from(generatedClassTweaker)
-    from(project(":platform:shared").file("src/main/resources/assets/dreamdisplays/lang/client")) {
+    from(project(":platform:resources").file("src/main/resources/assets/dreamdisplays/lang/client")) {
         into("assets/dreamdisplays/lang")
     }
     val projectVersion = project.version.toString()

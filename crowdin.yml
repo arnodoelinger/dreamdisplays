@@ -2,8 +2,8 @@
 
 "files": [
   {
-    "source": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/client/en_us.json",
-    "translation": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/client/%locale%.json",
+    "source": "/platform/resources/src/main/resources/assets/dreamdisplays/lang/client/en_us.json",
+    "translation": "/platform/resources/src/main/resources/assets/dreamdisplays/lang/client/%locale%.json",
     "languages_mapping": {
       "locale": {
         "de": "de_de",
@@ -20,7 +20,7 @@
     }
   },
   {
-    "source": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/server/en.json",
-    "translation": "/platform/shared/src/main/resources/assets/dreamdisplays/lang/server/%two_letters_code%.json"
+    "source": "/platform/resources/src/main/resources/assets/dreamdisplays/lang/server/en.json",
+    "translation": "/platform/resources/src/main/resources/assets/dreamdisplays/lang/server/%two_letters_code%.json"
   }
 ]

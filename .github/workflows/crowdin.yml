@@ -33,14 +33,14 @@ jobs:
           keep_client="en_us de_de ru_ru uk_ua pl_pl cs_cz be_by he_il es_es fr_fr it_it"
           keep_server="en de ru uk pl cs be he es fr it"
 
-          for f in platform/shared/src/main/resources/assets/dreamdisplays/lang/client/*.json; do
+          for f in platform/resources/src/main/resources/assets/dreamdisplays/lang/client/*.json; do
             name="$(basename "$f" .json)"
             if ! grep -qw "$name" <<< "$keep_client"; then
               rm -f "$f"
             fi
           done
 
-          for f in platform/shared/src/main/resources/assets/dreamdisplays/lang/server/*.json; do
+          for f in platform/resources/src/main/resources/assets/dreamdisplays/lang/server/*.json; do
             name="$(basename "$f" .json)"
             if ! grep -qw "$name" <<< "$keep_server"; then
               rm -f "$f"
@@ -58,5 +58,5 @@ jobs:
           commit-message: "chore(i18n): sync translations from Crowdin"
           author: "${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"
           committer: "${{ github.actor }} <${{ github.actor_id }}+${{ github.actor }}@users.noreply.github.com>"
-          add-paths: platform/shared/src/main/resources/assets/dreamdisplays/lang/**
+          add-paths: platform/resources/src/main/resources/assets/dreamdisplays/lang/**
           delete-branch: true

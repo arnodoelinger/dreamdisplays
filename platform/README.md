@@ -5,7 +5,8 @@ Aggregator for platform modules. It should not contain product logic by itself.
 ## Contents
 
 - `platform:client` are client-side Minecraft integrations
-- `platform:server` is server-side Paper/Fabric code
+- `platform:server` is server-side `Paper` / `Fabric` / `NeoForge` code
+- `platform:resources` are resources for `Fabric` and `NeoForge` platforms 
 
 ## Boundaries
 
