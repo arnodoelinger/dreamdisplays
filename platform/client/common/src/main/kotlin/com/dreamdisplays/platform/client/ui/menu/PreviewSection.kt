@@ -38,6 +38,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.UUID
 import kotlin.math.max
+import kotlin.math.roundToInt
 
 /**
  * The preview panel of the display menu: live video (or thumbnail while loading), the title/metadata
@@ -59,6 +60,8 @@ class PreviewSection(
     private val ambientSampler = AmbientFrameSampler(ds)
     private var frameSinkAttached = false
     private var lastVideoUrl: String? = null
+    private var audioPresence = 0f
+    private var lastPresenceFrameNanos = 0L
 
     companion object {
         /** Aspect ratio of a YouTube thumbnail image, independent of the screen's own block shape. */
@@ -83,21 +86,37 @@ class PreviewSection(
         drawVideoArea(g, innerX, innerY, innerW, previewMaxH)
         drawTitleOverlay(g, innerX, innerY + previewMaxH, innerW)
 
+        val now = System.nanoTime()
+        val dt = if (lastPresenceFrameNanos == 0L) 0.016f else ((now - lastPresenceFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
+        lastPresenceFrameNanos = now
+        val target = if (ds.audioTrackList.size > 1) 1f else 0f
+        val diff = target - audioPresence
+        audioPresence += diff * minOf(1f, dt * 10f)
+        if (diff in -0.002f..0.002f) audioPresence = target
+
         // Controls row: [mute][volume] [progress........] [audio][popout][pause]
         muteButton.place(UiRect(innerX, controlsRowY, btn, btn))
         val volumeX = innerX + btn + 4
         volume.place(UiRect(volumeX, controlsRowY, VOLUME_W, btn))
         pauseButton.place(UiRect(controlsRight - btn, controlsRowY, btn, btn))
         popoutButton.place(UiRect(controlsRight - btn * 2 - 4, controlsRowY, btn, btn))
-        audioTrackButton.place(UiRect(controlsRight - btn * 3 - 8, controlsRowY, btn, btn))
-        val hasAudioTracks = ds.audioTrackList.size > 1
-        val progRight = if (hasAudioTracks) controlsRight - btn * 3 - 12 else controlsRight - btn * 2 - 8
+
+        val audioSlotRight = controlsRight - btn * 2 - 8
+        val audioBtnW = (btn * audioPresence).roundToInt()
+        val audioGap = (4 * audioPresence).roundToInt()
+        val audioBtnLeft = audioSlotRight - audioBtnW
+        audioTrackButton.place(UiRect(audioBtnLeft, controlsRowY, audioBtnW, btn))
+        audioTrackButton.alpha = audioPresence
+
         val progX = volumeX + VOLUME_W + 4
-        val progW = max(40, progRight - progX)
+        val progW = max(40, (audioBtnLeft - audioGap) - progX)
         progress.place(UiRect(progX, controlsRowY, progW, btn))
 
-        dropdown.draw(g, popoutButton.x, popoutButton.y, mouseX, mouseY)
-        audioTrackDropdown.draw(g, audioTrackButton.x, audioTrackButton.y, mouseX, mouseY)
+        dropdown.draw(g, popoutButton.x + btn / 2, popoutButton.y, mouseX, mouseY)
+        // Centered on the slot's fixed target position (not the animating button rect), so it never
+        // drifts or jitters while the button is still easing in.
+        val audioBtnFinalCenterX = audioSlotRight - btn / 2
+        if (audioPresence > 0.01f) audioTrackDropdown.draw(g, audioBtnFinalCenterX, controlsRowY, mouseX, mouseY)
     }
 
     /** Draws the letterboxed video frame, or the dimmed thumbnail + waiting text while loading. */

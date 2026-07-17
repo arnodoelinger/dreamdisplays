@@ -140,8 +140,14 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
     final override fun mouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean =
         super.mouseDragged(mouseX / uiScale, mouseY / uiScale, button, dragX / uiScale, dragY / uiScale)*/
 
-    final override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
-        super.mouseScrolled(mouseX / uiScale, mouseY / uiScale, scrollX, scrollY)
+    /** Screen-specific scroll handling, in virtual coordinates. Return true to consume. */
+    protected open fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = false
+
+    final override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseScrolled(mx, my, scrollX, scrollY) || super.mouseScrolled(mx, my, scrollX, scrollY)
+    }
 
     final override fun mouseMoved(mouseX: Double, mouseY: Double) =
         super.mouseMoved(mouseX / uiScale, mouseY / uiScale)

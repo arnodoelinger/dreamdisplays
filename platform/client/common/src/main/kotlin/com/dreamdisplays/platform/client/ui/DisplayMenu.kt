@@ -274,7 +274,7 @@ class DisplayMenu private constructor(
 
         audioTrackButton = addUi(IconButton("lang") { audioTrackDropdown.toggle() })
         audioTrackButton.enabledWhen = { videoReady() && ds.audioTrackList.size > 1 }
-        audioTrackButton.visibleWhen = { videoReady() && ds.audioTrackList.size > 1 }
+        audioTrackButton.visibleWhen = notErrored
 
         val pauseButton = addUi(
             IconButton(
@@ -547,6 +547,9 @@ class DisplayMenu private constructor(
             suggestions.setRelatedTo(currentId)
         }
     }
+
+    override fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
+        audioTrackDropdown.handleScroll(mouseX.toInt(), mouseY.toInt(), scrollY)
 
     //? if >=1.21.11 {
     override fun onMouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {

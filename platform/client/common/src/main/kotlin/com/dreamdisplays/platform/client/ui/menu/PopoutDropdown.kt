@@ -54,8 +54,12 @@ class PopoutDropdown(
         visible = false
     }
 
-    /** Draws the dropdown anchored above the rect at ([anchorX], [anchorY]), easing in / out of [visible]. */
-    fun draw(g: GuiGraphicsCompat, anchorX: Int, anchorY: Int, mouseX: Int, mouseY: Int) {
+    /**
+     * Draws the dropdown anchored above ([anchorCenterX], [anchorY]), horizontally centered on that
+     * point (the button's own center) rather than growing out from one of its edges — easing in / out
+     * of [visible].
+     */
+    fun draw(g: GuiGraphicsCompat, anchorCenterX: Int, anchorY: Int, mouseX: Int, mouseY: Int) {
         val now = System.nanoTime()
         val dt = if (lastFrameNanos == 0L) 0.016f else ((now - lastFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
         lastFrameNanos = now
@@ -68,7 +72,7 @@ class PopoutDropdown(
         }
 
         val height = ITEM_H * items.size
-        rect = UiRect(anchorX, anchorY - height - 2, WIDTH, height)
+        rect = UiRect(anchorCenterX - WIDTH / 2, anchorY - height - 2, WIDTH, height)
 
         val scale = 0.85f + 0.15f * animProgress
         val matrices = g.pose()
