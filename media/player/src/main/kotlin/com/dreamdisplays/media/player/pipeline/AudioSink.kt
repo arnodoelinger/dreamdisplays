@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.pipeline
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.util.MediaBufferEffects
 import com.dreamdisplays.media.player.util.MediaUtil
@@ -27,8 +28,25 @@ internal class AudioSink(private val debugLabel: String) {
         /** Chunk size for each read from the audio process and each write to the line. 1 / 20 s of stereo 16-bit PCM */
         private const val CHUNK_BYTES = SAMPLE_RATE * 2 * 2 / 20
 
-        /** Line buffer size for the PCM line: 10 chunks, ~0.5 s of stereo 16-bit PCM. */
-        private const val LINE_BUFFER_BYTES = CHUNK_BYTES * 10
+        /**
+         * Capacity of the PCM line (8 chunks, ~0.4 s). This is only the ceiling the pacer may grow into,
+         * not the steady-state latency: [paceLiveWrite] holds the *unplayed* backlog near
+         * [paceTargetBytes] (well below this), so DSP-to-ear latency tracks the adaptive target, while the
+         * spare capacity is headroom the target can expand into on a stuttering machine.
+         */
+        private const val LINE_BUFFER_BYTES = CHUNK_BYTES * 8
+
+        /** Smallest backlog the live pacer holds (~0.05 s) — the floor it settles back to when playback is clean. */
+        private const val MIN_PACE_BYTES = CHUNK_BYTES
+
+        /** Largest backlog the pacer will grow to (~0.30 s) before it stops trading latency for stability. */
+        private const val MAX_PACE_BYTES = CHUNK_BYTES * 6
+
+        /** Backlog step added per detected underrun / eased off per clean-playback window. */
+        private const val PACE_STEP_BYTES = CHUNK_BYTES
+
+        /** Consecutive clean chunks (~20 s at 20 chunks/s) before the pacer eases the target back down one step. */
+        private const val PACE_RECOVER_CHUNKS = 400
 
         /** Number of times to retry opening the audio line if it is temporarily unavailable. */
         private const val OPEN_RETRIES = 3
@@ -43,6 +61,28 @@ internal class AudioSink(private val debugLabel: String) {
     /** Current volume multiplier applied to each audio chunk. */
     @Volatile
     var currentVolume: Double = 1.0
+
+    /**
+     * Optional per-source acoustics DSP stage; when set it replaces [MediaBufferEffects.applyVolumeS16LE]
+     * for every chunk (including the bridge prelude), receiving [currentVolume] as its bypass gain.
+     */
+    @Volatile
+    private var dspStage: AudioDspStage? = null
+
+    /** Installs (or clears) the acoustics DSP stage for this session; resets its state immediately. */
+    fun setDspStage(stage: AudioDspStage?) {
+        dspStage = stage
+        stage?.reset()
+    }
+
+    /** Adaptive backlog the live pacer currently targets; persists across sessions to keep learning the machine. */
+    private var paceTargetBytes = MIN_PACE_BYTES
+
+    /** Consecutive underrun-free chunks since the last target change, used to ease the target back down. */
+    private var paceCleanChunks = 0
+
+    /** True once the first live chunk has been written, so an empty line before then isn't read as an underrun. */
+    private var paceStreaming = false
 
     /**
      * Live-relative frame position of the open audio line, or -1 when no line is active (or the line is
@@ -198,6 +238,7 @@ internal class AudioSink(private val debugLabel: String) {
         pcmFlowing = false
         sessionEpoch++
         clearRing()
+        dspStage?.reset()
         val stderrBuf = drainStderr(proc, stopFlag)
         return daemon(
             { run(proc, terminated, stopFlag, startGate, stderrBuf, onUnexpectedEnd) }, "MediaPlayer-audio",
@@ -224,6 +265,7 @@ internal class AudioSink(private val debugLabel: String) {
         pcmFlowing = false
         sessionEpoch++
         clearRing()
+        dspStage?.reset()
         return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
     }
 
@@ -396,7 +438,7 @@ internal class AudioSink(private val debugLabel: String) {
         while (off < prelude.size && !terminated.get() && !stopFlag.get()) {
             val n = minOf(CHUNK_BYTES, prelude.size - off)
             System.arraycopy(prelude, off, chunk, 0, n)
-            MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
+            dspStage?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
             writeFully(ln, chunk, n, terminated, stopFlag)
             off += n
         }
@@ -420,6 +462,10 @@ internal class AudioSink(private val debugLabel: String) {
         val chunk = ByteArray(CHUNK_BYTES)
         var firstChunk = true
         var totalBytes = 0L
+        // Fresh line for this session: don't let its initially-empty buffer read as an underrun on the
+        // first paced write. The learned target itself persists across sessions.
+        paceStreaming = false
+        paceCleanChunks = 0
         while (!terminated.get() && !stopFlag.get()) {
             if (parkIfRequested(ln, terminated, stopFlag)) break
             val n = MediaUtil.readFull(input, chunk, CHUNK_BYTES)
@@ -441,8 +487,8 @@ internal class AudioSink(private val debugLabel: String) {
                 pcmFlowing = true
             }
             ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
-            MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
-            writeFully(ln, chunk, n, terminated, stopFlag)
+            dspStage?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
+            paceLiveWrite(ln, chunk, n, terminated, stopFlag)
         }
     }
 
@@ -480,6 +526,47 @@ internal class AudioSink(private val debugLabel: String) {
             val w = ln.write(chunk, written, n - written)
             if (w <= 0) break
             written += w
+        }
+    }
+
+    /**
+     * Writes one live chunk while keeping the line's *unplayed* backlog near [paceTargetBytes] instead of
+     * letting it fill the whole [LINE_BUFFER_BYTES] capacity, so DSP-to-ear latency (and thus how quickly
+     * acoustics track head / position changes) stays close to the target rather than the buffer size.
+     *
+     * The target is self-adapting: if the line drained to empty while this chunk was being produced (an
+     * underrun), it grows a step to buy more headroom; after a long clean-playback window it eases back
+     * one step toward [MIN_PACE_BYTES]. So it settles at the smallest backlog the machine can actually
+     * sustain without stuttering. A / V sync is unaffected — [framePosition] tracks the line's playout
+     * clock, not how far ahead we queue.
+     */
+    private fun paceLiveWrite(
+        ln: SourceDataLine,
+        chunk: ByteArray,
+        n: Int,
+        terminated: AtomicBoolean,
+        stopFlag: AtomicBoolean
+    ) {
+        val unplayedBefore = (ln.bufferSize - ln.available()).coerceAtLeast(0)
+        if (paceStreaming) {
+            if (unplayedBefore == 0) {
+                paceTargetBytes = (paceTargetBytes + PACE_STEP_BYTES).coerceAtMost(MAX_PACE_BYTES)
+                paceCleanChunks = 0
+            } else if (++paceCleanChunks >= PACE_RECOVER_CHUNKS) {
+                paceTargetBytes = (paceTargetBytes - PACE_STEP_BYTES).coerceAtLeast(MIN_PACE_BYTES)
+                paceCleanChunks = 0
+            }
+        }
+        writeFully(ln, chunk, n, terminated, stopFlag)
+        paceStreaming = true
+        // Hold the backlog at the target: wait for playout to drain the surplus before feeding the next chunk.
+        while (!terminated.get() && !stopFlag.get()) {
+            if ((ln.bufferSize - ln.available()).coerceAtLeast(0) <= paceTargetBytes) break
+            try {
+                Thread.sleep(1)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt(); break
+            }
         }
     }
 

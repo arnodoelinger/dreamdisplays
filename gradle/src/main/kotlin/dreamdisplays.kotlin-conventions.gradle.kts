@@ -35,7 +35,7 @@ private val javaFloor: Int = rootProject.file("versions").listFiles()
     ?.minOrNull() ?: javaVersion
 
 /** The bytecode target for the active Minecraft version. */
-private val platformIndependentModules = setOf(":api", ":core", ":util")
+private val platformIndependentModules = setOf(":api", ":core", ":util", ":media:audio")
 
 /** The bytecode target for all Minecraft versions. */
 private val bytecodeTarget: Int = if (project.path in platformIndependentModules) javaFloor else javaVersion

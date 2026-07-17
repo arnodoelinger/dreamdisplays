@@ -2,6 +2,7 @@ package com.dreamdisplays.platform.client.displays
 
 import com.dreamdisplays.api.display.service.DisplaySystem
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.DisplayId
@@ -65,6 +66,7 @@ object DisplayRegistry {
         displayScreen.volume = clientSettings.volume
         displayScreen.quality = VideoQuality.parse(clientSettings.quality)
         displayScreen.muted = clientSettings.muted
+        displayScreen.acousticsEnabled = clientSettings.acousticsEnabled
         // Disk-persisted fallback (survives a full game restart); overridden below by the
         // same-session cache when present, which is fresher.
         displayScreen.savedTimeNanos = clientSettings.savedTimeNanos
@@ -77,6 +79,7 @@ object DisplayRegistry {
 
         screens[displayScreen.uuid] = displayScreen
         recordScreen(displayScreen)
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.registerSource(displayScreen.uuid)
     }
 
     /** Unregisters a display screen, saving its data for later re-registration. */
@@ -87,11 +90,13 @@ object DisplayRegistry {
         screens.remove(displayScreen.uuid)
         displayScreen.unregister()
         displaySystem?.removeDisplay(DisplayId(displayScreen.uuid))
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.unregisterSource(displayScreen.uuid)
     }
 
     /** Unregisters all display screens. */
     fun unloadAll() {
-        screens.values.forEach { it.unregister() }
+        val acoustics = DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)
+        screens.values.forEach { it.unregister(); acoustics?.unregisterSource(it.uuid) }
         screens.clear()
         unloadedScreens.clear()
         displaySystem?.clearDisplays()

@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.managers
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.media.player.process.FFmpegBinary
 import com.dreamdisplays.media.runtime.MediaHostGuard
 import com.dreamdisplays.api.media.DreamMediaException
@@ -79,6 +80,9 @@ internal class PlaybackSessionManager(
 
     /** Whether the GPU-side planar (I420) render path is active. */
     private val gpuYuvActive: Boolean,
+
+    /** Optional per-display acoustics DSP stage; null keeps the legacy distance-gain-only pipeline. */
+    private val audioStage: AudioDspStage? = null,
 ) {
     /** Logger. */
     private val logger = LoggerFactory.getLogger("DreamDisplays/PlaybackSession")
@@ -237,6 +241,7 @@ internal class PlaybackSessionManager(
 
     init {
         audio.setParkFlag(parkFlag)
+        audio.setDspStage(audioStage)
     }
 
     /** Guards the live/incoming channel transitions across the control, render, and reader threads. */

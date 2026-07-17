@@ -37,6 +37,15 @@ import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.audio.AcousticEnvironment
+import com.dreamdisplays.api.media.audio.AcousticQuality
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
+import com.dreamdisplays.api.media.audio.SourceAcousticState
+import com.dreamdisplays.api.media.audio.SourcePlane
+import com.dreamdisplays.platform.client.audio.ListenerPoseTracker
+import com.dreamdisplays.platform.client.audio.VoxelAcousticsProbe
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -114,6 +123,12 @@ class DisplayScreen(
 
     /** Whether the user has muted this display. */
     var muted: Boolean = savedSettings.muted
+
+    /**
+     * Whether the 3D acoustics engine (directivity, occlusion, reverb, binaural) applies to this
+     * display; false forces the legacy distance-gain-only path.
+     */
+    var acousticsEnabled: Boolean = savedSettings.acousticsEnabled
 
     /** Legacy mirror of [mode]; true only for [PlaybackMode.SYNCED]. */
     val isSync: Boolean get() = mode == PlaybackMode.SYNCED
@@ -621,6 +636,18 @@ class DisplayScreen(
     fun getDistanceToScreen(pos: BlockPos): Double =
         DisplayGeometry.distanceTo(pos, x, y, z, width, height, facing)
 
+    /** Builds the world-space planar sound source fed to the acoustics engine (see [tick]). */
+    private fun toSourcePlane(): SourcePlane {
+        val pose = DisplayGeometry.worldPose(x, y, z, width, height, facing)
+        return SourcePlane(
+            pose.centerX, pose.centerY, pose.centerZ,
+            pose.normalX, pose.normalY, pose.normalZ,
+            pose.uAxisX, pose.uAxisY, pose.uAxisZ,
+            pose.vAxisX, pose.vAxisY, pose.vAxisZ,
+            width.toDouble(), height.toDouble(),
+        )
+    }
+
     /** Uploads the latest decoded frame to the GPU texture(s). Called on the render thread once per frame. */
     fun fitTexture() {
         val mp = mediaPlayer ?: return
@@ -823,6 +850,13 @@ class DisplayScreen(
         DisplayRegistry.recordScreen(this)
     }
 
+    /** Enables or disables the 3D acoustics engine for this display; no-op if already in that state. */
+    fun setAcoustics(enabled: Boolean) {
+        if (acousticsEnabled == enabled) return
+        acousticsEnabled = enabled
+        ClientSettingsStore.setAcousticsEnabled(uuid, enabled)
+    }
+
     /** Applies temporary focus mute without changing the user's persisted mute setting. */
     fun setFocusMuted(status: Boolean) {
         if (focusMuted == status) return
@@ -946,10 +980,50 @@ class DisplayScreen(
         return quality.targetHeight ?: DEFAULT_QUALITY
     }
 
+    /** Last raytraced acoustic environment, refreshed on the [ENV_PROBE_INTERVAL_TICKS] cadence. */
+    private var cachedEnvironment: AcousticEnvironment = AcousticEnvironment.OPEN_AIR
+
+    /** Ticks remaining before the next voxel-acoustics re-probe. */
+    private var envProbeCountdown: Int = 0
+
     /** Called every game tick to update distance-based volume attenuation from [pos]. */
     fun tick(pos: BlockPos) {
         val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
         mediaPlayer?.tick(getDistanceToScreen(pos), maxRadius)
+        val plane = toSourcePlane()
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.updateSource(
+            uuid,
+            SourceAcousticState(
+                plane = plane,
+                userVolume = volume,
+                muted = muted || focusMuted,
+                bypassSpatial = isPopoutActive,
+                acousticsEnabled = acousticsEnabled,
+                environment = probeEnvironment(plane),
+            ),
+        )
+    }
+
+    /**
+     * Returns the display's current acoustic environment, re-running the (relatively costly) voxel
+     * raytrace only every [ENV_PROBE_INTERVAL_TICKS] ticks and reusing the cached result between probes;
+     * the DSP chain smooths across the gap so the cadence is inaudible. Skips the trace entirely when
+     * spatial acoustics can't use it (popout, per-display opt-out, or a tier below ADVANCED).
+     */
+    private fun probeEnvironment(plane: SourcePlane): AcousticEnvironment {
+        val tier = ClientStateManager.config.audioAcoustics
+        if (isPopoutActive || !acousticsEnabled || (tier != AcousticQuality.ADVANCED && tier != AcousticQuality.ULTRA)) {
+            cachedEnvironment = AcousticEnvironment.OPEN_AIR
+            envProbeCountdown = 0
+            return cachedEnvironment
+        }
+        if (envProbeCountdown <= 0) {
+            cachedEnvironment = VoxelAcousticsProbe.probe(plane, ListenerPoseTracker.currentPose(Minecraft.getInstance()))
+            envProbeCountdown = ENV_PROBE_INTERVAL_TICKS
+        } else {
+            envProbeCountdown--
+        }
+        return cachedEnvironment
     }
 
     /** Called after a user-initiated seek completes; emits the seek intent upstream per mode. */
@@ -961,6 +1035,9 @@ class DisplayScreen(
     companion object {
         /** Logger for replay-capture and diagnostic messages. */
         private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayScreen")
+
+        /** Ticks between voxel-acoustics re-probes; the DSP chain smooths across this gap. */
+        private const val ENV_PROBE_INTERVAL_TICKS = 2
 
         /** Initial per-display volume for newly seen displays. */
         internal fun defaultVolume(): Float {

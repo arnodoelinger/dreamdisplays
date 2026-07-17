@@ -125,6 +125,7 @@ dependencies {
     shadow(project(":media:runtime"))
     shadow(project(":media:source"))
     shadow(project(":media:player"))
+    shadow(project(":media:audio"))
     shadow(project(":platform:client:common"))
     shadow(libs.kotlinxSerializationProtobuf)
     shadow(libs.kotlinxSerializationJson)
@@ -157,6 +158,7 @@ neoForge {
             sourceSet(mainSourceSetOf(":media:runtime"))
             sourceSet(mainSourceSetOf(":media:source"))
             sourceSet(mainSourceSetOf(":media:player"))
+            sourceSet(mainSourceSetOf(":media:audio"))
             sourceSet(sourceSets["vendoredLibraries"])
         }
     }
@@ -218,6 +220,7 @@ tasks.shadowJar {
         include(project(":media:runtime"))
         include(project(":media:source"))
         include(project(":media:player"))
+        include(project(":media:audio"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
         include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf"))

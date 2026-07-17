@@ -54,6 +54,35 @@ internal object DisplayGeometry {
         }
 
     /**
+     * World-space center and orientation basis for a screen anchored at ([x], [y], [z]) with the given
+     * [width] / [height] / [facing]. Approximate (block-center precision, no surface offset): good
+     * enough for placing acoustic emitters, not for rendering.
+     */
+    fun worldPose(x: Int, y: Int, z: Int, width: Int, height: Int, facing: DisplayFacing): ScreenPose =
+        withBounds(x, y, z, width, height, facing) { maxX, maxY, maxZ ->
+            val cx = (x + maxX + 1) / 2.0
+            val cy = (y + maxY + 1) / 2.0
+            val cz = (z + maxZ + 1) / 2.0
+            val (nx, ny, nz) = when (facing) {
+                DisplayFacing.NORTH -> Triple(0.0, 0.0, -1.0)
+                DisplayFacing.SOUTH -> Triple(0.0, 0.0, 1.0)
+                DisplayFacing.EAST -> Triple(1.0, 0.0, 0.0)
+                DisplayFacing.WEST -> Triple(-1.0, 0.0, 0.0)
+                DisplayFacing.UP -> Triple(0.0, 1.0, 0.0)
+                DisplayFacing.DOWN -> Triple(0.0, -1.0, 0.0)
+            }
+            val (ux, uy, uz) = when (facing) {
+                DisplayFacing.NORTH, DisplayFacing.SOUTH, DisplayFacing.UP, DisplayFacing.DOWN -> Triple(1.0, 0.0, 0.0)
+                DisplayFacing.EAST, DisplayFacing.WEST -> Triple(0.0, 0.0, 1.0)
+            }
+            val (vx, vy, vz) = when (facing) {
+                DisplayFacing.UP, DisplayFacing.DOWN -> Triple(0.0, 0.0, 1.0)
+                else -> Triple(0.0, 1.0, 0.0)
+            }
+            ScreenPose(cx, cy, cz, nx, ny, nz, ux, uy, uz, vx, vy, vz)
+        }
+
+    /**
      * Distance the quad floats in front of the supporting blocks, in local block space. This is a
      * secondary safety margin only: the primary defense against z-fighting is the GPU polygon-offset
      * bias baked into the render pipeline itself (see `RenderPipelineCompat.configureDepth` /
@@ -170,3 +199,11 @@ internal object DisplayGeometry {
         }
     }
 }
+
+/** World-space center + orthonormal (normal, uAxis, vAxis) basis for a screen, see [DisplayGeometry.worldPose]. */
+internal data class ScreenPose(
+    val centerX: Double, val centerY: Double, val centerZ: Double,
+    val normalX: Double, val normalY: Double, val normalZ: Double,
+    val uAxisX: Double, val uAxisY: Double, val uAxisZ: Double,
+    val vAxisX: Double, val vAxisY: Double, val vAxisZ: Double,
+)

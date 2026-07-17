@@ -43,6 +43,9 @@ data class ClientDisplaySettings(
 
     /** Whether the viewer pinned this display to a Picture-in-Picture overlay; re-opened on rejoin regardless of render distance. */
     var pipOpen: Boolean = false,
+
+    /** Whether the 3D acoustics engine applies to this display; false forces the legacy distance-gain-only path. */
+    var acousticsEnabled: Boolean = true,
 ) {
 
     companion object {

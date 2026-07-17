@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.displays
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.audio.AudioAcousticsServices
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
@@ -50,9 +51,10 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         screen.onVideoSwapped(videoUrl, lang)
         DisplayRegistry.recordScreen(screen)
         val shouldBePaused = preservePausedState && screen.paused
+        val audioStage = DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.registerSource(screen.uuid)
         val newPlayer = MediaPlayer(
             videoUrl, lang, DisplayPlaybackHost(screen), DreamPlaybackEnvironment,
-            screen.takeReplayBootstrap(videoUrl),
+            screen.takeReplayBootstrap(videoUrl), audioStage,
         )
         player = newPlayer
         screen.timelineFollower.onPlayerCreated()

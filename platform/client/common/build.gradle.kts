@@ -16,6 +16,7 @@ dependencies {
     api(project(":media:runtime"))
     api(project(":media:player"))
     api(project(":media:source"))
+    api(project(":media:audio"))
     api(project(":util"))
     api(libs.jspecify)
     api(libs.commonsCompress)
