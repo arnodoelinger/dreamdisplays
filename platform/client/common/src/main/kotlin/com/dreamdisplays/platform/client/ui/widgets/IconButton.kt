@@ -3,6 +3,9 @@ package com.dreamdisplays.platform.client.ui.widgets
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
+//? if >=1.21.11 {
+import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.components.WidgetSprites
 //? if >=1.21.11 {
@@ -38,6 +41,8 @@ class IconButton(
     constructor(icon: String, onPress: () -> Unit) :
             this(icon = { modIcon(icon) }, onPress = onPress)
 
+    override fun handlesWholeWidgetCursor(): Boolean = false
+
     // NeoForge deprecates the 2-arg onClick and reroutes mouseClicked to a Neo-only 3-arg overload that
     // Fabric lacks, so the legacy (1.21.1) branch overrides mouseClicked itself — the one click hook
     // that fires on both platforms.
@@ -71,6 +76,11 @@ class IconButton(
         //?} else
         /*g.blitSprite(icon(), dx, dy, iconSide, iconSide)*/
         g.disableScissor()
+        //? if >=1.21.11 {
+        if (isHovered) {
+            g.requestCursor(if (active) CursorTypes.POINTING_HAND else CursorTypes.NOT_ALLOWED)
+        }
+        //?}
     }
 
     companion object {

@@ -2,6 +2,9 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
+//? if >=1.21.11 {
+import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -35,6 +38,8 @@ class ModeSlider<T : Any>(
     private var sliderFocused: Boolean = false
     private var pendingMode: T? = null
     private var pendingUntilNanos: Long = 0L
+
+    override fun handlesWholeWidgetCursor(): Boolean = false
 
     /**
      * Re-syncs [mode] with [current], honoring a still-pending [onApply] (e.g. one still awaiting a
@@ -77,6 +82,11 @@ class ModeSlider<T : Any>(
         /*g.blitSprite(handleSprite(), handleX, y, 8, height)*/
         val color = if (active) 0xFFFFFF else 0xA0A0A0
         drawScrollingLabel(g, label(mode).copy().withStyle { it.withColor(color) }, 2)
+        //? if >=1.21.11 {
+        if (isHovered) {
+            g.requestCursor(if (active) CursorTypes.POINTING_HAND else CursorTypes.NOT_ALLOWED)
+        }
+        //?}
     }
 
     /**

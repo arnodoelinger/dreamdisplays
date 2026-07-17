@@ -2,6 +2,9 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
+//? if >=1.21.11 {
+import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
@@ -34,6 +37,8 @@ class ToggleSwitch(
 
     private var sliderFocused: Boolean = false
 
+    override fun handlesWholeWidgetCursor(): Boolean = false
+
     /** Sets the state to [newValue]; fires [onApply] only when the state actually changes. */
     fun set(newValue: Boolean) {
         if (value != newValue) {
@@ -62,6 +67,11 @@ class ToggleSwitch(
         /*g.blitSprite(handleSprite(), handleX, y, 8, height)*/
         val color = if (active) 0xFFFFFF else 0xA0A0A0
         drawScrollingLabel(g, label(value).copy().withStyle { it.withColor(color) }, 2)
+        //? if >=1.21.11 {
+        if (isHovered) {
+            g.requestCursor(if (active) CursorTypes.POINTING_HAND else CursorTypes.NOT_ALLOWED)
+        }
+        //?}
     }
 
     // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
