@@ -55,12 +55,14 @@ class IconButton(
     }*/
 
     override fun draw(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {
+        if (width <= 0 || height <= 0) return
         val sprite = sprites.get(active, isHoveredOrFocused)
         //? if >=1.21.11 {
         g.blitSprite(RenderPipelines.GUI_TEXTURED, sprite, x, y, width, height, ARGB.white(alpha))
         //?} else
         /*g.blitSprite(sprite, x, y, width, height)*/
 
+        g.enableScissor(x, y, x + width, y + height)
         val iconSide = max(width - 2 * margin, height - 2 * margin)
         val dx = x + width / 2 - iconSide / 2
         val dy = y + height / 2 - iconSide / 2
@@ -68,6 +70,7 @@ class IconButton(
         g.blitSprite(RenderPipelines.GUI_TEXTURED, icon(), dx, dy, iconSide, iconSide, ARGB.white(alpha))
         //?} else
         /*g.blitSprite(icon(), dx, dy, iconSide, iconSide)*/
+        g.disableScissor()
     }
 
     companion object {

@@ -112,7 +112,7 @@ class PreviewSection(
         val audioGap = (4 * audioPresence).roundToInt()
         val audioBtnLeft = audioSlotRight - audioBtnW
         audioTrackButton.place(UiRect(audioBtnLeft, controlsRowY, audioBtnW, btn))
-        audioTrackButton.alpha = audioPresence
+        audioTrackButton.setAlpha(audioPresence)
 
         val progX = volumeX + VOLUME_W + 4
         val progW = max(40, (audioBtnLeft - audioGap) - progX)
