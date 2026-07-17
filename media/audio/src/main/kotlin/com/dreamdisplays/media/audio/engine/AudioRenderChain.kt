@@ -60,6 +60,8 @@ internal class AudioRenderChain(
     private val limiter = Limiter(sampleRate)
     private val leftBinaural = ParametricBinaural(sampleRate)
     private val rightBinaural = ParametricBinaural(sampleRate)
+    private val leftPanner = StereoPanner()
+    private val rightPanner = StereoPanner()
 
     private val distanceGainL = ParamSmoother(GAIN_SMOOTH_SECONDS, 1f)
     private val distanceGainR = ParamSmoother(GAIN_SMOOTH_SECONDS, 1f)
@@ -182,11 +184,10 @@ internal class AudioRenderChain(
                 floatL[i] = outL
                 floatR[i] = outR
             } else {
-                StereoPanner.pan(l, azL.toDouble())
-                val panL = StereoPanner.lastL; val panR = StereoPanner.lastR
-                StereoPanner.pan(r, azR.toDouble())
-                var outL = panL + StereoPanner.lastL
-                var outR = panR + StereoPanner.lastR
+                leftPanner.pan(l, azL.toDouble())
+                rightPanner.pan(r, azR.toDouble())
+                var outL = leftPanner.lastL + rightPanner.lastL
+                var outR = leftPanner.lastR + rightPanner.lastR
 
                 if (reverbActive) {
                     reverb.process((l + r) * 0.5f)

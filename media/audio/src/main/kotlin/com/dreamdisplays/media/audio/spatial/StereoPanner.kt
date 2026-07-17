@@ -4,9 +4,16 @@ import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** Constant-power stereo pan used for the "speakers" output profile (no binaural processing). */
-object StereoPanner {
-    private val HALF_PI = (PI / 2.0)
+/**
+ * Constant-power stereo pan used for the "speakers" output profile (no binaural processing). One
+ * instance is needed per emitter (mirroring [ParametricBinaural]) since [lastL] / [lastR] are shared
+ * mutable state.
+ */
+class StereoPanner {
+    private companion object {
+        val HALF_PI = (PI / 2.0)
+    }
+
     var lastL = 0f
     var lastR = 0f
 
