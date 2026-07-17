@@ -114,6 +114,8 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
+
+
 # Determine the Java command to use to start the JVM.
 if [ -n "$JAVA_HOME" ] ; then
     if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
@@ -205,6 +207,7 @@ DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
 #     and any embedded shellness will be escaped.
 #   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
 #     treated as '${Hostname}' itself on the command line.
+
 set -- \
         "-Dorg.gradle.appname=$APP_BASE_NAME" \
         -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
@@ -234,6 +237,7 @@ fi
 # This will of course break if any of these variables contains a newline or
 # an unmatched quote.
 #
+
 eval "set -- $(
         printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
         xargs -n1 |
