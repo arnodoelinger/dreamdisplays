@@ -67,7 +67,7 @@ class PreviewSection(
     }
 
     /** Draws the panel content into [panel] and lays out the controls row along its bottom edge. */
-    fun render(g: GuiGraphicsCompat, panel: UiRect) {
+    fun render(g: GuiGraphicsCompat, panel: UiRect, mouseX: Int, mouseY: Int) {
         val font = Minecraft.getInstance().font
         val btn = UiTheme.CONTROL_BUTTON
         val innerX = panel.x + UiTheme.PANEL_PADDING_X
@@ -91,7 +91,7 @@ class PreviewSection(
         val progW = max(40, (controlsRight - btn * 2 - 8) - progX)
         progress.place(UiRect(progX, controlsRowY, progW, btn))
 
-        dropdown.draw(g, popoutButton.x, popoutButton.y)
+        dropdown.draw(g, popoutButton.x, popoutButton.y, mouseX, mouseY)
     }
 
     /** Draws the letterboxed video frame, or the dimmed thumbnail + waiting text while loading. */
@@ -106,7 +106,7 @@ class PreviewSection(
         if (currentSource() != null) {
             drawAmbientBackdrop(g, x, y, w, h)
         } else {
-            g.fill(x, y, x + w, y + h, 0xFF000000.toInt())
+            g.fill(x, y, x + w, y + h, UiTheme.VIDEO_BACKDROP)
         }
 
         val area = UiRect(x, y, w, h)
@@ -209,7 +209,7 @@ class PreviewSection(
         when {
             thumb != null -> {
                 blitTexture(g, thumb, box.x, box.y, box.w, box.h)
-                g.fill(box.x, box.y, box.right, box.bottom, 0x80000000.toInt())
+                g.fill(box.x, box.y, box.right, box.bottom, UiTheme.THUMB_DIM_SCRIM)
             }
             // Something is assigned and loading, just no thumbnail decoded yet: a neat shimmer
             currentSource() != null ->
@@ -377,7 +377,7 @@ class PreviewSection(
         val ambient = live ?: id?.let { Thumbnails.ambientTexture(it) }
         if (ambient != null) {
             blitTexture(g, ambient, x, y, w, h)
-            g.fill(x, y, x + w, y + h, 0x50000000)
+            g.fill(x, y, x + w, y + h, UiTheme.AMBIENT_SCRIM)
         } else {
             // Warm the thumbnail even while the video plays, so the backdrop appears once it decodes
             // (request de-dups, so calling it per frame is cheap).

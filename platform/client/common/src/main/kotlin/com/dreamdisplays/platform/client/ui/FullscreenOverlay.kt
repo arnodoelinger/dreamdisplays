@@ -6,6 +6,10 @@ import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import com.mojang.blaze3d.platform.NativeImage
 //? if >=1.21.11 {
 //?} else
@@ -180,7 +184,7 @@ class FullscreenOverlay(
 
         // Backdrop: opaque black for immersive, translucent scrim for standard
         val scrimAlpha = if (mode == FullscreenMode.IMMERSIVE) alpha else SCRIM_ALPHA * alpha
-        g.fill(0, 0, sw, sh, blendColor(0xFF000000.toInt(), scrimAlpha))
+        g.fill(0, 0, sw, sh, scaleAlpha(0xFF000000.toInt(), scrimAlpha))
 
         val id = textureId ?: return true
         val fw = texW
@@ -229,13 +233,13 @@ class FullscreenOverlay(
             content.h,
             fw,
             fh,
-            blendColor(0xFFFFFFFF.toInt(), alpha),
+            scaleAlpha(0xFFFFFFFF.toInt(), alpha),
         )
         //?} else
         /*RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc(); g.setColor(1f, 1f, 1f, alpha); g.blit(id, 0, 0, vw, vh, content.x.toFloat(), content.y.toFloat(), content.w, content.h, fw, fh); g.setColor(1f, 1f, 1f, 1f)*/
 
         if (mode == FullscreenMode.STANDARD) {
-            outline(g, 0, 0, vw, vh, blendColor(PANEL_BORDER, alpha))
+            g.drawOutline(UiRect(0, 0, vw, vh), scaleAlpha(UiTheme.PANEL_BORDER, alpha))
         }
 
         //? if >=1.21.11 {
@@ -290,20 +294,6 @@ class FullscreenOverlay(
 
         /** Scrim opacity behind the video in [FullscreenMode.STANDARD]. */
         private const val SCRIM_ALPHA = 0.72f
-
-        private const val PANEL_BORDER = 0xFF606060.toInt()
-
-        private fun outline(g: GuiGraphicsCompat, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
-            g.fill(x1, y1, x2, y1 + 1, color)
-            g.fill(x1, y2 - 1, x2, y2, color)
-            g.fill(x1, y1, x1 + 1, y2, color)
-            g.fill(x2 - 1, y1, x2, y2, color)
-        }
-
-        private fun blendColor(color: Int, alpha: Float): Int {
-            val a = ((color ushr 24 and 0xFF) * alpha).toInt().coerceIn(0, 255)
-            return (a shl 24) or (color and 0x00FFFFFF)
-        }
     }
 
     private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)
