@@ -20,7 +20,6 @@ import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.media.FramePixelFormat
 import com.dreamdisplays.api.media.player.GpuTextureRef
 import org.slf4j.LoggerFactory
@@ -661,7 +660,7 @@ class MediaPlayer(
 
     /**
      * Called by [PlaybackSessionManager] via [onStreamEnd] when a stream finishes.
-     * Delegates the retry decision to [RetryPolicy]; stops Local on normal EOS for VOD;
+     * Delegates the retry decision to [RetryPolicy]; loops VOD playback on normal EOS;
      * marks the screen as errored on unrecoverable failure.
      */
     private fun handleStreamEnd(stderr: String, normalEos: Boolean) {
@@ -690,8 +689,7 @@ class MediaPlayer(
         }
 
         if (normalEos && !liveStream) {
-            if (host.effectiveMode == PlaybackMode.LOCAL) completeVodPlayback()
-            else restartFromBeginning()
+            restartFromBeginning()
             return
         }
 
@@ -702,7 +700,7 @@ class MediaPlayer(
         host.mediaError = DreamMediaException.Decode("Unrecoverable stream failure", isFatal = true)
     }
 
-    /** Loops non-local VOD modes after a normal end, seeking back to 0 in place when possible so the
+    /** Loops VOD playback after a normal end, seeking back to 0 in place when possible so the
      *  wrap-around holds the last frame instead of blanking through a cold restart. */
     private fun restartFromBeginning() {
         if (!restartPending.compareAndSet(false, true)) return
@@ -720,19 +718,6 @@ class MediaPlayer(
             } finally {
                 restartPending.set(false)
             }
-        }
-    }
-
-    /** Stops a non-looping VOD at its end, keeping the last uploaded frame on screen. */
-    private fun completeVodPlayback() {
-        safeExecute {
-            if (terminated.get()) return@safeExecute
-            val endPosition = durationHintNanos.takeIf { it > 0L } ?: clock.currentTime().coerceAtLeast(0L)
-            endedAtEnd.set(true)
-            clock.seekOffsetNanos = endPosition
-            state.set(PlaybackState.PAUSED)
-            env.renderExecutor.execute { host.onPlaybackEnded(endPosition) }
-            stopSession()
         }
     }
 
