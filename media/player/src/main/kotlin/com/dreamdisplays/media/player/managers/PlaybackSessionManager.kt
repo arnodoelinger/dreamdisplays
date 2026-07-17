@@ -351,8 +351,14 @@ internal class PlaybackSessionManager(
      *
      * @param lastQuality last confirmed quality in pixels; 0 = derive from stream metadata
      * @param live true for a live stream; selects the JVM-fed HLS audio transport (see [buildAudioProcess])
+     * @param onFirstFrame invoked once the first real video frame actually decodes — the caller's
+     * signal that this session is genuinely playing, not just that its process launched (a launched
+     * `FFmpeg` / LAV session can still fail moments later, e.g. a 403 on the resolved URL).
      */
-    fun start(streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend, live: Boolean = false) {
+    fun start(
+        streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend, live: Boolean = false,
+        onFirstFrame: () -> Unit = {},
+    ) {
         stop()
         if (terminated.get()) return
         liveSession = live
@@ -372,6 +378,7 @@ internal class PlaybackSessionManager(
             channel.launch(ffmpeg, streamSet, w, h, offsetNanos, hwAccel, onFirstFrame = {
                 clock.markFirstFrame()
                 firstVideoFrame.countDown()
+                onFirstFrame()
             }, onEos = onStreamEnd, parkFlag = parkFlag)
             val aStop = AtomicBoolean()
             val ap = try {

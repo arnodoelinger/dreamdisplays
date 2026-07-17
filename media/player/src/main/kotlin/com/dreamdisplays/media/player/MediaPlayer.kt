@@ -573,7 +573,6 @@ class MediaPlayer(
             streams = prepared.streamSet
             lastQuality = MediaStreamSelector.parseQuality(prepared.streamSet.currentVideo)
             host.videoContentAspect = prepared.streamSet.currentVideo.contentAspect()
-            retryPolicy.reset()
 
             if (DEBUG) {
                 logger.debug("$debugLabel video=${prepared.streamSet.currentVideo} audio=${prepared.streamSet.currentAudio}")
@@ -622,7 +621,7 @@ class MediaPlayer(
         host.cancelQualityHandoff()
         sessionStartNanos = System.nanoTime()
         audioRestartAttempts.set(0)
-        sessionManager.start(streamSet, offsetNanos, lastQuality, currentHwAccel(), live = liveStream)
+        sessionManager.start(streamSet, offsetNanos, lastQuality, currentHwAccel(), live = liveStream, onFirstFrame = retryPolicy::reset)
         if (sessionManager.isPlaying) {
             state.set(PlaybackState.PLAYING)
             watchdog.start()
