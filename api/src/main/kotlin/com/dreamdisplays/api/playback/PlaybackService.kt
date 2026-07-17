@@ -35,6 +35,9 @@ interface PlaybackService {
     /** Sets the preferred video quality for [displayId]. */
     fun setQuality(displayId: DisplayId, quality: VideoQuality)
 
+    /** Sets the active audio track for [displayId], identified by its resolved stream URL. */
+    fun setAudioTrack(displayId: DisplayId, trackUrl: String)
+
     /** Sets the brightness multiplier (0.0–2.0) for [displayId]. */
     fun setBrightness(displayId: DisplayId, brightness: Float)
 

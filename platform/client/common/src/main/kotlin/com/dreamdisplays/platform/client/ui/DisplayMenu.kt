@@ -16,6 +16,7 @@ import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
 import com.dreamdisplays.platform.client.ui.kit.drawPanel
 import com.dreamdisplays.platform.client.ui.menu.ErrorPanel
 import com.dreamdisplays.platform.client.ui.menu.MenuLayout
+import com.dreamdisplays.platform.client.ui.menu.AudioTrackDropdown
 import com.dreamdisplays.platform.client.ui.menu.ModTitleLabel
 import com.dreamdisplays.platform.client.ui.menu.PopoutDropdown
 import com.dreamdisplays.platform.client.ui.menu.PreviewSection
@@ -65,6 +66,15 @@ class DisplayMenu private constructor(
         onFullscreen = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.STANDARD); onClose() },
         onBorderless = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.IMMERSIVE); onClose() },
     )
+    private val audioTrackDropdown = AudioTrackDropdown(
+        getTracks = { displayScreen.audioTrackList },
+        currentUrl = { displayScreen.currentAudioTrackUrl },
+        // Routed through the playback service (client-local, per-viewer) like every other control.
+        onSelect = {
+            DreamServices.registry.get(PlaybackServices.PLAYBACK)
+                .setAudioTrack(DisplayId(displayScreen.uuid), it.url)
+        },
+    )
 
     private lateinit var volume: ValueSlider
     private lateinit var renderD: ValueSlider
@@ -78,6 +88,7 @@ class DisplayMenu private constructor(
     private lateinit var settings: SettingsSection
     private lateinit var errorPanel: ErrorPanel
     private lateinit var popoutButton: IconButton
+    private lateinit var audioTrackButton: IconButton
 
     private var lastSuggestedVideoId: String? = null
     private var prevQualityListSize = 0
@@ -261,6 +272,10 @@ class DisplayMenu private constructor(
         popoutButton.enabledWhen = { videoReady() && (ds.canPopoutHere || ds.isPopoutActive) }
         popoutButton.visibleWhen = notErrored
 
+        audioTrackButton = addUi(IconButton("lang") { audioTrackDropdown.toggle() })
+        audioTrackButton.enabledWhen = { videoReady() && ds.audioTrackList.size > 1 }
+        audioTrackButton.visibleWhen = { videoReady() && ds.audioTrackList.size > 1 }
+
         val pauseButton = addUi(
             IconButton(
                 icon = { IconButton.modIcon(if (ds.isPaused) "play" else "pause") },
@@ -333,7 +348,10 @@ class DisplayMenu private constructor(
         suggestions.available = { ds.canSetVideoHere }
 
         preview =
-            PreviewSection(ds, muteButton, volume, popoutButton, pauseButton, progress, dropdown)
+            PreviewSection(
+                ds, muteButton, volume, popoutButton, audioTrackButton, pauseButton, progress,
+                dropdown, audioTrackDropdown,
+            )
         settings = SettingsSection(
             rows = settingsRows(renderDReset, qualityReset, brightnessReset, audio3dReset, syncReset),
             ownerActions = listOf(reportButton, deleteButton, lockButton),
@@ -536,6 +554,8 @@ class DisplayMenu private constructor(
         val my = event.y().toInt()
         val onPopoutButton = popoutButton.isMouseOver(mx.toDouble(), my.toDouble())
         if (dropdown.visible && event.button() == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
+        val onAudioTrackButton = audioTrackButton.isMouseOver(mx.toDouble(), my.toDouble())
+        if (audioTrackDropdown.visible && event.button() == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 
@@ -546,6 +566,8 @@ class DisplayMenu private constructor(
         val my = mouseY.toInt()
         val onPopoutButton = popoutButton.isMouseOver(mouseX, mouseY)
         if (dropdown.visible && button == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
+        val onAudioTrackButton = audioTrackButton.isMouseOver(mouseX, mouseY)
+        if (audioTrackDropdown.visible && button == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 

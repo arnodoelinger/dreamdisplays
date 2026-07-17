@@ -49,9 +49,11 @@ class PreviewSection(
     private val muteButton: IconButton,
     private val volume: ValueSlider,
     private val popoutButton: IconButton,
+    private val audioTrackButton: IconButton,
     private val pauseButton: IconButton,
     private val progress: SeekBar,
     private val dropdown: PopoutDropdown,
+    private val audioTrackDropdown: AudioTrackDropdown,
 ) {
     private val yuvPreview = PreviewFrameTexture(ds)
     private val ambientSampler = AmbientFrameSampler(ds)
@@ -81,17 +83,21 @@ class PreviewSection(
         drawVideoArea(g, innerX, innerY, innerW, previewMaxH)
         drawTitleOverlay(g, innerX, innerY + previewMaxH, innerW)
 
-        // Controls row: [mute][volume] [progress........] [popout][pause]
+        // Controls row: [mute][volume] [progress........] [audio][popout][pause]
         muteButton.place(UiRect(innerX, controlsRowY, btn, btn))
         val volumeX = innerX + btn + 4
         volume.place(UiRect(volumeX, controlsRowY, VOLUME_W, btn))
         pauseButton.place(UiRect(controlsRight - btn, controlsRowY, btn, btn))
         popoutButton.place(UiRect(controlsRight - btn * 2 - 4, controlsRowY, btn, btn))
+        audioTrackButton.place(UiRect(controlsRight - btn * 3 - 8, controlsRowY, btn, btn))
+        val hasAudioTracks = ds.audioTrackList.size > 1
+        val progRight = if (hasAudioTracks) controlsRight - btn * 3 - 12 else controlsRight - btn * 2 - 8
         val progX = volumeX + VOLUME_W + 4
-        val progW = max(40, (controlsRight - btn * 2 - 8) - progX)
+        val progW = max(40, progRight - progX)
         progress.place(UiRect(progX, controlsRowY, progW, btn))
 
         dropdown.draw(g, popoutButton.x, popoutButton.y, mouseX, mouseY)
+        audioTrackDropdown.draw(g, audioTrackButton.x, audioTrackButton.y, mouseX, mouseY)
     }
 
     /** Draws the letterboxed video frame, or the dimmed thumbnail + waiting text while loading. */

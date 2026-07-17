@@ -37,6 +37,7 @@ import com.dreamdisplays.util.FacingUtil
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.audio.AcousticEnvironment
 import com.dreamdisplays.api.media.audio.AcousticQuality
 import com.dreamdisplays.api.media.audio.AudioAcousticsServices
@@ -242,6 +243,17 @@ class DisplayScreen(
         }
 
     /**
+     * Requested audio track, identified by its resolved stream URL; writes push the choice to the
+     * player, which respawns only the audio line. Not persisted — track URLs are re-resolved per
+     * video, so there's nothing stable to save across sessions.
+     */
+    var audioTrack: String = ""
+        set(value) {
+            field = value
+            mediaPlayer?.setAudioTrack(value)
+        }
+
+    /**
      * In Broadcast ([qualityCap] > 0) every client is pinned to the highest allowed quality (the
      * cap, e.g. 360p) regardless of the user's saved setting; otherwise the user's [requested]
      * quality is used unchanged.
@@ -405,6 +417,14 @@ class DisplayScreen(
     /** Pixel heights of the qualities available for the current video. */
     val qualityList: List<Int>
         get() = mediaPlayer?.getAvailableQualities() ?: emptyList()
+
+    /** Audio tracks available for the current video (more than one only when the provider exposes dubs). */
+    val audioTrackList: List<MediaStream>
+        get() = mediaPlayer?.getAvailableAudioTracks() ?: emptyList()
+
+    /** Resolved URL of the audio track currently playing, or empty before a stream has resolved. */
+    val currentAudioTrackUrl: String
+        get() = mediaPlayer?.getCurrentAudioTrack() ?: ""
 
     init {
         // Ask the server for the current timeline / session; it replies only if it has one

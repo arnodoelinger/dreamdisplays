@@ -118,6 +118,13 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
         return screen.toDisplay()
     }
 
+    /** Sets the active audio track by its resolved stream [trackUrl]. */
+    override fun setAudioTrack(displayId: DisplayId, trackUrl: String): Display? {
+        val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
+        screen.audioTrack = trackUrl
+        return screen.toDisplay()
+    }
+
     /** Sets the display [brightness]. */
     override fun setBrightness(displayId: DisplayId, brightness: Float): Display? {
         val screen = DisplayRegistry.screens[displayId.uuid] ?: return null

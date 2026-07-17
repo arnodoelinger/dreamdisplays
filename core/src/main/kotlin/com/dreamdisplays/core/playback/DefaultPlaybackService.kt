@@ -35,6 +35,9 @@ class DefaultPlaybackService(
     /** Set the preferred video quality for a display. */
     override fun setQuality(displayId: DisplayId, quality: VideoQuality) = playback.setQuality(displayId, quality)
 
+    /** Set the active audio track for a display. */
+    override fun setAudioTrack(displayId: DisplayId, trackUrl: String) = playback.setAudioTrack(displayId, trackUrl)
+
     /** Set the brightness multiplier for a display. */
     override fun setBrightness(displayId: DisplayId, brightness: Float) = playback.setBrightness(displayId, brightness)
 
