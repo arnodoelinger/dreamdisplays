@@ -162,24 +162,46 @@ internal class AudioRenderChain(
             val l = srcL * gL * userGain * makeup * occGain
             val r = srcR * gR * userGain * makeup * occGain
 
-            val lPair = if (binaural) leftBinaural.renderSample(l) else StereoPanner.pan(l, azL.toDouble())
-            val rPair = if (binaural) rightBinaural.renderSample(r) else StereoPanner.pan(r, azR.toDouble())
+            if (binaural) {
+                leftBinaural.renderSample(l)
+                rightBinaural.renderSample(r)
+                var outL = leftBinaural.lastL + rightBinaural.lastL
+                var outR = leftBinaural.lastR + rightBinaural.lastR
 
-            var outL = lPair[0] + rPair[0]
-            var outR = lPair[1] + rPair[1]
+                if (reverbActive) {
+                    reverb.process((l + r) * 0.5f)
+                    outL += reverb.lastL * wetGain
+                    outR += reverb.lastR * wetGain
+                }
 
-            if (reverbActive) {
-                val wet = reverb.process((l + r) * 0.5f)
-                outL += wet[0] * wetGain
-                outR += wet[1] * wetGain
+                if (advanced) {
+                    limiter.process(outL, outR)
+                    outL = limiter.lastL
+                    outR = limiter.lastR
+                }
+                floatL[i] = outL
+                floatR[i] = outR
+            } else {
+                StereoPanner.pan(l, azL.toDouble())
+                val panL = StereoPanner.lastL; val panR = StereoPanner.lastR
+                StereoPanner.pan(r, azR.toDouble())
+                var outL = panL + StereoPanner.lastL
+                var outR = panR + StereoPanner.lastR
+
+                if (reverbActive) {
+                    reverb.process((l + r) * 0.5f)
+                    outL += reverb.lastL * wetGain
+                    outR += reverb.lastR * wetGain
+                }
+
+                if (advanced) {
+                    limiter.process(outL, outR)
+                    outL = limiter.lastL
+                    outR = limiter.lastR
+                }
+                floatL[i] = outL
+                floatR[i] = outR
             }
-
-            if (advanced) {
-                val limited = limiter.process(outL, outR)
-                outL = limited[0]; outR = limited[1]
-            }
-            floatL[i] = outL
-            floatR[i] = outR
         }
 
         encode(buf, frames)

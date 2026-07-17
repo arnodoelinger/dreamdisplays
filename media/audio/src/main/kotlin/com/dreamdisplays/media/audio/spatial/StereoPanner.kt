@@ -7,11 +7,14 @@ import kotlin.math.sin
 /** Constant-power stereo pan used for the "speakers" output profile (no binaural processing). */
 object StereoPanner {
     private val HALF_PI = (PI / 2.0)
+    var lastL = 0f
+    var lastR = 0f
 
-    /** Pans a mono [sample] to `[left, right]` given [azimuthRad] in `[-PI/2, PI/2]` (0 = center). */
-    fun pan(sample: Float, azimuthRad: Double): FloatArray {
+    /** Pans a mono [sample] to `[left, right]` given [azimuthRad], storing result in [lastL] and [lastR]. */
+    fun pan(sample: Float, azimuthRad: Double) {
         val t = (azimuthRad.coerceIn(-HALF_PI, HALF_PI) / HALF_PI + 1.0) / 2.0 // 0 = left .. 1 = right
         val angle = t * HALF_PI
-        return floatArrayOf((sample * cos(angle)).toFloat(), (sample * sin(angle)).toFloat())
+        lastL = (sample * cos(angle)).toFloat()
+        lastR = (sample * sin(angle)).toFloat()
     }
 }

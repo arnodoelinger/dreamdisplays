@@ -37,6 +37,9 @@ class Reverb(sampleRate: Float) {
     private val allpassL = ALLPASS_TUNING.map { AllpassFilter(scaled(it), ALLPASS_FEEDBACK) }
     private val allpassR = ALLPASS_TUNING.map { AllpassFilter(scaled(it + STEREO_SPREAD), ALLPASS_FEEDBACK) }
 
+    var lastL = 0f
+    var lastR = 0f
+
     /**
      * Sets the tail length and tone from [roomSize] (0 = tight, 1 = cavernous) and [damping]
      * (0 = bright/hard walls, 1 = dark / soft). Call once per block; [process] reuses the cached values.
@@ -48,15 +51,15 @@ class Reverb(sampleRate: Float) {
         combsR.forEach { it.feedback = feedback; it.damp = damp }
     }
 
-    /** Renders one mono [input] sample into a wet `[left, right]` pair. */
-    fun process(input: Float): FloatArray {
+    /** Renders one mono [input] sample into a wet pair, storing result in [lastL] and [lastR]. */
+    fun process(input: Float) {
         val fed = input * GAIN
         var l = 0f
         var r = 0f
         for (i in combsL.indices) { l += combsL[i].process(fed); r += combsR[i].process(fed) }
         for (ap in allpassL) l = ap.process(l)
         for (ap in allpassR) r = ap.process(r)
-        return floatArrayOf(l, r)
+        lastL = l; lastR = r
     }
 
     /** Clears every comb / all-pass buffer so a stale tail never bleeds into a fresh session. */

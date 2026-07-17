@@ -16,15 +16,17 @@ class Limiter(sampleRate: Float, private val ceiling: Float = 0.891f /* -1 dBFS 
     private val releaseCoeff = exp(-1f / (0.080f * sampleRate)) // ~80ms gain release
     private var peakEnv = 0f
     private var gain = 1f
+    var lastL = 0f
+    var lastR = 0f
 
     /**
-     * Applies linked-stereo gain reduction to one L / R sample pair in place, returning the pair. The
-     * raw instantaneous sample is fed through a peak-hold-with-decay envelope first (decaying slower
+     * Applies linked-stereo gain reduction to one L / R sample pair, storing result in [lastL] and [lastR].
+     * The raw instantaneous sample is fed through a peak-hold-with-decay envelope first (decaying slower
      * than one audio cycle, or it would ripple and let the gain relax back up mid-cycle); the smoothed
      * gain is then a defense-in-depth measure, not the sole guarantee, so the result is also hard
      * clamped to the ceiling.
      */
-    fun process(l: Float, r: Float): FloatArray {
+    fun process(l: Float, r: Float) {
         val instant = max(abs(l), abs(r))
         peakEnv = max(instant, peakEnv * peakDecayCoeff)
         val targetGain = if (peakEnv > 1e-9f) minOf(1f, ceiling / peakEnv) else 1f
@@ -33,7 +35,8 @@ class Limiter(sampleRate: Float, private val ceiling: Float = 0.891f /* -1 dBFS 
         } else {
             targetGain + (gain - targetGain) * releaseCoeff
         }
-        return floatArrayOf((l * gain).coerceIn(-ceiling, ceiling), (r * gain).coerceIn(-ceiling, ceiling))
+        lastL = (l * gain).coerceIn(-ceiling, ceiling)
+        lastR = (r * gain).coerceIn(-ceiling, ceiling)
     }
 
     /** Resets the peak envelope and gain-reduction state (call on session reset). */

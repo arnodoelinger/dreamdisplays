@@ -27,6 +27,8 @@ class ParametricBinaural(private val sampleRate: Float) {
     private var itdSamples = 0f
     private var farIsRight = true
     private var farGain = 1f
+    var lastL = 0f
+    var lastR = 0f
 
     /**
      * Recomputes ITD / ILD / head-shadow cutoff from [azimuthRad] (0 = ahead, positive = to the
@@ -43,12 +45,12 @@ class ParametricBinaural(private val sampleRate: Float) {
         shadowFilter.configure(Biquad.Type.LOW_PASS, sampleRate, cutoff, 0.7f)
     }
 
-    /** Renders one mono [sample] into a binaural `[left, right]` pair using the last [updateParams] call. */
-    fun renderSample(sample: Float): FloatArray {
+    /** Renders one mono [sample] into a binaural pair, storing result in [lastL] and [lastR]. */
+    fun renderSample(sample: Float) {
         delayLine.push(sample)
         val near = delayLine.read(0f)
         val far = shadowFilter.process(delayLine.read(itdSamples)) * farGain
-        return if (farIsRight) floatArrayOf(near, far) else floatArrayOf(far, near)
+        if (farIsRight) { lastL = near; lastR = far } else { lastL = far; lastR = near }
     }
 
     /** Clears delay-line and filter state (call on session reset). */
