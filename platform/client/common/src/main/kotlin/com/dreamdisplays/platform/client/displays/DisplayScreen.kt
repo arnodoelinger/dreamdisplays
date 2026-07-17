@@ -983,8 +983,8 @@ class DisplayScreen(
     /** Last raytraced acoustic environment, refreshed on the [ENV_PROBE_INTERVAL_TICKS] cadence. */
     private var cachedEnvironment: AcousticEnvironment = AcousticEnvironment.OPEN_AIR
 
-    /** Ticks remaining before the next voxel-acoustics re-probe. */
-    private var envProbeCountdown: Int = 0
+    /** Ticks remaining before the next voxel-acoustics re-probe; jittered per-display to avoid synchronized spikes. */
+    private var envProbeCountdown: Int = uuid.hashCode().mod(ENV_PROBE_INTERVAL_TICKS)
 
     /** Called every game tick to update distance-based volume attenuation from [pos]. */
     fun tick(pos: BlockPos) {
