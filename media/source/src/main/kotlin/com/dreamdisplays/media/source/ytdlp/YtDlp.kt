@@ -276,13 +276,16 @@ object YtDlp {
             logger.debug("yt-dlp resolve did not settle for {}: {}.", videoUrl, e.message?.take(200))
             emptyList()
         }
-        if (viaYtDlp.isNotEmpty()) return viaYtDlp
-
-        // Every yt-dlp client failed; a 360p-only NewPipeExtractor result still beats no playback at all.
+        if (YtStreams.offersQualityLadder(viaYtDlp)) return viaYtDlp
         if (viaNewPipe.isNotEmpty()) {
-            logger.warn("yt-dlp clients all failed for $videoUrl; using NewPipeExtractor streams without a quality ladder.")
+            logger.warn(
+                "yt-dlp only produced a non-ladder fallback-client result for $videoUrl " +
+                        "(heights=${YtStreams.distinctHeights(viaYtDlp)}); using NewPipeExtractor's muxed " +
+                        "stream instead, since fallback yt-dlp clients are PO-token gated."
+            )
             return viaNewPipe
         }
+        if (viaYtDlp.isNotEmpty()) return viaYtDlp
         throw IOException("All yt-dlp clients failed for $videoUrl.")
     }
 
