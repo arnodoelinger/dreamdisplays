@@ -990,6 +990,7 @@ class DisplayScreen(
     fun tick(pos: BlockPos) {
         val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
         mediaPlayer?.tick(getDistanceToScreen(pos), maxRadius)
+        if (ClientStateManager.config.audioAcoustics == AcousticQuality.OFF) return
         val plane = toSourcePlane()
         DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.updateSource(
             uuid,
