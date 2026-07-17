@@ -206,7 +206,13 @@ internal class FramePrebuffer(
                 }
                 // Bail out of the pacing wait as soon as a seek flush or teardown is requested;
                 // a pre-seek frame must be dropped, never presented late against the new clock.
-                if (FramePacing.pace(tf.pts, getAudioClock, { flushRequested || !alive() }) || flushRequested) {
+                // dropStaleTimeline=false: the generation check just above already recycled any
+                // frame from a superseded timeline, so a large diff here can only be genuine
+                // same-timeline lag (e.g. a game-thread hitch delaying the audio line) — let it
+                // wait out / resolve through pace()'s own watchdog instead of being dropped as
+                // "stale" on sight, which used to make every subsequent frame drop the same way
+                // until a seek reset the audio clock (the picture reads as frozen indefinitely).
+                if (FramePacing.pace(tf.pts, getAudioClock, { flushRequested || !alive() }, dropStaleTimeline = false) || flushRequested) {
                     surface.recycleFrameBuffer(tf.buf)
                     continue
                 }
