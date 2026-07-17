@@ -14,6 +14,7 @@ import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.render.DisplayGeometry
 import com.dreamdisplays.platform.client.render.DisplayTextureResource
+import com.dreamdisplays.platform.client.render.PreviewFrameTexture
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.render.toUploadFormat
 import com.dreamdisplays.api.watchparty.WatchPartySession
@@ -518,6 +519,14 @@ class DisplayScreen(
         )
     }
 
+    /** Lazily created menu-preview texture, kept alive across menu close/reopen (see [PreviewFrameTexture]). */
+    @Transient
+    private var previewFrameCache: PreviewFrameTexture? = null
+
+    /** The display's persistent preview texture, created on first use and released in [unregister]. */
+    internal fun previewFrameTexture(): PreviewFrameTexture =
+        previewFrameCache ?: PreviewFrameTexture(uuid).also { previewFrameCache = it }
+
     /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
     fun updateData(packet: DisplayInfo) {
         x = packet.x
@@ -837,6 +846,8 @@ class DisplayScreen(
         currentPlayer?.stop()
 
         textureResource.releaseAsync()
+        previewFrameCache?.closeAsync()
+        previewFrameCache = null
 
         val mc = Minecraft.getInstance()
         val screen = MinecraftScreenUtil.currentScreen(mc)

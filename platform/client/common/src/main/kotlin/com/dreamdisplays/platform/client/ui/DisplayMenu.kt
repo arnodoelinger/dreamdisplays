@@ -296,6 +296,7 @@ class DisplayMenu private constructor(
                         key?.let { ScrubPreview.frameAt(it, nanos) }
                     }
                 },
+                waitingLabel = { if (!ds.isVideoStarted) Component.translatable("dreamdisplays.ui.waiting").string else null },
             ) { nanos ->
                 if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
                     playback.seek(displayId, (nanos / 1_000_000L).milliseconds)

@@ -196,25 +196,12 @@ class AudioTrackDropdown(
     companion object {
         private const val WIDTH = 90
         private const val ITEM_H = 18
-
-        /** Rows shown at once before the list pages; keeps the dropdown from spilling off-screen. */
         private const val MAX_VISIBLE = 7
-
-        /** DROPDOWN_SPRITE's nine-slice border thickness (see dropdown.png.mcmeta); text/highlights inset by this. */
         private const val BORDER = 3
-
-        /** Small vertical breathing room above the first row and below the last, so their highlight
-         *  boxes don't touch the frame's top/bottom border the way BORDER keeps them off the sides. */
         private const val PAD_V = 2
-
         private const val SCROLLBAR_W = 5
         private const val MIN_THUMB_H = 6
-
-        /** Scrollbar's own inset from the right edge — deliberately smaller than BORDER so the bar
-         *  reads as touching the frame's inner edge instead of floating with a visible gap. */
-        private const val SCROLLBAR_MARGIN = 1
-
-        /** Faint blue tint marking the currently playing track (accent at low alpha). */
+        private const val SCROLLBAR_MARGIN = 0
         private const val ACTIVE_FILL = 0x334A90E2
     }
 }

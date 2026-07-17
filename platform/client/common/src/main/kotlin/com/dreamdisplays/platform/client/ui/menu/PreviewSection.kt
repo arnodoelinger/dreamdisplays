@@ -15,6 +15,7 @@ import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.AmbientGrid
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.render.PreviewFrameTexture
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.api.media.MediaServices
@@ -56,11 +57,16 @@ class PreviewSection(
     private val dropdown: PopoutDropdown,
     private val audioTrackDropdown: AudioTrackDropdown,
 ) {
-    private val yuvPreview = PreviewFrameTexture(ds)
+    // Owned by DisplayScreen (not this section) so the last decoded frame — and its GPU texture —
+    // survive closing and reopening the menu instead of needing a fresh push before showing anything.
+    private val yuvPreview: PreviewFrameTexture = ds.previewFrameTexture()
     private val ambientSampler = AmbientFrameSampler(ds)
     private var frameSinkAttached = false
     private var lastVideoUrl: String? = null
-    private var audioPresence = 0f
+    // Starts at the CURRENT state rather than always 0 — otherwise every menu reopen replays the
+    // grow-in animation even when the track count was already known and settled from a previous
+    // session, which reads as the menu "always refreshing" something that hasn't actually changed.
+    private var audioPresence = if (ds.audioTrackList.size > 1) 1f else 0f
     private var lastPresenceFrameNanos = 0L
 
     companion object {
@@ -119,10 +125,8 @@ class PreviewSection(
         if (audioPresence > 0.01f) audioTrackDropdown.draw(g, audioBtnFinalCenterX, controlsRowY, mouseX, mouseY)
     }
 
-    /** Draws the letterboxed video frame, or the dimmed thumbnail + waiting text while loading. */
+    /** Draws the letterboxed video frame, or the dimmed thumbnail while loading. */
     private fun drawVideoArea(g: GuiGraphicsCompat, x: Int, y: Int, w: Int, h: Int) {
-        val font = Minecraft.getInstance().font
-
         if (ds.videoUrl != lastVideoUrl) {
             lastVideoUrl = ds.videoUrl
             ambientSampler.reset()
@@ -160,10 +164,10 @@ class PreviewSection(
             if (previewId != null) {
                 blitVideoTexture(g, previewId, video.x, video.y, video.w, video.h, yuvPreview.texW, yuvPreview.texH)
             } else {
-                drawWaiting(g, font, area)
+                drawWaiting(g, area)
             }
         } else {
-            drawWaiting(g, font, area)
+            drawWaiting(g, area)
         }
     }
 
@@ -227,7 +231,9 @@ class PreviewSection(
         /*g.blit(id, x, y, w, h, content.x.toFloat(), content.y.toFloat(), content.w, content.h, texW, texH)*/
     }
 
-    private fun drawWaiting(g: GuiGraphicsCompat, font: net.minecraft.client.gui.Font, area: UiRect) {
+    /** Draws the dimmed thumbnail (or shimmer, or plain backdrop) while no frame is ready yet. The
+     *  "Waiting for video..." status text itself lives on the seek bar instead (see [SeekBar]). */
+    private fun drawWaiting(g: GuiGraphicsCompat, area: UiRect) {
         // YouTube thumbnails are always 16:9, regardless of the screen's own block shape.
         val box = fitRatio(area, THUMBNAIL_RATIO)
         val thumb = currentThumbnail()
@@ -242,13 +248,6 @@ class PreviewSection(
             // Nothing assigned to this display: leave the plain black backdrop from drawVideoArea
             else -> {}
         }
-        val waiting = Component.translatable("dreamdisplays.ui.waiting").string
-        g.drawText(
-            font, waiting,
-            area.centerX - font.width(waiting) / 2,
-            area.centerY - font.lineHeight / 2,
-            UiTheme.TEXT_DIM, true,
-        )
     }
 
     /** Generic overlay text resolved for the current display URL, regardless of provider. */
@@ -428,123 +427,10 @@ class PreviewSection(
 
     fun close() {
         detachFrameSink()
-        yuvPreview.close()
+        // yuvPreview is NOT closed here: it's owned by DisplayScreen and outlives this section so the
+        // last frame (and its GPU texture) survives menu close/reopen; DisplayScreen.unregister() owns
+        // its teardown.
         ambientSampler.close()
-    }
-
-    private class PreviewFrameTexture(private val ds: DisplayScreen) {
-        @Volatile
-        private var frontBuf: ByteBuffer = EMPTY_DIRECT
-
-        private var backBuf: ByteBuffer = EMPTY_DIRECT
-
-        @Volatile
-        private var frameW = 0
-
-        @Volatile
-        private var frameH = 0
-
-        @Volatile
-        private var frameFormat = UploadPixelFormat.RGB24
-
-        @Volatile
-        private var frameVersion = 0L
-
-        private var uploadedVersion = 0L
-
-        private var dynamicTexture: DynamicTexture? = null
-        var textureId: Identifier? = null
-            private set
-        var texW = 0
-            private set
-        var texH = 0
-            private set
-        private var uploader: AsyncTextureUploader? = null
-        private var rgbaUploadBuffer: ByteBuffer? = null
-
-        fun updateFrame(buf: ByteBuffer, w: Int, h: Int, format: UploadPixelFormat) {
-            val size = w * h * format.bytesPerPixel
-            if (size <= 0 || buf.remaining() < size) return
-            var back = backBuf
-            if (back.capacity() < size) {
-                back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-            }
-            back.clear()
-            val savedLimit = buf.limit()
-            val savedPos = buf.position()
-            buf.limit(savedPos + size)
-            back.put(buf)
-            buf.limit(savedLimit)
-            buf.position(savedPos)
-            back.flip()
-
-            val prev = frontBuf
-            frontBuf = back
-            backBuf =
-                if (prev.capacity() >= size) prev else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
-            frameW = w
-            frameH = h
-            frameFormat = format
-            frameVersion++
-        }
-
-        fun uploadFrame() {
-            val fw = frameW
-            val fh = frameH
-            val version = frameVersion
-            if (version == uploadedVersion) return
-            val buf = frontBuf
-            val format = frameFormat
-            val size = fw * fh * format.bytesPerPixel
-            if (fw <= 0 || fh <= 0 || buf.remaining() < size) return
-
-            val mc = Minecraft.getInstance()
-            var tex = dynamicTexture
-            if (tex == null || texW != fw || texH != fh) {
-                tex?.close()
-                textureId?.let { mc.textureManager.release(it) }
-                val img = NativeImage(NativeImage.Format.RGBA, fw, fh, false)
-                //? if >=1.21.11 {
-                tex = DynamicTexture({ "dreamdisplays:preview" }, img)
-                //?} else
-                /*tex = DynamicTexture(img)*/
-                textureId = Identifier.fromNamespaceAndPath(
-                    Initializer.MOD_ID,
-                    "preview/${ds.uuid}-${UUID.randomUUID()}",
-                )
-                mc.textureManager.register(textureId!!, tex)
-                TextureUploadUtil.applyBilinearFilter(tex)
-                dynamicTexture = tex
-                texW = fw
-                texH = fh
-            }
-
-            TextureUploadUtil.uploadDynamicTexture(
-                texture = tex,
-                src = buf,
-                w = fw,
-                h = fh,
-                format = format,
-                glUploader = { uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it } },
-                rgbaScratch = rgbaUploadBuffer,
-                setRgbaScratch = { rgbaUploadBuffer = it },
-            )
-            uploadedVersion = version
-        }
-
-        fun close() {
-            uploader?.close()
-            uploader = null
-            val mc = Minecraft.getInstance()
-            dynamicTexture?.close()
-            textureId?.let { mc.textureManager.release(it) }
-            dynamicTexture = null
-            textureId = null
-        }
-
-        companion object {
-            private val EMPTY_DIRECT: ByteBuffer = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
-        }
     }
 
     private class AmbientFrameSampler(private val ds: DisplayScreen) {

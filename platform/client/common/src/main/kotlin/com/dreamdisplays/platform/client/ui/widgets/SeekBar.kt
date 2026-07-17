@@ -40,11 +40,14 @@ import net.minecraft.util.Mth
  * @param onSeek invoked with the target position in nanoseconds when a drag is committed.
  * @param previewFrame optionally supplies a scrub-preview texture for a hovered position in
  * nanoseconds; returning null (or leaving this unset) shows no preview.
+ * @param waitingLabel optionally supplies a status string (e.g. "Waiting for video...") to show in
+ * place of the time label while non-null; drawn in a dim grey.
  */
 class SeekBar(
     private val current: () -> Long,
     private val duration: () -> Long,
     private val previewFrame: ((Long) -> Identifier?)? = null,
+    private val waitingLabel: (() -> String?)? = null,
     private val onSeek: (Long) -> Unit,
 ) : UiWidget(Component.empty()) {
 
@@ -80,7 +83,12 @@ class SeekBar(
             /*g.blitSprite(HANDLE, hoverX, y, 8, height)*/
         }
 
-        drawScrollingLabel(g, timeLabel(cur, dur), 4)
+        val waiting = waitingLabel?.invoke()
+        if (waiting != null) {
+            drawScrollingLabel(g, Component.literal(waiting).copy().withStyle { it.withColor(WAITING_COLOR) }, 4)
+        } else {
+            drawScrollingLabel(g, timeLabel(cur, dur), 4)
+        }
 
         val previewTarget = if (previewFrame != null && active && dur > 0 && (isHovered || dragging)) 1f else 0f
         previewFade += (previewTarget - previewFade) * FADE_SPEED
@@ -235,6 +243,9 @@ class SeekBar(
         private const val DISPLAY_HEIGHT = 60
         private const val GHOST_HANDLE_ALPHA = 0.45f
         private const val FADE_SPEED = 0.35f
+
+        /** Dim grey used for [waitingLabel] text (matches the disabled time-label color). */
+        private const val WAITING_COLOR = 0xFFA0A0A0.toInt()
 
         private val TRACK = Identifier.withDefaultNamespace("widget/slider")
         private val TRACK_HIGHLIGHTED = Identifier.withDefaultNamespace("widget/slider_highlighted")
