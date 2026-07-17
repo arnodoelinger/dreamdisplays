@@ -2,14 +2,11 @@ package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-//? if >=26 {
+//? if >=1.21.11 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes
 //?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-//? if >=26 {
-import net.minecraft.client.gui.GuiGraphicsExtractor
-//?}
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
 //? if >=1.21.11 {
@@ -60,6 +57,8 @@ class ValueSlider(
 
     private var sliderFocused: Boolean = false
 
+    override fun handlesWholeWidgetCursor(): Boolean = false
+
     /** Returns the track sprite, highlighted when the widget has keyboard focus. */
     private fun trackSprite(): Identifier =
         if (isFocused && !sliderFocused) TRACK_HIGHLIGHTED else TRACK
@@ -93,13 +92,12 @@ class ValueSlider(
         g.blitSprite(handleSprite(), x + (value * (width - 8).toDouble()).toInt(), y, 8, height)*/
         val color = if (active) 0xFFFFFF else 0xA0A0A0
         drawScrollingLabel(g, label(value).copy().withStyle { it.withColor(color) }, 2)
+        //? if >=1.21.11 {
+        if (isHovered) {
+            g.requestCursor(if (active) CursorTypes.RESIZE_EW else CursorTypes.NOT_ALLOWED)
+        }
+        //?}
     }
-
-    //? if >=26 {
-    override fun requestWidgetCursor(g: GuiGraphicsExtractor) {
-        if (active && isHovered) g.requestCursor(CursorTypes.RESIZE_EW) else super.requestWidgetCursor(g)
-    }
-    //?}
 
     // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
     // (1.21.1) branch overrides mouseClicked itself so the click-to-set fires on both platforms.

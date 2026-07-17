@@ -5,14 +5,11 @@ import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-//? if >=26 {
+//? if >=1.21.11 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes
 //?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-//? if >=26 {
-import net.minecraft.client.gui.GuiGraphicsExtractor
-//?}
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
 //? if >=1.21.11 {
@@ -57,6 +54,8 @@ class SeekBar(
     private var hoverFade = 0f
     private var previewFade = 0f
 
+    override fun handlesWholeWidgetCursor(): Boolean = false
+
     override fun draw(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {
         val dur = duration()
         val cur = if (dragging) dragTargetNanos else current()
@@ -96,6 +95,11 @@ class SeekBar(
             val hoverNanos = if (dragging) dragTargetNanos else positionFromMouse(mouseX.toDouble(), dur)
             previewFrame?.invoke(hoverNanos)?.let { drawPreview(g, it, mouseX, hoverNanos, dur, previewFade) }
         }
+        //? if >=1.21.11 {
+        if (isHovered) {
+            g.requestCursor(if (active && dur > 0) CursorTypes.RESIZE_EW else CursorTypes.NOT_ALLOWED)
+        }
+        //?}
     }
 
     /**
@@ -166,16 +170,6 @@ class SeekBar(
     override fun updateWidgetNarration(builder: NarrationElementOutput) {
         builder.add(NarratedElementType.TITLE, createNarrationMessage())
     }
-
-    //? if >=26 {
-    override fun requestWidgetCursor(g: GuiGraphicsExtractor) {
-        if (active && duration() > 0 && isHovered) {
-            g.requestCursor(CursorTypes.RESIZE_EW)
-        } else {
-            super.requestWidgetCursor(g)
-        }
-    }
-    //?}
 
     // NeoForge reroutes mouseClicked to a Neo-only 3-arg onClick that Fabric lacks, so the legacy
     // (1.21.1) branch overrides mouseClicked itself so drag-to-seek starts on both platforms. onDrag
