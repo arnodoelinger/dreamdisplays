@@ -44,12 +44,9 @@ object VideoMetadataCache {
 
     /** Fetches metadata for [videoId] via [YouTubeInnerTube] and stores the result. */
     private fun fetchAndStore(videoId: String) {
-        try {
-            YouTubeInnerTube.metadata(videoId)?.let { put(videoId, it) }
-        } catch (e: Exception) {
-            logger.warn("Metadata fetch failed for $videoId: ${e.message}")
-        } finally {
-            IN_FLIGHT.invalidate(videoId)
-        }
+        runCatching { YouTubeInnerTube.metadata(videoId) }
+            .onSuccess { metadata -> metadata?.let { put(videoId, it) } }
+            .onFailure { e -> logger.warn("Metadata fetch failed for $videoId: ${e.message}") }
+            .also { IN_FLIGHT.invalidate(videoId) }
     }
 }

@@ -75,9 +75,9 @@ class DefaultMediaResolverRegistry : MediaResolverRegistry {
         for (resolver in resolvers) {
             if (!resolver.canResolve(source)) continue
             attempted = true
-            try {
+            runCatching {
                 return resolver.resolve(source)
-            } catch (e: Throwable) {
+            }.onFailure { e ->
                 lastError = e
             }
         }

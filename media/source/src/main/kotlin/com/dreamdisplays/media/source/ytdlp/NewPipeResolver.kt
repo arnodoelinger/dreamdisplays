@@ -116,9 +116,9 @@ object NewPipeResolver : MediaResolver {
     /** Initializes NewPipeExtractor with our HTTP downloader exactly once. Safe to call repeatedly. */
     fun ensureInitialized() {
         if (!initialized.compareAndSet(false, true)) return
-        try {
+        runCatching {
             NewPipe.init(YtHttpDownloader)
-        } catch (e: Throwable) {
+        }.onFailure { e ->
             initialized.value = false
             logger.warn("NewPipe init failed: ${e.message}")
         }
@@ -132,13 +132,13 @@ object NewPipeResolver : MediaResolver {
      */
     fun prewarmPlayer() {
         if (!initialized.value) return
-        try {
+        runCatching {
             YoutubeJavaScriptPlayerManager.getSignatureTimestamp("")
             YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
                 "",
                 "https://dummy.googlevideo.com/videoplayback?n=0000000000000000",
             )
-        } catch (e: Throwable) {
+        }.onFailure { e ->
             logger.debug("NewPipe player prewarm skipped: {}", e.message)
         }
     }
@@ -181,7 +181,7 @@ object NewPipeResolver : MediaResolver {
      * no usable stream could be extracted.
      */
     private fun doExtract(url: String): Resolved? {
-        return try {
+        return runCatching {
             val service = NewPipe.getServiceByUrl(url)
             val extractor = service.getStreamExtractor(url)
             extractor.fetchPage()
@@ -207,10 +207,9 @@ object NewPipeResolver : MediaResolver {
                 isLive = live,
                 isSeekable = seekable,
             )
-        } catch (e: Throwable) {
+        }.onFailure { e ->
             logger.debug("NewPipeExtractor fetch failed for {}: {}", url, e.message)
-            null
-        }
+        }.getOrNull()
     }
 
     /** Maps the directly-fetched [extractor]'s stream lists into the flat [YtStream] list the player pipeline expects. */
@@ -240,11 +239,7 @@ object NewPipeResolver : MediaResolver {
     }
 
     /** Runs [block], swallowing any extractor failure and returning null so optional fields degrade gracefully. */
-    private inline fun <T> safe(block: () -> T): T? = try {
-        block()
-    } catch (_: Throwable) {
-        null
-    }
+    private inline fun <T> safe(block: () -> T): T? = runCatching(block).getOrNull()
 
     /** Converts a `NewPipeExtractor` [VideoStream] to a [YtStream]. */
     @Suppress("DEPRECATION")

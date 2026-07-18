@@ -1,8 +1,5 @@
 package com.dreamdisplays.platform.client
 
-//? if >=26 {
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
 import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.client.core.ClientApplication
@@ -17,7 +14,11 @@ import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 

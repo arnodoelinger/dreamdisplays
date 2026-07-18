@@ -23,6 +23,8 @@ import java.nio.file.Files
 import java.util.*
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -53,8 +55,7 @@ private class RemainingCountdown(initial: Int) {
  */
 object YtDlp {
     private val logger = LoggerFactory.getLogger("DreamDisplays/yt-dlp")
-
-    private val CACHE_TTL_MS: Long = FormatDiskCache.DEFAULT_TTL_MS
+    private const val CACHE_TTL_MS: Long = FormatDiskCache.DEFAULT_TTL_MS
     private const val INFO_CACHE_TTL_MS: Long = 30L * 60L * 1_000L
 
     /** Per-invocation yt-dlp wait. With cookies off + token-free clients a warm fetch is sub-second,
@@ -152,18 +153,19 @@ object YtDlp {
     /** Resolves the binary path, cookie browser, and cookie header in the background to reduce first-fetch latency. */
     fun prewarmAsync() {
         DreamCoroutines.clientIo.launch {
-            try {
+            runCatching {
                 NewPipeResolver.ensureInitialized()
                 NewPipeResolver.prewarmPlayer()
                 YtDlpBinary.resolveCommand()
                 cookies.prewarm()
-            } catch (e: IOException) {
+            }.onFailure { e ->
                 logger.warn("Failed to prewarm yt-dlp", e)
             }
         }
     }
 
     /** Fires a background fetch for [videoUrl] if not already cached, so it is ready before [fetch] is called. */
+    @Suppress("DeferredResultUnused")
     fun prefetchFormats(videoUrl: String) {
         if (videoUrl.isBlank()) return
         if (!MediaUrlPolicy.isAllowed(videoUrl)) return
@@ -253,32 +255,31 @@ object YtDlp {
         val ytProcesses = CopyOnWriteArrayList<Process>()
         val abandoned = AbandonFlag()
         val ytdlp = DreamCoroutines.clientIo.async {
-            if (HEDGE_DELAY_MS > 0) delay(HEDGE_DELAY_MS)
-            if (abandoned.isAbandoned) emptyList()
-            else raceClients(videoUrl) { proc ->
+            if (HEDGE_DELAY_MS > 0) delay(HEDGE_DELAY_MS.milliseconds)
+            if (abandoned.isAbandoned) return@async emptyList()
+            raceClients(videoUrl) { proc ->
                 ytProcesses.add(proc)
-                if (abandoned.isAbandoned) Processes.destroyTree(proc) // NewPipeExtractor already won; kill
+                if (abandoned.isAbandoned) Processes.destroyTree(proc)
             } ?: emptyList()
         }
 
-        // Aborts the parallel yt-dlp branch and reaps any subprocess it managed to spawn.
+        // Aborts the parallel yt-dlp branch and reaps any subprocess it managed to spawn
         fun abandonYtDlp() {
             abandoned.abandon()
             ytProcesses.forEach { runCatching { Processes.destroyTree(it) } }
             ytdlp.cancel()
         }
 
-        // A NewPipe crash must not leak the parallel yt-dlp branch: treat it as an empty fast path
-        // and let the yt-dlp result decide, aborting the race only on cancellation.
-        val viaNewPipe = try {
-            NewPipeResolver.fetch(videoUrl)
-        } catch (e: CancellationException) {
-            abandonYtDlp()
-            throw e
-        } catch (e: Exception) {
-            logger.debug("NewPipe resolve failed for {}: {}.", videoUrl, e.message?.take(200))
-            emptyList()
-        }
+        val viaNewPipe = runCatching { NewPipeResolver.fetch(videoUrl) }
+            .onFailure { e ->
+                if (e is CancellationException) {
+                    abandonYtDlp()
+                    throw e
+                }
+                logger.debug("NewPipe resolve failed for {}: {}.", videoUrl, e.message?.take(200))
+            }
+            .getOrElse { emptyList() }
+
         if (YtStreams.offersQualityLadder(viaNewPipe)) {
             abandonYtDlp()
             return viaNewPipe
@@ -290,25 +291,27 @@ object YtDlp {
             )
         }
 
-        val viaYtDlp = try {
+        val viaYtDlp = runCatching {
             withTimeoutOrNull((FETCH_TIMEOUT_SECONDS + 15).seconds) { ytdlp.await() }
                 ?: emptyList<YtStream>().also { abandonYtDlp() }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             abandonYtDlp()
             logger.debug("yt-dlp resolve did not settle for {}: {}.", videoUrl, e.message?.take(200))
-            emptyList()
+        }.getOrElse { emptyList() }
+
+        return when {
+            YtStreams.offersQualityLadder(viaYtDlp) -> viaYtDlp
+            viaNewPipe.isNotEmpty() -> {
+                logger.warn(
+                    "yt-dlp only produced a non-ladder fallback-client result for $videoUrl " +
+                            "(heights=${YtStreams.distinctHeights(viaYtDlp)}); using NewPipeExtractor's muxed " +
+                            "stream instead, since fallback yt-dlp clients are PO-token gated."
+                )
+                viaNewPipe
+            }
+            viaYtDlp.isNotEmpty() -> viaYtDlp
+            else -> throw IOException("All yt-dlp clients failed for $videoUrl.")
         }
-        if (YtStreams.offersQualityLadder(viaYtDlp)) return viaYtDlp
-        if (viaNewPipe.isNotEmpty()) {
-            logger.warn(
-                "yt-dlp only produced a non-ladder fallback-client result for $videoUrl " +
-                        "(heights=${YtStreams.distinctHeights(viaYtDlp)}); using NewPipeExtractor's muxed " +
-                        "stream instead, since fallback yt-dlp clients are PO-token gated."
-            )
-            return viaNewPipe
-        }
-        if (viaYtDlp.isNotEmpty()) return viaYtDlp
-        throw IOException("All yt-dlp clients failed for $videoUrl.")
     }
 
     /**
@@ -327,18 +330,18 @@ object YtDlp {
 
     /** Runs a single [client] fetch, reporting its subprocess to [onProcess]; returns null instead of throwing. */
     private fun runCatchingClient(videoUrl: String, client: String?, onProcess: (Process) -> Unit): List<YtStream>? =
-        try {
+        runCatching {
             runClientFetch(videoUrl, client, onProcess)
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.debug("yt-dlp client {} failed for {}: {}.", client ?: "cookies", videoUrl, e.message?.take(200))
-            null
-        }
+        }.getOrNull()
 
     /**
      * Races [clients] (one subprocess each) in parallel: the first to yield a quality ladder wins
      * immediately and the still-running losers are killed; otherwise, once every client finishes,
      * [bestResult] picks the strongest result. Returns null when every client failed.
      */
+    @Suppress("CoroutineContextWithJob")
     private suspend fun raceParallel(
         videoUrl: String,
         clients: List<String?>,
@@ -347,40 +350,51 @@ object YtDlp {
         val processes = CopyOnWriteArrayList<Process>()
         val results = CopyOnWriteArrayList<List<YtStream>>()
         val winner = CompletableDeferred<List<YtStream>>()
-        val remaining = RemainingCountdown(clients.size)
+        val remaining = AtomicInteger(clients.size)
 
-        for (client in clients) {
-            DreamCoroutines.clientIo.launch {
-                try {
-                    val streams = runClientFetch(videoUrl, client) { proc ->
-                        processes.add(proc)
-                        onProcess(proc)
-                        if (winner.isCompleted) Processes.destroyTree(proc) // Race already won; don't bother finishing
+        val runRace: suspend () -> List<YtStream> = {
+            coroutineScope {
+                for (client in clients) {
+                    launch(DreamCoroutines.clientIo.coroutineContext) {
+                        runCatching {
+                            val streams = runClientFetch(videoUrl, client) { proc ->
+                                processes.add(proc)
+                                onProcess(proc)
+                                if (winner.isCompleted) Processes.destroyTree(proc)
+                            }
+                            if (streams.isNotEmpty()) results.add(streams)
+                            if (YtStreams.offersQualityLadder(streams)) winner.complete(streams)
+                        }.onFailure { e ->
+                            if (e is CancellationException) throw e
+                            logger.debug(
+                                "yt-dlp client {} failed for {}: {}",
+                                client ?: "cookies",
+                                videoUrl,
+                                e.message?.take(200)
+                            )
+                        }.also { result ->
+                            if (result.exceptionOrNull() is CancellationException) return@launch
+
+                            if (remaining.decrementAndGet() == 0) {
+                                winner.complete(bestResult(results))
+                            }
+                        }
                     }
-                    if (streams.isNotEmpty()) results.add(streams)
-                    if (YtStreams.offersQualityLadder(streams)) winner.complete(streams)
-                } catch (e: Exception) {
-                    logger.debug(
-                        "yt-dlp client {} failed for {}: {}",
-                        client ?: "cookies",
-                        videoUrl,
-                        e.message?.take(200)
-                    )
-                } finally {
-                    if (remaining.decrementAndGet() == 0) winner.complete(bestResult(results))
                 }
+                winner.await()
             }
         }
 
-        val result = try {
-            withTimeoutOrNull((FETCH_TIMEOUT_SECONDS + 10).seconds) { winner.await() } ?: run {
+        val finalResult = try {
+            withTimeoutOrNull((FETCH_TIMEOUT_SECONDS + 10).seconds) { runRace() } ?: run {
                 logger.warn("yt-dlp race for $videoUrl did not settle.")
                 emptyList()
             }
         } finally {
             processes.forEach { runCatching { Processes.destroyTree(it) } }
         }
-        return result.takeIf { it.isNotEmpty() }
+
+        return finalResult.takeIf { it.isNotEmpty() }
     }
 
     /** Picks the strongest raced result: a quality ladder first, then the one with the most heights. */
@@ -421,10 +435,7 @@ object YtDlp {
         pb.redirectErrorStream(false)
         val process = pb.start()
         onStarted(process)
-        try {
-            process.outputStream.close()
-        } catch (_: IOException) {
-        }
+        runCatching { process.outputStream.close() }
         val stdout = StringBuilder()
         val stderr = StringBuilder()
         val stdoutReader = Processes.collector(process.inputStream, stdout, "YtDlp-stdout")
@@ -445,10 +456,7 @@ object YtDlp {
             Thread.currentThread().interrupt()
             throw IOException("Interrupted while waiting for yt-dlp.", e)
         } finally {
-            if (tempCookies != null) try {
-                Files.deleteIfExists(tempCookies)
-            } catch (_: IOException) {
-            }
+            if (tempCookies != null) runCatching { Files.deleteIfExists(tempCookies) }
         }
         if (process.exitValue() != 0) {
             throw IOException("Exited with code ${process.exitValue()}: ${stderr.toString().trim()}.")

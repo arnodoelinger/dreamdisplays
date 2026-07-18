@@ -76,21 +76,17 @@ object TwitchMetadataCache {
     fun resolveBlocking(source: MediaSource.Twitch): TwitchMetadata? {
         val key = cacheKey(source) ?: return null
         get(key)?.let { return it }
-        return try {
+        return runCatching {
             TwitchApi.resolve(source)?.also { CACHE.put(key, it) }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Twitch metadata fetch failed for {}: {}.", key, e.message)
-            null
-        }
+        }.getOrNull()
     }
 
     private fun fetchAndStore(key: String, source: MediaSource.Twitch) {
-        try {
-            TwitchApi.resolve(source)?.let { CACHE.put(key, it) }
-        } catch (e: Exception) {
-            logger.warn("Twitch metadata fetch failed for {}: {}.", key, e.message)
-        } finally {
-            IN_FLIGHT.invalidate(key)
-        }
+        runCatching { TwitchApi.resolve(source) }
+            .onSuccess { metadata -> metadata?.let { CACHE.put(key, it) } }
+            .onFailure { e -> logger.warn("Twitch metadata fetch failed for {}: {}.", key, e.message) }
+            .also { IN_FLIGHT.invalidate(key) }
     }
 }

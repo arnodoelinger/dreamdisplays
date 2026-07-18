@@ -28,8 +28,7 @@ class DefaultCapabilityNegotiationService(
 
     /** Updated as handshake packets arrive; null until the first arrives. */
     @Volatile
-    override var serverCapabilities: ServerHello? = null
-        private set
+    override var serverCapabilities: ServerHello? = null; private set
 
     /** True, once any server capability information has arrived. */
     override val isNegotiated: Boolean get() = serverCapabilities != null
@@ -42,11 +41,9 @@ class DefaultCapabilityNegotiationService(
     override fun advertise() {
         runCatching { ProtocolRouter.sendV2(localCapabilities) }
             .onFailure { logger.debug("v2 hello not deliverable, staying on v1.", it) }
-        try {
-            ProtocolRouter.send(localCapabilities)
-        } catch (e: Exception) {
-            logger.error("Unable to advertise client version", e)
-        }
+
+        runCatching { ProtocolRouter.send(localCapabilities) }
+            .onFailure { e -> logger.error("Unable to advertise client version.", e) }
     }
 
     /** Replaces the negotiated [serverCapabilities] snapshot wholesale. */

@@ -30,6 +30,7 @@ import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
+import kotlin.coroutines.cancellation.CancellationException
 
 /**
  * Thumbnail manager that handles downloading, caching, and registering YouTube video thumbnails as Minecraft textures.
@@ -165,14 +166,17 @@ object Thumbnails {
 
     /** Awaits the thumbnail bytes and registers them on the render thread. */
     private suspend fun download(avgColorKey: String, cacheKey: String, bytesDeferred: Deferred<ByteArray>) {
-        try {
-            val bytes = bytesDeferred.await()
-            Minecraft.getInstance().execute { register(avgColorKey, cacheKey, bytes) }
-        } catch (e: Exception) {
-            logger.warn("Fetch failed for $cacheKey: ${e.message}")
-            BYTES.invalidate(cacheKey)
-            IN_FLIGHT.invalidate(cacheKey)
-        }
+        runCatching { bytesDeferred.await() }
+            .onSuccess { bytes ->
+                Minecraft.getInstance().execute { register(avgColorKey, cacheKey, bytes) }
+            }
+            .onFailure { e ->
+                if (e is CancellationException) throw e
+
+                logger.warn("Fetch failed for $cacheKey: ${e.message}.")
+                BYTES.invalidate(cacheKey)
+                IN_FLIGHT.invalidate(cacheKey)
+            }
     }
 
     /** Reads the cached thumbnail bytes for [cacheKey] from disk; returns null if absent or expired. */
@@ -232,7 +236,8 @@ object Thumbnails {
         var tex: DynamicTexture? = null
         var ambientImage: NativeImage? = null
         var ambientTex: DynamicTexture? = null
-        try {
+
+        runCatching {
             val decoded = decode(bytes)
             image = decoded.image
             ambientImage = decoded.ambientImage
@@ -259,15 +264,15 @@ object Thumbnails {
             } else {
                 ambientImage.close()
             }
-        } catch (e: Exception) {
-            // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread.
+        }.onFailure { e ->
+            // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread
             logger.warn("Decode / register failed for $key: ${e.message}")
             BYTES.invalidate(key)
             // The texture manager owns the image only once registration succeeds; closing the
             // texture also closes its image, so close the bare image only when no texture exists yet.
             runCatching { tex?.close() ?: image?.close() }
             runCatching { ambientTex?.close() ?: ambientImage?.close() }
-        } finally {
+        }.also {
             IN_FLIGHT.invalidate(key)
         }
     }
@@ -330,8 +335,14 @@ object Thumbnails {
                     readTimeoutMs = 15_000,
                 ),
             )
-            if (response.code != 200) null else response.body
-        } catch (_: Exception) {
+            if (response.code != 200) {
+                logger.warn("Thumbnail fetch got HTTP ${response.code} for $url.")
+                null
+            } else {
+                response.body
+            }
+        } catch (e: Exception) {
+            logger.warn("Thumbnail fetch failed for $url: ${e::class.simpleName}: ${e.message}.")
             null
         }
     }

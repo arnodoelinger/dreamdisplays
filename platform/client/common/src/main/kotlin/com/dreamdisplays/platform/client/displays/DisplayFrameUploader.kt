@@ -38,24 +38,33 @@ internal class DisplayFrameUploader(private val uuid: UUID) {
             return
         }
         if (!tex.isYuv) shaderPackYuvFallbackRequested = false
-        try {
-            // The live channel always keeps drawing the current texture, so the picture never freezes
+
+        runCatching {
             if (uploadLive(mp, tex)) onRendered()
 
             // Quality switch: the new resolution warms up in a parallel channel. Feed its frames into
             // the staged texture; the instant the first one lands, promote channel and texture together
             // so the picture snaps to the new quality with no freeze and no blank.
-            if (tex.hasPending && mp.hasIncomingVideo() && uploadIncoming(mp, tex)) {
+            val canPromote = tex.hasPending && mp.hasIncomingVideo() && uploadIncoming(mp, tex)
+            if (canPromote) {
                 if (mp.promoteIncomingVideo()) {
                     tex.promotePending()
                     onRendered()
-                    if (MediaPlayer.DEBUG) logger.debug("$uuid promoted quality handoff texture ${tex.width} x ${tex.height}.")
+                    if (MediaPlayer.DEBUG) logger.debug(
+                        "{} promoted quality handoff texture {} x {}.",
+                        uuid,
+                        tex.width,
+                        tex.height
+                    )
                 } else {
-                    if (MediaPlayer.DEBUG) logger.debug("$uuid discarded staged quality handoff after incoming abort.")
+                    if (MediaPlayer.DEBUG) logger.debug(
+                        "{} discarded staged quality handoff after incoming abort.",
+                        uuid
+                    )
                     tex.discardPendingAsync()
                 }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("$uuid fitTexture failed: ${e.message ?: e::class.java.name}")
         }
     }

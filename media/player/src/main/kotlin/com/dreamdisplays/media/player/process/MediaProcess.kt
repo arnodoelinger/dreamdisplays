@@ -149,9 +149,10 @@ object MediaProcess {
         if (proc == null) return
         runCatching { proc.outputStream?.close() }
         proc.destroy()
-        try {
+        runCatching {
             if (!proc.waitFor(1, TimeUnit.SECONDS)) proc.destroyForcibly()
-        } catch (_: InterruptedException) {
+        }.onFailure { e ->
+            if (e !is InterruptedException) throw e
             proc.destroyForcibly()
             Thread.currentThread().interrupt()
         }

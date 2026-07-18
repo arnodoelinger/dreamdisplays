@@ -51,13 +51,12 @@ object FormatDiskCache {
         if (!f.isFile) return null
         // A transient read failure is treated as a miss and left on disk to retry; only a corrupt or
         // schema-mismatched payload is deleted.
-        val json = try {
+        val json = runCatching {
             Files.readString(f.toPath(), StandardCharsets.UTF_8)
-        } catch (e: IOException) {
+        }.onFailure { e ->
             logger.debug("Cache read failed for {}: {}.", f.name, e.message)
-            return null
-        }
-        return try {
+        }.getOrNull() ?: return null
+        return runCatching {
             val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
             if (entry.v != SCHEMA_VERSION) {
                 f.delete()
@@ -73,11 +72,10 @@ object FormatDiskCache {
                 return null
             }
             entry.streams.takeIf { it.isNotEmpty() }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.debug("Cache parse failed for {}, dropping entry: {}.", f.name, e.message)
             runCatching { f.delete() }
-            null
-        }
+        }.getOrNull()
     }
 
     /** Serialises [streams] to disk for [videoUrl] asynchronously, ordered behind any in-flight write. */
@@ -88,7 +86,7 @@ object FormatDiskCache {
 
     /** Atomically writes the stream JSON to disk using a temp file and rename. */
     private fun writeNow(videoUrl: String, streams: List<YtStream>) {
-        try {
+        runCatching {
             Files.createDirectories(CACHE_DIR)
             val target = fileFor(videoUrl)
             val tmp = File(target.parentFile, target.name + ".tmp")
@@ -98,7 +96,7 @@ object FormatDiskCache {
                 tmp.toPath(), target.toPath(),
                 StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE
             )
-        } catch (e: IOException) {
+        }.onFailure { e ->
             logger.warn("Write failed: ${e.message}")
         }
     }
@@ -112,21 +110,20 @@ object FormatDiskCache {
 
     /** Scans the cache directory and deletes all `.json` entries older than [maxAgeMs] milliseconds. */
     fun sweepExpired(maxAgeMs: Long = DEFAULT_TTL_MS) {
-        try {
+        runCatching {
             if (!Files.isDirectory(CACHE_DIR)) return
             val now = System.currentTimeMillis()
             Files.list(CACHE_DIR).use { stream ->
                 stream.filter { it.toString().endsWith(".json") }.forEach { p ->
-                    try {
+                    runCatching {
                         val json = Files.readString(p, StandardCharsets.UTF_8)
                         val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
                         if (entry.v != SCHEMA_VERSION || now - entry.ts > maxAgeMs) Files.deleteIfExists(p)
-                    } catch (_: Exception) {
+                    }.onFailure {
                         runCatching { Files.deleteIfExists(p) }
                     }
                 }
             }
-        } catch (_: IOException) {
         }
     }
 
@@ -134,10 +131,11 @@ object FormatDiskCache {
     private fun fileFor(videoUrl: String): File = File(CACHE_DIR.toFile(), hash(videoUrl) + ".json")
 
     /** Returns a SHA-1 hex digest of [s], falling back to `hashCode` if SHA-1 is unavailable. */
-    private fun hash(s: String): String = try {
+    private fun hash(s: String): String = runCatching {
         val md = MessageDigest.getInstance("SHA-1")
         HexFormat.of().formatHex(md.digest(s.toByteArray(StandardCharsets.UTF_8)))
-    } catch (_: NoSuchAlgorithmException) {
+    }.getOrElse { e ->
+        if (e !is NoSuchAlgorithmException) throw e
         Integer.toHexString(s.hashCode())
     }
 

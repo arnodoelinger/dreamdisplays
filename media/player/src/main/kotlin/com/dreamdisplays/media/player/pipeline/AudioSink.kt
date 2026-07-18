@@ -316,54 +316,68 @@ internal class AudioSink(private val debugLabel: String) {
         var newLine: SourceDataLine? = null
         var promoted = false
         var pumped = false
-        try {
+
+        fun isInterrupted() = terminated.get() || stopFlag.get()
+        runCatching {
             proc.inputStream.use { input ->
                 val fmt = pcmFormat()
                 val info = DataLine.Info(SourceDataLine::class.java, fmt)
                 if (!AudioSystem.isLineSupported(info)) {
-                    logger.warn("$debugLabel PCM line not supported (switch)."); return
+                    logger.warn("$debugLabel PCM line not supported (switch).")
+                    return@use
                 }
-                val ln = openLine(info, fmt) ?: run {
-                    logger.warn("$debugLabel [audio] switch line failed to open."); return
+                newLine = openLine(info, fmt) ?: run {
+                    logger.warn("$debugLabel [audio] switch line failed to open.")
+                    return@use
                 }
-                newLine = ln
-                if (terminated.get() || stopFlag.get()) return
-                // Old line keeps playing while we skip the catch-up span and pre-buffer the new line
+
+                if (isInterrupted()) return@use
                 catchUp?.let { skipCatchUp(input, it, terminated, stopFlag) }
-                if (terminated.get() || stopFlag.get()) return
-                if (!primeSwitchLine(input, ln, terminated, stopFlag)) return
-                if (terminated.get() || stopFlag.get() || !shouldPromote()) return
-                // Flip: silence the old line, promote the primed one, start it (plays instantly from
-                // its pre-buffered PCM), then tear down the old line. Gap between the two is microseconds.
-                val old = line
-                old?.let { runCatching { it.stop() }; runCatching { it.flush() } }
-                sessionEpoch++
-                clearRing()
-                dspStage?.reset()
-                preludeFrames = 0L
-                exposeLiveClock = true
-                pcmFlowing = true
-                line = ln
-                ln.start()
-                old?.let { runCatching { it.close() } }
+
+                if (isInterrupted() || !primeSwitchLine(input, newLine, terminated, stopFlag)) return@use
+                if (isInterrupted() || !shouldPromote()) return@use
+
+                line?.apply {
+                    runCatching { stop() }
+                    runCatching { flush() }
+                }.also { old ->
+                    sessionEpoch++
+                    clearRing()
+                    dspStage?.reset()
+                    preludeFrames = 0L
+                    exposeLiveClock = true
+                    pcmFlowing = true
+                    line = newLine
+                    newLine.start()
+
+                    old?.let { runCatching { it.close() } }
+                }
+
                 promoted = true
                 logger.debug("$debugLabel [audio] switch line promoted — new track playing.")
                 onPromoted()
-                pumpLive(input, ln, terminated, stopFlag)
+
+                pumpLive(input, newLine, terminated, stopFlag)
                 pumped = true
             }
-        } catch (e: IOException) {
-            if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) logger.warn("$debugLabel Switch read: ${e.message}.")
-        } catch (e: Exception) {
-            if (!terminated.get() && !stopFlag.get()) logger.warn("$debugLabel Switch pipeline: ${e.message}.")
-        } finally {
-            newLine?.let {
-                if (line === it) line = null
-                runCatching { it.flush() }; runCatching { it.stop() }; runCatching { it.close() }
+        }.onFailure { e ->
+            if (isInterrupted()) return@onFailure
+            when (e) {
+                is IOException -> if (MediaPlayer.DEBUG) logger.warn("$debugLabel Switch read: ${e.message}.")
+                else -> logger.warn("$debugLabel Switch pipeline: ${e.message}.")
             }
-            if (!promoted) onAborted()
         }
-        if (pumped && !terminated.get() && !stopFlag.get()) {
+
+        newLine?.let {
+            if (line === it) line = null
+            runCatching { it.flush() }
+            runCatching { it.stop() }
+            runCatching { it.close() }
+        }
+
+        if (!promoted) onAborted()
+
+        if (pumped && !isInterrupted()) {
             onUnexpectedEnd(synchronized(stderrBuf) { stderrBuf.toString() })
         }
     }
@@ -461,49 +475,49 @@ internal class AudioSink(private val debugLabel: String) {
     ) {
         var ln: SourceDataLine? = null
         var pumped = false
-        try {
+        runCatching {
             proc.inputStream.use { input ->
                 val fmt = pcmFormat()
                 val info = DataLine.Info(SourceDataLine::class.java, fmt)
                 if (!AudioSystem.isLineSupported(info)) {
                     logger.warn("$debugLabel PCM line not supported.")
-                    return
+                    return@runCatching
                 }
                 ln = openLine(info, fmt) ?: run {
                     logger.warn("$debugLabel [audio] line failed to open.")
-                    return
+                    return@runCatching
                 }
-                if (terminated.get() || stopFlag.get()) return
+                if (terminated.get() || stopFlag.get()) return@runCatching
                 logger.debug("$debugLabel [audio] line open, waiting for start gate...")
                 if (!awaitStartGate(startGate, terminated, stopFlag)) {
                     logger.debug("$debugLabel [audio] aborted before start gate opened (terminated / stopped).")
-                    return
+                    return@runCatching
                 }
                 catchUp?.let { skipCatchUp(input, it, terminated, stopFlag) }
-                if (terminated.get() || stopFlag.get()) return
+                if (terminated.get() || stopFlag.get()) return@runCatching
                 ln.start()
                 line = ln
                 logger.debug("$debugLabel [audio] start gate passed, line started — audio is now playing.")
                 pumpLive(input, ln, terminated, stopFlag)
                 pumped = true
             }
-        } catch (e: IOException) {
-            if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
-                logger.warn("$debugLabel Read: ${e.message}.")
-            }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             if (!terminated.get() && !stopFlag.get()) {
-                logger.warn("$debugLabel Pipeline: ${e.message}.")
-            }
-        } finally {
-            ln?.let {
-                // A newer session may already own the field (overlapped restart): only clear our own line
-                if (line === it) line = null
-                runCatching { it.flush() }
-                runCatching { it.stop() }
-                runCatching { it.close() }
+                if (e is IOException) {
+                    if (MediaPlayer.DEBUG) logger.warn("$debugLabel Read: ${e.message}.")
+                } else {
+                    logger.warn("$debugLabel Pipeline: ${e.message}.")
+                }
             }
         }
+
+        ln?.let {
+            if (line === it) line = null
+            runCatching { it.flush() }
+            runCatching { it.stop() }
+            runCatching { it.close() }
+        }
+
         if (pumped && !terminated.get() && !stopFlag.get()) {
             onUnexpectedEnd(synchronized(stderrBuf) { stderrBuf.toString() })
         }
@@ -522,48 +536,52 @@ internal class AudioSink(private val debugLabel: String) {
         var ln: SourceDataLine? = null
         var pumped = false
         var stderrBuf: StringBuilder? = null
-        try {
+
+        runCatching {
             val fmt = pcmFormat()
             val info = DataLine.Info(SourceDataLine::class.java, fmt)
             if (!AudioSystem.isLineSupported(info)) {
                 logger.warn("$debugLabel PCM line not supported (bridge).")
-                return
+                return@runCatching
             }
             ln = openLine(info, fmt) ?: run {
                 logger.warn("$debugLabel [audio] bridge line failed to open.")
-                return
+                return@runCatching
             }
-            if (terminated.get() || stopFlag.get()) return
+            if (terminated.get() || stopFlag.get()) return@runCatching
             ln.start()
             line = ln
             val cachedSec = prelude.size / (SAMPLE_RATE * BYTES_PER_FRAME).toDouble()
-            logger.debug("$debugLabel [audio] bridge line started; playing ${"%.2f".format(cachedSec)}s cached prelude.")
+            logger.debug("$debugLabel [audio] bridge line started; playing ${"%.2f".format(cachedSec)} s cached prelude.")
+
             // 1. Cached prelude — paced naturally by the line (not ring-cached: already-played audio)
             writePrelude(ln, prelude, terminated, stopFlag)
+
             // 2. Continue with the live PCM on the SAME line: sample-continuous, no flush, no second line
             val proc = awaitLiveInput(terminated, stopFlag) ?: run {
                 logger.debug("$debugLabel [audio] bridge ended before live input attached.")
-                return
+                return@runCatching
             }
+
             // provideLiveInput sets liveStderrBuf before liveProc, both before opening the gate this
             // just passed, so it is already populated for this bridge's live process here.
             stderrBuf = liveStderrBuf
             logger.debug("$debugLabel [audio] bridge handing off cached -> live on one line.")
             proc.inputStream.use { input -> pumpLive(input, ln, terminated, stopFlag) }
             pumped = true
-        } catch (e: Exception) {
+        }.onFailure { e ->
             if (!terminated.get() && !stopFlag.get()) {
                 logger.warn("$debugLabel Bridge pipeline: ${e.message}.")
             }
-        } finally {
-            ln?.let {
-                // A newer session may already own the field (overlapped restart): only clear our own line.
-                if (line === it) line = null
-                runCatching { it.flush() }
-                runCatching { it.stop() }
-                runCatching { it.close() }
-            }
         }
+
+        ln?.let {
+            if (line === it) line = null
+            runCatching { it.flush() }
+            runCatching { it.stop() }
+            runCatching { it.close() }
+        }
+
         if (pumped && !terminated.get() && !stopFlag.get()) {
             onUnexpectedEnd(stderrBuf?.let { buf -> synchronized(buf) { buf.toString() } } ?: "")
         }

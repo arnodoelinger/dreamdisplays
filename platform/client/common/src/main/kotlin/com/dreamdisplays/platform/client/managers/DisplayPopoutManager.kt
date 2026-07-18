@@ -90,17 +90,20 @@ class DisplayPopoutManager(
         currentPlayer = player
         this.contentAspect = contentAspect
         closePipOverlay()
+
+        val w = textureWidth.takeIf { it > 0 } ?: 1280
+        val h = textureHeight.takeIf { it > 0 } ?: 720
         val win = popoutWindow
+
         if (win != null && win.isOpen) {
             // TODO: modify window size?
-            win.open(textureWidth.takeIf { it > 0 } ?: 1280, textureHeight.takeIf { it > 0 } ?: 720)
+            win.open(w, h)
             windowActive = true
             rewireSink()
             return
         }
-        try {
-            val w = textureWidth.takeIf { it > 0 } ?: 1280
-            val h = textureHeight.takeIf { it > 0 } ?: 720
+
+        runCatching {
             val newWin = win ?: VideoPopoutWindow(displayScreen.uuid.toString()) {
                 windowActive = false
                 rewireSink()
@@ -109,9 +112,10 @@ class DisplayPopoutManager(
                 created.on { event -> emit(event) }
             }
             newWin.open(w, h)
+        }.onSuccess {
             windowActive = true
             rewireSink()
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Could not open window: ${e.message}.")
             emit(PopoutEvent.BackendFailed(displayScreen.uuid.toString(), e.message))
         }

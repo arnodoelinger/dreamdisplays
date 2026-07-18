@@ -23,11 +23,7 @@ internal object YtDlpOutputParser {
     @Throws(IOException::class)
     fun parseFormats(json: String): List<YtStream> {
         val result = ArrayList<YtStream>()
-        val root: JsonElement = try {
-            DreamJson.compact.parseToJsonElement(json)
-        } catch (e: Exception) {
-            throw IOException("Failed to parse yt-dlp JSON output", e)
-        }
+        val root: JsonElement = run { DreamJson.compact.parseToJsonElement(json) }
         val obj = root.asJsonObjectOrNull() ?: throw IOException("Returned unexpected JSON shape.")
         val live = isLive(obj)
         val durationNanos = durationNanos(obj)
@@ -82,8 +78,7 @@ internal object YtDlpOutputParser {
 
     /** Returns true if the `yt-dlp` output object indicates a live or upcoming stream. */
     private fun isLive(obj: JsonObject): Boolean {
-        if (obj.optBoolean("is_live")) return true
-        return LiveStatus.fromWire(obj.optString("live_status")).isLiveLike
+        return obj.optBoolean("is_live") || LiveStatus.fromWire(obj.optString("live_status")).isLiveLike
     }
 
     /** Reads the `duration` field and converts seconds to nanoseconds; returns 0 for live or missing values. */

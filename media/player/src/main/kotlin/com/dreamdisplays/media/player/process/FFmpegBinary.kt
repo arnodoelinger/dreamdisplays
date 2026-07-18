@@ -33,11 +33,8 @@ object FFmpegBinary {
     /** Resolves the `FFmpeg` binary in the background to minimize latency on first use. */
     fun prewarmAsync() {
         daemon({
-            try {
-                getPath()
-            } catch (e: Exception) {
-                logger.warn("Prewarm failed", e)
-            }
+            runCatching { getPath() }
+                .onFailure { e -> logger.warn("Prewarm failed", e) }
         }, "FFmpeg-prewarm").start()
     }
 
@@ -59,7 +56,7 @@ object FFmpegBinary {
             return binary.absolutePath
         }
 
-        return try {
+        return runCatching {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
                 throw IOException("Cannot create cache dir: $cacheDir.")
             }
@@ -71,7 +68,7 @@ object FFmpegBinary {
             Processes.removeMacQuarantine(binary.toPath())
             logger.info("Ready to work.")
             binary.absolutePath
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.error("Download failed, falling back to system ffmpeg", e)
             findSystemFfmpeg()
         }

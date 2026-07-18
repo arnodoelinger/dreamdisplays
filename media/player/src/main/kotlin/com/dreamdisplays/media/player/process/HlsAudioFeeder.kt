@@ -191,9 +191,8 @@ internal class HlsAudioFeeder(
     private fun alive(): Boolean = !stopFlag.get() && !terminated.get()
 
     private fun sleepQuietly(ms: Long) {
-        try {
-            Thread.sleep(ms)
-        } catch (_: InterruptedException) {
+        runCatching { Thread.sleep(ms) }.onFailure { e ->
+            if (e !is InterruptedException) throw e
             Thread.currentThread().interrupt()
         }
     }

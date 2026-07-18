@@ -53,11 +53,15 @@ class MediaPlayer(
     private val replayBootstrap: ReplayBootstrap? = null,
     private val audioStage: AudioDspStage? = null,
 ) {
-    /** One-shot native packet-cache bootstrap used when a local display reappears.
-     *  [audioPcm] is the cached raw PCM for the same window, played during the bridge (null = silent bridge). */
+    /**
+     * One-shot native packet-cache bootstrap used when a local display reappears.
+     * [audioPcm] is the cached raw PCM for the same window, played during the bridge (null = silent bridge).
+     */
     data class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long, val audioPcm: ByteArray? = null) {
-        /** Cached resolved streams for this URL, reused on reappear to skip the network `prepare()` so the
-         *  live source warms in ~decoder-open time instead of ~seconds (null = none / re-resolve). */
+        /**
+         * Cached resolved streams for this URL, reused on reappear to skip the network `prepare()` so the
+         * live source warms in ~decoder-open time instead of ~seconds (null = none / re-resolve).
+         */
         var prepared: PreparedMedia? = null
     }
 
@@ -84,8 +88,10 @@ class MediaPlayer(
         /** Max fetch retries. */
         private const val MAX_FETCH_RETRIES = 3
 
-        /** In-place audio-half restarts allowed per session before a dead live audio escalates to a full
-         *  stall recovery (see [handleAudioFailure]). */
+        /**
+         * In-place audio-half restarts allowed per session before a dead live audio escalates to a full
+         * stall recovery (see [handleAudioFailure]).
+         */
         private const val MAX_AUDIO_RESTARTS = 3
 
         /** Hwaccel failures show up within the first few seconds, past this window assume the stream is just unreliable. */
@@ -137,15 +143,19 @@ class MediaPlayer(
     private val replayBootstrapRef = AtomicReference(replayBootstrap)
     private val primedStartPositionNanos = AtomicLong(-1L)
 
-    /** One-shot cached prepared streams from the bootstrap: consumed by the first [initialize] to skip the
-     *  network resolve. Cleared after use so a retry (e.g. expired cached URLs) re-resolves fresh. */
+    /**
+     * One-shot cached prepared streams from the bootstrap: consumed by the first [initialize] to skip the
+     * network resolve. Cleared after use so a retry (e.g. expired cached URLs) re-resolves fresh.
+     */
     private val preparedBootstrapRef = AtomicReference(replayBootstrap?.prepared)
 
     /** True once replay-only video is rendering, so [startStreams] attaches live instead of cold-starting. */
     private val replayVideoActive = AtomicBoolean(false)
 
-    /** True when this player was created from a replay bootstrap: it already resumes at the saved position,
-     *  so the controller must NOT also fire restoreSavedTime (its corrective seek would cold-restart the bridge). */
+    /**
+     * True when this player was created from a replay bootstrap: it already resumes at the saved position,
+     * so the controller must NOT also fire restoreSavedTime (its corrective seek would cold-restart the bridge).
+     */
     private val startedFromReplay = replayBootstrap != null
     private val retryPolicy = RetryPolicy(MAX_FETCH_RETRIES)
 
@@ -167,8 +177,10 @@ class MediaPlayer(
         isLive = { liveStream },
     )
 
-    /** Timestamp of the last stall recovery (watchdog or audio failure), 0 = none yet. Used to detect a second
-     *  stall shortly after the first, which means the plain restart isn't fixing anything. */
+    /**
+     * Timestamp of the last stall recovery (watchdog or audio failure), 0 = none yet. Used to detect a second
+     * stall shortly after the first, which means the plain restart isn't fixing anything.
+     */
     @Volatile
     private var lastStallNanos = 0L
 
@@ -178,13 +190,13 @@ class MediaPlayer(
     /** Guards [dispatchInitialize] so at most one resolve is ever in flight for this player. */
     private val initializing = AtomicBoolean(false)
 
-    // Watchdog is created before sessionManager but its lambdas reference sessionManager lazily
     private val watchdog = StreamWatchdog(
         debugLabel = debugLabel,
         isActive = { sessionManager.isPlaying && !sessionManager.isParked() && !terminated.get() },
         getLastFrameNanos = { sessionManager.lastFrameNanos.get() },
         onStall = { handleSessionStall("no frames") },
     )
+
     private val sessionManager = PlaybackSessionManager(
         debugLabel = debugLabel,
         clock = clock,
@@ -204,8 +216,10 @@ class MediaPlayer(
     private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
     private val initCallbacks = CopyOnWriteArrayList<() -> Unit>()
 
-    /** Set once [initialize] has completed successfully; from then on [whenInitialized] runs callbacks
-     *  immediately instead of queueing them (the queue is only drained at the end of [initialize]). */
+    /**
+     * Set once [initialize] has completed successfully; from then on [whenInitialized] runs callbacks
+     * immediately instead of queueing them (the queue is only drained at the end of [initialize]).
+     */
     private val initDrained = AtomicBoolean(false)
 
     @Volatile
@@ -227,10 +241,12 @@ class MediaPlayer(
     @Volatile
     private var lastRequestedQuality = 0
 
-    /** Snapshot to restore [streams] / [lastQuality] / [lastRequestedQuality] to if an in-flight
-     *  parallel quality switch genuinely fails (old channel stays live on the old quality) — set right
-     *  before [changeQuality] optimistically applies the new stream set, cleared on success or on a
-     *  failure that still applied the new quality some other way (see [handleQualitySwitchAborted]). */
+    /**
+     * Snapshot to restore [streams] / [lastQuality] / [lastRequestedQuality] to if an in-flight
+     * parallel quality switch genuinely fails (old channel stays live on the old quality) — set right
+     * before [changeQuality] optimistically applies the new stream set, cleared on success or on a
+     * failure that still applied the new quality some other way (see [handleQualitySwitchAborted]).
+     */
     private class QualityRollback(val previousStreams: ActiveStreams, val previousQuality: Int, val target: Int)
 
     @Volatile
@@ -352,7 +368,6 @@ class MediaPlayer(
             callback(); return
         }
         initCallbacks.add(callback)
-        // initialize() may have drained between the check and the add; claim our own callback if so.
         if ((initDrained.get() || isReady) && initCallbacks.remove(callback)) callback()
     }
 
@@ -564,40 +579,38 @@ class MediaPlayer(
      */
     private fun initialize() {
         state.set(PlaybackState.INITIALIZING)
-        var success = false
-        try {
-            val cached = preparedBootstrapRef.getAndSet(null)
-            if (cached != null) logger.debug("$debugLabel [reappear] reusing cached prepared streams; skipping prepare().")
-            val prepared = cached ?: MediaPreparationService.prepare(youtubeUrl, lang, host.quality, env)
+        runCatching {
+            val prepared = preparedBootstrapRef.getAndSet(null)
+                ?: MediaPreparationService.prepare(youtubeUrl, lang, host.quality, env)
+
             if (terminated.get()) return
 
-            liveStream = prepared.isLive
-            seekable = prepared.isSeekable
-            durationHintNanos = prepared.durationNanos
-            streams = prepared.streamSet
-            lastQuality = MediaStreamSelector.parseQuality(prepared.streamSet.currentVideo)
-            host.videoContentAspect = prepared.streamSet.currentVideo.contentAspect()
+            prepared.also {
+                liveStream = it.isLive
+                seekable = it.isSeekable
+                durationHintNanos = it.durationNanos
+                streams = it.streamSet
+                lastQuality = MediaStreamSelector.parseQuality(it.streamSet.currentVideo)
+                host.videoContentAspect = it.streamSet.currentVideo.contentAspect()
+            }
 
             if (DEBUG) {
                 logger.debug("$debugLabel video=${prepared.streamSet.currentVideo} audio=${prepared.streamSet.currentAudio}")
                 logger.debug("$debugLabel live=$liveStream seekable=$seekable dur=$durationHintNanos")
                 stats.start()
             }
-            success = true
-            val ss = prepared.streamSet
+
             val primed = primedStartPositionNanos.get().takeIf { it >= 0L } ?: 0L
             val initialOffset = replayBootstrapRef.get()?.positionNanos ?: primed
-            safeExecute { if (!terminated.get()) startStreams(ss, initialOffset) }
-        } catch (e: DreamMediaException) {
-            logger.error("$debugLabel Initialization failed: ${e.message}")
+
+            safeExecute { if (!terminated.get()) startStreams(prepared.streamSet, initialOffset) }
+        }.onSuccess {
+            drainInitCallbacks(run = true)
+        }.onFailure { e ->
+            logger.error("$debugLabel Initialization failed: ${e.message}.")
             state.set(PlaybackState.ERROR)
-            host.mediaError = e
-        } catch (e: Exception) {
-            logger.error("$debugLabel Initialization failed: ${e.message}")
-            state.set(PlaybackState.ERROR)
-            host.mediaError = DreamMediaException.Unknown(e.message ?: "Initialization failed", e)
-        } finally {
-            drainInitCallbacks(run = success)
+            host.mediaError = if (e is DreamMediaException) e else DreamMediaException.Unknown(e.message ?: "initialization failed", e)
+            drainInitCallbacks(run = false)
         }
     }
 

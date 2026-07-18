@@ -24,11 +24,8 @@ import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.RegionUtil.calculateRegion
 import com.dreamdisplays.platform.server.utils.ReporterUtil
-import com.dreamdisplays.platform.server.utils.ReporterUtil.sendReport
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
-import com.dreamdisplays.platform.server.utils.net.PacketUtil.sendDelete
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
@@ -60,7 +57,7 @@ object DisplayManager {
     /** Throttles reports to prevent spam. */
     private val reportThrottle = ReportThrottle()
 
-    /** Proximity index for tracking nearby players in Folia. */
+    /** Proximity index for tracking nearby players in `Folia`. */
     private val proximityIndex = DisplayProximityIndex()
 
     /** Returns the display registered under [id], or null if none exists. */
@@ -130,7 +127,7 @@ object DisplayManager {
         val pos1 = data.pos1 ?: return false
         val pos2 = data.pos2 ?: return false
         val selWorld = pos1.world
-        val region = calculateRegion(pos1, pos2)
+        val region = RegionUtil.calculateRegion(pos1, pos2)
         val box = BoundingBox(
             region.minX.toDouble(), region.minY.toDouble(), region.minZ.toDouble(),
             (region.maxX + 1).toDouble(), (region.maxY + 1).toDouble(), (region.maxZ + 1).toDouble(),
@@ -163,18 +160,17 @@ object DisplayManager {
             config.settings.maxRenderDistance,
         )
 
-    /** Returns true if [player] is in [display]'s world and within render range. Must run on the player's thread on Folia. */
+    /** Returns true if [player] is in [display]'s world and within render range. Must run on the player's thread on `Folia`. */
     @PaperOnly
     private fun Player.isInRange(display: PaperDisplayData): Boolean {
-        if (display.pos1.world != world) return false
-        return location.isInRange(display)
+        return display.pos1.world == world && location.isInRange(display)
     }
 
-    /** Removes [playerId] from the cached Folia proximity index. */
+    /** Removes [playerId] from the cached `Folia` proximity index. */
     @PaperOnly
     fun forgetNearbyPlayer(playerId: UUID) = proximityIndex.forgetPlayer(playerId)
 
-    /** Cached nearby player ids for Folia global coordinators that cannot read entity locations directly. */
+    /** Cached nearby player ids for `Folia` global coordinators that cannot read entity locations directly. */
     @PaperOnly
     fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> = proximityIndex.trackedNearbyPlayerIds(display.id)
 
@@ -190,7 +186,7 @@ object DisplayManager {
         )
     }
 
-    /** Broadcasts [display]'s current info through the appropriate Paper/Folia player scheduler path. */
+    /** Broadcasts [display]'s current info through the appropriate `Paper` / `Folia` player scheduler path. */
     @PaperOnly
     fun broadcastUpdate(display: PaperDisplayData) {
         if (PlatformUtil.isFolia) {
@@ -202,15 +198,15 @@ object DisplayManager {
         }
     }
 
-    /** Broadcasts a display delete packet through the appropriate Paper/Folia player scheduler path. */
+    /** Broadcasts a display delete packet through the appropriate `Paper` / `Folia` player scheduler path. */
     @PaperOnly
     fun broadcastDelete(display: PaperDisplayData) {
         if (PlatformUtil.isFolia) {
             Scheduler.forEachTrackedPlayer { player ->
-                if (player.isInRange(display)) sendDelete(listOf(player), display.id)
+                if (player.isInRange(display)) PacketUtil.sendDelete(listOf(player), display.id)
             }
         } else {
-            sendDelete(getReceivers(display), display.id)
+            PacketUtil.sendDelete(getReceivers(display), display.id)
         }
     }
 
@@ -289,19 +285,23 @@ object DisplayManager {
     @JvmStatic
     fun report(id: UUID, player: Player) {
         val displayData = displays[id] as? PaperDisplayData ?: return
-        if (reportThrottle.isThrottled(id, player.uniqueId, config.settings.reportCooldown.toLong())) {
+
+        if (reportThrottle.isThrottled(id, player.uniqueId, config.settings.reportCooldown)) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
+
         runAsync {
-            try {
-                if (config.settings.webhookUrl.isEmpty()) return@runAsync
-                sendReport(
+            if (config.settings.webhookUrl.isEmpty()) return@runAsync
+
+            runCatching {
+                ReporterUtil.sendReport(
                     displayData.pos1, displayData.url, displayData.id, player,
                     config.settings.webhookUrl, getOfflinePlayer(displayData.ownerId).name,
                 )
+            }.onSuccess {
                 runSync { MessageUtil.sendMessage(player, "reportSent") }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 getInstance().logger.warning("Exception while sending report: ${e.message}")
                 runSync { MessageUtil.sendMessage(player, "reportFailed") }
             }
@@ -326,7 +326,7 @@ object DisplayManager {
         val invalidDisplays = mutableListOf<PaperDisplayData>()
 
         displays.values.filterIsInstance<PaperDisplayData>().forEach { display ->
-            // An unloaded world (e.g. a Multiverse world that loads later) is not an invalid display:
+            // An unloaded world (e.g., a Multiverse world that loads later) is not an invalid display:
             // skip it this pass instead of wiping it from the database.
             val world = display.pos1.world
             if (world == null) {

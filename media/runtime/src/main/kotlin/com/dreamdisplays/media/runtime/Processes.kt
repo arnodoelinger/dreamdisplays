@@ -46,10 +46,7 @@ object Processes {
      */
     fun drainAsync(input: InputStream): Thread =
         Thread {
-            try {
-                input.use { it.readAllBytes() }
-            } catch (_: Exception) {
-            }
+            runCatching { input.use { it.readAllBytes() } }
         }.apply {
             isDaemon = true
             start()
@@ -61,23 +58,21 @@ object Processes {
      */
     fun collector(input: InputStream, sink: StringBuilder, name: String): Thread =
         Thread({
-            try {
+            runCatching {
                 BufferedReader(InputStreamReader(input, StandardCharsets.UTF_8)).use { r ->
                     val buf = CharArray(8192)
                     var n: Int
                     while (r.read(buf).also { n = it } != -1) sink.appendRange(buf, 0, n)
                 }
-            } catch (_: IOException) {
-            }
+            }.onFailure { e -> if (e !is IOException) throw e }
         }, name).apply { isDaemon = true }
 
     /** Marks [binary] world-executable, falling back to [java.io.File.setExecutable] on non-POSIX filesystems. */
     fun markExecutable(binary: Path) {
-        try {
+        runCatching {
             Files.setPosixFilePermissions(binary, PosixFilePermissions.fromString("rwxr-xr-x"))
-        } catch (_: UnsupportedOperationException) {
-            binary.toFile().setExecutable(true, false)
-        } catch (_: IOException) {
+        }.onFailure { e ->
+            if (e !is UnsupportedOperationException && e !is IOException) throw e
             binary.toFile().setExecutable(true, false)
         }
     }
@@ -88,10 +83,9 @@ object Processes {
      */
     fun removeMacQuarantine(binary: Path) {
         if (!OsInfo.isMac) return
-        try {
+        runCatching {
             ProcessBuilder("xattr", "-d", "com.apple.quarantine", binary.toString())
                 .redirectErrorStream(true).start().waitFor(5, TimeUnit.SECONDS)
-        } catch (_: Exception) {
         }
     }
 }

@@ -140,9 +140,9 @@ class VideoPopoutWindow(
         @Volatile
         private var fullscreen = false
 
-        private var savedX = 0;
+        private var savedX = 0
         private var savedY = 0
-        private var savedW = 0;
+        private var savedW = 0
         private var savedH = 0
 
         override val isOpen: Boolean get() = windowHandle != 0L
@@ -156,7 +156,7 @@ class VideoPopoutWindow(
             var back = backBuf
             if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
             back.clear()
-            val savedLimit = buf.limit();
+            val savedLimit = buf.limit()
             val savedPos = buf.position()
             buf.limit(savedPos + size)
             back.put(buf)
@@ -175,11 +175,11 @@ class VideoPopoutWindow(
         override fun renderFrame() {
             val handle = windowHandle
             if (handle == 0L) return
-            val fw = frameW;
-            val fh = frameH;
+            val fw = frameW
+            val fh = frameH
             val buf = frontBuf
             val format = frameFormat
-            val vw = winW.value;
+            val vw = winW.value
             val vh = winH.value
             if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
 
@@ -189,7 +189,7 @@ class VideoPopoutWindow(
             val prevCtx = GLFW.glfwGetCurrentContext()
             // Only restore capabilities when there is an active GL context to restore.
             // Skipping setCapabilities(null) avoids corrupting LWJGL state for mods that
-            // replace the GL pipeline (e.g. Vulkan-based renderers).
+            // replace the GL pipeline (e.g., Vulkan-based renderers).
             val prevCaps = if (prevCtx != 0L) runCatching { GL.getCapabilities() }.getOrNull() else null
 
             GLFW.glfwMakeContextCurrent(handle)
@@ -251,7 +251,7 @@ class VideoPopoutWindow(
                 }
             }
             GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.value = fw; winH.value = fh }
-            val wa = IntArray(1);
+            val wa = IntArray(1)
             val ha = IntArray(1)
             GLFW.glfwGetFramebufferSize(handle, wa, ha)
             if (wa[0] > 0 && ha[0] > 0) {
@@ -282,7 +282,7 @@ class VideoPopoutWindow(
                 val monitor = GLFW.glfwGetPrimaryMonitor()
                 if (monitor == 0L) return
                 val mode = GLFW.glfwGetVideoMode(monitor) ?: return
-                val xa = IntArray(1);
+                val xa = IntArray(1)
                 val ya = IntArray(1)
                 GLFW.glfwGetWindowPos(handle, xa, ya)
                 savedX = xa[0]; savedY = ya[0]; savedW = winW.value; savedH = winH.value
@@ -296,7 +296,7 @@ class VideoPopoutWindow(
 
         companion object {
             private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
-            private val EMPTY_DIRECT = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())!!
+            private val EMPTY_DIRECT = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
 
             private fun contentRect(frameW: Int, frameH: Int, contentAspect: Double): ContentRect {
                 if (frameW <= 0 || frameH <= 0) return ContentRect(0, 0, frameW, frameH)
@@ -370,35 +370,40 @@ class VideoPopoutWindow(
         }
 
         private fun createFrame(videoW: Int, videoH: Int) {
-            try {
+            runCatching {
                 val w = videoW.coerceIn(480, 1280)
                 val h = videoH.coerceIn(270, 720)
-                val p = VideoPanel(); panel = p
-                val f = JFrame("Dream Displays"); frame = f
-                f.defaultCloseOperation = JFrame.DO_NOTHING_ON_CLOSE
-                f.contentPane = p
-                f.setSize(w, h)
-                f.setLocationRelativeTo(null)
-                f.addWindowListener(object : WindowAdapter() {
-                    override fun windowClosing(e: WindowEvent) = destroyFrame()
-                })
-                f.addKeyListener(object : KeyAdapter() {
-                    override fun keyPressed(e: KeyEvent) {
-                        when (e.keyCode) {
-                            KeyEvent.VK_ESCAPE -> destroyFrame()
-                            KeyEvent.VK_F -> {
-                                val state = f.extendedState
-                                f.extendedState =
-                                    if (state and JFrame.MAXIMIZED_BOTH != 0) JFrame.NORMAL
+
+                val p = VideoPanel().also { panel = it }
+
+                JFrame("Dream Displays").apply {
+                    frame = this
+                    defaultCloseOperation = JFrame.DO_NOTHING_ON_CLOSE
+                    contentPane = p
+                    setSize(w, h)
+                    setLocationRelativeTo(null)
+
+                    addWindowListener(object : WindowAdapter() {
+                        override fun windowClosing(e: WindowEvent) = destroyFrame()
+                    })
+
+                    addKeyListener(object : KeyAdapter() {
+                        override fun keyPressed(e: KeyEvent) {
+                            when (e.keyCode) {
+                                KeyEvent.VK_ESCAPE -> destroyFrame()
+                                KeyEvent.VK_F -> extendedState =
+                                    if (extendedState and JFrame.MAXIMIZED_BOTH != 0) JFrame.NORMAL
                                     else JFrame.MAXIMIZED_BOTH
                             }
                         }
-                    }
-                })
-                f.isVisible = true
-            } catch (e: Exception) {
-                logger.error("Failed to create AWT popout window", e)
-                frame = null; panel = null
+                    })
+
+                    isVisible = true
+                }
+            }.onFailure { e ->
+                logger.error("Failed to create AWT popout window.", e)
+                frame = null
+                panel = null
                 onClose()
             }
         }
@@ -417,7 +422,7 @@ class VideoPopoutWindow(
                 super.paintComponent(g)
                 val img = currentImage ?: return
                 val aspect = contentAspect
-                val vw = width;
+                val vw = width
                 val vh = height
                 if (vw <= 0 || vh <= 0) return
                 val drawW: Int;
@@ -454,8 +459,7 @@ class VideoPopoutWindow(
          * set by [Initializer] during mod init.
          */
         val isAvailable: Boolean by lazy {
-            if (IS_MACOS) true
-            else try {
+            IS_MACOS || try {
                 !GraphicsEnvironment.isHeadless()
             } catch (_: Exception) {
                 false

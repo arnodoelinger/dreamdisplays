@@ -137,10 +137,10 @@ object YouTubeInnerTube {
         if (!response.isSuccessful) {
             throw IOException("$endpoint returned HTTP ${response.code}: ${response.bodyString().take(500)}")
         }
-        return try {
+        return runCatching {
             DreamJson.compact.parseToJsonElement(response.bodyString()).asJsonObjectOrNull()
                 ?: throw IOException("InnerTube $endpoint returned unexpected JSON shape")
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             throw IOException("Failed to parse InnerTube $endpoint response", e)
         }
     }
@@ -148,7 +148,7 @@ object YouTubeInnerTube {
     /** Walks the `InnerTube` search response JSON and collects up to [limit] parsed video entries. */
     private fun extractSearchVideos(root: JsonObject, limit: Int): List<MediaSearchResult> {
         val out = ArrayList<MediaSearchResult>()
-        try {
+        runCatching {
             val sections = path(
                 root, "contents", "twoColumnSearchResultsRenderer", "primaryContents",
                 "sectionListRenderer", "contents"
@@ -165,7 +165,7 @@ object YouTubeInnerTube {
                     }
                 }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Search parse failed: ${e.message}")
         }
         return out
@@ -189,7 +189,7 @@ object YouTubeInnerTube {
 
     /** Extracts title, channel, view count, and like count from a `next` endpoint response. */
     private fun extractWatchMetadata(root: JsonObject): MetaHolder? {
-        try {
+        return runCatching {
             val contents = path(
                 root, "contents", "twoColumnWatchNextResults", "results",
                 "results", "contents"
@@ -221,17 +221,16 @@ object YouTubeInnerTube {
                 }
             }
             if (title == null) return null
-            return MetaHolder(title, channel, views, likes, publishedText, daysAgo)
-        } catch (e: Exception) {
+            MetaHolder(title, channel, views, likes, publishedText, daysAgo)
+        }.onFailure { e ->
             logger.warn("Watch metadata parse failed: ${e.message}")
-            return null
-        }
+        }.getOrNull()
     }
 
     /** Parses up to [limit] related videos from a `next` response, skipping the video with id [selfId]. */
     private fun extractRelatedVideos(root: JsonObject, selfId: String, limit: Int): List<MediaSearchResult> {
         val out = ArrayList<MediaSearchResult>()
-        try {
+        runCatching {
             val results = path(
                 root, "contents", "twoColumnWatchNextResults", "secondaryResults",
                 "secondaryResults", "results"
@@ -245,7 +244,7 @@ object YouTubeInnerTube {
                     if (out.size >= limit) return out
                 }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Related parse failed: ${e.message}")
         }
         return out
@@ -293,14 +292,13 @@ object YouTubeInnerTube {
 
     /** Returns true if [vr] appears to be a YouTube Shorts entry based on its navigation URL or JSON markers. */
     private fun looksLikeShorts(vr: JsonObject): Boolean {
-        try {
-            val webUrl = vr.obj("navigationEndpoint")
+        val webUrl = runCatching {
+            vr.obj("navigationEndpoint")
                 ?.obj("commandMetadata")
                 ?.obj("webCommandMetadata")
                 ?.optString("url")
-            if (webUrl != null && webUrl.startsWith("/shorts/")) return true
-        } catch (_: Exception) {
-        }
+        }.getOrNull()
+        if (webUrl != null && webUrl.startsWith("/shorts/")) return true
         val s = vr.toString()
         return "\"label\":\"Shorts\"" in s || "shortsLockupViewModel" in s
     }
@@ -334,13 +332,11 @@ object YouTubeInnerTube {
     private fun parseDuration(s: String?): Long? {
         if (s == null) return null
         val parts = s.split(":")
-        return try {
+        return runCatching {
             var total = 0L
             for (p in parts) total = total * 60 + p.trim().toInt()
             total
-        } catch (_: NumberFormatException) {
-            null
-        }
+        }.getOrNull()
     }
 
     /** Parses a human-readable view count string (e.g. "1.2M views", "45K") into a raw long, or null on failure. */
@@ -362,11 +358,7 @@ object YouTubeInnerTube {
                 mult = 1_000_000_000.0; t = t.dropLast(1)
             }
         }
-        return try {
-            (t.trim().toDouble() * mult).toLong()
-        } catch (_: NumberFormatException) {
-            null
-        }
+        return runCatching { (t.trim().toDouble() * mult).toLong() }.getOrNull()
     }
 
     /** Converts a relative age string (e.g. "3 days ago", "2 weeks ago") to an approximate day count, or null. */
@@ -374,11 +366,7 @@ object YouTubeInnerTube {
         if (s == null) return null
         val m = AGE_PATTERN.matcher(s)
         if (!m.find()) return null
-        val n = try {
-            m.group(1).toInt()
-        } catch (_: NumberFormatException) {
-            return null
-        }
+        val n = runCatching { m.group(1).toInt() }.getOrNull() ?: return null
         return when (m.group(2).lowercase()) {
             "second", "minute", "hour" -> 0
             "day" -> n

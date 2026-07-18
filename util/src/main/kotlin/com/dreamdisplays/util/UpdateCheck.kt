@@ -47,7 +47,7 @@ object UpdateCheck {
 
     /** Check the latest release version against the current version. */
     private fun doCheck() {
-        try {
+        runCatching {
             val body = DreamHttpClient.readText(
                 API,
                 DreamHttpClient.RequestOptions(
@@ -75,7 +75,7 @@ object UpdateCheck {
                 else -> null
             } ?: return
             latestVersion = rawTag.trimStart('v', 'V')
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Update check failed: ${e.message}")
         }
     }

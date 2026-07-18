@@ -27,12 +27,11 @@ object MediaHostGuard {
             logger.warn("Blocked media URL with no parseable host: ${url.take(120)}")
             return false
         }
-        val addresses = try {
+        val addresses = runCatching {
             InetAddress.getAllByName(host)
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Blocked media URL; host '$host' did not resolve: ${e.message}.")
-            return false
-        }
+        }.getOrNull() ?: return false
         addresses.firstOrNull { isNonPublic(it) }?.let {
             logger.warn("Blocked media URL resolving to non-public address ${it.hostAddress} (host=$host).")
             return false
@@ -58,19 +57,15 @@ object MediaHostGuard {
     fun resolveSafeUrl(url: String, maxRedirects: Int = 5): String {
         requireAllowed(url)
         if (allowPrivate) return url
-        val scheme = try {
-            URI(url.trim()).scheme?.lowercase()
-        } catch (_: Exception) {
-            null
-        }
+        val scheme = runCatching { URI(url.trim()).scheme?.lowercase() }.getOrNull()
         if (scheme != "http" && scheme != "https") return url
 
         var current = url
         repeat(maxRedirects) {
             val location = peekRedirectLocation(current) ?: return current
-            val next = try {
+            val next = runCatching {
                 URI(current.trim()).resolve(location.trim()).toString()
-            } catch (e: Exception) {
+            }.getOrElse { e ->
                 throw IOException("Refusing to follow an unparseable media redirect: ${e.message}.")
             }
             requireAllowed(next)
@@ -85,7 +80,7 @@ object MediaHostGuard {
      * rejects the probe degrades to "trust the URL as-is" rather than blocking playback).
      */
     private fun peekRedirectLocation(url: String): String? {
-        return try {
+        return runCatching {
             DreamHttpClient.peekRedirectLocation(
                 url.trim(),
                 DreamHttpClient.RequestOptions(
@@ -94,19 +89,16 @@ object MediaHostGuard {
                     readTimeoutMs = 5_000,
                 ),
             )
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.debug("Redirect probe failed for ${url.take(120)}: ${e.message}.")
-            null
-        }
+        }.getOrNull()
     }
 
     /** Extracts the host from [url] (stripping IPv6 literal brackets), or null when it cannot be parsed. */
     private fun hostOf(url: String): String? =
-        try {
+        runCatching {
             URI(url.trim()).host?.removeSurrounding("[", "]")?.takeIf { it.isNotEmpty() }
-        } catch (_: Exception) {
-            null
-        }
+        }.getOrNull()
 
     /** True when [addr] is anything other than a public unicast address. */
     private fun isNonPublic(addr: InetAddress): Boolean {

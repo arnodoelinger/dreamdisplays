@@ -62,12 +62,11 @@ class JsonFileStore(
 
     /** Writes [value] to [file] through a temporary file and atomic replace. */
     fun <T> write(file: File, serializer: SerializationStrategy<T>, value: T, logger: Logger) {
-        val element = try {
+        val element = runCatching {
             DreamJson.pretty.encodeToJsonElement(serializer, value)
-        } catch (e: SerializationException) {
+        }.onFailure { e ->
             logger.error("Failed to encode ${file.name}.", e)
-            return
-        }
+        }.getOrNull() ?: return
         writeJsonElement(file, element, logger)
     }
 
@@ -79,33 +78,26 @@ class JsonFileStore(
         schemaVersion: Int,
         logger: Logger,
     ) {
-        val element = try {
+        val element = runCatching {
             buildJsonObject {
                 put(SCHEMA_VERSION_FIELD, JsonPrimitive(schemaVersion))
                 put(DATA_FIELD, DreamJson.pretty.encodeToJsonElement(serializer, value))
             }
-        } catch (e: SerializationException) {
+        }.onFailure { e ->
             logger.error("Failed to encode ${file.name}.", e)
-            return
-        }
+        }.getOrNull() ?: return
         writeJsonElement(file, element, logger)
     }
 
     /** Read JSON element from a file, returning null if the file is absent or unreadable. */
     private fun readJsonElement(file: File, logger: Logger): JsonElement? {
         if (!file.isFile) return null
-        return try {
+        return runCatching {
             DreamJson.pretty.parseToJsonElement(Files.readString(file.toPath(), StandardCharsets.UTF_8))
-        } catch (e: IOException) {
-            logger.error("Failed to read ${file.name}.", e)
-            null
-        } catch (e: SerializationException) {
-            logger.error("Failed to parse ${file.name}.", e)
-            null
-        } catch (e: IllegalArgumentException) {
-            logger.error("Failed to parse ${file.name}.", e)
-            null
-        }
+        }.onFailure { e ->
+            val action = if (e is IOException) "read" else "parse"
+            logger.error("Failed to $action ${file.name}.", e)
+        }.getOrNull()
     }
 
     /** Decode JSON element from a file, returning null if the file is absent or unreadable. */
@@ -114,15 +106,11 @@ class JsonFileStore(
         deserializer: DeserializationStrategy<T>,
         element: JsonElement,
         logger: Logger,
-    ): T? = try {
+    ): T? = runCatching {
         DreamJson.pretty.decodeFromJsonElement(deserializer, element)
-    } catch (e: SerializationException) {
+    }.onFailure { e ->
         logger.error("Failed to parse ${file.name}.", e)
-        null
-    } catch (e: IllegalArgumentException) {
-        logger.error("Failed to parse ${file.name}.", e)
-        null
-    }
+    }.getOrNull()
 
     /** Versioned payload extraction. */
     private fun versionedPayload(
@@ -150,12 +138,12 @@ class JsonFileStore(
 
     /** Write JSON element to a file through a temporary file and atomic replace. */
     private fun writeJsonElement(file: File, element: JsonElement, logger: Logger) {
-        try {
-            val parent = file.parentFile ?: dir
-            if (!parent.exists() && !parent.mkdirs()) {
-                logger.error("Failed to create JSON store directory.")
-                return
-            }
+        val parent = file.parentFile ?: dir
+        if (!parent.exists() && !parent.mkdirs()) {
+            logger.error("Failed to create JSON store directory.")
+            return
+        }
+        runCatching {
             val tmp = File(parent, "${file.name}.tmp")
             Files.writeString(
                 tmp.toPath(),
@@ -163,22 +151,22 @@ class JsonFileStore(
                 StandardCharsets.UTF_8,
             )
             replace(tmp, file)
-        } catch (e: IOException) {
-            logger.error("Failed to write ${file.name}.", e)
-        } catch (e: SerializationException) {
-            logger.error("Failed to encode ${file.name}.", e)
+        }.onFailure { e ->
+            val action = if (e is IOException) "write" else "encode"
+            logger.error("Failed to $action ${file.name}.", e)
         }
     }
 
-    /** Atomic replace of a file. */
+    /** Atomic replace of a file, falling back to a non-atomic move where the filesystem can't do atomic replace. */
     private fun replace(tmp: File, target: File) {
-        try {
+        runCatching {
             Files.move(
                 tmp.toPath(), target.toPath(),
                 StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE,
             )
-        } catch (_: AtomicMoveNotSupportedException) {
+        }.recoverCatching { e ->
+            if (e !is AtomicMoveNotSupportedException) throw e
             Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
-        }
+        }.getOrThrow()
     }
 }

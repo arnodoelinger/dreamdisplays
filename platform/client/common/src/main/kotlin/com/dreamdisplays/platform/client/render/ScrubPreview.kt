@@ -15,12 +15,15 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.RemovalCause
 import com.mojang.blaze3d.platform.NativeImage
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.IOException
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -33,6 +36,8 @@ import java.security.NoSuchAlgorithmException
 import java.util.*
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
+import kotlin.coroutines.cancellation.CancellationException
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * Generates and caches seek-bar scrub-preview thumbnails: a sparse set of downscaled frames sampled
@@ -94,20 +99,21 @@ object ScrubPreview {
      * host-safety checks run in the background, never on the calling (render) thread.
      */
     fun request(key: String, rawUrl: String, durationNanos: Long) {
-        if (durationNanos <= 0) return
-        if (FRAMES.getIfPresent(key) != null) return
+        if (durationNanos <= 0 || FRAMES.getIfPresent(key) != null) return
         if (IN_FLIGHT.asMap().putIfAbsent(key, true) != null) return
+
         logger.info("Requesting scrub preview for $key (durationNanos=$durationNanos)")
+
         DreamCoroutines.clientIo.launch {
-            try {
+            runCatching {
                 val safeUrl = MediaHostGuard.resolveSafeUrl(rawUrl)
                 generate(key, safeUrl, durationNanos)
-            } catch (e: Exception) {
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+
                 logger.warn("Scrub preview generation failed for $key: ${e.message}", e)
-                // Cache the failure (empty list) so a hover-triggered retry every frame doesn't
-                // hammer the source with another full generation round; a video swap gets a fresh key.
                 FRAMES.put(key, emptyList())
-            } finally {
+            }.also {
                 IN_FLIGHT.invalidate(key)
             }
         }
@@ -143,7 +149,7 @@ object ScrubPreview {
         val timestamps = generateSequence(spacing / 2) { it + spacing }.takeWhile { it < durationNanos }.toList()
         logger.info("Generating $key: ${timestamps.size} sample(s), concurrency=$EXTRACT_CONCURRENCY, ffmpeg=$ffmpeg")
 
-        val collected = java.util.Collections.synchronizedList(ArrayList<Frame>(timestamps.size))
+        val collected = Collections.synchronizedList(ArrayList<Frame>(timestamps.size))
         val semaphore = Semaphore(EXTRACT_CONCURRENCY)
         FRAMES.put(key, emptyList())
         val outcomes = coroutineScope {
@@ -166,51 +172,61 @@ object ScrubPreview {
     }
 
     /** Runs a single-frame `FFmpeg` extraction at [offsetNanos] and returns the raw JPEG bytes. */
-    private fun extractFrame(key: String, ffmpeg: String, sourceUrl: String, offsetNanos: Long): ByteArray? {
-        val proc = try {
+    private suspend fun extractFrame(key: String, ffmpeg: String, sourceUrl: String, offsetNanos: Long): ByteArray? = coroutineScope {
+        val proc = runCatching {
             MediaProcess.buildFrameExtract(ffmpeg, sourceUrl, offsetNanos, FRAME_WIDTH, FRAME_HEIGHT)
-        } catch (e: IOException) {
+        }.onFailure { e ->
             logger.warn("Scrub frame process start failed for $key@$offsetNanos: ${e.message}")
-            return null
-        }
-        return try {
-            // Both pipes must be drained concurrently: FFmpeg can block writing stderr (e.g. a
-            // verbose error) while stdout is only read after waitFor, deadlocking the process.
-            val stderrThread = Thread({ runCatching { proc.errorStream.readBytes() } }, "scrub-preview-stderr")
-                .apply { isDaemon = true; start() }
-            val bytes = proc.inputStream.use { it.readBytes() }
-            val exited = proc.waitFor(10, TimeUnit.SECONDS)
-            stderrThread.join(1_000)
-            if (!exited) {
-                logger.warn("Scrub frame extraction timed out for $key@$offsetNanos")
-                null
-            } else if (bytes.isEmpty()) {
-                logger.warn("Scrub frame extraction produced no output for $key@$offsetNanos (exit=${proc.exitValue()})")
-                null
-            } else {
-                bytes
+        }.getOrNull() ?: return@coroutineScope null
+
+        val stderrDeferred = async(Dispatchers.IO) { runCatching { proc.errorStream.use { it.readBytes() } }.getOrNull() }
+        val stdoutDeferred = async(Dispatchers.IO) { runCatching { proc.inputStream.use { it.readBytes() } }.getOrNull() }
+
+        val result = runCatching {
+            val exited = withTimeoutOrNull(10.seconds) {
+                withContext(Dispatchers.IO) { proc.waitFor() }
             }
-        } catch (e: Exception) {
-            logger.warn("Scrub frame extraction failed for $key@$offsetNanos: ${e.message}")
-            null
+
+            val bytes = stdoutDeferred.await()
+            stderrDeferred.await()
+
+            when {
+                exited == null -> {
+                    logger.warn("Scrub frame extraction timed out for $key@$offsetNanos.")
+                    null
+                }
+                bytes == null || bytes.isEmpty() -> {
+                    logger.warn("Scrub frame extraction produced no output for $key@$offsetNanos (exit=${proc.exitValue()}).")
+                    null
+                }
+                else -> bytes
+            }
+        }.onFailure { e ->
+            if (e is CancellationException) throw e
+            logger.warn("Scrub frame extraction failed for $key@$offsetNanos: ${e.message}.")
+        }
+        try {
+            result.getOrNull()
         } finally {
             MediaProcess.gracefulDestroy(proc)
         }
     }
 
-    /** Decodes [bytes] and registers them as a Minecraft texture on the render thread; blocks the calling
-     *  (background) thread until registration completes so [generate] can build an ordered frame list. */
+    /**
+     * Decodes [bytes] and registers them as a Minecraft texture on the render thread; blocks the calling
+     * (background) thread until registration completes so [generate] can build an ordered frame list.
+     */
     private fun registerFrame(key: String, timestampNanos: Long, bytes: ByteArray): Identifier? {
-        val image = try {
+        val image = runCatching {
             decode(bytes)
-        } catch (e: Exception) {
-            logger.warn("Scrub frame decode failed for $key@$timestampNanos: ${e.message}")
-            return null
-        }
+        }.onFailure { e ->
+            logger.warn("Scrub frame decode failed for $key@$timestampNanos: ${e.message}.")
+        }.getOrNull() ?: return null
+
         val latch = java.util.concurrent.CountDownLatch(1)
         var result: Identifier? = null
         Minecraft.getInstance().execute {
-            try {
+            runCatching {
                 val texKey = "$key@$timestampNanos"
                 //? if >=1.21.11 {
                 val tex = DynamicTexture({ "scrub-$texKey" }, image)
@@ -220,10 +236,10 @@ object ScrubPreview {
                 Minecraft.getInstance().textureManager.register(id, tex)
                 TextureUploadUtil.applyBilinearFilter(tex)
                 result = id
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 logger.warn("Scrub frame register failed for $key@$timestampNanos: ${e.message}")
                 runCatching { image.close() }
-            } finally {
+            }.also {
                 latch.countDown()
             }
         }

@@ -188,7 +188,7 @@ internal class VideoFramePipe(
 
         var normalEos = false
 
-        try {
+        runCatching {
             proc.inputStream.use { input ->
                 val rowBuf = ByteArray(w * 3)
                 while (!terminated.get() && !stopFlag.get()) {
@@ -273,7 +273,8 @@ internal class VideoFramePipe(
                     videoPts += frameNs
                 }
             }
-        } catch (e: IOException) {
+        }.onFailure { e ->
+            if (e !is IOException) throw e
             if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
                 logger.warn("$debugLabel Read: ${e.message}")
             }
@@ -290,20 +291,18 @@ internal class VideoFramePipe(
 
         var exitCode = -1
         if (normalEos) {
-            try {
+            runCatching {
                 val done = proc.waitFor(500, TimeUnit.MILLISECONDS)
                 exitCode = if (done) proc.exitValue() else -1
                 if (!done) proc.destroyForcibly()
-            } catch (_: InterruptedException) {
+            }.onFailure { e ->
+                if (e !is InterruptedException) throw e
                 Thread.currentThread().interrupt()
             }
         }
 
         if (!terminated.get() && !stopFlag.get()) {
-            try {
-                stderrThread.join(500)
-            } catch (_: InterruptedException) {
-            }
+            runCatching { stderrThread.join(500) }
             val stderr = synchronized(stderrBuf) { stderrBuf.toString() }
             onEos(stderr, exitCode == 0)
         }

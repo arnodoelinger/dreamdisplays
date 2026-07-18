@@ -26,7 +26,7 @@ internal object FFmpegCapabilities {
     /** Returns the probed subset of [PROBED_FILTERS] available in [ffmpeg], caching per path. */
     private fun probedFilters(ffmpeg: String): Set<String> =
         filterCache.computeIfAbsent(ffmpeg) { bin ->
-            try {
+            runCatching {
                 val proc = ProcessBuilder(bin, "-hide_banner", "-filters")
                     .redirectErrorStream(true)
                     .start()
@@ -40,7 +40,7 @@ internal object FFmpegCapabilities {
                 // Each line lists the filter name as a whitespace-delimited column.
                 PROBED_FILTERS.filterTo(HashSet()) { f -> output.contains(" $f ") }
                     .also { logger.info("FFmpeg optional filters available: $it.") }
-            } catch (e: Exception) {
+            }.getOrElse { e ->
                 logger.warn("FFmpeg -filters probe failed (${e.message}); assuming no optional filters.")
                 emptySet()
             }

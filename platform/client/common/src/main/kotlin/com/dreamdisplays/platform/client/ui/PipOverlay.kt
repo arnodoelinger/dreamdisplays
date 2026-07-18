@@ -3,9 +3,6 @@ package com.dreamdisplays.platform.client.ui
 //? if >=1.21.11 {
 //?} else
 /*import com.mojang.blaze3d.systems.RenderSystem*/
-//? if >=26 {
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
 //? if >=1.21.11 {
 //?}
 //? if >=1.21.11 {
@@ -25,7 +22,11 @@ import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.client.resources.sounds.SimpleSoundInstance

@@ -11,9 +11,14 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.atomicfu.atomic
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
+import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
 /**
@@ -59,72 +64,78 @@ class SuggestionsController {
      */
     fun runSearch(query: String) {
         val q = query.trim()
+
         if (q.isEmpty()) {
             currentVideoId?.let { loadRelated(it) }
             return
         }
+
+        startLoad()
+
+        val seq = requestSeq.incrementAndGet()
         val svc = DreamServices.registry.get(MediaServices.SEARCH)
         val maybeId = YouTubeUrls.extractVideoId(q)
-        if (maybeId != null) {
-            startLoad()
-            val seq = requestSeq.incrementAndGet()
-            launchLoad {
-                try {
-                    val meta = svc.metadata(maybeId)
-                    publish(seq, listOf(meta ?: fallbackResult(maybeId)), null)
-                } catch (e: Exception) {
-                    logger.warn("URL meta fetch failed: ${e.message}")
-                    publish(seq, listOf(fallbackResult(maybeId)), null)
-                }
-            }
-            return
-        }
         val twitchSource = MediaSource.from(q) as? MediaSource.Twitch
-        if (twitchSource != null) {
-            startLoad()
-            val seq = requestSeq.incrementAndGet()
-            launchLoad {
-                try {
-                    publish(seq, listOf(twitchResult(twitchSource, TwitchMetadataCache.resolveBlocking(twitchSource))), null)
-                } catch (e: Exception) {
-                    logger.warn("Twitch meta fetch failed: ${e.message}.")
-                    publish(seq, listOf(twitchResult(twitchSource, null)), null)
-                }
-            }
-            return
-        }
-        startLoad()
-        val seq = requestSeq.incrementAndGet()
-        val twitchLogin = twitchLoginCandidate(q)
+
         launchLoad {
-            val youtubeResults = try {
-                svc.search(q, RESULT_LIMIT)
-            } catch (e: Exception) {
-                logger.warn("Search failed '$q': ${e.message}")
-                null
-            }
-            // The query itself might be a channel's handle (e.g. searching a streamer's name): if that
-            // channel is live right now, it's almost certainly what the user is after, so it's shown
-            // ahead of the YouTube results rather than mixed in by relevance.
-            var liveTwitch = twitchLogin?.let(::liveTwitchResult)
-            if (liveTwitch == null) {
-                // Twitch's public channel lookup only matches an exact login, so a typo'd or truncated
-                // query ("shroud" -> "shrou") would otherwise find nothing. YouTube's own (fuzzy) search
-                // has already done the hard work of guessing the intended creator, so the uploader names
-                // it returned are used as the candidate pool for an edit-distance match against the query.
-                val fuzzyLogin = fuzzyTwitchLogin(q, youtubeResults)
-                if (fuzzyLogin != null && fuzzyLogin != twitchLogin) {
-                    liveTwitch = liveTwitchResult(fuzzyLogin)
+            val results = runCatching {
+                when {
+                    maybeId != null -> {
+                        val meta = runCatching { svc.metadata(maybeId) }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("URL meta: ${it.message}") }
+                            .getOrNull()
+                        listOf(meta ?: fallbackResult(maybeId))
+                    }
+                    twitchSource != null -> {
+                        val meta = runCatching {
+                            withContext(Dispatchers.IO) { TwitchMetadataCache.resolveBlocking(twitchSource) }
+                        }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("Twitch meta: ${it.message}") }
+                            .getOrNull()
+                        listOf(twitchResult(twitchSource, meta))
+                    }
+                    else -> {
+                        val twitchLogin = twitchLoginCandidate(q)
+
+                        val ytDeferred = async {
+                            runCatching { svc.search(q, RESULT_LIMIT) }
+                                .onFailure { if (it is CancellationException) throw it; logger.warn("Search failed: ${it.message}") }
+                                .getOrNull()
+                        }
+
+                        val twitchDeferred = async {
+                            twitchLogin?.let {
+                                runCatching { liveTwitchResult(it) }.getOrNull()
+                            }
+                        }
+
+                        val youtubeResults = ytDeferred.await()
+                        var liveTwitch = twitchDeferred.await()
+
+                        if (liveTwitch == null) {
+                            val fuzzyLogin = fuzzyTwitchLogin(q, youtubeResults)
+                            if (fuzzyLogin != null && fuzzyLogin != twitchLogin) {
+                                liveTwitch = runCatching { liveTwitchResult(fuzzyLogin) }.getOrNull()
+                            }
+                        }
+
+                        if (youtubeResults == null && liveTwitch == null) {
+                            publish(seq, null, KEY_ERROR)
+                            return@launchLoad
+                        }
+
+                        ArrayList<MediaSearchResult>(1 + (youtubeResults?.size ?: 0)).apply {
+                            liveTwitch?.let(::add)
+                            youtubeResults?.let(::addAll)
+                        }
+                    }
                 }
-            }
-            if (youtubeResults == null && liveTwitch == null) {
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
                 publish(seq, null, KEY_ERROR)
-                return@launchLoad
-            }
-            val merged = ArrayList<MediaSearchResult>(1 + (youtubeResults?.size ?: 0))
-            liveTwitch?.let(merged::add)
-            youtubeResults?.let(merged::addAll)
-            publish(seq, merged, null)
+            }.getOrNull()
+
+            results?.let { publish(seq, it, null) }
         }
     }
 
@@ -135,14 +146,13 @@ class SuggestionsController {
     }
 
     /** Looks up [login] on Twitch and, if it's live, builds the card shown ahead of the YouTube results. */
-    private fun liveTwitchResult(login: String): MediaSearchResult? = try {
+    private fun liveTwitchResult(login: String): MediaSearchResult? = runCatching {
         TwitchApi.queryChannel(login)?.takeIf { it.isLive }?.let { meta ->
             twitchResult(MediaSource.Twitch(url = "https://www.twitch.tv/$login", channel = login), meta)
         }
-    } catch (e: Exception) {
+    }.onFailure { e ->
         logger.debug("Twitch live-channel lookup failed for '$login': ${e.message}.")
-        null
-    }
+    }.getOrNull()
 
     /**
      * Picks the uploader (from [youtubeResults]) whose login shape is closest to [query] by edit
@@ -207,9 +217,12 @@ class SuggestionsController {
         startLoad()
         val seq = requestSeq.incrementAndGet()
         launchLoad {
-            try {
-                publish(seq, DreamServices.registry.get(MediaServices.SEARCH).related(videoId, RESULT_LIMIT), null)
-            } catch (e: Exception) {
+            runCatching {
+                DreamServices.registry.get(MediaServices.SEARCH).related(videoId, RESULT_LIMIT)
+            }.onSuccess { results ->
+                publish(seq, results, null)
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
                 logger.warn("Related failed $videoId: ${e.message}")
                 publish(seq, null, KEY_ERROR)
             }
@@ -217,9 +230,8 @@ class SuggestionsController {
     }
 
     /** Launch load. */
-    private fun launchLoad(block: () -> Unit) {
-        DreamCoroutines.clientIo.launch { block() }
-    }
+    private fun launchLoad(block: suspend CoroutineScope.() -> Unit) =
+        DreamCoroutines.clientIo.launch(block = block)
 
     /** Switches the panel into the loading state and clears stale results. */
     private fun startLoad() {

@@ -152,12 +152,9 @@ object YtDlpBinary {
 
     /** Runs `<exe> --version` and returns true when it reports CPython >= 3.[MIN_PYTHON_MINOR]. */
     private fun pythonVersionOk(exe: String): Boolean {
-        return try {
+        return runCatching {
             val p = ProcessBuilder(exe, "--version").redirectErrorStream(true).start()
-            try {
-                p.outputStream.close()
-            } catch (_: IOException) {
-            }
+            runCatching { p.outputStream.close() }
             val out = p.inputStream.use { String(it.readAllBytes()) }
             if (!p.waitFor(10, TimeUnit.SECONDS)) {
                 p.destroyForcibly()
@@ -168,9 +165,7 @@ object YtDlpBinary {
             val major = m.groupValues[1].toInt()
             val minor = m.groupValues[2].toInt()
             major > 3 || (major == 3 && minor >= MIN_PYTHON_MINOR)
-        } catch (_: Exception) {
-            false
-        }
+        }.getOrDefault(false)
     }
 
     /** Returns the local zipapp path, provisioning it (existing copy or GitHub download) on first use; null on failure. */
@@ -180,13 +175,12 @@ object YtDlpBinary {
             maybeRefreshZipapp(pyz)
             return pyz
         }
-        return try {
+        return runCatching {
             downloadAsset(pyz, ZIPAPP_ASSET, executable = false)
             pyz
-        } catch (e: IOException) {
+        }.onFailure { e ->
             logger.warn("yt-dlp zipapp download failed; falling back to the bundled binary: ${e.message}.")
-            null
-        }
+        }.getOrNull()
     }
 
     /**
@@ -196,18 +190,16 @@ object YtDlpBinary {
      */
     private fun maybeRefreshZipapp(pyz: Path) {
         if (!zipappUpdateChecked.compareAndSet(false, true)) return
-        val age = try {
+        val age = runCatching {
             System.currentTimeMillis() - Files.getLastModifiedTime(pyz).toMillis()
-        } catch (_: IOException) {
-            return
-        }
+        }.getOrNull() ?: return
         if (age < BINARY_REFRESH_MS) return
         DreamCoroutines.clientIo.launch {
-            try {
+            runCatching {
                 logger.debug("Bundled yt-dlp.pyz is ${age / 86_400_000L} days old, refreshing...")
                 downloadAsset(pyz, ZIPAPP_ASSET, executable = false)
                 logger.debug("yt-dlp.pyz refresh finished.")
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 logger.warn("yt-dlp.pyz refresh failed: ${e.message}.")
             }
         }
@@ -221,32 +213,24 @@ object YtDlpBinary {
      */
     private fun maybeSelfUpdate(bundled: Path) {
         if (!updateChecked.compareAndSet(false, true)) return
-        val age = try {
+        val age = runCatching {
             System.currentTimeMillis() - Files.getLastModifiedTime(bundled).toMillis()
-        } catch (_: IOException) {
-            return
-        }
+        }.getOrNull() ?: return
         if (age < BINARY_REFRESH_MS) return
         DreamCoroutines.clientIo.launch {
-            try {
+            runCatching {
                 logger.debug("Bundled yt-dlp is ${age / 86_400_000L} days old, running self-update...")
                 val p = ProcessBuilder(bundled.toString(), "-U", "--no-warnings")
                     .redirectErrorStream(true).start()
-                try {
-                    p.outputStream.close()
-                } catch (_: IOException) {
-                }
+                runCatching { p.outputStream.close() }
                 p.inputStream.use { it.readAllBytes() }
                 if (!p.waitFor(120, TimeUnit.SECONDS)) {
                     Processes.destroyTree(p)
                     return@launch
                 }
-                try {
-                    Files.setLastModifiedTime(bundled, FileTime.fromMillis(System.currentTimeMillis()))
-                } catch (_: IOException) {
-                }
+                runCatching { Files.setLastModifiedTime(bundled, FileTime.fromMillis(System.currentTimeMillis())) }
                 logger.debug("yt-dlp self-update finished.")
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 logger.warn("yt-dlp self-update failed: ${e.message}")
             }
         }
@@ -304,24 +288,19 @@ object YtDlpBinary {
 
     /** Returns true if [path] refers to a file that can be executed (or a command on PATH that exits 0). */
     private fun canExecute(path: String): Boolean {
-        return try {
+        return runCatching {
             val f = File(path)
             if (f.isAbsolute || File.separator in path) return f.isFile && f.canExecute()
             val pb = ProcessBuilder(path, "--version")
             pb.redirectErrorStream(true)
             val p = pb.start()
-            try {
-                p.outputStream.close()
-            } catch (_: IOException) {
-            }
+            runCatching { p.outputStream.close() }
             p.inputStream.use { it.readAllBytes() }
             if (!p.waitFor(30, TimeUnit.SECONDS)) {
                 p.destroyForcibly()
                 return false
             }
             p.exitValue() == 0
-        } catch (_: Exception) {
-            false
-        }
+        }.getOrDefault(false)
     }
 }

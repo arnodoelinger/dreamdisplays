@@ -142,17 +142,15 @@ object TwitchApi {
     }
 
     /** Fetches metadata from the public GQL endpoint; returns null on any failure. */
-    private fun resolveViaGql(source: MediaSource.Twitch): TwitchMetadata? {
-        return try {
-            source.channel?.let { return queryChannel(it) }
-            source.videoId?.let { return queryVideo(it) }
-            source.clipSlug?.let { return queryClip(it) }
+    private fun resolveViaGql(source: MediaSource.Twitch): TwitchMetadata? =
+        runCatching {
+            source.channel?.let { return@runCatching queryChannel(it) }
+            source.videoId?.let { return@runCatching queryVideo(it) }
+            source.clipSlug?.let { return@runCatching queryClip(it) }
             null
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.debug("Twitch GQL lookup failed for {}: {}.", source.url, e.message)
-            null
-        }
-    }
+        }.getOrNull()
 
     /** Fetches channel metadata (title, viewers, live status) for [login], or null if the channel doesn't exist. */
     fun queryChannel(login: String): TwitchMetadata? {
@@ -244,19 +242,18 @@ object TwitchApi {
     private fun escape(value: String): String = value.replace("\\", "\\\\").replace("\"", "\\\"")
 
     /** Fallback: derives metadata from the yt-dlp stream list's generic info-dict fields. */
-    private fun resolveViaStreams(source: MediaSource.Twitch): TwitchMetadata? {
-        return try {
-            val first = YtDlp.fetch(source.url).firstOrNull() ?: return null
-            TwitchMetadata(
-                title = first.title,
-                channelName = first.uploaderName,
-                thumbnailUrl = first.thumbnailUrl,
-                viewCount = first.viewCount,
-                isLive = first.isLive,
-            )
-        } catch (e: Exception) {
+    private fun resolveViaStreams(source: MediaSource.Twitch): TwitchMetadata? =
+        runCatching {
+            YtDlp.fetch(source.url).firstOrNull()?.let { first ->
+                TwitchMetadata(
+                    title = first.title,
+                    channelName = first.uploaderName,
+                    thumbnailUrl = first.thumbnailUrl,
+                    viewCount = first.viewCount,
+                    isLive = first.isLive,
+                )
+            }
+        }.onFailure { e ->
             logger.debug("Twitch metadata fetch failed for {}: {}.", source.url, e.message)
-            null
-        }
-    }
+        }.getOrNull()
 }

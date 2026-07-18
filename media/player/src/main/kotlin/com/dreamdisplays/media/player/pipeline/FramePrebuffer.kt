@@ -104,7 +104,7 @@ internal class FramePrebuffer(
     fun submit(frame: ByteBuffer, pts: Long, nextSize: Int): ByteBuffer {
         var blockedSinceNs = 0L
         val gen = generation.get()
-        try {
+        runCatching {
             while (alive() && !flushRequested) {
                 if (queue.offer(Timed(frame, pts, gen), POLL_MS, TimeUnit.MILLISECONDS)) {
                     if (!primed && queue.size >= prefillFrames) primed = true
@@ -113,7 +113,8 @@ internal class FramePrebuffer(
                 }
                 if (blockedSinceNs == 0L) blockedSinceNs = System.nanoTime()
             }
-        } catch (_: InterruptedException) {
+        }.onFailure { e ->
+            if (e !is InterruptedException) throw e
             Thread.currentThread().interrupt()
         }
         logSlowSubmit(blockedSinceNs)

@@ -73,20 +73,18 @@ class YtCookieManager {
         val master = cookieFile
         if (!Files.exists(master) && !unavailableThisSession) ensureMaterialized(master)
         if (Files.exists(master)) {
-            val tempCopy = try {
+            val tempCopy = runCatching {
                 val target = Files.createTempFile(YtDlpBinary.bundledDir, "cookies-", ".txt")
                 Files.copy(master, target, StandardCopyOption.REPLACE_EXISTING)
                 target
-            } catch (e: IOException) {
+            }.onFailure { e ->
                 logger.warn("Failed to create temp cookies copy, using master file: ${e.message}")
-                null
-            }
+            }.getOrNull()
             args.add("--cookies")
             args.add((tempCopy ?: master).toString())
-            try {
+            runCatching {
                 val age = System.currentTimeMillis() - Files.getLastModifiedTime(master).toMillis()
                 if (age >= COOKIE_REFRESH_MS) refreshAsync()
-            } catch (_: IOException) {
             }
             return tempCopy
         }
@@ -109,12 +107,12 @@ class YtCookieManager {
             if (cachedHeader != null && (System.currentTimeMillis() - headerExportedAt) < COOKIE_REFRESH_MS) {
                 return cachedHeader
             }
-            return try {
+            return runCatching {
                 val header = exportHeader()
                 cachedHeader = header
                 headerExportedAt = System.currentTimeMillis()
                 header
-            } catch (e: Exception) {
+            }.getOrElse { e ->
                 logger.warn("Cookie export failed: ${e.message}")
                 cachedHeader
             }
@@ -128,14 +126,12 @@ class YtCookieManager {
      */
     private fun ensureMaterialized(master: Path) {
         if (resolveBrowser() == null) return
-        try {
+        runCatching {
             Files.createDirectories(EXPORT_LOCK_FILE.parent)
             RandomAccessFile(EXPORT_LOCK_FILE.toFile(), "rw").use { raf ->
                 raf.channel.lock().use {
                     if (Files.exists(master)) return
-                    try {
-                        exportHeader()
-                    } catch (e: Exception) {
+                    runCatching { exportHeader() }.onFailure { e ->
                         logger.warn("Synchronous cookie export failed: ${e.message}")
                     }
                     if (!Files.exists(master)) {
@@ -146,7 +142,7 @@ class YtCookieManager {
                     }
                 }
             }
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Could not acquire cookie export lock: ${e.message}")
         }
     }
@@ -181,26 +177,21 @@ class YtCookieManager {
         )
         pb.redirectErrorStream(true)
         val p = pb.start()
-        try {
-            p.outputStream.close()
-        } catch (_: IOException) {
-        }
+        runCatching { p.outputStream.close() }
         val drainer = Processes.drainAsync(p.inputStream)
-        try {
+        runCatching {
             if (!p.waitFor(15, TimeUnit.SECONDS)) {
                 Processes.destroyTree(p)
                 unavailableThisSession = true
                 throw IOException("Cookie export timed out.")
             }
-        } catch (e: InterruptedException) {
+        }.onFailure { e ->
+            if (e !is InterruptedException) throw e
             Processes.destroyTree(p)
             Thread.currentThread().interrupt()
             throw IOException("Interrupted", e)
         }
-        try {
-            drainer.join(500)
-        } catch (_: InterruptedException) {
-        }
+        runCatching { drainer.join(500) }
 
         if (!Files.exists(master)) return null
         val lines = Files.readAllLines(master, StandardCharsets.UTF_8)
@@ -245,9 +236,10 @@ class YtCookieManager {
 
             // Cookies are opt-in, so "configured" is always a single explicit browser name here
             // (see disabledByConfig). No auto-detection sweep -> no macOS keychain popup.
-            val binary: String? = try {
+            val binary: String? = runCatching {
                 YtDlpBinary.resolve()
-            } catch (_: IOException) {
+            }.getOrElse { e ->
+                if (e !is IOException) throw e
                 browserResolved = true
                 return null
             }
@@ -276,7 +268,7 @@ class YtCookieManager {
 
     /** Runs `yt-dlp --dump-user-agent` with [browser] cookies and checks whether the cookie file was produced. */
     private fun testBrowser(binary: String, browser: String): Boolean {
-        return try {
+        return runCatching {
             val safeName = browser.replace(Regex("[^A-Za-z0-9_-]"), "_")
             val testFile = YtDlpBinary.bundledDir.resolve("cookie-test-$safeName.txt")
             Files.createDirectories(testFile.parent)
@@ -290,32 +282,21 @@ class YtCookieManager {
             )
             pb.redirectErrorStream(true)
             val p = pb.start()
-            try {
-                p.outputStream.close()
-            } catch (_: IOException) {
-            }
+            runCatching { p.outputStream.close() }
             val drainer = Processes.drainAsync(p.inputStream)
             if (!p.waitFor(10, TimeUnit.SECONDS)) {
                 Processes.destroyTree(p)
-                try {
-                    drainer.join(500)
-                } catch (_: InterruptedException) {
-                }
+                runCatching { drainer.join(500) }
                 return false
             }
-            try {
-                drainer.join(500)
-            } catch (_: InterruptedException) {
-            }
+            runCatching { drainer.join(500) }
             if (!Files.exists(testFile)) {
                 return p.exitValue() == 0
             }
             val lines = Files.readAllLines(testFile, StandardCharsets.UTF_8)
             Files.deleteIfExists(testFile)
             lines.any { !it.startsWith("#") && it.count { c -> c == '\t' } >= 6 }
-        } catch (_: Exception) {
-            false
-        }
+        }.getOrDefault(false)
     }
 
     companion object {

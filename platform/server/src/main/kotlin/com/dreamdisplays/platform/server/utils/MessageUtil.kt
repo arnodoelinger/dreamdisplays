@@ -6,6 +6,7 @@ package com.dreamdisplays.platform.server.utils
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 //? if >=26 {
+import net.minecraft.world.item.ItemStackTemplate
 //?} else
 /*import net.minecraft.world.item.ItemStack*/
 import com.dreamdisplays.platform.server.PaperServer
@@ -22,7 +23,6 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.contents.objects.AtlasSprite
 import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.item.ItemStackTemplate
 import org.bukkit.Material
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player

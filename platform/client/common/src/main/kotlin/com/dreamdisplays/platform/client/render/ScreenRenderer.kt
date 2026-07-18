@@ -3,6 +3,9 @@ package com.dreamdisplays.platform.client.render
 //? if >=26 {
 //?} else
 /*import com.mojang.blaze3d.systems.RenderSystem*/
+//? if >=26 {
+//?} else
+/*import com.mojang.blaze3d.vertex.Tesselator*/
 //? if >=1.21.11 {
 //?} else
 /*import net.minecraft.client.renderer.RenderType*/

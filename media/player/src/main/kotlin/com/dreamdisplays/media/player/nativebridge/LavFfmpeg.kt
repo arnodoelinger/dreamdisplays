@@ -48,7 +48,7 @@ object LavFfmpeg {
     fun ensure(dir: File): Boolean {
         if (hasFfmpeg(dir)) return true
         val source = source() ?: return false
-        return try {
+        return runCatching {
             if (!dir.exists() && !dir.mkdirs()) throw IOException("Cannot create $dir.")
             val archive = File(dir, "_ffmpeg" + if (source.isTarXz) ".tar.xz" else ".zip")
             try {
@@ -64,7 +64,7 @@ object LavFfmpeg {
                 if (archive.exists() && !archive.delete()) archive.deleteOnExit()
             }
             hasFfmpeg(dir)
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.warn("Could not provision FFmpeg libraries (${e.javaClass.simpleName}: ${e.message}).")
             false
         }

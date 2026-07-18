@@ -37,37 +37,31 @@ object Updater {
      * Network errors are logged but never propagated, so a transient outage is harmless.
      */
     fun checkForUpdates(repoOwner: String, repoName: String) {
-        try {
-            val releases = fetchReleases(repoOwner, repoName)
-
-            if (releases.isEmpty()) {
-                logger.warn("No releases found on GitHub. This may be due to network issues or API problems.")
-                return
-            }
-
-            val stableVersions = releases.mapNotNull { parseVersion(it.tagName) }
-
-            val latestMod = stableVersions.maxOrNull()
-            VersionState.modLatestVersion = latestMod
-
-            val latestPlugin = releases
-                .filter {
-                    it.tagName.contains("spigot", ignoreCase = true) ||
-                            it.tagName.contains("plugin", ignoreCase = true)
+        runCatching { fetchReleases(repoOwner, repoName) }
+            .onSuccess { releases ->
+                if (releases.isEmpty()) {
+                    logger.warn("No releases found on GitHub. This may be due to network issues or API problems.")
+                    return
                 }
-                .mapNotNull { parseVersion(it.tagName)?.toString() }
-                .maxOrNull() ?: latestMod?.toString()
-            VersionState.pluginLatestVersion = latestPlugin
 
-        } catch (_: UnknownHostException) {
-            logger.warn("Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain.")
-        } catch (_: ConnectException) {
-            logger.warn("Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed.")
-        } catch (_: SocketTimeoutException) {
-            logger.warn("GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection.")
-        } catch (e: Exception) {
-            logger.warn("Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
-        }
+                val stableVersions = releases.mapNotNull { parseVersion(it.tagName) }
+                val latestMod = stableVersions.maxOrNull()
+                VersionState.modLatestVersion = latestMod
+
+                VersionState.pluginLatestVersion = releases
+                    .filter { it.tagName.contains("spigot", ignoreCase = true) || it.tagName.contains("plugin", ignoreCase = true) }
+                    .mapNotNull { parseVersion(it.tagName)?.toString() }
+                    .maxOrNull() ?: latestMod?.toString()
+            }
+            .onFailure { e ->
+                val message = when (e) {
+                    is UnknownHostException -> "Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain."
+                    is ConnectException -> "Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed."
+                    is SocketTimeoutException -> "GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection."
+                    else -> "Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}"
+                }
+                logger.warn(message)
+            }
     }
 
     /** Fetches releases from GitHub API, returning an empty list on non-200 responses. Rethrows connection errors. */

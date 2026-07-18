@@ -1,6 +1,5 @@
 package com.dreamdisplays.platform.client.ui
 
-//? if >=26 {
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
@@ -9,6 +8,7 @@ import com.dreamdisplays.platform.client.overlay.OverlayEvent
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
 import net.minecraft.client.Minecraft
+//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //?} else

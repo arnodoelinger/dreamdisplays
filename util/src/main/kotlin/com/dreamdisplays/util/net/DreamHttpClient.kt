@@ -46,7 +46,41 @@ object DreamHttpClient {
         val callTimeoutMs: Long = 0L,
         val followRedirects: Boolean = true,
         val proxyUrl: String? = null,
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as RequestOptions
+
+            if (connectTimeoutMs != other.connectTimeoutMs) return false
+            if (readTimeoutMs != other.readTimeoutMs) return false
+            if (writeTimeoutMs != other.writeTimeoutMs) return false
+            if (callTimeoutMs != other.callTimeoutMs) return false
+            if (followRedirects != other.followRedirects) return false
+            if (method != other.method) return false
+            if (headers != other.headers) return false
+            if (!body.contentEquals(other.body)) return false
+            if (contentType != other.contentType) return false
+            if (proxyUrl != other.proxyUrl) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = connectTimeoutMs.hashCode()
+            result = 31 * result + readTimeoutMs.hashCode()
+            result = 31 * result + writeTimeoutMs.hashCode()
+            result = 31 * result + callTimeoutMs.hashCode()
+            result = 31 * result + followRedirects.hashCode()
+            result = 31 * result + method.hashCode()
+            result = 31 * result + headers.hashCode()
+            result = 31 * result + (body?.contentHashCode() ?: 0)
+            result = 31 * result + contentType.hashCode()
+            result = 31 * result + proxyUrl.hashCode()
+            return result
+        }
+    }
 
     data class HttpResponse(
         val code: Int,
@@ -58,6 +92,31 @@ object DreamHttpClient {
         val isSuccessful: Boolean get() = code in 200..299
 
         fun bodyString(charset: Charset = StandardCharsets.UTF_8): String = body.toString(charset)
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as HttpResponse
+
+            if (code != other.code) return false
+            if (message != other.message) return false
+            if (headers != other.headers) return false
+            if (!body.contentEquals(other.body)) return false
+            if (finalUrl != other.finalUrl) return false
+            if (isSuccessful != other.isSuccessful) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = code
+            result = 31 * result + message.hashCode()
+            result = 31 * result + headers.hashCode()
+            result = 31 * result + body.contentHashCode()
+            result = 31 * result + finalUrl.hashCode()
+            result = 31 * result + isSuccessful.hashCode()
+            return result
+        }
     }
 
     fun headersOf(vararg headers: Pair<String, String>): Map<String, List<String>> =
@@ -172,24 +231,21 @@ object DreamHttpClient {
     }
 
     private fun proxyFor(rawProxyUrl: String?): Proxy? {
-        val raw = rawProxyUrl?.trim().orEmpty()
-        if (raw.isEmpty()) return null
-        val uri = try {
-            URI.create(raw)
-        } catch (e: Exception) {
-            logger.warn("Invalid proxy URL: $raw.")
-            return null
-        }
-        val type = when (uri.scheme?.lowercase(Locale.ROOT)) {
-            "socks", "socks4", "socks5" -> Proxy.Type.SOCKS
-            else -> Proxy.Type.HTTP
-        }
-        val host = uri.host ?: run {
-            logger.warn("Invalid proxy URL without host: $raw.")
-            return null
-        }
-        val port = if (uri.port > 0) uri.port else if (type == Proxy.Type.SOCKS) 1080 else 8080
-        return Proxy(type, InetSocketAddress(host, port))
+        val raw = rawProxyUrl?.trim().takeIf { it!!.isNotEmpty() } ?: return null
+        return runCatching { URI.create(raw) }
+            .onFailure { logger.warn("Invalid proxy URL: $raw.") }
+            .mapCatching { uri ->
+                val host = uri.host ?: throw IllegalArgumentException("Missing host")
+                val type = when (uri.scheme?.lowercase(Locale.ROOT)) {
+                    "socks", "socks4", "socks5" -> Proxy.Type.SOCKS
+                    else -> Proxy.Type.HTTP
+                }
+                val port = if (uri.port > 0) uri.port else if (type == Proxy.Type.SOCKS) 1080 else 8080
+
+                Proxy(type, InetSocketAddress(host, port))
+            }
+            .onFailure { logger.warn("Invalid proxy URL without host: $raw.") }
+            .getOrNull()
     }
 
     private fun Response.readBodyBytes(): ByteArray {
