@@ -6,7 +6,6 @@ package com.dreamdisplays.platform.server.utils
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 //? if >=26 {
-import net.minecraft.world.item.ItemStackTemplate
 //?} else
 /*import net.minecraft.world.item.ItemStack*/
 import com.dreamdisplays.platform.server.PaperServer
@@ -23,6 +22,7 @@ import net.minecraft.network.chat.MutableComponent
 import net.minecraft.network.chat.contents.objects.AtlasSprite
 import net.minecraft.resources.Identifier
 import net.minecraft.server.level.ServerPlayer
+import net.minecraft.world.item.ItemStackTemplate
 import org.bukkit.Material
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
@@ -210,15 +210,17 @@ object MessageUtil {
             var placeholder = formatted.indexOf("%s")
             while (placeholder >= 0 && index[0] < args.size) {
                 formatted = formatted.substring(0, placeholder) +
-                    args[index[0]++] +
-                    formatted.substring(placeholder + 2)
+                        args[index[0]++] +
+                        formatted.substring(placeholder + 2)
                 placeholder = formatted.indexOf("%s", placeholder)
             }
             formatted
         }
+
         is Map<*, *> -> value.entries.associate { (key, entryValue) ->
             key.toString() to replacePlaceholders(entryValue, args, index)
         }
+
         is List<*> -> value.map { replacePlaceholders(it, args, index) }
         else -> value
     }
@@ -236,11 +238,13 @@ object MessageUtil {
             }
             root.withJsonStyle(value)
         }
+
         is List<*> -> {
             val root = NmsComponent.empty()
             value.forEach { child -> nmsComponentFromJsonValue(child)?.let(root::append) }
             root
         }
+
         else -> null
     }
 
@@ -322,24 +326,24 @@ object MessageUtil {
                 val spriteComponent =
                     //? if >=1.21.11 {
                     run {
-                val item = BuiltInRegistries.ITEM.getValue(itemId)
-                val isBlock = item is net.minecraft.world.item.BlockItem
-                val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
-                val spriteId = Identifier.fromNamespaceAndPath(
-                    itemId.namespace,
-                    (if (isBlock) "block/" else "item/") + itemId.path
-                )
-                val atlasSprite = AtlasSprite(atlasId, spriteId)
-                //? if >=26 {
-                val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStackTemplate(item))
-                val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite, Optional.empty()))
-                    //?} else
-                    /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
-                    val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
-                    spriteComponent.withStyle { it.withHoverEvent(hoverEvent) }
+                        val item = BuiltInRegistries.ITEM.getValue(itemId)
+                        val isBlock = item is net.minecraft.world.item.BlockItem
+                        val atlasId = if (isBlock) AtlasIds.BLOCKS else AtlasIds.ITEMS
+                        val spriteId = Identifier.fromNamespaceAndPath(
+                            itemId.namespace,
+                            (if (isBlock) "block/" else "item/") + itemId.path
+                        )
+                        val atlasSprite = AtlasSprite(atlasId, spriteId)
+                        //? if >=26 {
+                        val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStackTemplate(item))
+                        val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite, Optional.empty()))
+                        //?} else
+                        /*val hoverEvent = net.minecraft.network.chat.HoverEvent.ShowItem(ItemStack(item))
+                        val spriteComponent = MutableComponent.create(NmsObjectContents(atlasSprite))*/
+                        spriteComponent.withStyle { it.withHoverEvent(hoverEvent) }
                     }
-                    //?} else
-                    /*NmsComponent.literal(itemId.toString())*/
+                //?} else
+                /*NmsComponent.literal(itemId.toString())*/
                 root.append(spriteComponent)
             }
             lastIndex = match.range.last + 1

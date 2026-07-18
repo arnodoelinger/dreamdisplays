@@ -79,7 +79,15 @@ class SeekBar(
             val hoverPct = Mth.clamp((mouseX - (x + 4).toDouble()) / (width - 8).toDouble(), 0.0, 1.0)
             val hoverX = x + (hoverPct * (width - 8)).toInt()
             //? if >=1.21.11 {
-            g.blitSprite(RenderPipelines.GUI_TEXTURED, HANDLE, hoverX, y, 8, height, ARGB.white(GHOST_HANDLE_ALPHA * hoverFade))
+            g.blitSprite(
+                RenderPipelines.GUI_TEXTURED,
+                HANDLE,
+                hoverX,
+                y,
+                8,
+                height,
+                ARGB.white(GHOST_HANDLE_ALPHA * hoverFade)
+            )
             //?} else
             /*g.blitSprite(HANDLE, hoverX, y, 8, height)*/
         }
@@ -112,7 +120,14 @@ class SeekBar(
      * the box is done with a pose-stack scale around a full-resolution blit instead (GPU bilinear
      * downsample, keeping the extra source detail instead of just cropping to the box size).
      */
-    private fun drawPreview(g: GuiGraphicsCompat, texture: Identifier, mouseX: Int, hoverNanos: Long, dur: Long, fade: Float) {
+    private fun drawPreview(
+        g: GuiGraphicsCompat,
+        texture: Identifier,
+        mouseX: Int,
+        hoverNanos: Long,
+        dur: Long,
+        fade: Float
+    ) {
         val textureW = ScrubPreview.FRAME_WIDTH
         val textureH = ScrubPreview.FRAME_HEIGHT
         val boxW = DISPLAY_WIDTH + 4
@@ -135,7 +150,19 @@ class SeekBar(
         matrices.pushMatrix()
         matrices.translate((boxX + 2).toFloat(), (boxY + 2).toFloat())
         matrices.scale(scaleX, scaleY)
-        g.blit(RenderPipelines.GUI_TEXTURED, texture, 0, 0, 0f, 0f, textureW, textureH, textureW, textureH, ARGB.white(fade))
+        g.blit(
+            RenderPipelines.GUI_TEXTURED,
+            texture,
+            0,
+            0,
+            0f,
+            0f,
+            textureW,
+            textureH,
+            textureW,
+            textureH,
+            ARGB.white(fade)
+        )
         matrices.popMatrix()
         //?} else
         /*matrices.pushPose()

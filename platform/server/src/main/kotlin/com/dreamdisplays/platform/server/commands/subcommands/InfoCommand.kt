@@ -32,7 +32,8 @@ class InfoCommand : SubCommand {
         val data = DisplayManager.isContains(block.location)
             ?: return MessageUtil.sendMessage(player, "noDisplay")
 
-        val ownerName = Bukkit.getOfflinePlayer(data.ownerId).name ?: MessageUtil.messageFor(player, "displayInfoUnknownOwner")
+        val ownerName =
+            Bukkit.getOfflinePlayer(data.ownerId).name ?: MessageUtil.messageFor(player, "displayInfoUnknownOwner")
         val worldName = data.pos1.world?.name ?: MessageUtil.messageFor(player, "displayInfoUnknownWorld")
         val displayUrl = data.url.ifBlank { MessageUtil.messageFor(player, "displayInfoUnavailableUrl") }
         val displayLang = data.lang.ifBlank { MessageUtil.messageFor(player, "displayInfoAutoLang") }

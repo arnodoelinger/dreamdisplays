@@ -269,7 +269,7 @@ class SuggestionsPanel(
         val along = if (sbVertical) my else mx
         val cross = if (sbVertical) mx else my
         return along >= sbStart && along <= sbStart + sbViewport &&
-            cross >= sbCross - SB_GRAB && cross <= sbCross + 2 + SB_GRAB
+                cross >= sbCross - SB_GRAB && cross <= sbCross + 2 + SB_GRAB
     }
 
     /** Maps a cursor position along the scroll axis to [scrollOffset], centering the thumb on it. */

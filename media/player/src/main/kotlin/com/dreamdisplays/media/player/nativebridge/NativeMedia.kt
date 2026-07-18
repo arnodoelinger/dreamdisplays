@@ -92,10 +92,12 @@ object NativeMedia {
      * `error_<ExceptionSimpleName>`. Reported in telemetry so unavailability causes can actually be
      * broken down instead of only seeing the aggregate unavailable percentage.
      */
-    @Volatile var unavailableReason: String = ""; private set
+    @Volatile
+    var unavailableReason: String = ""; private set
 
     /** Same as [unavailableReason] but for [lavAvailable]. */
-    @Volatile var lavUnavailableReason: String = ""; private set
+    @Volatile
+    var lavUnavailableReason: String = ""; private set
 
     /** Uses native RGBA output so the render thread can upload directly into RGBA8 textures. */
     val rgbaFramesEnabled: Boolean

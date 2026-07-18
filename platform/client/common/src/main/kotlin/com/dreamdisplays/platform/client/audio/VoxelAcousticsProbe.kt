@@ -205,7 +205,10 @@ object VoxelAcousticsProbe {
     private fun buildMaterialTable(): Map<SoundType, AcousticMaterial> {
         fun m(reflectivity: Float, occlusion: Float = 1.0f) = AcousticMaterial(reflectivity, occlusion)
         val map = HashMap<SoundType, AcousticMaterial>()
-        fun put(type: SoundType?, material: AcousticMaterial) { if (type != null) map[type] = material }
+        fun put(type: SoundType?, material: AcousticMaterial) {
+            if (type != null) map[type] = material
+        }
+
         val stone = m(1.5f)
 
         put(SoundType.STONE, stone); put(SoundType.DEEPSLATE, stone); put(SoundType.TUFF, stone)

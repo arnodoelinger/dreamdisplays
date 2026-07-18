@@ -1,7 +1,7 @@
 # Platform resources
 
-Shared, platform-agnostic asset source of truth for Dream Displays. No code, no build logic — a
-plain `src/main/resources` tree that other platform modules pull files out of via
+Shared, platform-agnostic asset source of truth for Dream Displays. No code, no build logic — a plain
+`src/main/resources` tree that other platform modules pull files out of via
 `project(":platform:resources").file(...)` instead of duplicating assets per loader.
 
 ## Contents
@@ -19,5 +19,5 @@ plain `src/main/resources` tree that other platform modules pull files out of vi
 
 ## Note
 
-`platform/server` and the client loader modules each add this module's resources as an extra source
-dir and copy out only the `lang/` subtree they own.
+`platform/server` and the client loader modules each add this module's resources as an extra source dir and copy out
+only the `lang/` subtree they own.

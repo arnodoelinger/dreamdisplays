@@ -8,7 +8,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AudioRenderChainTest {
-    private fun newChain(quality: AcousticQuality = AcousticQuality.ADVANCED, binaural: Boolean = true): AudioRenderChain {
+    private fun newChain(
+        quality: AcousticQuality = AcousticQuality.ADVANCED,
+        binaural: Boolean = true
+    ): AudioRenderChain {
         val engine = AcousticsEngine(44100f)
         engine.setGlobalQuality(quality)
         engine.setBinauralOutput(binaural)

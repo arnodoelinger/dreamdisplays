@@ -83,6 +83,7 @@ object FabricV2Networking {
             is FullscreenAck -> FullscreenBroadcastManager.handleAck(
                 packet.sessionId, player.uuid, FullscreenAckAction.fromWire(packet.action),
             )
+
             is PipPin -> if (packet.pinned) {
                 PipPinManager.pin(player.uuid, packet.id)
             } else {

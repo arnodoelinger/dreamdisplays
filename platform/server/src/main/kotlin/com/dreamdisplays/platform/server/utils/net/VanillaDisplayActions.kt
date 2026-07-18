@@ -221,7 +221,11 @@ object VanillaDisplayActions {
         PlaybackContexts.of(
             display, player.uuid,
             isAdmin(player) ||
-                VanillaPermissions.has(player, VanillaServerState.config.permissions.lock, VanillaPermissions.Fallback.OP),
+                    VanillaPermissions.has(
+                        player,
+                        VanillaServerState.config.permissions.lock,
+                        VanillaPermissions.Fallback.OP
+                    ),
         )
 
     /** Checks if [player] has permission to access the specified [mode]. */
@@ -249,8 +253,8 @@ object VanillaDisplayActions {
         val server =
             //? if >=1.21.11 {
             player.level().server
-            //?} else
-            /*player.serverLevel().server*/
+        //?} else
+        /*player.serverLevel().server*/
         return server.playerList.isOp(
             //? if >=1.21.11 {
             NameAndId(player.gameProfile)

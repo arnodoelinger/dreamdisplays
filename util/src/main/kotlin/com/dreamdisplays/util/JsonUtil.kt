@@ -78,12 +78,15 @@ fun Any?.toJsonElement(): JsonElement = when (this) {
             put(key.toString(), value.toJsonElement())
         }
     }
+
     is Iterable<*> -> buildJsonArray {
         this@toJsonElement.forEach { add(it.toJsonElement()) }
     }
+
     is Array<*> -> buildJsonArray {
         this@toJsonElement.forEach { add(it.toJsonElement()) }
     }
+
     is Boolean -> JsonPrimitive(this)
     is Number -> JsonPrimitive(this)
     is String -> JsonPrimitive(this)

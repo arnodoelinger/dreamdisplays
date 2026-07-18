@@ -1028,7 +1028,8 @@ class DisplayScreen(
             return cachedEnvironment
         }
         if (envProbeCountdown <= 0) {
-            cachedEnvironment = VoxelAcousticsProbe.probe(plane, ListenerPoseTracker.currentPose(Minecraft.getInstance()))
+            cachedEnvironment =
+                VoxelAcousticsProbe.probe(plane, ListenerPoseTracker.currentPose(Minecraft.getInstance()))
             envProbeCountdown = ENV_PROBE_INTERVAL_TICKS
         } else {
             envProbeCountdown--

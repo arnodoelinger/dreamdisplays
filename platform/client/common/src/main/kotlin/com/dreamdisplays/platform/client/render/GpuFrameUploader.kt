@@ -27,8 +27,8 @@ class GpuFrameUploader : FrameUploader {
     override fun canUpload(): Boolean =
         //? if >=1.21.11 {
         !Minecraft.getInstance().window.isMinimized
-        //?} else
-        /*true*/
+    //?} else
+    /*true*/
 
     /** Uploads an interleaved [src] frame into [target] in the given [format]. */
     override fun uploadInterleaved(target: GpuTextureRef, src: ByteBuffer, format: FramePixelFormat): Boolean {

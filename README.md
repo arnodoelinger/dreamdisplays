@@ -18,8 +18,8 @@
 
 ## Available for Fabric, NeoForge, Quilt, and popular server forks
 
-**Dream Displays** fully supports multiplayer! For the mod to work, players must install the client-side mod (available for
-**Fabric**, **NeoForge**, and **Quilt**).
+**Dream Displays** fully supports multiplayer! For the mod to work, players must install the client-side mod (available
+for **Fabric**, **NeoForge**, and **Quilt**).
 
 On the server side, admins can install one of the following options depending on their server software:
 
@@ -70,6 +70,7 @@ Done! To customize the display, look at it and press `Shift + RMB`
 
 ## Support this project
 
-If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arnodoelinger). Every contribution helps keep the project alive!
+If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arnodoelinger). Every contribution helps
+keep the project alive!
 
 [![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/arnodoelinger)

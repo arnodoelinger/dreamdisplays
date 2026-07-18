@@ -5,7 +5,6 @@ import com.dreamdisplays.util.json.DreamJson
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.io.IOException
 import kotlinx.serialization.Serializable
 import org.slf4j.LoggerFactory
 import java.io.File

@@ -338,7 +338,7 @@ jobs:
   discord-announce:
     name: Announce release on Discord
     runs-on: ubuntu-latest
-    needs: [build, publish]
+    needs: [ build, publish ]
     if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_preview == 'true') && needs.build.outputs.is_marketplace_publishable == 'true'
     permissions:
       contents: read

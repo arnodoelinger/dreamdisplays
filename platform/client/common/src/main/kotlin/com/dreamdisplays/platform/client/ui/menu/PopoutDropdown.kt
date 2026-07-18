@@ -94,8 +94,17 @@ class PopoutDropdown(
         items.forEachIndexed { i, (label, _) ->
             val itemY = rect.y + ITEM_H * i
             if (i == hovered) {
-                g.fill(rect.x + 1, itemY, rect.x + WIDTH - 1, itemY + ITEM_H, scaleAlpha(UiTheme.HOVER_FILL, animProgress))
-                g.drawOutline(UiRect(rect.x + 1, itemY, WIDTH - 2, ITEM_H), scaleAlpha(UiTheme.CARD_BORDER_HOVER, animProgress))
+                g.fill(
+                    rect.x + 1,
+                    itemY,
+                    rect.x + WIDTH - 1,
+                    itemY + ITEM_H,
+                    scaleAlpha(UiTheme.HOVER_FILL, animProgress)
+                )
+                g.drawOutline(
+                    UiRect(rect.x + 1, itemY, WIDTH - 2, ITEM_H),
+                    scaleAlpha(UiTheme.CARD_BORDER_HOVER, animProgress)
+                )
             }
             val color = scaleAlpha(if (i == hovered) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM, animProgress)
             g.drawText(font, label, rect.x + 6, fy + ITEM_H * i, color, false)

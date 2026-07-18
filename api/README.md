@@ -1,7 +1,7 @@
 # API
 
-Public, unstable Dream Displays API. This module is the boundary external code, platform integrations,
-and sibling modules can use without depending on `core` internals. Public contracts are marked with
+Public, unstable Dream Displays API. This module is the boundary external code, platform integrations, and sibling
+modules can use without depending on `core` internals. Public contracts are marked with
 `DreamDisplaysUnstableApi`.
 
 ## Contents
@@ -29,8 +29,8 @@ and sibling modules can use without depending on `core` internals. Public contra
 - `platform` — loader-neutral platform hooks: `Platform`, `PlatformSide`, `PlatformLogger`, `PlatformPaths`,
   `PlatformScheduler`, `TaskHandle`, `PlatformId`, `PlatformServices`
 - `util` — small shared API helpers such as `WireEnum`
-- `media` (top-level, alongside `media.player` / `media.source` / etc.) — foundational media value types
-  with zero dependencies: `VideoQuality`, `FramePixelFormat`, `DreamMediaException`, `MediaFailureKind`
+- `media` (top-level, alongside `media.player` / `media.source` / etc.) — foundational media value types with zero
+  dependencies: `VideoQuality`, `FramePixelFormat`, `DreamMediaException`, `MediaFailureKind`
 
 ## Boundaries
 
@@ -41,5 +41,5 @@ and sibling modules can use without depending on `core` internals. Public contra
 
 ## Dependents
 
-`core`, `media:runtime`, `media:player`, `media:source`, and `platform:*` may depend on `api`. The reverse
-dependency is forbidden.
+`core`, `media:runtime`, `media:player`, `media:source`, and `platform:*` may depend on `api`. The reverse dependency is
+forbidden.

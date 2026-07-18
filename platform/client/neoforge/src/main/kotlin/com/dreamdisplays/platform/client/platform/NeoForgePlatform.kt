@@ -47,6 +47,6 @@ object NeoForgePlatform : Platform {
         get() =
             //? if >=1.21.11 {
             !FMLEnvironment.isProduction()
-            //?} else
-            /*!FMLEnvironment.production*/
+    //?} else
+    /*!FMLEnvironment.production*/
 }

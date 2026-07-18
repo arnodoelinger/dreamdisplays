@@ -33,6 +33,6 @@ class MinecraftRenderContext(
     private fun cameraPosition() =
         //? if >=1.21.11 {
         camera.position()
-        //?} else
-        /*camera.getPosition()*/
+    //?} else
+    /*camera.getPosition()*/
 }

@@ -56,7 +56,9 @@ class Reverb(sampleRate: Float) {
         val fed = input * GAIN
         var l = 0f
         var r = 0f
-        for (i in combsL.indices) { l += combsL[i].process(fed); r += combsR[i].process(fed) }
+        for (i in combsL.indices) {
+            l += combsL[i].process(fed); r += combsR[i].process(fed)
+        }
         for (ap in allpassL) l = ap.process(l)
         for (ap in allpassR) r = ap.process(r)
         lastL = l; lastR = r
@@ -86,7 +88,9 @@ class Reverb(sampleRate: Float) {
         }
 
         /** Clears the delay line and damping store. */
-        fun reset() { buf.fill(0f); store = 0f; idx = 0 }
+        fun reset() {
+            buf.fill(0f); store = 0f; idx = 0
+        }
     }
 
     /** One Schröder all-pass: diffuses the comb output without coloring its magnitude response. */
@@ -104,6 +108,8 @@ class Reverb(sampleRate: Float) {
         }
 
         /** Clears the delay line. */
-        fun reset() { buf.fill(0f); idx = 0 }
+        fun reset() {
+            buf.fill(0f); idx = 0
+        }
     }
 }

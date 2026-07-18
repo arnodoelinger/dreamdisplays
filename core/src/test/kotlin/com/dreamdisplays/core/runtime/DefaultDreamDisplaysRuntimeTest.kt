@@ -51,7 +51,13 @@ class DefaultDreamDisplaysRuntimeTest {
     @Test
     fun runtimeRejectsMissingDependencies() {
         val runtime = DefaultDreamDisplaysRuntime()
-        runtime.registerModule(recordingModule("test:feature", dependencies = listOf("test:missing"), events = mutableListOf()))
+        runtime.registerModule(
+            recordingModule(
+                "test:feature",
+                dependencies = listOf("test:missing"),
+                events = mutableListOf()
+            )
+        )
 
         val error = runCatching { runtime.start() }.exceptionOrNull()
 

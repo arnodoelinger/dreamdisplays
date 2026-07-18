@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.media.source.MediaSource
@@ -11,11 +12,7 @@ import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.atomicfu.atomic
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.*
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
@@ -39,11 +36,30 @@ class SuggestionsController {
     private val requestSeq = atomic(0)
     private var currentVideoId: String? = null
 
+    /** How to continue the current result list when [loadMoreIfNeeded] fires; null when the current
+     *  list isn't paginable (single-video / Twitch-only results). */
+    private var moreMode: MoreMode? = null
+
+    /** Continuation token for the next page, or null when the list is exhausted (or not yet loaded). */
+    private var continuationToken: String? = null
+
+    /** Guards against firing a second page-2 request while one is already in flight. */
+    private var loadingMore = false
+
     /** Reload hook the panel uses to reset scroll when new results land. */
     var onResults: () -> Unit = {}
 
     /** True while the status line is the animated loading message. */
     val isLoading: Boolean get() = statusKey == KEY_LOADING
+
+    /** True while a background "load more" request is in flight (distinct from the initial [isLoading]). */
+    val isLoadingMore: Boolean get() = loadingMore
+
+    /** Distinguishes what a follow-up "load more" page should continue: a text search or a related-video list. */
+    private sealed class MoreMode {
+        data class Search(val query: String) : MoreMode()
+        data class Related(val videoId: String) : MoreMode()
+    }
 
     /** Shows videos related to [videoId]; clears the panel when null/empty; no-op if already shown. */
     fun setRelatedTo(videoId: String?) {
@@ -86,6 +102,7 @@ class SuggestionsController {
                             .getOrNull()
                         listOf(meta ?: fallbackResult(maybeId))
                     }
+
                     twitchSource != null -> {
                         val meta = runCatching {
                             withContext(Dispatchers.IO) { TwitchMetadataCache.resolveBlocking(twitchSource) }
@@ -94,6 +111,7 @@ class SuggestionsController {
                             .getOrNull()
                         listOf(twitchResult(twitchSource, meta))
                     }
+
                     else -> {
                         val twitchLogin = twitchLoginCandidate(q)
 

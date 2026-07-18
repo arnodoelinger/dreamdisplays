@@ -12,17 +12,17 @@ your help makes the project better for everyone.
 
 ### Version policy
 
-| Version example    | Display name       | GitHub               | Modrinth / CurseForge | Notes                                |
-|--------------------|--------------------|----------------------|-----------------------|--------------------------------------|
-| `1.7.0-dev`        | `1.7.0 Developer`  | Build artifacts only | —                     | Work-in-progress; nothing published  |
-| `1.7.0-preview.1`  | `1.7.0 Preview 1`  | Pre-release          | Alpha channel         | Numbered previews are public test builds |
-| `1.7.0`            | `1.7.0 Release`    | Release              | Alpha channel         | Stable release                       |
+| Version example   | Display name      | GitHub               | Modrinth / CurseForge | Notes                                    |
+|-------------------|-------------------|----------------------|-----------------------|------------------------------------------|
+| `1.7.0-dev`       | `1.7.0 Developer` | Build artifacts only | —                     | Work-in-progress; nothing published      |
+| `1.7.0-preview.1` | `1.7.0 Preview 1` | Pre-release          | Alpha channel         | Numbered previews are public test builds |
+| `1.7.0`           | `1.7.0 Release`   | Release              | Alpha channel         | Stable release                           |
 
 ### Tips
 
 - Keep commits focused and write them ~[as that](https://www.conventionalcommits.org/en/v1.0.0/)
-- Ensure your code compiles and runs correctly in **both client (Forge, NeoForge, etc.)** and **all forks (Paper,
-  Folia, etc.)**
+- Ensure your code compiles and runs correctly in **both client (Forge, NeoForge, etc.)** and **all forks (Paper, Folia,
+  etc.)**
 - Update documentation if your changes introduce new features
 - Respect the project's license
 - Respect our guidelines

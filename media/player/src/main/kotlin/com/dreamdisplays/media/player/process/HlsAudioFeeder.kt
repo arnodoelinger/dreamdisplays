@@ -158,10 +158,14 @@ internal class HlsAudioFeeder(
     private fun scanFirstAudioPts(segment: ByteArray) {
         var i = 0
         while (i + TS_PACKET_SIZE <= segment.size) {
-            if (segment[i] != TS_SYNC_BYTE) { i++; continue } // Tolerate junk: re-sync byte-by-byte
+            if (segment[i] != TS_SYNC_BYTE) {
+                i++; continue
+            } // Tolerate junk: re-sync byte-by-byte
             val payloadUnitStart = (segment[i + 1].toInt() and 0x40) != 0
             val adaptation = (segment[i + 3].toInt() shr 4) and 0x3
-            if (!payloadUnitStart || adaptation == 2) { i += TS_PACKET_SIZE; continue }
+            if (!payloadUnitStart || adaptation == 2) {
+                i += TS_PACKET_SIZE; continue
+            }
             var p = i + 4
             if (adaptation == 3) p += 1 + (segment[i + 4].toInt() and 0xFF)
             // PES start code + stream id + flags + 5 PTS bytes must fit inside this TS packet

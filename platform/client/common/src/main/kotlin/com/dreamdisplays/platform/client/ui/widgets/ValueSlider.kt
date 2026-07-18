@@ -137,8 +137,8 @@ class ValueSlider(
 
     //? if >=1.21.11 {
     override fun onRelease(event: MouseButtonEvent) {
-    //?} else
-    /*override fun onRelease(mouseX: Double, mouseY: Double) {*/
+        //?} else
+        /*override fun onRelease(mouseX: Double, mouseY: Double) {*/
         // Non-live sliders defer the (expensive) apply until the drag / click is released
         if (!live && pendingCommit) {
             pendingCommit = false

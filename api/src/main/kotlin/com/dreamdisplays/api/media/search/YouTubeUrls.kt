@@ -39,7 +39,8 @@ object YouTubeUrls {
      * a `404`, so callers must verify the response (e.g. by size) before trusting it and fall back to
      * [thumbnailUrl] otherwise.
      */
-    fun maxResThumbnailUrl(videoId: YouTubeVideoId): String = "https://i.ytimg.com/vi/${videoId.value}/maxresdefault.jpg"
+    fun maxResThumbnailUrl(videoId: YouTubeVideoId): String =
+        "https://i.ytimg.com/vi/${videoId.value}/maxresdefault.jpg"
 
     /** Returns the max-resolution thumbnail URL for [videoId]; see the [YouTubeVideoId] overload for caveats. */
     fun maxResThumbnailUrl(videoId: String): String = maxResThumbnailUrl(YouTubeVideoId.require(videoId))

@@ -213,7 +213,13 @@ internal class FramePrebuffer(
                 // wait out / resolve through pace()'s own watchdog instead of being dropped as
                 // "stale" on sight, which used to make every subsequent frame drop the same way
                 // until a seek reset the audio clock (the picture reads as frozen indefinitely).
-                if (FramePacing.pace(tf.pts, getAudioClock, { flushRequested || !alive() }, dropStaleTimeline = false) || flushRequested) {
+                if (FramePacing.pace(
+                        tf.pts,
+                        getAudioClock,
+                        { flushRequested || !alive() },
+                        dropStaleTimeline = false
+                    ) || flushRequested
+                ) {
                     surface.recycleFrameBuffer(tf.buf)
                     continue
                 }

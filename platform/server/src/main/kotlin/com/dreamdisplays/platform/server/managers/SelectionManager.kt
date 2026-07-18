@@ -73,8 +73,10 @@ object SelectionManager {
         if (sel.pos1 == null || sel.worldKey != worldKey) {
             sel.reset()
             MessageUtil.sendMessageWithMaterials(
-                player, "noDisplayTerritories",
-                VanillaServerState.config.settings.selectionMaterialId, VanillaServerState.config.settings.baseMaterialId
+                player,
+                "noDisplayTerritories",
+                VanillaServerState.config.settings.selectionMaterialId,
+                VanillaServerState.config.settings.baseMaterialId
             )
             return
         }

@@ -16,11 +16,7 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.*
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
-import com.dreamdisplays.platform.client.ui.kit.UiRect
-import com.dreamdisplays.platform.client.ui.kit.UiText
-import com.dreamdisplays.platform.client.ui.kit.UiTheme
-import com.dreamdisplays.platform.client.ui.kit.drawShimmer
-import com.dreamdisplays.platform.client.ui.kit.drawVerifiedBadge
+import com.dreamdisplays.platform.client.ui.kit.*
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
@@ -58,6 +54,7 @@ class PreviewSection(
     private val ambientSampler = AmbientFrameSampler(ds)
     private var frameSinkAttached = false
     private var lastVideoUrl: String? = null
+
     // Starts at the CURRENT state rather than always 0 — otherwise every menu reopen replays the
     // grow-in animation even when the track count was already known and settled from a previous
     // session, which reads as the menu "always refreshing" something that hasn't actually changed.
@@ -88,7 +85,8 @@ class PreviewSection(
         drawTitleOverlay(g, innerX, innerY + previewMaxH, innerW)
 
         val now = System.nanoTime()
-        val dt = if (lastPresenceFrameNanos == 0L) 0.016f else ((now - lastPresenceFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
+        val dt =
+            if (lastPresenceFrameNanos == 0L) 0.016f else ((now - lastPresenceFrameNanos) / 1e9f).coerceIn(0f, 0.1f)
         lastPresenceFrameNanos = now
         val target = if (ds.audioTrackList.size > 1) 1f else 0f
         val diff = target - audioPresence
@@ -218,10 +216,32 @@ class PreviewSection(
     }
 
     /** Like [blitTexture], but crops the block-shape padding out of a [texW] x [texH] decode texture first. */
-    private fun blitVideoTexture(g: GuiGraphicsCompat, id: Identifier, x: Int, y: Int, w: Int, h: Int, texW: Int, texH: Int) {
+    private fun blitVideoTexture(
+        g: GuiGraphicsCompat,
+        id: Identifier,
+        x: Int,
+        y: Int,
+        w: Int,
+        h: Int,
+        texW: Int,
+        texH: Int
+    ) {
         val content = contentRect(texW, texH, ds.videoContentAspect)
         //? if >=1.21.11 {
-        g.blit(RenderPipelines.GUI_TEXTURED, id, x, y, content.x.toFloat(), content.y.toFloat(), w, h, content.w, content.h, texW, texH)
+        g.blit(
+            RenderPipelines.GUI_TEXTURED,
+            id,
+            x,
+            y,
+            content.x.toFloat(),
+            content.y.toFloat(),
+            w,
+            h,
+            content.w,
+            content.h,
+            texW,
+            texH
+        )
         //?} else
         /*g.blit(id, x, y, w, h, content.x.toFloat(), content.y.toFloat(), content.w, content.h, texW, texH)*/
     }

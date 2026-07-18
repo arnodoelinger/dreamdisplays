@@ -23,8 +23,8 @@ Rust native kernels.
 ./gradlew :native:testHostNatives    # cargo test
 ```
 
-The auto-build needs a Rust toolchain (`cargo` on `PATH`, or `~/.cargo/bin/cargo`). Machines without
-Rust — or CI using the `native/build/ci-bundle/` artifacts — skip it automatically; force-disable with
+The auto-build needs a Rust toolchain (`cargo` on `PATH`, or `~/.cargo/bin/cargo`). Machines without Rust — or CI using
+the `native/build/ci-bundle/` artifacts — skip it automatically; force-disable with
 `-Pdreamdisplays.autoBuildNatives=false`.
 
 > [WARNING]

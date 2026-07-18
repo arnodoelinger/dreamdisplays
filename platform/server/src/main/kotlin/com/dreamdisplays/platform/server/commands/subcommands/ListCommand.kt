@@ -74,7 +74,8 @@ class ListCommand : SubCommand {
 
         pageDisplays.forEachIndexed { localIndex, d ->
             val index = startIndex + localIndex + 1
-            val owner = getOwnerName(d.ownerId, ownerNameCache) ?: MessageUtil.messageFor(sender, "displayListUnknownOwner")
+            val owner =
+                getOwnerName(d.ownerId, ownerNameCache) ?: MessageUtil.messageFor(sender, "displayListUnknownOwner")
             val worldName = d.pos1.world?.name ?: MessageUtil.messageFor(sender, "displayListUnknownWorld")
             val idShort = d.id.toString().substring(0, 8)
             val url = d.url.ifBlank { MessageUtil.messageFor(sender, "displayListUnavailableUrl") }
@@ -374,7 +375,13 @@ object VanillaListCommand {
         sendColoredMsg(
             ctx,
             player,
-            MessageUtil.formatIndexed(player, "displayListPageLine", p.toString(), totalPages.toString(), displays.size.toString())
+            MessageUtil.formatIndexed(
+                player,
+                "displayListPageLine",
+                p.toString(),
+                totalPages.toString(),
+                displays.size.toString()
+            )
         )
 
         pageDisplays.forEachIndexed { localIndex, d ->

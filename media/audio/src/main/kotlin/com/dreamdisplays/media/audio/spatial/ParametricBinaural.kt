@@ -50,7 +50,11 @@ class ParametricBinaural(private val sampleRate: Float) {
         delayLine.push(sample)
         val near = delayLine.read(0f)
         val far = shadowFilter.process(delayLine.read(itdSamples)) * farGain
-        if (farIsRight) { lastL = near; lastR = far } else { lastL = far; lastR = near }
+        if (farIsRight) {
+            lastL = near; lastR = far
+        } else {
+            lastL = far; lastR = near
+        }
     }
 
     /** Clears delay-line and filter state (call on session reset). */

@@ -153,8 +153,8 @@ object ClientTickManager {
         val window =
             //? if >=1.21.11 {
             minecraft.window.handle()
-            //?} else
-            /*minecraft.window.window*/
+        //?} else
+        /*minecraft.window.window*/
         val menuButton = DreamServices.registry.getOrNull<KeyBindingRegistry>()
             ?.findById(DisplayMenuInputHandler.OPEN_MENU_BINDING_ID)?.defaultKey
             ?: GLFW.GLFW_MOUSE_BUTTON_RIGHT

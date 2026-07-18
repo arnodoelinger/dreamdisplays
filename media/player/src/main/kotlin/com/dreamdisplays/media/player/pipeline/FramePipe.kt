@@ -35,7 +35,8 @@ internal interface FramePipe {
      * meaningful for pipes producing planar output (GPU-YUV mode); no-op otherwise.
      * Must be called from the render thread. Returns true when a frame was actually uploaded.
      */
-    fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, actualW: Int, actualH: Int): Boolean = false
+    fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, actualW: Int, actualH: Int): Boolean =
+        false
 
     /** Discards the current ready frame. Call when stopping or seeking. */
     fun clear()
@@ -159,7 +160,12 @@ internal object FramePacing {
      * generation tag), so it passes false and lets a same-timeline stall resolve through the normal
      * wait / [MAX_PACING_WAIT_NS] give-up path instead of being misread as a stale frame forever.
      */
-    fun pace(videoPts: Long, audioClock: () -> Long, abort: () -> Boolean = { false }, dropStaleTimeline: Boolean = true): Boolean {
+    fun pace(
+        videoPts: Long,
+        audioClock: () -> Long,
+        abort: () -> Boolean = { false },
+        dropStaleTimeline: Boolean = true
+    ): Boolean {
         val started = System.nanoTime()
         while (true) {
             if (abort()) return true

@@ -6,6 +6,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.resources.Identifier
+
 //?} else
 /*import com.mojang.blaze3d.vertex.DefaultVertexFormat
 import com.mojang.blaze3d.vertex.VertexFormat

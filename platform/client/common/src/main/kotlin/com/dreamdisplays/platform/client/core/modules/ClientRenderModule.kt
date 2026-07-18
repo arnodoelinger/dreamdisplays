@@ -18,7 +18,8 @@ object ClientRenderModule : DreamDisplaysModule {
         services.register(RenderServices.DISPLAY_RENDERER, DefaultRendererProvider.create())
         services.register(RenderServices.TEXTURE_UPLOADER_FACTORY, DefaultTextureUploaderProvider.create())
         services.register<RenderHook>(RenderHook { renderContext ->
-            services.getOrNull(RenderServices.DISPLAY_RENDERER)?.takeIf { it.registeredCount > 0 }?.renderAll(renderContext)
+            services.getOrNull(RenderServices.DISPLAY_RENDERER)?.takeIf { it.registeredCount > 0 }
+                ?.renderAll(renderContext)
         })
     }
 }

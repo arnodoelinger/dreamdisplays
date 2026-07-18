@@ -548,7 +548,11 @@ class DisplayMenu private constructor(
         val onPopoutButton = popoutButton.isMouseOver(mx.toDouble(), my.toDouble())
         if (dropdown.visible && event.button() == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
         val onAudioTrackButton = audioTrackButton.isMouseOver(mx.toDouble(), my.toDouble())
-        if (audioTrackDropdown.visible && event.button() == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(mx, my)) return true
+        if (audioTrackDropdown.visible && event.button() == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(
+                mx,
+                my
+            )
+        ) return true
         return modLabel.handleClick(mx, my)
     }
 

@@ -73,7 +73,11 @@ object VanillaDeleteCommand {
             ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
 
         if (data.ownerId != player.uuid &&
-            !VanillaPermissions.has(player, VanillaServerState.config.permissions.deleteOthers, VanillaPermissions.Fallback.OP)
+            !VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.deleteOthers,
+                VanillaPermissions.Fallback.OP
+            )
         ) {
             MessageUtil.sendMessage(player, "displayCommandMissingPermission")
             return 0

@@ -210,8 +210,8 @@ class DisplayTextureResource(private val uuid: UUID) {
     private fun build(w: Int, h: Int): Allocation =
         //? if >=1.21.11 {
         if (DisplayYuvRenderTypes.active) buildYuv(w, h) else buildRgba(w, h)
-        //?} else
-        /*buildRgba(w, h)*/
+    //?} else
+    /*buildRgba(w, h)*/
 
     /** Builds the legacy single RGBA texture fed by CPU-converted frames. */
     private fun buildRgba(w: Int, h: Int): Allocation {

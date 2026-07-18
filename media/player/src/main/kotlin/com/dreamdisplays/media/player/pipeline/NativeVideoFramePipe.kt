@@ -117,8 +117,10 @@ internal class NativeVideoFramePipe(
 
     private class LavSeekCommand(val offsetNanos: Long, val onFirstFrame: () -> Unit) {
         val createdNanos: Long = System.nanoTime()
-        @Volatile var applied = false
-        @Volatile var failed = false
+        @Volatile
+        var applied = false
+        @Volatile
+        var failed = false
     }
 
     /**
@@ -553,7 +555,8 @@ internal class NativeVideoFramePipe(
                 videoPts
             }
             if (hasLavPts && !passFirstFrameAfterSeek
-                && framePts + frameNs < currentSeekOffsetNanos - prerollMarginNs) {
+                && framePts + frameNs < currentSeekOffsetNanos - prerollMarginNs
+            ) {
                 if (MediaPlayer.DEBUG) {
                     MediaPlayer.framesDropped.incrementAndGet()
                     metrics.recordPrerollDrop(currentSeekOffsetNanos - framePts)

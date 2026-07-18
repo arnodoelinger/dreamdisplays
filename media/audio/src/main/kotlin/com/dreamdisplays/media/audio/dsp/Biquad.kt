@@ -9,17 +9,28 @@ import kotlin.math.sqrt
 class Biquad {
     enum class Type { LOW_PASS, HIGH_PASS, HIGH_SHELF }
 
-    private var b0 = 1f; private var b1 = 0f; private var b2 = 0f
-    private var a1 = 0f; private var a2 = 0f
-    private var x1 = 0f; private var x2 = 0f
-    private var y1 = 0f; private var y2 = 0f
+    private var b0 = 1f
+    private var b1 = 0f
+    private var b2 = 0f
+    private var a1 = 0f
+    private var a2 = 0f
+    private var x1 = 0f
+    private var x2 = 0f
+    private var y1 = 0f
+    private var y2 = 0f
 
     /** Recomputes coefficients for [type] at [freqHz] / [sampleRate], with [q] and (shelf-only) [gainDb]. */
     fun configure(type: Type, sampleRate: Float, freqHz: Float, q: Float, gainDb: Float = 0f) {
         val w0 = 2.0 * PI * (freqHz / sampleRate).coerceIn(0.0001f, 0.499f)
-        val cosW0 = cos(w0); val sinW0 = sin(w0)
+        val cosW0 = cos(w0);
+        val sinW0 = sin(w0)
         val alpha = sinW0 / (2.0 * q)
-        var b0d: Double; var b1d: Double; var b2d: Double; var a0d: Double; var a1d: Double; var a2d: Double
+        var b0d: Double
+        var b1d: Double
+        var b2d: Double
+        var a0d: Double
+        var a1d: Double
+        var a2d: Double
         when (type) {
             Type.LOW_PASS -> {
                 b0d = (1.0 - cosW0) / 2.0; b1d = 1.0 - cosW0; b2d = (1.0 - cosW0) / 2.0
@@ -33,7 +44,7 @@ class Biquad {
 
             Type.HIGH_SHELF -> {
                 val a = Math.pow(10.0, gainDb / 40.0)
-                val s = 1.0 // shelf slope
+                val s = 1.0 // Shelf slope
                 val alphaS = sinW0 / 2.0 * sqrt((a + 1.0 / a) * (1.0 / s - 1.0) + 2.0)
                 val twoSqrtAAlpha = 2.0 * sqrt(a) * alphaS
                 b0d = a * ((a + 1.0) + (a - 1.0) * cosW0 + twoSqrtAAlpha)

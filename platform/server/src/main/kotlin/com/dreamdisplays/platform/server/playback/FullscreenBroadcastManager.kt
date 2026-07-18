@@ -112,8 +112,8 @@ object FullscreenBroadcastManager {
      */
     private fun looksLikeUrl(value: String): Boolean =
         Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(value) ||
-            Regex("""^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+(?:[/?#].*)?$""")
-                .matches(value.trim())
+                Regex("""^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+(?:[/?#].*)?$""")
+                    .matches(value.trim())
 
     /** Display id short-id suggestions (the same 8-char prefix `/display list` shows) for the `target` argument. */
     fun displayIdSuggestions(): List<String> = DisplayManager.getDisplays().map { it.id.toString().take(8) }
@@ -185,7 +185,13 @@ object FullscreenBroadcastManager {
 
     /** Snapshot of live sessions for the `list` subcommand: (sessionId, display id, title, reach count). */
     fun list(): List<FullscreenSessionInfo> = sessions.values.map { session ->
-        FullscreenSessionInfo(session.sessionId, session.display.id, session.virtual, session.title, session.shownTo.size)
+        FullscreenSessionInfo(
+            session.sessionId,
+            session.display.id,
+            session.virtual,
+            session.title,
+            session.shownTo.size
+        )
     }
 
     /**
@@ -387,4 +393,10 @@ object FullscreenBroadcastManager {
 }
 
 /** Snapshot of a live fullscreen session for the `list` subcommand. */
-data class FullscreenSessionInfo(val sessionId: String, val displayId: UUID, val virtual: Boolean, val title: String, val reach: Int)
+data class FullscreenSessionInfo(
+    val sessionId: String,
+    val displayId: UUID,
+    val virtual: Boolean,
+    val title: String,
+    val reach: Int
+)

@@ -16,8 +16,14 @@ class LimiterTest {
             val x = 3.0f * sin(2.0 * PI * 1000.0 * i / sampleRate).toFloat() // Way over unity
             limiter.process(x, x)
             if (i > settleSamples) {
-                assertTrue(abs(limiter.lastL) <= 0.891f + 1e-3f, "Left exceeded ceiling: ${limiter.lastL} at sample $i.")
-                assertTrue(abs(limiter.lastR) <= 0.891f + 1e-3f, "Right exceeded ceiling: ${limiter.lastR} at sample $i.")
+                assertTrue(
+                    abs(limiter.lastL) <= 0.891f + 1e-3f,
+                    "Left exceeded ceiling: ${limiter.lastL} at sample $i."
+                )
+                assertTrue(
+                    abs(limiter.lastR) <= 0.891f + 1e-3f,
+                    "Right exceeded ceiling: ${limiter.lastR} at sample $i."
+                )
             }
         }
     }

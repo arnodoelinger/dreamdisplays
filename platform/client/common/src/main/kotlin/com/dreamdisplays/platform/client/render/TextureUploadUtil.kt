@@ -136,7 +136,13 @@ object TextureUploadUtil {
             val planeBytes = texture.getWidth(0) * texture.getHeight(0)
             val view = src.duplicate()
             view.position(src.position() + offset).limit(src.position() + offset + planeBytes)
-            writeToTexture(texture, view, texture.getWidth(0), texture.getHeight(0), UploadPixelFormat.R8.nativeImageFormat)
+            writeToTexture(
+                texture,
+                view,
+                texture.getWidth(0),
+                texture.getHeight(0),
+                UploadPixelFormat.R8.nativeImageFormat
+            )
             offset += planeBytes
         }
     }

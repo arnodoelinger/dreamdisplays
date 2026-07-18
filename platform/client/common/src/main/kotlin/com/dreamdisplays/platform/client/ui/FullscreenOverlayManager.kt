@@ -36,7 +36,12 @@ object FullscreenOverlayManager {
         get() = active?.mode == FullscreenMode.IMMERSIVE
 
     /** Opens a fullscreen overlay for [screen], fading out any previous one. */
-    fun open(screen: DisplayScreen, mode: FullscreenMode, forced: Boolean = false, sessionId: String? = null): FullscreenOverlay {
+    fun open(
+        screen: DisplayScreen,
+        mode: FullscreenMode,
+        forced: Boolean = false,
+        sessionId: String? = null
+    ): FullscreenOverlay {
         overlays.forEach { it.startClose() }
         val overlay = FullscreenOverlay(screen, mode, forced, sessionId)
         overlays.add(overlay)

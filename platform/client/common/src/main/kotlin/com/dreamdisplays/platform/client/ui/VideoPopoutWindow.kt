@@ -323,6 +323,7 @@ class VideoPopoutWindow(
 
         @Volatile
         private var currentImage: BufferedImage? = null
+
         @Volatile
         private var contentAspect = 0.0
 

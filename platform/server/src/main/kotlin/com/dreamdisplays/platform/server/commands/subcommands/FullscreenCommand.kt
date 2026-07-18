@@ -169,16 +169,21 @@ object PaperFullscreenCommand {
     private fun resolveTargetToken(sender: Player, token: String): Set<UUID> = when {
         token.equals("@a", ignoreCase = true) || token.equals("@e", ignoreCase = true) ->
             Bukkit.getOnlinePlayers().map { it.uniqueId }.toSet()
+
         token.equals("@s", ignoreCase = true) -> setOf(sender.uniqueId)
         token.equals("@p", ignoreCase = true) ->
             Bukkit.getOnlinePlayers()
                 .filter { it.world == sender.world }
                 .minByOrNull { it.location.distanceSquared(sender.location) }
                 ?.let { setOf(it.uniqueId) } ?: emptySet()
+
         token.equals("@r", ignoreCase = true) ->
             Bukkit.getOnlinePlayers().randomOrNull()?.let { setOf(it.uniqueId) } ?: emptySet()
+
         token.startsWith("%") ->
-            Bukkit.getOnlinePlayers().filter { it.hasPermission("group.${token.substring(1)}") }.map { it.uniqueId }.toSet()
+            Bukkit.getOnlinePlayers().filter { it.hasPermission("group.${token.substring(1)}") }.map { it.uniqueId }
+                .toSet()
+
         else -> Bukkit.getPlayerExact(token)?.uniqueId?.let { setOf(it) } ?: emptySet()
     }
 
@@ -186,7 +191,10 @@ object PaperFullscreenCommand {
     fun stop(sender: CommandSender, idOrAll: String) {
         val count = FullscreenCommand.stop(idOrAll)
         if (count > 0) {
-            MessageUtil.sendColoredMessage(sender, MessageUtil.formatIndexed(sender, "fullscreenStopped", count.toString()))
+            MessageUtil.sendColoredMessage(
+                sender,
+                MessageUtil.formatIndexed(sender, "fullscreenStopped", count.toString())
+            )
         } else {
             MessageUtil.sendMessage(sender, "fullscreenStopFailed")
         }
@@ -219,6 +227,7 @@ object PaperFullscreenCommand {
                 sender,
                 MessageUtil.formatIndexed(sender, "fullscreenStarted", result.sessionId, result.reach.toString()),
             )
+
             FullscreenStartResult.NoTargets -> MessageUtil.sendMessage(sender, "fullscreenNoTargets")
             FullscreenStartResult.AlreadyRunning -> MessageUtil.sendMessage(sender, "fullscreenAlreadyRunning")
             FullscreenStartResult.ForcedDisallowed -> MessageUtil.sendMessage(sender, "fullscreenForcedDisallowed")
@@ -287,17 +296,27 @@ object VanillaFullscreenCommand {
     private fun resolveTargetToken(online: List<ServerPlayer>, sender: ServerPlayer, token: String): Set<UUID> = when {
         token.equals("@a", ignoreCase = true) || token.equals("@e", ignoreCase = true) ->
             online.map { it.uuid }.toSet()
+
         token.equals("@s", ignoreCase = true) -> setOf(sender.uuid)
         token.equals("@p", ignoreCase = true) ->
             online
                 .filter { it.level() == sender.level() }
                 .minByOrNull { it.distanceToSqr(sender) }
                 ?.let { setOf(it.uuid) } ?: emptySet()
+
         token.equals("@r", ignoreCase = true) -> online.randomOrNull()?.let { setOf(it.uuid) } ?: emptySet()
         token.startsWith("%") ->
-            online.filter { VanillaPermissions.has(it, "group.${token.substring(1)}", VanillaPermissions.Fallback.NOBODY) }
+            online.filter {
+                VanillaPermissions.has(
+                    it,
+                    "group.${token.substring(1)}",
+                    VanillaPermissions.Fallback.NOBODY
+                )
+            }
                 .map { it.uuid }.toSet()
-        else -> online.firstOrNull { it.gameProfile.name.equals(token, ignoreCase = true) }?.uuid?.let { setOf(it) } ?: emptySet()
+
+        else -> online.firstOrNull { it.gameProfile.name.equals(token, ignoreCase = true) }?.uuid?.let { setOf(it) }
+            ?: emptySet()
     }
 
     /** Handles `/display fullscreen stop <sessionId|displayId|all>`. */
@@ -306,7 +325,10 @@ object VanillaFullscreenCommand {
         val count = FullscreenCommand.stop(idOrAll)
         val key = if (count > 0) "fullscreenStopped" else "fullscreenStopFailed"
         val line = MessageUtil.formatIndexed(player, key, count.toString())
-        if (player != null) MessageUtil.sendColoredMessage(player, line) else ctx.source.sendSystemMessage(Component.literal(line))
+        if (player != null) MessageUtil.sendColoredMessage(
+            player,
+            line
+        ) else ctx.source.sendSystemMessage(Component.literal(line))
         return count
     }
 
@@ -316,7 +338,10 @@ object VanillaFullscreenCommand {
         val sessions = FullscreenCommand.list()
         if (sessions.isEmpty()) {
             val line = MessageUtil.messageFor(player, "fullscreenListEmpty")
-            if (player != null) MessageUtil.sendColoredMessage(player, line) else ctx.source.sendSystemMessage(Component.literal(line))
+            if (player != null) MessageUtil.sendColoredMessage(
+                player,
+                line
+            ) else ctx.source.sendSystemMessage(Component.literal(line))
             return 0
         }
         sessions.forEach { s ->
@@ -324,7 +349,10 @@ object VanillaFullscreenCommand {
                 player, "fullscreenListEntry",
                 s.sessionId, s.displayId.toString(), s.virtual.toString(), s.reach.toString(),
             )
-            if (player != null) MessageUtil.sendColoredMessage(player, line) else ctx.source.sendSystemMessage(Component.literal(line))
+            if (player != null) MessageUtil.sendColoredMessage(
+                player,
+                line
+            ) else ctx.source.sendSystemMessage(Component.literal(line))
         }
         return sessions.size
     }
@@ -342,6 +370,7 @@ object VanillaFullscreenCommand {
                 player,
                 MessageUtil.formatIndexed(player, "fullscreenStarted", result.sessionId, result.reach.toString()),
             )
+
             FullscreenStartResult.NoTargets -> MessageUtil.sendMessage(player, "fullscreenNoTargets")
             FullscreenStartResult.AlreadyRunning -> MessageUtil.sendMessage(player, "fullscreenAlreadyRunning")
             FullscreenStartResult.ForcedDisallowed -> MessageUtil.sendMessage(player, "fullscreenForcedDisallowed")

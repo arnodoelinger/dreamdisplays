@@ -224,12 +224,16 @@ class MediaPlayer(
 
     @Volatile
     private var streams: ActiveStreams? = null
+
     @Volatile
     private var liveStream = false
+
     @Volatile
     private var seekable = false
+
     @Volatile
     private var durationHintNanos = 0L
+
     @Volatile
     private var lastQuality = 0
 
@@ -254,8 +258,10 @@ class MediaPlayer(
 
     @Volatile
     private var brightness = 1.0
+
     @Volatile
     private var hwAccelDisabled = false
+
     @Volatile
     private var sessionStartNanos = 0L
 
@@ -609,7 +615,10 @@ class MediaPlayer(
         }.onFailure { e ->
             logger.error("$debugLabel Initialization failed: ${e.message}.")
             state.set(PlaybackState.ERROR)
-            host.mediaError = if (e is DreamMediaException) e else DreamMediaException.Unknown(e.message ?: "initialization failed", e)
+            host.mediaError = if (e is DreamMediaException) e else DreamMediaException.Unknown(
+                e.message ?: "initialization failed",
+                e
+            )
             drainInitCallbacks(run = false)
         }
     }
@@ -638,7 +647,14 @@ class MediaPlayer(
         host.cancelQualityHandoff()
         sessionStartNanos = System.nanoTime()
         audioRestartAttempts.set(0)
-        sessionManager.start(streamSet, offsetNanos, lastQuality, currentHwAccel(), live = liveStream, onFirstFrame = retryPolicy::reset)
+        sessionManager.start(
+            streamSet,
+            offsetNanos,
+            lastQuality,
+            currentHwAccel(),
+            live = liveStream,
+            onFirstFrame = retryPolicy::reset
+        )
         if (sessionManager.isPlaying) {
             state.set(PlaybackState.PLAYING)
             watchdog.start()

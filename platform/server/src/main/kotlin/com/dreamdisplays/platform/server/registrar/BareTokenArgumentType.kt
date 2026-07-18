@@ -11,6 +11,7 @@ import net.minecraft.core.Registry
 import net.minecraft.core.registries.BuiltInRegistries
 //? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 
@@ -77,7 +78,8 @@ object NeoForgeBareTokenArgumentType {
         val field = net.minecraft.commands.synchronization.ArgumentTypeInfos::class.java.getDeclaredField("BY_CLASS")
         field.isAccessible = true
         @Suppress("UNCHECKED_CAST")
-        val byClass = field.get(null) as MutableMap<Class<*>, net.minecraft.commands.synchronization.ArgumentTypeInfo<*, *>>
+        val byClass =
+            field.get(null) as MutableMap<Class<*>, net.minecraft.commands.synchronization.ArgumentTypeInfo<*, *>>
         val info = SingletonArgumentInfo.contextFree { BareTokenArgumentType }
         byClass.putIfAbsent(BareTokenArgumentType::class.java, info)
         Registry.register(BuiltInRegistries.COMMAND_ARGUMENT_TYPE, BareTokenArgumentType.ID, info)

@@ -36,7 +36,7 @@ run {
     }.getProperty("java.version")
     check(pinnedJavaVersion == "21") {
         "versions/$paperPinVersion/gradle.properties has java.version=$pinnedJavaVersion, expected 21. " +
-            "The paperPinVersion in platform/server/build.gradle.kts must point at a Java 21 version."
+                "The paperPinVersion in platform/server/build.gradle.kts must point at a Java 21 version."
     }
 }
 
@@ -49,9 +49,9 @@ tasks.named("compileKotlin") {
     doFirst {
         require(active == pin) {
             "The Paper jar must be compiled with the active Stonecutter version pinned to $pin " +
-                "(active is $active). Run the root ':platform:server:buildPaper' task instead " +
-                "of building this module's tasks directly, or switch with " +
-                "./gradlew \"Set active project to $pin\" first."
+                    "(active is $active). Run the root ':platform:server:buildPaper' task instead " +
+                    "of building this module's tasks directly, or switch with " +
+                    "./gradlew \"Set active project to $pin\" first."
         }
     }
 }
@@ -64,7 +64,7 @@ if (activeStonecutterVersion == paperPinVersion) {
     val buildPaper = tasks.register("buildPaper") {
         group = "build"
         description = "Builds the cross-version Paper jar, pinning the active Stonecutter version to " +
-            "$paperPinVersion (currently $activeStonecutterVersion) for a nested Gradle invocation."
+                "$paperPinVersion (currently $activeStonecutterVersion) for a nested Gradle invocation."
         val activeVersionFile = rootProject.file("versions/active.txt")
         val gradlewPath = rootProject.file("gradlew").absolutePath
         val rootDir = rootProject.projectDir

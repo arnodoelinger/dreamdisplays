@@ -49,7 +49,12 @@ object Updater {
                 VersionState.modLatestVersion = latestMod
 
                 VersionState.pluginLatestVersion = releases
-                    .filter { it.tagName.contains("spigot", ignoreCase = true) || it.tagName.contains("plugin", ignoreCase = true) }
+                    .filter {
+                        it.tagName.contains("spigot", ignoreCase = true) || it.tagName.contains(
+                            "plugin",
+                            ignoreCase = true
+                        )
+                    }
                     .mapNotNull { parseVersion(it.tagName)?.toString() }
                     .maxOrNull() ?: latestMod?.toString()
             }

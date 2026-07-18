@@ -9,14 +9,15 @@ import java.lang.reflect.Method
 /** Reads the current game camera pose for the acoustics engine's shared listener state. */
 internal object ListenerPoseTracker {
     private var cachedMainCameraMethod: Method? = null
+
     /** Returns the current camera pose, or [ListenerPose.IDENTITY] before a camera exists. */
     fun currentPose(minecraft: Minecraft): ListenerPose {
         val camera = runCatching { mainCameraOf(minecraft) }.getOrNull() ?: return ListenerPose.IDENTITY
         val pos =
             //? if >=1.21.11 {
             camera.position()
-            //?} else
-            /*camera.getPosition()*/
+        //?} else
+        /*camera.getPosition()*/
         val rotation = camera.rotation()
         val forward = Vector3f(0f, 0f, -1f).rotate(rotation)
         val up = Vector3f(0f, 1f, 0f).rotate(rotation)

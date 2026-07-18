@@ -34,6 +34,9 @@ class LoudnessMeterTest {
         val meter = LoudnessMeter(44100f)
         repeat(1000) { meter.observe(0.5f, 0.5f, 1f / 44100f) }
         meter.reset()
-        assertTrue(meter.loudnessLufs() < -80f, "Expected near-silence right after reset, got ${meter.loudnessLufs()} LUFS.")
+        assertTrue(
+            meter.loudnessLufs() < -80f,
+            "Expected near-silence right after reset, got ${meter.loudnessLufs()} LUFS."
+        )
     }
 }

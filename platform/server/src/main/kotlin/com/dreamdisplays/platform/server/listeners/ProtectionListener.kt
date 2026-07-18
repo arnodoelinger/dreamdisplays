@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.listeners
 
 //? if >=26 {
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreakEvent
 //?} else
 /*import net.neoforged.neoforge.event.level.BlockEvent.BreakEvent as NeoForgeBreakEvent*/
 import com.dreamdisplays.platform.server.managers.DisplayManager
@@ -26,6 +25,7 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPistonExtendEvent
 import org.bukkit.event.block.BlockPistonRetractEvent
 import org.bukkit.event.entity.EntityExplodeEvent
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreakEvent
 
 /**
  * Listener for protecting display areas from modifications.

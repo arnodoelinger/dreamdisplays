@@ -70,8 +70,8 @@ object ScreenRenderer : ClientRenderService {
         val cameraPos =
             //? if >=1.21.11 {
             camera.position()
-            //?} else
-            /*camera.getPosition()*/
+        //?} else
+        /*camera.getPosition()*/
         for (displayScreen in DisplayRegistry.getScreens()) {
             if (displayScreen.isDormant || !displayScreen.hasTexture) continue
 

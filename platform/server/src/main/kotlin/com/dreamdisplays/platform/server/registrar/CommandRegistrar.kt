@@ -186,7 +186,8 @@ object CommandRegistrar {
     private fun fullscreenIdOrUrlNode(literalName: String) = Commands.literal(literalName).then(
         Commands.argument("id", PaperBareTokenArgumentType)
             .suggests { _, builder ->
-                if (literalName == "id") FullscreenBroadcastManager.displayIdSuggestions().forEach { builder.suggest(it) }
+                if (literalName == "id") FullscreenBroadcastManager.displayIdSuggestions()
+                    .forEach { builder.suggest(it) }
                 builder.buildFuture()
             }
             .executes { ctx -> runFullscreenStart(ctx); Command.SINGLE_SUCCESS }
@@ -242,7 +243,10 @@ object CommandRegistrar {
     }
 
     /** Builds one flag's own literal / argument subtree, attaching the already-built [children] at every terminal. */
-    private fun buildFullscreenFlagNode(name: String, children: List<CommandNode<CommandSourceStack>>): CommandNode<CommandSourceStack> =
+    private fun buildFullscreenFlagNode(
+        name: String,
+        children: List<CommandNode<CommandSourceStack>>
+    ): CommandNode<CommandSourceStack> =
         when (name) {
             "target" -> Commands.literal("target").then(
                 terminate(
@@ -251,6 +255,7 @@ object CommandRegistrar {
                     children,
                 )
             ).build()
+
             "radius" -> Commands.literal("radius").then(
                 terminate(Commands.argument("blocks", DoubleArgumentType.doubleArg(0.0)), children).also { blocks ->
                     blocks.addChild(
@@ -263,15 +268,18 @@ object CommandRegistrar {
                     )
                 }
             ).build()
+
             "mode" -> Commands.literal("mode")
                 .then(terminate(Commands.literal("standard"), children))
                 .then(terminate(Commands.literal("immersive"), children))
                 .build()
+
             "forced" -> terminate(Commands.literal("forced"), children)
             "transient" -> terminate(Commands.literal("transient"), children)
             "volume" -> Commands.literal("volume").then(
                 terminate(Commands.argument("volume", DoubleArgumentType.doubleArg(0.0, 200.0)), children)
             ).build()
+
             "looped" -> terminate(Commands.literal("looped"), children)
             "quality" -> Commands.literal("quality").then(
                 terminate(
@@ -283,6 +291,7 @@ object CommandRegistrar {
                     children,
                 )
             ).build()
+
             else -> error("Unknown fullscreen flag: $name")
         }
 

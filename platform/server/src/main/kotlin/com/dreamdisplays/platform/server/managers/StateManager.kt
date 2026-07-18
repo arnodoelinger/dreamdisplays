@@ -104,7 +104,12 @@ object StateManager {
     @PaperOnly
     @JvmStatic
     fun processSyncPacket(packet: SyncData, player: Player) {
-        if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))) return
+        if (!applySyncPacket(
+                packet,
+                player.uniqueId,
+                player.hasPermission(PaperServer.config.permissions.delete)
+            )
+        ) return
         val data = getDisplayData(packet.id) ?: return
         if (PlatformUtil.isFolia) {
             DisplayManager.sendLegacySyncToTrackedNearbyPlayers(

@@ -1,7 +1,8 @@
 # Security policy
 
-At the moment, there are no known vulnerabilities in any version of Dream Displays. However, as the project evolves (
-especially when adding support for other platforms or custom video sources, like links) new security issues could arise.
+At the moment, there are no known vulnerabilities in any version of Dream Displays. However, as the project evolves
+(especially when adding support for other platforms or custom video sources, like links) new security issues could
+arise.
 
 In such cases, we will respond immediately and update this document with a list of:
 

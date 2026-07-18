@@ -243,12 +243,16 @@ internal class PlaybackSessionManager(
 
     /** Guards the live/incoming channel transitions across the control, render, and reader threads. */
     private val switchLock = Any()
+
     @Volatile
     private var active: VideoChannel? = null
+
     @Volatile
     private var incoming: VideoChannel? = null
+
     @Volatile
     private var incomingGeneration: Long = 0L
+
     @Volatile
     private var audioHalf: AudioHalf? = null
 
@@ -432,7 +436,8 @@ internal class PlaybackSessionManager(
                 firstVideoFrame.countDown()
             }
             if (seeked) {
-                val at = audio.start(ap, terminated, aStop, startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure)
+                val at =
+                    audio.start(ap, terminated, aStop, startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure)
                 audioHalf = AudioHalf(ap, at, aStop)
                 updateRawFrameSink()
                 discardHalvesAsync(null, oldAudio)
@@ -768,7 +773,8 @@ internal class PlaybackSessionManager(
             } else {
                 // No cached prelude: live audio joins at the edge, gated on the first live frame (as in start()).
                 val aStop = AtomicBoolean()
-                val at = audio.start(ap, terminated, aStop, startGate = firstLiveFrame, onUnexpectedEnd = onAudioFailure)
+                val at =
+                    audio.start(ap, terminated, aStop, startGate = firstLiveFrame, onUnexpectedEnd = onAudioFailure)
                 audioHalf = AudioHalf(ap, at, aStop)
             }
 
@@ -812,6 +818,7 @@ internal class PlaybackSessionManager(
 
     @Volatile
     private var parkStartNanos = 0L
+
     @Volatile
     private var frozenPositionNanos = -1L
 

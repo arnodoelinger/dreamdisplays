@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.source.ytdlp
 
+import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.security.MediaUrlPolicy
@@ -229,6 +230,30 @@ object YtDlp {
         }
     }
 
+    /** Fetches the first page (up to [limit] results) matching [query]; a fresh network call each time (continuation isn't cacheable). */
+    @Throws(IOException::class)
+    fun searchPage(query: String, limit: Int): MediaSearchPage {
+        if (query.isBlank()) return MediaSearchPage(emptyList(), null)
+        return YouTubeInnerTube.searchPage(query.trim(), limit.coerceIn(1, 25))
+    }
+
+    /** Fetches the page following [continuationToken] from a prior [searchPage]/[searchMore] call. */
+    @Throws(IOException::class)
+    fun searchMore(continuationToken: String, limit: Int): MediaSearchPage =
+        YouTubeInnerTube.searchMore(continuationToken, limit.coerceIn(1, 25))
+
+    /** Fetches the first page (up to [limit] results) related to [videoId]. */
+    @Throws(IOException::class)
+    fun relatedPage(videoId: String, limit: Int): MediaSearchPage {
+        if (videoId.isBlank()) return MediaSearchPage(emptyList(), null)
+        return YouTubeInnerTube.relatedPage(videoId, limit.coerceIn(1, 25))
+    }
+
+    /** Fetches the page following [continuationToken] from a prior [relatedPage]/[relatedMore] call. */
+    @Throws(IOException::class)
+    fun relatedMore(continuationToken: String, limit: Int): MediaSearchPage =
+        YouTubeInnerTube.relatedMore(continuationToken, limit.coerceIn(1, 25))
+
     /** Extracts the 11-character YouTube video ID from a full URL, short URL, or bare ID. Returns null if not recognized. */
     fun extractVideoId(url: String?): String? = YouTubeUrls.extractVideoId(url)
 
@@ -309,6 +334,7 @@ object YtDlp {
                 )
                 viaNewPipe
             }
+
             viaYtDlp.isNotEmpty() -> viaYtDlp
             else -> throw IOException("All yt-dlp clients failed for $videoUrl.")
         }

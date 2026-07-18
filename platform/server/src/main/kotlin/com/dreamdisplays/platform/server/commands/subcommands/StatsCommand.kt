@@ -31,7 +31,10 @@ class StatsCommand : SubCommand {
         MessageUtil.sendMessage(sender, "displayStatsHeader")
 
         for ((version, count) in counts) {
-            MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "displayStatsEntry", version, count))
+            MessageUtil.sendColoredMessage(
+                sender,
+                MessageUtil.formatPrintf(sender, "displayStatsEntry", version, count)
+            )
         }
 
         val total = counts.values.sum()
@@ -57,17 +60,37 @@ object VanillaStatsCommand {
         if (player != null) {
             MessageUtil.sendMessage(player, "displayStatsHeader")
             for ((version, count) in counts) {
-                MessageUtil.sendColoredMessage(player, MessageUtil.formatPrintf(player, "displayStatsEntry", version, count))
+                MessageUtil.sendColoredMessage(
+                    player,
+                    MessageUtil.formatPrintf(player, "displayStatsEntry", version, count)
+                )
             }
             val total = counts.values.sum()
             MessageUtil.sendColoredMessage(player, MessageUtil.formatPrintf(player, "displayStatsTotal", total))
         } else {
             ctx.source.sendSystemMessage(Component.literal(MessageUtil.messageFor(player, "displayStatsHeader")))
             for ((version, count) in counts) {
-                ctx.source.sendSystemMessage(Component.literal(MessageUtil.formatPrintf(player, "displayStatsEntry", version, count)))
+                ctx.source.sendSystemMessage(
+                    Component.literal(
+                        MessageUtil.formatPrintf(
+                            player,
+                            "displayStatsEntry",
+                            version,
+                            count
+                        )
+                    )
+                )
             }
             val total = counts.values.sum()
-            ctx.source.sendSystemMessage(Component.literal(MessageUtil.formatPrintf(player, "displayStatsTotal", total)))
+            ctx.source.sendSystemMessage(
+                Component.literal(
+                    MessageUtil.formatPrintf(
+                        player,
+                        "displayStatsTotal",
+                        total
+                    )
+                )
+            )
         }
 
         return 1

@@ -149,8 +149,10 @@ object VanillaCreateCommand {
 
         val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
-                player, "noDisplayTerritories",
-                VanillaServerState.config.settings.selectionMaterialId, VanillaServerState.config.settings.baseMaterialId
+                player,
+                "noDisplayTerritories",
+                VanillaServerState.config.settings.selectionMaterialId,
+                VanillaServerState.config.settings.baseMaterialId
             ).let { 0 }
 
         validate(

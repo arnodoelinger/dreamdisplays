@@ -86,6 +86,7 @@ object PaperV2Networking : PluginMessageListener {
             is FullscreenAck -> FullscreenBroadcastManager.handleAck(
                 packet.sessionId, player.uniqueId, FullscreenAckAction.fromWire(packet.action),
             )
+
             is PipPin -> if (packet.pinned) {
                 PipPinManager.pin(player.uniqueId, packet.id)
             } else {

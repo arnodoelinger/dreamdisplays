@@ -40,7 +40,10 @@ class OnCommand : SubCommand {
         if (PlayerManager.isDisplaysEnabled(target)) {
             MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
-                MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "display.already-enabled.target", target.name))
+                MessageUtil.sendColoredMessage(
+                    sender,
+                    MessageUtil.formatPrintf(sender, "display.already-enabled.target", target.name)
+                )
             }
             return
         }
@@ -49,7 +52,10 @@ class OnCommand : SubCommand {
         PacketUtil.sendDisplayEnabled(target, true)
         MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
-            MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "display.enabled.target", target.name))
+            MessageUtil.sendColoredMessage(
+                sender,
+                MessageUtil.formatPrintf(sender, "display.enabled.target", target.name)
+            )
         }
     }
 
@@ -114,7 +120,11 @@ object VanillaOnCommand {
         val selfTarget = self?.uuid == target.uuid
 
         if (!selfTarget &&
-            (self == null || !VanillaPermissions.has(self, config.permissions.toggleOthers, VanillaPermissions.Fallback.OP))
+            (self == null || !VanillaPermissions.has(
+                self,
+                config.permissions.toggleOthers,
+                VanillaPermissions.Fallback.OP
+            ))
         ) {
             if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))

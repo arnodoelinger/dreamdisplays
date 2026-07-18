@@ -96,8 +96,8 @@ object RegionUtil {
     fun getLevelKey(level: ServerLevel): String =
         //? if >=1.21.11 {
         level.dimension().identifier().toString()
-        //?} else
-        /*level.dimension().location().toString()*/
+    //?} else
+    /*level.dimension().location().toString()*/
 
     /** Returns the dimension key string for a [ServerPlayer]'s current server level. */
     fun getPlayerLevelKey(player: ServerPlayer): String = getLevelKey(playerServerLevel(player))
@@ -117,8 +117,8 @@ object RegionUtil {
     private fun playerServerLevel(player: ServerPlayer): ServerLevel =
         //? if >=1.21.11 {
         player.level()
-        //?} else
-        /*player.serverLevel()*/
+    //?} else
+    /*player.serverLevel()*/
 
     /**
      * Describes a region in 3D space.

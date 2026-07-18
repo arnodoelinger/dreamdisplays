@@ -37,13 +37,13 @@ internal object RenderBackendCompat {
 
     /** Fingerprint of the active render device. */
     private fun backendFingerprint(): String =
-        //? if >=1.21.11 {
+    //? if >=1.21.11 {
         //? if >=26.2 {
         RenderSystem.getDevice().deviceInfo.backendName().lowercase()
-        //?} else
-        /*RenderSystem.getDevice().backendName.lowercase()*/
-        //?} else
-        /*RenderSystem.getBackendDescription().lowercase()*/
+    //?} else
+    /*RenderSystem.getDevice().backendName.lowercase()*/
+    //?} else
+    /*RenderSystem.getBackendDescription().lowercase()*/
 
     /** True if the given [value] is a known OpenGL backend fingerprint. */
     private fun isOpenGlFingerprint(value: String): Boolean =

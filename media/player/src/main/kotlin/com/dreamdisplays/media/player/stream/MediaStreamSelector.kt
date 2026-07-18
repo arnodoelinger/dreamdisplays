@@ -8,13 +8,15 @@ import kotlin.math.abs
 /** Pure helpers for parsing quality values and picking video / audio tracks from a [MediaStream] list. */
 object MediaStreamSelector {
     /** Realtime-safe selection is enabled by default, but can be disabled via system property. */
-    private val realtimeSafeSelection: Boolean = System.getProperty("dreamdisplays.stream.realtimeSafe", "true").toBoolean()
+    private val realtimeSafeSelection: Boolean =
+        System.getProperty("dreamdisplays.stream.realtimeSafe", "true").toBoolean()
 
     /** Default 60 fps preference. Can be overridden by system property. */
     private val defaultPreferFps60: Boolean = System.getProperty("dreamdisplays.stream.prefer60", "false").toBoolean()
 
     /** Default 60 fps penalty. Can be overridden by system property. */
-    private val defaultFps60Penalty: Int = System.getProperty("dreamdisplays.stream.fps60Penalty", "420").toIntOrNull()?.coerceAtLeast(0) ?: 420
+    private val defaultFps60Penalty: Int =
+        System.getProperty("dreamdisplays.stream.fps60Penalty", "420").toIntOrNull()?.coerceAtLeast(0) ?: 420
 
     /** Operating system name. Used to determine platform-specific behavior. */
     private val osName: String = System.getProperty("os.name").orEmpty().lowercase()

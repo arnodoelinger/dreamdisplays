@@ -16,6 +16,7 @@ internal class VolumeController(
 ) {
     @Volatile
     private var userVolume = initialVolume
+
     @Volatile
     private var lastAttenuation = 1.0
 

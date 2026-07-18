@@ -153,6 +153,7 @@ internal class AudioSink(private val debugLabel: String) {
     /** Gate a bridge session waits on for its live `FFmpeg` process; null outside a bridge. */
     @Volatile
     private var liveGate: CountDownLatch? = null
+
     @Volatile
     private var liveProc: Process? = null
 
@@ -298,7 +299,19 @@ internal class AudioSink(private val debugLabel: String) {
     ): Thread {
         val stderrBuf = drainStderr(proc, stopFlag)
         return daemon(
-            { runSwitch(proc, terminated, stopFlag, catchUp, shouldPromote, onPromoted, onAborted, stderrBuf, onUnexpectedEnd) },
+            {
+                runSwitch(
+                    proc,
+                    terminated,
+                    stopFlag,
+                    catchUp,
+                    shouldPromote,
+                    onPromoted,
+                    onAborted,
+                    stderrBuf,
+                    onUnexpectedEnd
+                )
+            },
             "MediaPlayer-audio-switch-line",
         ).also { it.start() }
     }
@@ -426,7 +439,10 @@ internal class AudioSink(private val debugLabel: String) {
         sessionEpoch++
         clearRing()
         dspStage?.reset()
-        return daemon({ runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) }, "MediaPlayer-audio-bridge").also { it.start() }
+        return daemon(
+            { runBridge(prelude, terminated, stopFlag, onUnexpectedEnd) },
+            "MediaPlayer-audio-bridge"
+        ).also { it.start() }
     }
 
     /** Supplies the live `FFmpeg` audio process to an in-flight bridge session (see [startBridge]). */

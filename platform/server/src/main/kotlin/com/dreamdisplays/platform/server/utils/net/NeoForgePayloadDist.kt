@@ -16,11 +16,11 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar
 @NeoForgeOnly
 val isClientDist: Boolean by lazy {
     (
-        //? if >=1.21.11 {
-        FMLEnvironment.getDist()
-        //?} else
-        /*FMLEnvironment.dist*/
-    ) == Dist.CLIENT
+            //? if >=1.21.11 {
+            FMLEnvironment.getDist()
+            //?} else
+            /*FMLEnvironment.dist*/
+            ) == Dist.CLIENT
 }
 
 /**
@@ -51,7 +51,7 @@ fun <T : CustomPacketPayload> PayloadRegistrar.playBidirectionalCompat(
         { payload, context -> serverHandler(payload, context) },
         { payload, context -> clientHandler(payload, context) },
     )
-    //?} else
-    /*playBidirectional(type, codec) { payload, context ->
-        if (context.flow() == PacketFlow.SERVERBOUND) serverHandler(payload, context) else clientHandler(payload, context)
-    }*/
+//?} else
+/*playBidirectional(type, codec) { payload, context ->
+    if (context.flow() == PacketFlow.SERVERBOUND) serverHandler(payload, context) else clientHandler(payload, context)
+}*/

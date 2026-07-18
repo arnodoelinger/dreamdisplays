@@ -172,7 +172,8 @@ object DisplayManager {
 
     /** Cached nearby player ids for `Folia` global coordinators that cannot read entity locations directly. */
     @PaperOnly
-    fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> = proximityIndex.trackedNearbyPlayerIds(display.id)
+    fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> =
+        proximityIndex.trackedNearbyPlayerIds(display.id)
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly

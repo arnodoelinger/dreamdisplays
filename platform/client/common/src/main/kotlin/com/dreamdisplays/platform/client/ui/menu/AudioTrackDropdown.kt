@@ -141,12 +141,16 @@ class AudioTrackDropdown(
             when {
                 row == hovered -> {
                     g.fill(innerLeft, itemY, textRight, itemY + ITEM_H, scaleAlpha(UiTheme.HOVER_FILL, animProgress))
-                    g.drawOutline(UiRect(innerLeft, itemY, textRight - innerLeft, ITEM_H), scaleAlpha(UiTheme.CARD_BORDER_HOVER, animProgress))
+                    g.drawOutline(
+                        UiRect(innerLeft, itemY, textRight - innerLeft, ITEM_H),
+                        scaleAlpha(UiTheme.CARD_BORDER_HOVER, animProgress)
+                    )
                 }
                 // The playing track keeps a faint accent tint so it's always visible, even unhovered
                 isActive -> g.fill(innerLeft, itemY, textRight, itemY + ITEM_H, scaleAlpha(ACTIVE_FILL, animProgress))
             }
-            val color = scaleAlpha(if (row == hovered || isActive) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM, animProgress)
+            val color =
+                scaleAlpha(if (row == hovered || isActive) UiTheme.TEXT_PRIMARY else UiTheme.TEXT_DIM, animProgress)
             val textW = textRight - innerLeft - 6
             g.drawText(font, UiText.trim(font, label(stream, i), textW), innerLeft + 4, fy + ITEM_H * row, color, false)
         }
@@ -163,7 +167,7 @@ class AudioTrackDropdown(
         //? if >=1.21.11 {
         if (visible && hovered >= 0 && animProgress > 0.5f) g.requestCursor(CursorTypes.POINTING_HAND)
         val overScrollbar = sbPaged && mouseX in (sbColLeft - SB_GRAB)..(sbColRight + 1) &&
-            mouseY in sbTrackTop..sbTrackBottom
+                mouseY in sbTrackTop..sbTrackBottom
         if (visible && (draggingScrollbar || overScrollbar) && animProgress > 0.5f) g.requestCursor(CursorTypes.RESIZE_NS)
         //?}
 

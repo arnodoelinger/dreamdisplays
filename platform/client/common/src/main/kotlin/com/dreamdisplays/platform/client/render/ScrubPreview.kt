@@ -15,15 +15,9 @@ import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.RemovalCause
 import com.mojang.blaze3d.platform.NativeImage
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.IOException
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
@@ -172,45 +166,50 @@ object ScrubPreview {
     }
 
     /** Runs a single-frame `FFmpeg` extraction at [offsetNanos] and returns the raw JPEG bytes. */
-    private suspend fun extractFrame(key: String, ffmpeg: String, sourceUrl: String, offsetNanos: Long): ByteArray? = coroutineScope {
-        val proc = runCatching {
-            MediaProcess.buildFrameExtract(ffmpeg, sourceUrl, offsetNanos, FRAME_WIDTH, FRAME_HEIGHT)
-        }.onFailure { e ->
-            logger.warn("Scrub frame process start failed for $key@$offsetNanos: ${e.message}")
-        }.getOrNull() ?: return@coroutineScope null
+    private suspend fun extractFrame(key: String, ffmpeg: String, sourceUrl: String, offsetNanos: Long): ByteArray? =
+        coroutineScope {
+            val proc = runCatching {
+                MediaProcess.buildFrameExtract(ffmpeg, sourceUrl, offsetNanos, FRAME_WIDTH, FRAME_HEIGHT)
+            }.onFailure { e ->
+                logger.warn("Scrub frame process start failed for $key@$offsetNanos: ${e.message}")
+            }.getOrNull() ?: return@coroutineScope null
 
-        val stderrDeferred = async(Dispatchers.IO) { runCatching { proc.errorStream.use { it.readBytes() } }.getOrNull() }
-        val stdoutDeferred = async(Dispatchers.IO) { runCatching { proc.inputStream.use { it.readBytes() } }.getOrNull() }
+            val stderrDeferred =
+                async(Dispatchers.IO) { runCatching { proc.errorStream.use { it.readBytes() } }.getOrNull() }
+            val stdoutDeferred =
+                async(Dispatchers.IO) { runCatching { proc.inputStream.use { it.readBytes() } }.getOrNull() }
 
-        val result = runCatching {
-            val exited = withTimeoutOrNull(10.seconds) {
-                withContext(Dispatchers.IO) { proc.waitFor() }
-            }
-
-            val bytes = stdoutDeferred.await()
-            stderrDeferred.await()
-
-            when {
-                exited == null -> {
-                    logger.warn("Scrub frame extraction timed out for $key@$offsetNanos.")
-                    null
+            val result = runCatching {
+                val exited = withTimeoutOrNull(10.seconds) {
+                    withContext(Dispatchers.IO) { proc.waitFor() }
                 }
-                bytes == null || bytes.isEmpty() -> {
-                    logger.warn("Scrub frame extraction produced no output for $key@$offsetNanos (exit=${proc.exitValue()}).")
-                    null
+
+                val bytes = stdoutDeferred.await()
+                stderrDeferred.await()
+
+                when {
+                    exited == null -> {
+                        logger.warn("Scrub frame extraction timed out for $key@$offsetNanos.")
+                        null
+                    }
+
+                    bytes == null || bytes.isEmpty() -> {
+                        logger.warn("Scrub frame extraction produced no output for $key@$offsetNanos (exit=${proc.exitValue()}).")
+                        null
+                    }
+
+                    else -> bytes
                 }
-                else -> bytes
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.warn("Scrub frame extraction failed for $key@$offsetNanos: ${e.message}.")
             }
-        }.onFailure { e ->
-            if (e is CancellationException) throw e
-            logger.warn("Scrub frame extraction failed for $key@$offsetNanos: ${e.message}.")
+            try {
+                result.getOrNull()
+            } finally {
+                MediaProcess.gracefulDestroy(proc)
+            }
         }
-        try {
-            result.getOrNull()
-        } finally {
-            MediaProcess.gracefulDestroy(proc)
-        }
-    }
 
     /**
      * Decodes [bytes] and registers them as a Minecraft texture on the render thread; blocks the calling

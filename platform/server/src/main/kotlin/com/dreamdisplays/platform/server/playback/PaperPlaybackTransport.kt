@@ -59,7 +59,8 @@ object PaperPlaybackTransport : PlaybackTransport {
     /** True if [playerId] is recognized as an admin (op / delete permission). */
     override fun isAdmin(playerId: UUID): Boolean {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerIsAdmin(playerId)
-        return PaperServer.getInstance().server.getPlayer(playerId)?.hasPermission(PaperServer.config.permissions.delete) == true
+        return PaperServer.getInstance().server.getPlayer(playerId)
+            ?.hasPermission(PaperServer.config.permissions.delete) == true
     }
 
     /** UUIDs of every online player. */

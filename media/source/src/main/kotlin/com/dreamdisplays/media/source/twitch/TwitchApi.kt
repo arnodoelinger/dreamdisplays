@@ -87,8 +87,8 @@ object TwitchApi {
     fun livePlayback(login: String): TwitchLivePlayback? {
         val data = gql(
             """{user(login:"${escape(login)}"){displayName profileImageURL(width:70) broadcastSettings{title} """ +
-                """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}} """ +
-                """streamPlaybackAccessToken(channelName:"${escape(login)}",$TOKEN_PARAMS){value signature}}"""
+                    """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}} """ +
+                    """streamPlaybackAccessToken(channelName:"${escape(login)}",$TOKEN_PARAMS){value signature}}"""
         )
         val user = data.obj("user") ?: return null
         if (user.obj("stream") == null) return null // Channel exists but is offline
@@ -103,8 +103,8 @@ object TwitchApi {
     fun vodPlayback(id: String): TwitchVodPlayback? {
         val data = gql(
             """{video(id:"${escape(id)}"){title lengthSeconds viewCount owner{displayName profileImageURL(width:70)} """ +
-                """game{displayName} previewThumbnailURL(width:640,height:360)} """ +
-                """videoPlaybackAccessToken(id:"${escape(id)}",$TOKEN_PARAMS){value signature}}"""
+                    """game{displayName} previewThumbnailURL(width:640,height:360)} """ +
+                    """videoPlaybackAccessToken(id:"${escape(id)}",$TOKEN_PARAMS){value signature}}"""
         )
         val video = data.obj("video") ?: return null
         val token = data.obj("videoPlaybackAccessToken")?.toToken() ?: return null
@@ -118,9 +118,9 @@ object TwitchApi {
     fun clipPlayback(slug: String): TwitchClipPlayback? {
         val data = gql(
             """{clip(slug:"${escape(slug)}"){title durationSeconds viewCount broadcaster{displayName profileImageURL(width:70)} """ +
-                """game{displayName} thumbnailURL(width:480,height:272) """ +
-                """playbackAccessToken(params:{platform:"web",playerType:"site"}){value signature} """ +
-                """videoQualities{frameRate quality sourceURL}}}"""
+                    """game{displayName} thumbnailURL(width:480,height:272) """ +
+                    """playbackAccessToken(params:{platform:"web",playerType:"site"}){value signature} """ +
+                    """videoQualities{frameRate quality sourceURL}}}"""
         )
         val clip = data.obj("clip") ?: return null
         val token = clip.obj("playbackAccessToken")?.toToken() ?: return null
@@ -157,7 +157,7 @@ object TwitchApi {
     fun queryChannel(login: String): TwitchMetadata? {
         val user = gql(
             """{user(login:"${escape(login)}"){displayName profileImageURL(width:70) broadcastSettings{title} """ +
-                """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}}}"""
+                    """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}}}"""
         ).obj("user") ?: return null
         return channelMetadata(user, login)
     }
@@ -165,7 +165,7 @@ object TwitchApi {
     private fun queryVideo(id: String): TwitchMetadata? {
         val video = gql(
             """{video(id:"${escape(id)}"){title viewCount owner{displayName profileImageURL(width:70)} game{displayName} """ +
-                """previewThumbnailURL(width:640,height:360)}}"""
+                    """previewThumbnailURL(width:640,height:360)}}"""
         ).obj("video") ?: return null
         return videoMetadata(video)
     }
@@ -173,7 +173,7 @@ object TwitchApi {
     private fun queryClip(slug: String): TwitchMetadata? {
         val clip = gql(
             """{clip(slug:"${escape(slug)}"){title viewCount broadcaster{displayName profileImageURL(width:70)} """ +
-                """game{displayName} thumbnailURL(width:480,height:272)}}"""
+                    """game{displayName} thumbnailURL(width:480,height:272)}}"""
         ).obj("clip") ?: return null
         return clipMetadata(clip)
     }

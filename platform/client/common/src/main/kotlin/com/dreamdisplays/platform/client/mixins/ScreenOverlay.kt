@@ -89,8 +89,8 @@ open class ScreenOverlay {
         val window =
             //? if >=1.21.11 {
             mc.window.handle()
-            //?} else
-            /*mc.window.window*/
+        //?} else
+        /*mc.window.window*/
         val leftPressed = GLFW.glfwGetMouseButton(window, GLFW.GLFW_MOUSE_BUTTON_LEFT) == GLFW.GLFW_PRESS
         //? if >=1.21.11 {
         graphics.nextStratum()

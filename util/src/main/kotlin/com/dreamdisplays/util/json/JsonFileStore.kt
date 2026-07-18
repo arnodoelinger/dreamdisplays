@@ -2,7 +2,6 @@ package com.dreamdisplays.util.json
 
 import kotlinx.io.IOException
 import kotlinx.serialization.DeserializationStrategy
-import kotlinx.serialization.SerializationException
 import kotlinx.serialization.SerializationStrategy
 import kotlinx.serialization.json.*
 import org.slf4j.Logger

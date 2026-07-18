@@ -154,7 +154,8 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
     }*/
 
     /** Screen-specific scroll handling, in virtual coordinates. Return true to consume. */
-    protected open fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean = false
+    protected open fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
+        false
 
     final override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
         val mx = mouseX / uiScale

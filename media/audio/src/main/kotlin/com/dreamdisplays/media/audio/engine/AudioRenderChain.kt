@@ -126,7 +126,8 @@ internal class AudioRenderChain(
         val cutoffTarget = if (advanced) {
             val occCutoff = MAX_CUTOFF_HZ * (MIN_OCCLUSION_CUTOFF_HZ / MAX_CUTOFF_HZ).pow(occ)
             val centerDist = max(AIR_ABSORPTION_REF_DISTANCE, (listenerPos - center).length().toFloat())
-            val airCutoff = max(AIR_ABSORPTION_MIN_CUTOFF_HZ, MAX_CUTOFF_HZ * (AIR_ABSORPTION_REF_DISTANCE / centerDist))
+            val airCutoff =
+                max(AIR_ABSORPTION_MIN_CUTOFF_HZ, MAX_CUTOFF_HZ * (AIR_ABSORPTION_REF_DISTANCE / centerDist))
             min(occCutoff, airCutoff)
         } else MAX_CUTOFF_HZ
         val cutoff = occlusionCutoff.next(cutoffTarget, dtBlock)
@@ -143,7 +144,8 @@ internal class AudioRenderChain(
 
         val dtSample = 1f / sampleRate
         for (i in 0 until frames) {
-            val rawL = floatL[i]; val rawR = floatR[i]
+            val rawL = floatL[i];
+            val rawR = floatR[i]
             loudness.observe(rawL, rawR, dtSample)
 
             val srcL = if (advanced) occlusionFilterL.process(rawL) else rawL

@@ -419,6 +419,7 @@ class PipOverlay(
                     Minecraft.getInstance().soundManager.play(s)
                     displayScreen.deactivatePopout()
                 }
+
                 pressedInBody -> if (interactive) DisplayMenu.open(displayScreen)
             }
             pressed = false
