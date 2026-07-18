@@ -4,12 +4,10 @@ import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.util.json.DreamJson
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
 import java.io.IOException
 import java.nio.charset.StandardCharsets
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
 import java.util.*
+import kotlin.time.Clock
 import org.bukkit.Location
 import org.bukkit.entity.Player
 
@@ -70,7 +68,7 @@ object ReporterUtil {
         val embed = WebhookEmbed(
             description = EMBED_TITLE,
             color = EMBED_COLOR,
-            timestamp = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+            timestamp = Clock.System.now().toString(),
             fields = listOf(
                 createField("Location", locationStr),
                 createField("Video", videoLink),
