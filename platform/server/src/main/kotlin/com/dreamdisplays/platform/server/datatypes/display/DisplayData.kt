@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.server.datatypes.display
 
-import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.display.model.ContentRotation
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import java.util.*
 

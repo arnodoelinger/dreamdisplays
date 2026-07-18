@@ -1,7 +1,6 @@
 package com.dreamdisplays.media.audio.engine
 
 import com.dreamdisplays.api.media.audio.AcousticQuality
-import com.dreamdisplays.api.media.audio.ListenerPose
 import com.dreamdisplays.api.media.audio.SourceAcousticState
 import com.dreamdisplays.api.media.audio.SourcePlane
 import kotlin.test.Test

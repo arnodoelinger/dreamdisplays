@@ -2,26 +2,21 @@ package com.dreamdisplays.platform.client.managers
 
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.media.audio.AudioAcousticsServices
+import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.audio.ListenerPoseTracker
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.input.DisplayInteraction
-import com.dreamdisplays.platform.client.input.DisplayInteractionService
-import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler
-import com.dreamdisplays.platform.client.input.InputAction
-import com.dreamdisplays.platform.client.input.InputHandler
-import com.dreamdisplays.platform.client.input.KeyBindingRegistry
-import com.dreamdisplays.platform.client.overlay.OverlayManager
-import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.input.*
+import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import net.minecraft.client.Minecraft
 import net.minecraft.client.multiplayer.ClientLevel
 import org.lwjgl.glfw.GLFW
-import java.util.UUID
+import java.util.*
 
 /**
  * Handles per-tick client display state: level changes, hover, unloading, and shortcuts.

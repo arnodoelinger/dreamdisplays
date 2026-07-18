@@ -1,10 +1,10 @@
 package com.dreamdisplays.media.source.twitch
 
+import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.util.DreamCoroutines
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
 import com.github.benmanes.caffeine.cache.Expiry
-import com.dreamdisplays.api.media.source.MediaSource
-import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit

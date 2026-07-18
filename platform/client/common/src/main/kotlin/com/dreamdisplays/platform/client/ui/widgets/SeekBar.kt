@@ -1,30 +1,32 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+//? if >=1.21.11 {
+//?}
 import com.dreamdisplays.platform.client.render.ScrubPreview
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-//? if >=1.21.11 {
+import com.dreamdisplays.platform.client.ui.widgets.SeekBar.Companion.DISPLAY_HEIGHT
+import com.dreamdisplays.platform.client.ui.widgets.SeekBar.Companion.DISPLAY_WIDTH
 import com.mojang.blaze3d.platform.cursor.CursorTypes
-//?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.narration.NarratedElementType
 import net.minecraft.client.gui.narration.NarrationElementOutput
-//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
-//?}
 import net.minecraft.network.chat.Component
 import net.minecraft.network.chat.MutableComponent
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
-//? if >=1.21.11 {
 import net.minecraft.util.ARGB
-//?}
 import net.minecraft.util.Mth
 
 /**

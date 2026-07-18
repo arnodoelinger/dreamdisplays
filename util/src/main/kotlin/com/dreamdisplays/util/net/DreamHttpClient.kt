@@ -1,5 +1,6 @@
 package com.dreamdisplays.util.net
 
+import kotlinx.io.IOException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -7,7 +8,6 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URI
@@ -16,7 +16,7 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 

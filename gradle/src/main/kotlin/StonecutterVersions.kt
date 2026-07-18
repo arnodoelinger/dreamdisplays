@@ -1,4 +1,4 @@
-import java.util.Properties
+import java.util.*
 
 /**
  * Reads `versions/active.txt` and that version's `gradle.properties` once, and shares the

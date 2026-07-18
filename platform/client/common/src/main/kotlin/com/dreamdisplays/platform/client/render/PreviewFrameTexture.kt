@@ -1,16 +1,16 @@
 package com.dreamdisplays.platform.client.render
 
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.platform.client.Initializer
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.UUID
+import java.util.*
 
 /**
  * Holds the display menu's RGBA preview texture for one display, fed by [updateFrame] (decode thread)

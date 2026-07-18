@@ -1,19 +1,21 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.kit.UiWidget
-//? if >=1.21.11 {
+import com.dreamdisplays.platform.client.ui.widgets.ModeSlider.Companion.PENDING_TIMEOUT_NANOS
 import com.mojang.blaze3d.platform.cursor.CursorTypes
-//?}
 import net.minecraft.client.InputType
 import net.minecraft.client.Minecraft
-//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
-//?}
 import net.minecraft.network.chat.Component
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 

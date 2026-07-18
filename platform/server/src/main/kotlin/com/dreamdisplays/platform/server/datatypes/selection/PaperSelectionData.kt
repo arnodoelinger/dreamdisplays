@@ -8,8 +8,8 @@ import org.bukkit.Location
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
+import java.util.*
 import java.util.UUID.randomUUID
-import java.util.UUID
 
 /**
  * Player's current selection for a feature display.

@@ -1,34 +1,38 @@
 package com.dreamdisplays.platform.client.render
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.RemovalCause
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.media.player.process.FFmpegBinary
 import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.runtime.MediaHostGuard
+import com.dreamdisplays.platform.client.render.ScrubPreview.EXTRACT_CONCURRENCY
+import com.dreamdisplays.platform.client.render.ScrubPreview.FRAMES
+import com.dreamdisplays.platform.client.render.ScrubPreview.SAMPLE_COUNT
+import com.dreamdisplays.platform.client.render.ScrubPreview.generate
 import com.dreamdisplays.util.DreamCoroutines
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.RemovalCause
 import com.mojang.blaze3d.platform.NativeImage
-import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.texture.DynamicTexture
-//? if >=1.21.11 {
-import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
-import java.io.ByteArrayInputStream
-import java.io.IOException
-import java.security.MessageDigest
-import java.security.NoSuchAlgorithmException
-import java.nio.charset.StandardCharsets
-import java.util.HexFormat
-import java.util.concurrent.TimeUnit
-import javax.imageio.ImageIO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withPermit
+import kotlinx.io.IOException
+import net.minecraft.client.Minecraft
+import net.minecraft.client.renderer.texture.DynamicTexture
+import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
+import java.io.ByteArrayInputStream
+import java.nio.charset.StandardCharsets
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
+import java.util.*
+import java.util.concurrent.TimeUnit
+import javax.imageio.ImageIO
 
 /**
  * Generates and caches seek-bar scrub-preview thumbnails: a sparse set of downscaled frames sampled

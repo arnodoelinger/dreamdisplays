@@ -1,54 +1,43 @@
 package com.dreamdisplays.platform.client.ui
 
+//? if >=1.21.11 {
+//?}
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.playback.PlaybackServices
-import com.dreamdisplays.api.watchparty.WatchPartyServices
 import com.dreamdisplays.api.display.service.DisplayServices
-import com.dreamdisplays.api.playback.FullscreenMode
-import com.dreamdisplays.platform.client.popout.PopoutManager
-import com.dreamdisplays.platform.client.render.ScrubPreview
-import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.get
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.ui.kit.UiRect
-import com.dreamdisplays.platform.client.ui.kit.UiTheme
-import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
-import com.dreamdisplays.platform.client.ui.kit.drawPanel
-import com.dreamdisplays.platform.client.ui.menu.ErrorPanel
-import com.dreamdisplays.platform.client.ui.menu.MenuLayout
-import com.dreamdisplays.platform.client.ui.menu.AudioTrackDropdown
-import com.dreamdisplays.platform.client.ui.menu.ModTitleLabel
-import com.dreamdisplays.platform.client.ui.menu.PopoutDropdown
-import com.dreamdisplays.platform.client.ui.menu.PreviewSection
-import com.dreamdisplays.platform.client.ui.menu.SettingsSection
-import com.dreamdisplays.platform.client.ui.widgets.IconButton
-import com.dreamdisplays.platform.client.ui.widgets.ModeSlider
-import com.dreamdisplays.platform.client.ui.widgets.SeekBar
-import com.dreamdisplays.platform.client.ui.widgets.SuggestionsPanel
-import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
-import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.api.media.audio.AcousticQuality
 import com.dreamdisplays.api.media.audio.AudioAcousticsServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
-import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
+import com.dreamdisplays.api.playback.PlaybackServices
+import com.dreamdisplays.api.runtime.get
+import com.dreamdisplays.api.watchparty.WatchPartyServices
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
+import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.managers.ClientStateManager
+import com.dreamdisplays.platform.client.popout.PopoutManager
+import com.dreamdisplays.platform.client.render.ScrubPreview
+import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawPanel
+import com.dreamdisplays.platform.client.ui.menu.*
+import com.dreamdisplays.platform.client.ui.widgets.*
+import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
-//?}
 import net.minecraft.network.chat.Component
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The display configuration screen: video preview with playback controls, the settings rows, and

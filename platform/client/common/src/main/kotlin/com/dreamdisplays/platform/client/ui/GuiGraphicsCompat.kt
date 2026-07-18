@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.client.ui
 
-import net.minecraft.client.gui.Font
-import net.minecraft.network.chat.Component
 //? if >=26 {
+import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.GuiGraphicsExtractor
+import net.minecraft.network.chat.Component
 
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/

@@ -1,14 +1,15 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.platform.client.displays.DisplayScreen
+//? if >=26 {
 import com.dreamdisplays.api.playback.FullscreenAckAction
 import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.core.protocol.FullscreenAck
+import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
-//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
 

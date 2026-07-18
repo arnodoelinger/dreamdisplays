@@ -7,6 +7,7 @@ dependencies {
     api(libs.caffeine)
     api(libs.kotlinxCoroutinesCore)
     api(libs.kotlinxSerializationJson)
+    api(libs.kotlinxIoCore)
     implementation(libs.okhttp)
     compileOnly(libs.slf4jApi)
     compileOnly(libs.semver4j)

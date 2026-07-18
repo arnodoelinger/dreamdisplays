@@ -1,28 +1,24 @@
 package com.dreamdisplays.platform.server.utils.net
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.api.display.model.ContentRotation
+import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.ClearCache
 import com.dreamdisplays.core.protocol.DisplayDelete
 import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.core.protocol.SetDisplaysEnabled
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
+import com.dreamdisplays.platform.server.utils.net.PacketUtil.writeUUID
+import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.io.*
 import org.bukkit.block.BlockFace
 import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.util.*
-import kotlinx.io.Buffer
-import kotlinx.io.Sink
-import kotlinx.io.Source
-import kotlinx.io.readByteArray
 
 /**
  * Returns true if the client identified by [uuid] runs a mod version that understands vertical

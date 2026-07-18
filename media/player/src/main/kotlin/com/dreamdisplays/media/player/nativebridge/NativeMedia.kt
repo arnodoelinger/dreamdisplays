@@ -5,12 +5,7 @@ import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.runtime.OsInfo
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.lang.foreign.Arena
-import java.lang.foreign.FunctionDescriptor
-import java.lang.foreign.Linker
-import java.lang.foreign.MemorySegment
-import java.lang.foreign.SymbolLookup
-import java.lang.foreign.ValueLayout
+import java.lang.foreign.*
 import java.lang.invoke.MethodHandle
 import java.nio.ByteBuffer
 

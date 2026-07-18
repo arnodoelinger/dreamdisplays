@@ -1,17 +1,12 @@
 package com.dreamdisplays.platform.server.managers
 
-import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.selectionMaterial
-import com.dreamdisplays.platform.server.baseMaterial
-import com.dreamdisplays.platform.server.selectionMaterialId
-import com.dreamdisplays.platform.server.baseMaterialId
-import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
+import com.dreamdisplays.platform.server.*
 import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
 import com.dreamdisplays.platform.server.datatypes.selection.SelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import io.github.arnodoelinger.platformweaver.*
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer

@@ -1,34 +1,34 @@
 package com.dreamdisplays.platform.client.render
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.util.net.DreamHttpClient
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import com.mojang.blaze3d.platform.NativeImage
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
+import org.slf4j.LoggerFactory
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import java.io.File
-import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
-import java.util.HexFormat
+import java.util.*
 import java.util.concurrent.TimeUnit
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.Deferred
-import org.slf4j.LoggerFactory
 import javax.imageio.ImageIO
 
 /**

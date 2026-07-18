@@ -2,7 +2,7 @@ package com.dreamdisplays.platform.server.utils
 
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import net.minecraft.server.level.ServerPlayer
-import java.util.UUID
+import java.util.*
 
 /**
  * Permission-node resolution for the `Fabric` / `NeoForge` servers, giving parity with the Paper

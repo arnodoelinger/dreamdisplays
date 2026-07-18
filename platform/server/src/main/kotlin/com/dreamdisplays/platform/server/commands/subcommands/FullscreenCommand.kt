@@ -1,7 +1,5 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
@@ -13,13 +11,14 @@ import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.mojang.brigadier.context.CommandContext
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.Bukkit
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
-import java.util.UUID
+import java.util.*
 
 /** Outcome of a `/display fullscreen start` attempt, for the platform trees to turn into a reply message. */
 sealed class FullscreenStartResult {

@@ -10,8 +10,8 @@ import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaServerScheduler
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.VanillaServerScheduler
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
@@ -25,7 +25,7 @@ import org.bukkit.event.Listener
 import org.bukkit.event.player.PlayerJoinEvent
 import org.bukkit.event.player.PlayerQuitEvent
 import org.jspecify.annotations.NullMarked
-import java.util.UUID
+import java.util.*
 
 /**
  * Handles player join and leave events. If mod detection is enabled, schedules a delayed `modRequired` message for

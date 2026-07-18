@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.runtime
 
 import com.dreamdisplays.util.net.DreamHttpClient
+import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.net.InetAddress
 import java.net.URI
 

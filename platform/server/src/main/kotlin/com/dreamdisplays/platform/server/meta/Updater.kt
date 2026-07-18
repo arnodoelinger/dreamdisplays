@@ -1,11 +1,10 @@
 package com.dreamdisplays.platform.server.meta
 
-import com.dreamdisplays.platform.server.utils.GitHubFetcherUtil
 import com.dreamdisplays.util.asJsonArrayOrNull
 import com.dreamdisplays.util.asJsonObjectOrNull
+import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.util.optString
-import com.dreamdisplays.util.json.DreamJson
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
 import java.net.ConnectException

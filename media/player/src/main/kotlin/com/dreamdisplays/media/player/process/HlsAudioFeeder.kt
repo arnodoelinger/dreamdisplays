@@ -2,8 +2,8 @@ package com.dreamdisplays.media.player.process
 
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.util.net.DreamHttpClient
+import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.io.OutputStream
 import java.net.URI
 import java.util.concurrent.atomic.AtomicBoolean

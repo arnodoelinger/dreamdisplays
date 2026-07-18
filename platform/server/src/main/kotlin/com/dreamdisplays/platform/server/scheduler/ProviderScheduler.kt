@@ -1,8 +1,7 @@
 package com.dreamdisplays.platform.server.scheduler
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.jspecify.annotations.NullMarked
 
 /**

@@ -2,7 +2,9 @@ package com.dreamdisplays.platform.server.managers
 
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.security.MediaUrlPolicy
-import com.dreamdisplays.platform.server.datatypes.display.*
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.DIRECTION_TO_ORDINAL
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.ORDINAL_TO_DIRECTION
@@ -17,13 +19,14 @@ import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackPos
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.unpackRotation
 import com.zaxxer.hikari.HikariConfig
 import com.zaxxer.hikari.HikariDataSource
-import io.github.arnodoelinger.platformweaver.*
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import org.bukkit.Bukkit
 import org.bukkit.Location
 import org.bukkit.block.BlockFace
-import org.jetbrains.exposed.v1.core.*
+import org.jetbrains.exposed.v1.core.ResultRow
+import org.jetbrains.exposed.v1.core.Table
 import org.jetbrains.exposed.v1.core.eq
 import org.jetbrains.exposed.v1.jdbc.Database
 import org.jetbrains.exposed.v1.jdbc.deleteWhere

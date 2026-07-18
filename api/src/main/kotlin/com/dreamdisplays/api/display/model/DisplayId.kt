@@ -1,7 +1,7 @@
 package com.dreamdisplays.api.display.model
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import java.util.UUID
+import java.util.*
 
 /**
  * A unique identifier for a display.

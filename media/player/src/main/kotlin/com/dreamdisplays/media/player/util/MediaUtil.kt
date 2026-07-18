@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.util
 
-import java.io.IOException
+import kotlinx.io.IOException
 import java.io.InputStream
 
 /** Stateless helpers used by the media pipeline. */

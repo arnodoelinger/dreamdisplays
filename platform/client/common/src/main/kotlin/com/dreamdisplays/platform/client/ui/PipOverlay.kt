@@ -1,43 +1,39 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.platform.client.Initializer
+//? if >=1.21.11 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
+//? if >=26 {
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.platform.client.overlay.Overlay
-import com.dreamdisplays.platform.client.overlay.OverlayBounds
-import com.dreamdisplays.platform.client.overlay.OverlayEvent
-import com.dreamdisplays.platform.client.overlay.OverlayManager
-import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.overlay.*
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.render.TextureUploadUtil
+import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
-import com.dreamdisplays.platform.client.render.TextureUploadUtil
-import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.mojang.blaze3d.platform.NativeImage
-//? if >=1.21.11 {
-//?} else
-/*import com.mojang.blaze3d.systems.RenderSystem*/
 import net.minecraft.client.Minecraft
-//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
-//? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
-//?}
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.sounds.SoundEvents
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.UUID
+import java.util.*
 
 /**
  * In-game Picture-in-Picture overlay for one display screen.

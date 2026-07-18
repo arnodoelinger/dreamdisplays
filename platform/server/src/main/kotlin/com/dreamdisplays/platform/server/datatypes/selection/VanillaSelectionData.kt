@@ -6,8 +6,8 @@ import com.dreamdisplays.platform.server.utils.RegionUtil
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.world.phys.AABB
+import java.util.*
 import java.util.UUID.randomUUID
-import java.util.UUID
 
 /**
  * Vanilla implementation of [SelectionData], shared by `Fabric` and `NeoForge`.

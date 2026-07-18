@@ -4,7 +4,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
-import java.util.UUID
+import java.util.*
 
 /**
  * The display a [com.dreamdisplays.media.player.MediaPlayer] drives, abstracted away from the Minecraft

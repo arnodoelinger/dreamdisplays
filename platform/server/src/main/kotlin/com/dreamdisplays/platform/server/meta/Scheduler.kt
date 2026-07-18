@@ -1,13 +1,12 @@
 package com.dreamdisplays.platform.server.meta
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import org.jspecify.annotations.NullMarked
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**

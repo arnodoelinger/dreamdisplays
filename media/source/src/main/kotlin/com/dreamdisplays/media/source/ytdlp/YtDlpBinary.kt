@@ -1,19 +1,23 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.media.runtime.OsInfo
 import com.dreamdisplays.media.runtime.Processes
+import com.dreamdisplays.media.source.ytdlp.YtDlpBinary.BINARY_REFRESH_MS
+import com.dreamdisplays.media.source.ytdlp.YtDlpBinary.MIN_PYTHON_MINOR
+import com.dreamdisplays.media.source.ytdlp.YtDlpBinary.PYTHON_CANDIDATES
+import com.dreamdisplays.media.source.ytdlp.YtDlpBinary.maybeSelfUpdate
+import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.util.net.DreamHttpClient
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.launch
+import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.TimeUnit
-import kotlinx.atomicfu.atomic
 
 /**
  * Provisioning of the `yt-dlp` executable: locating a system install, falling back to the bundled

@@ -3,17 +3,17 @@ package com.dreamdisplays.platform.server.utils.net
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.managers.StateManager
 import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.io.Buffer
+import kotlinx.io.Source
+import kotlinx.io.readString
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
 import java.util.*
-import kotlinx.io.Buffer
-import kotlinx.io.Source
-import kotlinx.io.readString
 
 /**
  * Frozen protocol v1 — the wire format of these channels must never change. Decodes legacy

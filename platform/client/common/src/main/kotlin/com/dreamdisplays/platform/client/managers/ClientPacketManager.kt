@@ -1,22 +1,14 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.platform.client.Mod
+import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.display.service.DisplaySystem
+import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.core.protocol.*
+import com.dreamdisplays.core.storage.DisplayStorage
+import com.dreamdisplays.platform.client.Mod
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.core.protocol.ClearCache
-import com.dreamdisplays.core.protocol.DisplayDelete
-import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.core.protocol.DisplaySync
-import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.core.protocol.FullscreenState
-import com.dreamdisplays.core.protocol.ServerHello
-import com.dreamdisplays.core.protocol.SetDisplaysEnabled
-import com.dreamdisplays.core.protocol.WatchPartyState
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 

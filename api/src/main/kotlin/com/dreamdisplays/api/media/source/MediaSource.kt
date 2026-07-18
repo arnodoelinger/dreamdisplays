@@ -3,7 +3,7 @@ package com.dreamdisplays.api.media.source
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.security.MediaHttpUrl
-import java.util.Locale
+import java.util.*
 
 /**
  * User-provided media locator before resolver-specific stream extraction.

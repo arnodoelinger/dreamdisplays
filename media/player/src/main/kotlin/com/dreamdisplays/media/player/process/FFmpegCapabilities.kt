@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.process
 
+import com.dreamdisplays.media.player.process.FFmpegCapabilities.PROBED_FILTERS
 import org.slf4j.LoggerFactory
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit

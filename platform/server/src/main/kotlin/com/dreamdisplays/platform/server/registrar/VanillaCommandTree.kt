@@ -1,10 +1,10 @@
 package com.dreamdisplays.platform.server.registrar
 
-import com.dreamdisplays.platform.server.VanillaConfig
-import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.PermissionsSection
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.registrar.VanillaCommandTree.fullscreenFlagsNode
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.mojang.brigadier.Command
@@ -17,10 +17,10 @@ import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.CommandNode
 import com.mojang.brigadier.tree.LiteralCommandNode
-import net.minecraft.commands.Commands
 import net.minecraft.commands.CommandSourceStack
+import net.minecraft.commands.Commands
 import net.minecraft.server.level.ServerPlayer
-import java.util.Locale
+import java.util.*
 import java.util.concurrent.CompletableFuture
 
 /**

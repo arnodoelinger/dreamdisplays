@@ -1,8 +1,19 @@
 package com.dreamdisplays.platform.client.ui
 
+//? if >=1.21.11 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
+//? if >=26 {
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.api.playback.FullscreenMode
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
@@ -11,25 +22,14 @@ import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawOutline
 import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
 import com.mojang.blaze3d.platform.NativeImage
-//? if >=1.21.11 {
-//?} else
-/*import com.mojang.blaze3d.systems.RenderSystem*/
 import net.minecraft.client.Minecraft
-//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
-//? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
-//?}
 import net.minecraft.client.renderer.texture.DynamicTexture
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.UUID
+import java.util.*
 
 /**
  * Screen-covering video overlay for one display screen.

@@ -1,29 +1,26 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Expiry
+import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.media.source.MediaMetadata
 import com.dreamdisplays.api.media.source.MediaResolver
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
-import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.media.source.ytdlp.NewPipeResolver.PARTIAL_TTL_NANOS
+import com.dreamdisplays.media.source.ytdlp.NewPipeResolver.POSITIVE_TTL_NANOS
 import com.dreamdisplays.util.net.DreamHttpClient
-import kotlin.time.Duration.Companion.nanoseconds
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Expiry
+import kotlinx.atomicfu.atomic
 import org.schabi.newpipe.extractor.NewPipe
 import org.schabi.newpipe.extractor.downloader.Downloader
 import org.schabi.newpipe.extractor.downloader.Request
 import org.schabi.newpipe.extractor.downloader.Response
 import org.schabi.newpipe.extractor.services.youtube.YoutubeJavaScriptPlayerManager
-import org.schabi.newpipe.extractor.stream.AudioStream
-import org.schabi.newpipe.extractor.stream.DeliveryMethod
-import org.schabi.newpipe.extractor.stream.Stream
-import org.schabi.newpipe.extractor.stream.StreamExtractor
-import org.schabi.newpipe.extractor.stream.StreamType
-import org.schabi.newpipe.extractor.stream.VideoStream
+import org.schabi.newpipe.extractor.stream.*
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import kotlinx.atomicfu.atomic
+import kotlin.time.Duration.Companion.nanoseconds
 
 /**
  * In-process YouTube stream resolver backed by NewPipeExtractor. This is the fast path used before

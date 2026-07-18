@@ -1,11 +1,10 @@
 package com.dreamdisplays.platform.client.render
 
+//? if >=1.21.11 {
+//?}
 import com.dreamdisplays.api.media.FramePixelFormat
 import com.dreamdisplays.api.media.player.FrameUploader
 import com.dreamdisplays.api.media.player.GpuTextureRef
-//? if >=1.21.11 {
-import com.mojang.blaze3d.textures.GpuTexture
-//?}
 import net.minecraft.client.Minecraft
 import java.nio.ByteBuffer
 

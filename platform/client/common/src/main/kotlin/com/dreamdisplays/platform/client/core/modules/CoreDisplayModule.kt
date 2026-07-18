@@ -1,17 +1,12 @@
 package com.dreamdisplays.platform.client.core.modules
 
-import com.dreamdisplays.api.display.service.DisplayService
-import com.dreamdisplays.api.display.service.DisplayServices
+import com.dreamdisplays.api.display.service.*
+import com.dreamdisplays.api.playback.PlaybackPort
 import com.dreamdisplays.api.runtime.DreamDisplaysModule
 import com.dreamdisplays.api.runtime.ModuleContext
 import com.dreamdisplays.api.runtime.register
-import com.dreamdisplays.api.display.service.DisplayLookup
-import com.dreamdisplays.api.display.service.DisplayMutationPort
-import com.dreamdisplays.api.display.service.DisplaySystem
-import com.dreamdisplays.core.display.service.impl.DefaultDisplayService
-import com.dreamdisplays.api.display.service.DefaultDisplaySystem
-import com.dreamdisplays.api.playback.PlaybackPort
 import com.dreamdisplays.api.watchparty.WatchPartyPort
+import com.dreamdisplays.core.display.service.impl.DefaultDisplayService
 import com.dreamdisplays.platform.client.displays.MinecraftDisplayCommands
 
 /** Installs the client-side display system and its public [DisplayService]. */

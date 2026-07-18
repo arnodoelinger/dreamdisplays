@@ -1,8 +1,11 @@
 package com.dreamdisplays.platform.server.listeners
 
+//? if >=26 {
+//?} else
+/*import net.neoforged.neoforge.event.level.BlockEvent.BreakEvent as NeoForgeBreakEvent*/
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.FabricOnly
@@ -13,10 +16,6 @@ import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
 import net.minecraft.server.level.ServerPlayer
 import net.neoforged.bus.api.SubscribeEvent
-//? if >=26 {
-import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreakEvent
-//?} else
-/*import net.neoforged.neoforge.event.level.BlockEvent.BreakEvent as NeoForgeBreakEvent*/
 import org.bukkit.Location
 import org.bukkit.block.Block
 import org.bukkit.event.Cancellable
@@ -26,6 +25,7 @@ import org.bukkit.event.block.BlockBreakEvent
 import org.bukkit.event.block.BlockPistonExtendEvent
 import org.bukkit.event.block.BlockPistonRetractEvent
 import org.bukkit.event.entity.EntityExplodeEvent
+import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreakEvent
 
 /**
  * Listener for protecting display areas from modifications.

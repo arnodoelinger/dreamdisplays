@@ -1,11 +1,11 @@
 package com.dreamdisplays.media.source
 
 import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.media.runtime.MediaHostGuard
 import com.dreamdisplays.api.media.source.MediaResolver
 import com.dreamdisplays.api.media.source.MediaResolverRegistry
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
+import com.dreamdisplays.media.runtime.MediaHostGuard
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore

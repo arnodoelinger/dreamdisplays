@@ -1,11 +1,10 @@
 package com.dreamdisplays.platform.server.registrar
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.utils.net.PacketReceiver
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
+import io.github.arnodoelinger.platformweaver.PaperOnly
 
 /**
  * Manages the registration of plugin channels for incoming and outgoing messages.

@@ -1,8 +1,19 @@
 package com.dreamdisplays.platform.client.ui.menu
 
+//? if >=1.21.11 {
+//?}
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
+import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
+import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.render.*
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
@@ -12,32 +23,15 @@ import com.dreamdisplays.platform.client.ui.kit.drawShimmer
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
-import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.platform.client.render.AmbientGrid
-import com.dreamdisplays.platform.client.render.AsyncTextureUploader
-import com.dreamdisplays.platform.client.render.PreviewFrameTexture
-import com.dreamdisplays.platform.client.render.TextureUploadUtil
-import com.dreamdisplays.platform.client.render.UploadPixelFormat
-import com.dreamdisplays.api.media.MediaServices
-import com.dreamdisplays.api.media.source.MediaSource
-import com.dreamdisplays.platform.client.render.Thumbnails
-import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
-import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
-import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
-//? if >=1.21.11 {
 import net.minecraft.client.renderer.RenderPipelines
-//?}
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.network.chat.Component
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.UUID
+import java.util.*
 import kotlin.math.max
 import kotlin.math.roundToInt
 

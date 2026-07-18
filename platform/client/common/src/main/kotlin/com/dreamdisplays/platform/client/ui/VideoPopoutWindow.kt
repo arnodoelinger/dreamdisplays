@@ -1,21 +1,17 @@
 package com.dreamdisplays.platform.client.ui
 
+import com.dreamdisplays.api.media.sink.VideoFrameSink
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutWindow
 import com.dreamdisplays.platform.client.popout.WindowBackend
 import com.dreamdisplays.platform.client.popout.WindowConfig
-import com.dreamdisplays.api.media.sink.VideoFrameSink
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import kotlinx.atomicfu.atomic
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.opengl.GL
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GLCapabilities
+import org.lwjgl.opengl.*
 import org.slf4j.LoggerFactory
 import java.awt.Color
 import java.awt.Graphics
@@ -28,7 +24,6 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import kotlinx.atomicfu.atomic
 import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities

@@ -2,10 +2,10 @@ package com.dreamdisplays.core.playback
 
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.display.model.DisplayRuntimeState
+import com.dreamdisplays.api.media.VideoQuality
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPort
 import com.dreamdisplays.api.playback.PlaybackService
-import com.dreamdisplays.api.media.VideoQuality
 import kotlin.time.Duration
 
 /**

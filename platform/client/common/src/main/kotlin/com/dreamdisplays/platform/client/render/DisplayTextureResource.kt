@@ -1,20 +1,20 @@
 package com.dreamdisplays.platform.client.render
 
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
+//? if >=1.21.11 {
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
-//? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderType
-//?} else
-/*import net.minecraft.client.renderer.RenderType*/
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.client.renderer.texture.DynamicTexture
-//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
-import java.util.UUID
+import java.util.*
 
 /**
  * Owns the per-display GPU resources and their allocation / release lifecycle. Depending on the

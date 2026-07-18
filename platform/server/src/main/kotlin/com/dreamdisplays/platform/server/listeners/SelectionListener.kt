@@ -1,11 +1,6 @@
 package com.dreamdisplays.platform.server.listeners
 
-import com.dreamdisplays.platform.server.PaperServer
-import com.dreamdisplays.platform.server.VanillaServerState
-import com.dreamdisplays.platform.server.selectionMaterial
-import com.dreamdisplays.platform.server.baseMaterial
-import com.dreamdisplays.platform.server.selectionMaterialId
-import com.dreamdisplays.platform.server.baseMaterialId
+import com.dreamdisplays.platform.server.*
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.managers.SelectionVisualizer
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -23,13 +18,13 @@ import net.minecraft.server.level.ServerPlayer
 import net.minecraft.world.InteractionHand
 import net.minecraft.world.InteractionResult
 import net.neoforged.bus.api.SubscribeEvent
-import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent as NeoForgePlayerInteractEvent
 import org.bukkit.event.EventHandler
 import org.bukkit.event.Listener
 import org.bukkit.event.block.Action
 import org.bukkit.event.block.Action.*
 import org.bukkit.event.player.PlayerInteractEvent
 import org.bukkit.inventory.EquipmentSlot
+import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent as NeoForgePlayerInteractEvent
 
 /**
  * Listener for player interactions to manage selection points for display creation.

@@ -1,7 +1,5 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
-import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.get
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
@@ -9,12 +7,13 @@ import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.source.twitch.TwitchApi
 import com.dreamdisplays.media.source.twitch.TwitchMetadata
 import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.util.DreamCoroutines
+import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
-import kotlinx.atomicfu.atomic
 import kotlin.math.min
 
 /**

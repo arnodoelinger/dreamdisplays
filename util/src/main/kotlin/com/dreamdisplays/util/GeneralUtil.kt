@@ -1,6 +1,6 @@
 package com.dreamdisplays.util
 
-import java.io.IOException
+import kotlinx.io.IOException
 
 /** General utility functions for the mod. */
 object GeneralUtil {

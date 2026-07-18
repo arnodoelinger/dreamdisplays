@@ -4,6 +4,10 @@ import com.dreamdisplays.api.media.audio.AcousticEnvironment
 import com.dreamdisplays.api.media.audio.AcousticMaterial
 import com.dreamdisplays.api.media.audio.ListenerPose
 import com.dreamdisplays.api.media.audio.SourcePlane
+import com.dreamdisplays.platform.client.audio.VoxelAcousticsProbe.MAX_OCCLUSION
+import com.dreamdisplays.platform.client.audio.VoxelAcousticsProbe.REVERB_MAX_DISTANCE
+import com.dreamdisplays.platform.client.audio.VoxelAcousticsProbe.REVERB_RAYS
+import com.dreamdisplays.platform.client.audio.VoxelAcousticsProbe.TRANSPARENT_TAGS
 import net.minecraft.client.Minecraft
 import net.minecraft.tags.BlockTags
 import net.minecraft.tags.TagKey

@@ -1,8 +1,6 @@
 package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.util.json.DreamJson
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.encodeToString
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse

@@ -1,30 +1,28 @@
 package com.dreamdisplays.platform.server.managers
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
-import com.dreamdisplays.platform.server.datatypes.display.DisplayData
-import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
-import com.dreamdisplays.platform.server.datatypes.state.StateData
-import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.state.StateData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager.getDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager.getReceivers
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
-import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.jvm.JvmName
 
 /**
  * Manages server-side playback state for synced displays. Processes sync packets from clients,

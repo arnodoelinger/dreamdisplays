@@ -1,11 +1,6 @@
 package com.dreamdisplays.util
 
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame

@@ -2,7 +2,7 @@ package com.dreamdisplays.media.player.process
 
 import com.dreamdisplays.media.player.pipeline.VideoFramePipe
 import com.dreamdisplays.media.runtime.MediaHostGuard
-import java.io.IOException
+import kotlinx.io.IOException
 import java.util.*
 import java.util.concurrent.TimeUnit
 

@@ -1,10 +1,9 @@
 package com.dreamdisplays.platform.server.registrar
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.registrar.CommandRegistrar.fullscreenFlagsNode
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.Command
 import com.mojang.brigadier.LiteralMessage
@@ -20,6 +19,7 @@ import com.mojang.brigadier.suggestion.Suggestions
 import com.mojang.brigadier.suggestion.SuggestionsBuilder
 import com.mojang.brigadier.tree.CommandNode
 import com.mojang.brigadier.tree.LiteralCommandNode
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import io.papermc.paper.command.brigadier.CommandSourceStack
 import io.papermc.paper.command.brigadier.Commands
 import io.papermc.paper.command.brigadier.argument.CustomArgumentType

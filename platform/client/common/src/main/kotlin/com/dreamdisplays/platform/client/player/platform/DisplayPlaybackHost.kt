@@ -2,10 +2,10 @@ package com.dreamdisplays.platform.client.player.platform
 
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.player.PlaybackHost
 import com.dreamdisplays.api.playback.PlaybackMode
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.api.media.player.PlaybackHost
-import java.util.UUID
+import java.util.*
 
 /**
  * Adapts a Minecraft [DisplayScreen] to the platform-agnostic [PlaybackHost] the media player drives.

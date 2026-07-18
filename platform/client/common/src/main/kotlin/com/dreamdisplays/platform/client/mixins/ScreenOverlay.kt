@@ -1,15 +1,15 @@
 package com.dreamdisplays.platform.client.mixins
 
-import com.dreamdisplays.platform.client.core.DreamServices
+//? if >=26 {
+//?} else
+/*import net.minecraft.client.gui.GuiGraphics*/
 import com.dreamdisplays.api.runtime.getOrNull
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import net.minecraft.client.Minecraft
-//? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
-//?} else
-/*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.screens.Screen
 import org.lwjgl.glfw.GLFW
 import org.spongepowered.asm.mixin.Mixin

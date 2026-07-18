@@ -4,7 +4,7 @@ import com.dreamdisplays.api.DreamDisplaysUnstableApi
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
-import java.util.Locale
+import java.util.*
 
 /**
  * Canonical YouTube URL parsing and building.

@@ -2,7 +2,7 @@ package com.dreamdisplays.media.source.twitch
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.util.Locale
+import java.util.*
 import kotlin.random.Random
 
 /**

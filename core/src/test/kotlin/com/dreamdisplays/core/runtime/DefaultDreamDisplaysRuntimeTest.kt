@@ -1,10 +1,6 @@
 package com.dreamdisplays.core.runtime
 
-import com.dreamdisplays.api.runtime.DreamDisplaysModule
-import com.dreamdisplays.api.runtime.ModuleContext
-import com.dreamdisplays.api.runtime.get
-import com.dreamdisplays.api.runtime.register
-import com.dreamdisplays.api.runtime.serviceKey
+import com.dreamdisplays.api.runtime.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertSame

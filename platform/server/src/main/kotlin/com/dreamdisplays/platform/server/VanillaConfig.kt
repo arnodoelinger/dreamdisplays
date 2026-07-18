@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.server
 
 import net.minecraft.server.level.ServerPlayer
+import org.slf4j.LoggerFactory
 import org.tomlj.Toml
 import org.tomlj.TomlTable
-import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 

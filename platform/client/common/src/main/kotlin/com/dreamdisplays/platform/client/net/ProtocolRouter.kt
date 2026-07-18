@@ -1,12 +1,8 @@
 package com.dreamdisplays.platform.client.net
 
-import com.dreamdisplays.platform.client.managers.ClientPacketManager
-import com.dreamdisplays.core.protocol.ClientHello
-import com.dreamdisplays.core.protocol.DisplaySync
-import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.api.protocol.PacketDirection
-import com.dreamdisplays.core.protocol.PacketRegistry
-import com.dreamdisplays.core.protocol.ServerHello
+import com.dreamdisplays.core.protocol.*
+import com.dreamdisplays.platform.client.managers.ClientPacketManager
 import org.slf4j.LoggerFactory
 
 /**

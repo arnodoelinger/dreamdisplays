@@ -1,7 +1,5 @@
 package com.dreamdisplays.platform.server.managers
 
-import io.github.arnodoelinger.platformweaver.PaperOnly
-
 import com.dreamdisplays.core.protocol.DreamPacket
 import com.dreamdisplays.platform.server.PaperServer.Companion.config
 import com.dreamdisplays.platform.server.PaperServer.Companion.getInstance
@@ -9,16 +7,16 @@ import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.baseMaterial
 import com.dreamdisplays.platform.server.baseMaterialId
 import com.dreamdisplays.platform.server.datatypes.display.DisplayData
-import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
-import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.datatypes.sync.SyncData
+import com.dreamdisplays.platform.server.managers.DisplayManager.removeDisplays
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.Scheduler.runSync
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
-import kotlinx.coroutines.launch
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.PipPinManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
@@ -29,11 +27,13 @@ import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil.calculateRegion
 import com.dreamdisplays.platform.server.utils.ReporterUtil
 import com.dreamdisplays.platform.server.utils.ReporterUtil.sendReport
-import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil.sendDelete
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer

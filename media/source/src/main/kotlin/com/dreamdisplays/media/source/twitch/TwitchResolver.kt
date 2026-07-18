@@ -1,8 +1,5 @@
 package com.dreamdisplays.media.source.twitch
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Expiry
 import com.dreamdisplays.api.media.DreamMediaException
 import com.dreamdisplays.api.media.source.MediaMetadata
 import com.dreamdisplays.api.media.source.MediaResolver
@@ -12,6 +9,9 @@ import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
 import com.dreamdisplays.media.source.ytdlp.YtDlpResolver
 import com.dreamdisplays.util.net.DreamHttpClient
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import com.github.benmanes.caffeine.cache.Expiry
 import org.slf4j.LoggerFactory
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets

@@ -11,7 +11,7 @@ import kotlinx.serialization.encoding.Encoder
 import kotlinx.serialization.protobuf.ProtoIntegerType
 import kotlinx.serialization.protobuf.ProtoNumber
 import kotlinx.serialization.protobuf.ProtoType
-import java.util.UUID
+import java.util.*
 
 /** UUID with all-zero bits, used as the wire default. */
 val ZERO_UUID: UUID = UUID(0L, 0L)

@@ -1,12 +1,7 @@
 package com.dreamdisplays.platform.client.platform
 
+import com.dreamdisplays.api.platform.*
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.platform.Platform
-import com.dreamdisplays.api.platform.PlatformId
-import com.dreamdisplays.api.platform.PlatformLogger
-import com.dreamdisplays.api.platform.PlatformPaths
-import com.dreamdisplays.api.platform.PlatformScheduler
-import com.dreamdisplays.api.platform.PlatformSide
 import com.dreamdisplays.util.GeneralUtil
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Path

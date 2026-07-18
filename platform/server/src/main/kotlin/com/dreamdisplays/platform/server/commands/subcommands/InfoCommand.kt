@@ -5,8 +5,6 @@ import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import com.mojang.brigadier.context.CommandContext
-import io.github.arnodoelinger.platformweaver.FabricOnly
-import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component

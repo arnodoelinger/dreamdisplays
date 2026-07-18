@@ -1,14 +1,14 @@
 package com.dreamdisplays.media.player.pipeline
 
-import com.dreamdisplays.media.player.MediaPlayer
-import com.dreamdisplays.media.player.util.MediaUtil
-import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.api.media.FramePixelFormat
 import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import com.dreamdisplays.api.media.player.GpuTextureRef
+import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.media.player.util.MediaUtil
+import com.dreamdisplays.media.player.util.daemon
+import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
-import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.ByteBuffer

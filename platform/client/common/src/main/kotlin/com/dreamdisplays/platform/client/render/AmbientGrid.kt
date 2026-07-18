@@ -1,5 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
+import com.dreamdisplays.platform.client.render.AmbientGrid.PIC_H
+import com.dreamdisplays.platform.client.render.AmbientGrid.PIC_W
 import com.mojang.blaze3d.platform.NativeImage
 import java.nio.ByteBuffer
 

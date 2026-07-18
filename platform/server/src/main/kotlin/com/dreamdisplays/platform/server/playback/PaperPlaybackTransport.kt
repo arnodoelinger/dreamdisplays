@@ -11,7 +11,7 @@ import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.jspecify.annotations.NullMarked
-import java.util.UUID
+import java.util.*
 
 /** `Paper` implementation of [PlaybackTransport]: v2 envelopes via [PaperV2Networking]. */
 @PaperOnly

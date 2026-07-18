@@ -1,9 +1,9 @@
 package com.dreamdisplays.media.source.ytdlp
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.util.DreamCoroutines
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
 import kotlinx.coroutines.launch
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
