@@ -17,12 +17,12 @@ import org.bukkit.entity.Player
 import org.bukkit.util.Vector
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
-import java.io.DataInputStream
-import java.io.DataOutputStream
 import java.io.IOException
-import java.nio.charset.StandardCharsets
 import java.util.*
+import kotlinx.io.Buffer
+import kotlinx.io.Sink
+import kotlinx.io.Source
+import kotlinx.io.readByteArray
 
 /**
  * Returns true if the client identified by [uuid] runs a mod version that understands vertical
@@ -100,7 +100,7 @@ object PacketUtil {
                 output.writeVarInt(width)
                 output.writeVarInt(height)
                 output.writeString(url)
-                output.writeByte(facing.toPacketByte().toInt())
+                output.writeByte(facing.toPacketByte())
                 output.writeBoolean(isSync)
                 output.writeString(lang)
                 output.writeBoolean(isLocked)
@@ -216,14 +216,11 @@ object PacketUtil {
         }
     }
 
-    /** Allocates a buffer, runs [builder] against a [DataOutputStream] and returns the resulting bytes. */
-    private fun buildPacket(builder: (DataOutputStream) -> Unit): ByteArray {
-        return ByteArrayOutputStream().use { byteStream ->
-            DataOutputStream(byteStream).use { output ->
-                builder(output)
-            }
-            byteStream.toByteArray()
-        }
+    /** Allocates a buffer, runs [builder] against a [Sink] and returns the resulting bytes. */
+    private fun buildPacket(builder: (Sink) -> Unit): ByteArray {
+        val buffer = Buffer()
+        builder(buffer)
+        return buffer.readByteArray()
     }
 
     /** Sends an already-built [packet] on [channel] to every non-null player in [players]. */
@@ -234,37 +231,42 @@ object PacketUtil {
     }
 
     /** Writes a UUID as two big-endian longs. */
-    private fun DataOutputStream.writeUUID(uuid: UUID) {
+    private fun Sink.writeUUID(uuid: UUID) {
         writeLong(uuid.mostSignificantBits)
         writeLong(uuid.leastSignificantBits)
     }
 
     /** Writes [value] in Minecraft's VarInt encoding (1–5 bytes). */
-    private fun DataOutputStream.writeVarInt(value: Int) {
+    private fun Sink.writeVarInt(value: Int) {
         var current = value
         while ((current and -0x80) != 0) {
-            writeByte((current and 0x7F) or 0x80)
+            writeByte(((current and 0x7F) or 0x80).toByte())
             current = current ushr 7
         }
-        writeByte(current and 0x7F)
+        writeByte((current and 0x7F).toByte())
     }
 
     /** Writes [value] in Minecraft's VarLong encoding (1–10 bytes). */
-    private fun DataOutputStream.writeVarLong(value: Long) {
+    private fun Sink.writeVarLong(value: Long) {
         var current = value
         while (true) {
             if ((current and 0x7FL.inv()) == 0L) {
-                writeByte(current.toInt())
+                writeByte(current.toByte())
                 return
             }
-            writeByte((current.toInt() and 0x7F) or 0x80)
+            writeByte(((current.toInt() and 0x7F) or 0x80).toByte())
             current = current ushr 7
         }
     }
 
+    /** Writes a single byte, 1 for `true` and 0 for `false`. */
+    private fun Sink.writeBoolean(value: Boolean) {
+        writeByte(if (value) 1 else 0)
+    }
+
     /** Writes [text] as UTF-8 bytes prefixed by its byte length as a VarInt. */
-    private fun DataOutputStream.writeString(text: String) {
-        val bytes = text.toByteArray(StandardCharsets.UTF_8)
+    private fun Sink.writeString(text: String) {
+        val bytes = text.encodeToByteArray()
         writeVarInt(bytes.size)
         write(bytes)
     }
@@ -281,12 +283,12 @@ object PacketUtil {
     }
 
     /** Reads a UUID encoded as two big-endian longs by [writeUUID]. */
-    fun DataInputStream.readUUID(): UUID {
+    fun Source.readUUID(): UUID {
         return UUID(readLong(), readLong())
     }
 
     /** Decodes a VarInt; throws [IOException] if the encoding exceeds 5 bytes. */
-    fun DataInputStream.readVarInt(): Int {
+    fun Source.readVarInt(): Int {
         var result = 0
         var shift = 0
         var byte: Int
@@ -294,7 +296,7 @@ object PacketUtil {
         do {
             if (shift >= 35) throw IOException("VarInt is too big.")
 
-            byte = readUnsignedByte()
+            byte = readByte().toInt() and 0xFF
             result = result or ((byte and 0x7F) shl shift)
             shift += 7
         } while ((byte and 0x80) != 0)
@@ -303,7 +305,7 @@ object PacketUtil {
     }
 
     /** Decodes a VarLong; throws if the encoding exceeds 10 bytes. */
-    fun DataInputStream.readVarLong(): Long {
+    fun Source.readVarLong(): Long {
         var result = 0L
         var shift = 0
         var byte: Byte

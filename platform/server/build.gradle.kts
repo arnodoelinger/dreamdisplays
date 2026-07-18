@@ -131,6 +131,7 @@ dependencies {
     implementation(libs.kotlinxSerializationProtobuf)
     implementation(libs.kotlinxSerializationJson)
     implementation(libs.kotlinxCoroutinesCore)
+    implementation(libs.kotlinxIoCore)
     implementation(libs.semver4j)
     implementation(libs.tomlj)
     implementation(libs.exposedCore)
@@ -188,6 +189,7 @@ tasks.shadowJar {
         "okio",
         "org.jetbrains.exposed",
         "kotlinx.serialization",
+        "kotlinx.io",
         "com.zaxxer.hikari",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
