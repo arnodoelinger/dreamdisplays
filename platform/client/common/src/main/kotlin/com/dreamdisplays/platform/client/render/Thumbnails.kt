@@ -342,7 +342,7 @@ object Thumbnails {
                 response.body
             }
         } catch (e: Exception) {
-            logger.warn("Thumbnail fetch failed for $url: ${e::class.simpleName}: ${e.message}.")
+            logger.warn("Thumbnail fetch failed for $url.", e)
             null
         }
     }

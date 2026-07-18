@@ -231,7 +231,7 @@ object DreamHttpClient {
     }
 
     private fun proxyFor(rawProxyUrl: String?): Proxy? {
-        val raw = rawProxyUrl?.trim().takeIf { it!!.isNotEmpty() } ?: return null
+        val raw = rawProxyUrl?.trim()?.takeIf { it.isNotEmpty() } ?: return null
         return runCatching { URI.create(raw) }
             .onFailure { logger.warn("Invalid proxy URL: $raw.") }
             .mapCatching { uri ->
