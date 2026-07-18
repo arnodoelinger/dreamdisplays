@@ -19,6 +19,7 @@ data class TwitchMetadata(
     val viewCount: Long?,
     val isLive: Boolean,
     val gameName: String? = null,
+    val channelAvatarUrl: String? = null,
 )
 
 /** A usher playback access token: [value] is the token blob, [signature] authenticates it. */
@@ -85,7 +86,7 @@ object TwitchApi {
      */
     fun livePlayback(login: String): TwitchLivePlayback? {
         val data = gql(
-            """{user(login:"${escape(login)}"){displayName broadcastSettings{title} """ +
+            """{user(login:"${escape(login)}"){displayName profileImageURL(width:70) broadcastSettings{title} """ +
                 """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}} """ +
                 """streamPlaybackAccessToken(channelName:"${escape(login)}",$TOKEN_PARAMS){value signature}}"""
         )
@@ -101,7 +102,7 @@ object TwitchApi {
      */
     fun vodPlayback(id: String): TwitchVodPlayback? {
         val data = gql(
-            """{video(id:"${escape(id)}"){title lengthSeconds viewCount owner{displayName} """ +
+            """{video(id:"${escape(id)}"){title lengthSeconds viewCount owner{displayName profileImageURL(width:70)} """ +
                 """game{displayName} previewThumbnailURL(width:640,height:360)} """ +
                 """videoPlaybackAccessToken(id:"${escape(id)}",$TOKEN_PARAMS){value signature}}"""
         )
@@ -116,7 +117,7 @@ object TwitchApi {
      */
     fun clipPlayback(slug: String): TwitchClipPlayback? {
         val data = gql(
-            """{clip(slug:"${escape(slug)}"){title durationSeconds viewCount broadcaster{displayName} """ +
+            """{clip(slug:"${escape(slug)}"){title durationSeconds viewCount broadcaster{displayName profileImageURL(width:70)} """ +
                 """game{displayName} thumbnailURL(width:480,height:272) """ +
                 """playbackAccessToken(params:{platform:"web",playerType:"site"}){value signature} """ +
                 """videoQualities{frameRate quality sourceURL}}}"""
@@ -155,7 +156,7 @@ object TwitchApi {
     /** Fetches channel metadata (title, viewers, live status) for [login], or null if the channel doesn't exist. */
     fun queryChannel(login: String): TwitchMetadata? {
         val user = gql(
-            """{user(login:"${escape(login)}"){displayName broadcastSettings{title} """ +
+            """{user(login:"${escape(login)}"){displayName profileImageURL(width:70) broadcastSettings{title} """ +
                 """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}}}"""
         ).obj("user") ?: return null
         return channelMetadata(user, login)
@@ -163,7 +164,7 @@ object TwitchApi {
 
     private fun queryVideo(id: String): TwitchMetadata? {
         val video = gql(
-            """{video(id:"${escape(id)}"){title viewCount owner{displayName} game{displayName} """ +
+            """{video(id:"${escape(id)}"){title viewCount owner{displayName profileImageURL(width:70)} game{displayName} """ +
                 """previewThumbnailURL(width:640,height:360)}}"""
         ).obj("video") ?: return null
         return videoMetadata(video)
@@ -171,7 +172,7 @@ object TwitchApi {
 
     private fun queryClip(slug: String): TwitchMetadata? {
         val clip = gql(
-            """{clip(slug:"${escape(slug)}"){title viewCount broadcaster{displayName} """ +
+            """{clip(slug:"${escape(slug)}"){title viewCount broadcaster{displayName profileImageURL(width:70)} """ +
                 """game{displayName} thumbnailURL(width:480,height:272)}}"""
         ).obj("clip") ?: return null
         return clipMetadata(clip)
@@ -187,6 +188,7 @@ object TwitchApi {
             viewCount = stream?.optLong("viewersCount"),
             isLive = stream != null,
             gameName = stream?.obj("game")?.optString("displayName"),
+            channelAvatarUrl = user.optString("profileImageURL"),
         )
     }
 
@@ -198,6 +200,7 @@ object TwitchApi {
         viewCount = video.optLong("viewCount"),
         isLive = false,
         gameName = video.obj("game")?.optString("displayName"),
+        channelAvatarUrl = video.obj("owner")?.optString("profileImageURL"),
     )
 
     /** Maps a GQL `clip` object to [TwitchMetadata]. */
@@ -208,6 +211,7 @@ object TwitchApi {
         viewCount = clip.optLong("viewCount"),
         isLive = false,
         gameName = clip.obj("game")?.optString("displayName"),
+        channelAvatarUrl = clip.obj("broadcaster")?.optString("profileImageURL"),
     )
 
     /** Maps a GQL access-token object to [TwitchAccessToken]; null when either half is missing. */

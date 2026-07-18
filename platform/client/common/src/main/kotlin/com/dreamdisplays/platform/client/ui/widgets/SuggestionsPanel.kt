@@ -214,6 +214,7 @@ class SuggestionsPanel(
                 if (hover) hoveredCard = i
                 drawCard(g, f, info, cardX, cardY, cw, th, ch, hover)
                 if (cardThumbnail(info) == null) requestCardThumbnail(info)
+                info.channelAvatarUrl?.let { url -> if (Thumbnails.get(url) == null) Thumbnails.request(url, url) }
             }
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
@@ -377,7 +378,16 @@ class SuggestionsPanel(
             else UiText.trim(f, meta, max(20, textW - f.width(" • $views"))) + " • " + views
         }
         if (meta.isNotEmpty()) {
-            g.drawText(f, UiText.trim(f, meta, textW), textX, textY, UiTheme.TEXT_META, true)
+            var metaX = textX
+            var metaW = textW
+            val avatar = info.channelAvatarUrl?.let { Thumbnails.get(it) }
+            if (avatar != null) {
+                val iconSize = f.lineHeight
+                blitTexture(g, avatar, metaX, textY, iconSize, iconSize)
+                metaX += iconSize + 3
+                metaW -= iconSize + 3
+            }
+            g.drawText(f, UiText.trim(f, meta, metaW), metaX, textY, UiTheme.TEXT_META, true)
         }
     }
 

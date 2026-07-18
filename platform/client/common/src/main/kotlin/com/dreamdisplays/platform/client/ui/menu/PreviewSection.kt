@@ -248,6 +248,7 @@ class PreviewSection(
     private data class OverlayInfo(
         val title: String?,
         val uploader: String?,
+        val uploaderAvatarUrl: String?,
         val views: String,
         val likes: String,
         val published: String?,
@@ -265,6 +266,7 @@ class PreviewSection(
                 return OverlayInfo(
                     title = meta?.title,
                     uploader = meta?.channelName,
+                    uploaderAvatarUrl = meta?.channelAvatarUrl,
                     views = meta?.viewCount?.let {
                         formatCompactCount(it) + " " + Component.translatable(
                             if (meta.isLive) "dreamdisplays.ui.watching" else "dreamdisplays.ui.views_short"
@@ -286,6 +288,7 @@ class PreviewSection(
                 return OverlayInfo(
                     title = title,
                     uploader = meta?.uploader,
+                    uploaderAvatarUrl = meta?.channelAvatarUrl,
                     views = meta?.formatViews() ?: "",
                     likes = meta?.formatLikes() ?: "",
                     published = meta?.publishedText,
@@ -347,9 +350,23 @@ class PreviewSection(
             if (parts.isNotEmpty()) parts.append(" • ")
             parts.append(info.published)
         }
+
+        val metaY = boxY + padY + font.lineHeight + padY
+        var metaX = x + padX
+        var metaW = textW
+        val avatarUrl = info.uploaderAvatarUrl
+        val avatar = avatarUrl?.let { Thumbnails.get(it) }
+        if (avatar != null) {
+            val iconSize = font.lineHeight
+            blitTexture(g, avatar, metaX, metaY, iconSize, iconSize)
+            metaX += iconSize + 3
+            metaW -= iconSize + 3
+        } else if (avatarUrl != null) {
+            Thumbnails.request(avatarUrl, avatarUrl)
+        }
         g.drawText(
-            font, UiText.trim(font, parts.toString(), textW),
-            x + padX, boxY + padY + font.lineHeight + padY, UiTheme.TEXT_SECONDARY, false,
+            font, UiText.trim(font, parts.toString(), metaW),
+            metaX, metaY, UiTheme.TEXT_SECONDARY, false,
         )
     }
 

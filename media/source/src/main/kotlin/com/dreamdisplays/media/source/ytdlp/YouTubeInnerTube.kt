@@ -7,6 +7,7 @@ import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.io.IOException
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import org.slf4j.LoggerFactory
@@ -92,7 +93,8 @@ object YouTubeInnerTube {
         val meta = extractWatchMetadata(root) ?: return null
         return MediaSearchResult(
             videoId, meta.title ?: return null, meta.uploader, null,
-            meta.viewCountRaw, meta.likeCountRaw, meta.publishedText, meta.daysAgo
+            meta.viewCountRaw, meta.likeCountRaw, meta.publishedText, meta.daysAgo,
+            channelAvatarUrl = meta.channelAvatarUrl,
         )
     }
 
@@ -111,6 +113,8 @@ object YouTubeInnerTube {
         val likeCountRaw: Long?,
         val publishedText: String?,
         val daysAgo: Int?,
+        val channelAvatarUrl: String? = null,
+        val isVerified: Boolean = false,
     )
 
     /** Sends a POST request to the InnerTube [endpoint] with [body] and returns the parsed JSON response. */
@@ -184,7 +188,14 @@ object YouTubeInnerTube {
             ?: parseViews(simpleText(vr.obj("shortViewCountText")))
         val publishedText = simpleText(vr.obj("publishedTimeText"))
         val daysAgo = parseDaysAgo(publishedText)
-        return MediaSearchResult(id, title, uploader, duration, views, null, publishedText, daysAgo)
+        val avatarUrl = largestThumbnailUrl(
+            vr.obj("channelThumbnailSupportedRenderers")?.obj("channelThumbnailWithLinkRenderer")?.obj("thumbnail")
+        )
+        val isVerified = hasVerifiedBadge(vr.array("ownerBadges"))
+        return MediaSearchResult(
+            id, title, uploader, duration, views, null, publishedText, daysAgo,
+            channelAvatarUrl = avatarUrl, isVerified = isVerified,
+        )
     }
 
     /** Extracts title, channel, view count, and like count from a `next` endpoint response. */
@@ -197,6 +208,8 @@ object YouTubeInnerTube {
             val contentArray = contents.asJsonArrayOrNull() ?: return null
             var title: String? = null
             var channel: String? = null
+            var channelAvatarUrl: String? = null
+            var isVerified = false
             var views: Long? = null
             var likes: Long? = null
             var publishedText: String? = null
@@ -217,11 +230,13 @@ object YouTubeInnerTube {
                 }
                 val vs = obj.obj("videoSecondaryInfoRenderer")
                 if (vs != null && channel == null) {
-                    channel = runsText(vs.obj("owner")?.obj("videoOwnerRenderer")?.obj("title"))
+                    val owner = vs.obj("owner")?.obj("videoOwnerRenderer")
+                    channel = runsText(owner?.obj("title"))
+                    channelAvatarUrl = largestThumbnailUrl(owner?.obj("thumbnail"))
                 }
             }
             if (title == null) return null
-            MetaHolder(title, channel, views, likes, publishedText, daysAgo)
+            MetaHolder(title, channel, views, likes, publishedText, daysAgo, channelAvatarUrl)
         }.onFailure { e ->
             logger.warn("Watch metadata parse failed: ${e.message}")
         }.getOrNull()
@@ -262,7 +277,12 @@ object YouTubeInnerTube {
             ?: parseViews(simpleText(cvr.obj("shortViewCountText")))
         val publishedText = simpleText(cvr.obj("publishedTimeText"))
         val daysAgo = parseDaysAgo(publishedText)
-        return MediaSearchResult(id, title, uploader, duration, views, null, publishedText, daysAgo)
+        val avatarUrl = largestThumbnailUrl(cvr.obj("channelThumbnail"))
+        val isVerified = hasVerifiedBadge(cvr.array("ownerBadges") ?: cvr.array("channelBadges"))
+        return MediaSearchResult(
+            id, title, uploader, duration, views, null, publishedText, daysAgo,
+            channelAvatarUrl = avatarUrl, isVerified = isVerified,
+        )
     }
 
     /** Navigates the nested `viewCount.videoViewCountRenderer.viewCount` path in [vp]; returns null if absent. */
@@ -326,6 +346,21 @@ object YouTubeInnerTube {
     private fun simpleText(obj: JsonObject?): String? {
         if (obj == null) return null
         return obj.optString("simpleText") ?: runsText(obj)
+    }
+
+    /** Extracts the largest listed image URL from a `{thumbnails: [{url, width, height}, ...]}`-shaped [thumbnailContainer]. */
+    private fun largestThumbnailUrl(thumbnailContainer: JsonObject?): String? {
+        val thumbs = thumbnailContainer?.array("thumbnails") ?: return null
+        return thumbs.lastOrNull()?.asJsonObjectOrNull()?.optString("url")
+    }
+
+    /** Returns true if [badgesArray] contains a `metadataBadgeRenderer` whose style is a verified-channel badge. */
+    private fun hasVerifiedBadge(badgesArray: JsonArray?): Boolean {
+        val badges = badgesArray ?: return false
+        return badges.any { badge ->
+            val style = badge.asJsonObjectOrNull()?.obj("metadataBadgeRenderer")?.optString("style")
+            style != null && "VERIFIED" in style
+        }
     }
 
     /** Parses a colon-separated duration string (e.g. "1:23:45") into total seconds, or null on failure. */

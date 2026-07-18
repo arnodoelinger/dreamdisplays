@@ -41,6 +41,12 @@ data class MediaSearchResult(
 
     /** True when this result comes from Twitch, so the UI can show a "Twitch" tag instead of/alongside "New". */
     val isTwitch: Boolean = false,
+
+    /** The uploader / channel's avatar image URL, or null when unavailable. */
+    val channelAvatarUrl: String? = null,
+
+    /** True when the uploader/channel carries a platform "verified" badge. */
+    val isVerified: Boolean = false,
 ) {
     /** Returns true if the video was published within the last [daysWindow] days. */
     fun isRecent(daysWindow: Int): Boolean =
