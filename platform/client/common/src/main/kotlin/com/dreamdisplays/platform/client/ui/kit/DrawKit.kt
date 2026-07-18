@@ -15,6 +15,7 @@ import net.minecraft.resources.Identifier
 import net.minecraft.util.ARGB
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
+import kotlin.math.max
 
 /**
  * Version-neutral drawing helpers built on [GuiGraphicsCompat]: bordered panels, 1px outlines, and
@@ -102,6 +103,31 @@ fun lightenRgb(color: Int, factor: Float): Int {
         return (c + (0xFF - c) * f).toInt() and 0xFF
     }
     return (0xFF shl 24) or (ch(16) shl 16) or (ch(8) shl 8) or ch(0)
+}
+
+/** Row spans (xStart, xEndExclusive) approximating an 8px filled circle, the [drawVerifiedBadge] backdrop. */
+private val VERIFIED_BADGE_ROWS = arrayOf(
+    2 to 6, 1 to 7, 0 to 8, 0 to 8, 0 to 8, 0 to 8, 1 to 7, 2 to 6,
+)
+
+/** Pixel coordinates (within the 8px badge grid) tracing [drawVerifiedBadge]'s checkmark. */
+private val VERIFIED_BADGE_CHECK_PIXELS = arrayOf(
+    1 to 4, 2 to 5, 3 to 6, 4 to 5, 4 to 4, 5 to 3, 5 to 2, 6 to 1,
+)
+
+/**
+ * Draws a small "verified" badge (a filled circle with a white checkmark) with its top-left at
+ * ([x], [y]) and total size [size] (an 8px pixel-art grid scaled up, so any multiple of 8 stays crisp).
+ */
+fun GuiGraphicsCompat.drawVerifiedBadge(x: Int, y: Int, size: Int, badgeColor: Int) {
+    val scale = max(1, size / 8)
+    for ((row, span) in VERIFIED_BADGE_ROWS.withIndex()) {
+        val (startX, endX) = span
+        fill(x + startX * scale, y + row * scale, x + endX * scale, y + (row + 1) * scale, badgeColor)
+    }
+    for ((px, py) in VERIFIED_BADGE_CHECK_PIXELS) {
+        fill(x + px * scale, y + py * scale, x + (px + 1) * scale, y + (py + 1) * scale, UiTheme.TEXT_PRIMARY)
+    }
 }
 
 /** Nine-slice panel background sprite; see textures/gui/sprites/widgets/panel.png. */

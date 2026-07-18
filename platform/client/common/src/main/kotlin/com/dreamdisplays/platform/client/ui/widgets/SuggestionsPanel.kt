@@ -383,9 +383,15 @@ class SuggestionsPanel(
             val avatar = info.channelAvatarUrl?.let { Thumbnails.get(it) }
             if (avatar != null) {
                 val iconSize = f.lineHeight
-                blitTexture(g, avatar, metaX, textY, iconSize, iconSize)
+                blitTexture(g, avatar, metaX, textY - 1, iconSize, iconSize)
                 metaX += iconSize + 3
                 metaW -= iconSize + 3
+            }
+            if (info.isVerified) {
+                val badgeSize = f.lineHeight - 1
+                g.drawVerifiedBadge(metaX, textY - 1, badgeSize, UiTheme.ACCENT)
+                metaX += badgeSize + 3
+                metaW -= badgeSize + 3
             }
             g.drawText(f, UiText.trim(f, meta, metaW), metaX, textY, UiTheme.TEXT_META, true)
         }

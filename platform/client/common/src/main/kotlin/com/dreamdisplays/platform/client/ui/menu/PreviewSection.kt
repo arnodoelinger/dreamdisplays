@@ -20,6 +20,7 @@ import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiText
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawShimmer
+import com.dreamdisplays.platform.client.ui.kit.drawVerifiedBadge
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
@@ -249,6 +250,7 @@ class PreviewSection(
         val title: String?,
         val uploader: String?,
         val uploaderAvatarUrl: String?,
+        val isVerified: Boolean,
         val views: String,
         val likes: String,
         val published: String?,
@@ -267,6 +269,7 @@ class PreviewSection(
                     title = meta?.title,
                     uploader = meta?.channelName,
                     uploaderAvatarUrl = meta?.channelAvatarUrl,
+                    isVerified = false,
                     views = meta?.viewCount?.let {
                         formatCompactCount(it) + " " + Component.translatable(
                             if (meta.isLive) "dreamdisplays.ui.watching" else "dreamdisplays.ui.views_short"
@@ -289,6 +292,7 @@ class PreviewSection(
                     title = title,
                     uploader = meta?.uploader,
                     uploaderAvatarUrl = meta?.channelAvatarUrl,
+                    isVerified = meta?.isVerified == true,
                     views = meta?.formatViews() ?: "",
                     likes = meta?.formatLikes() ?: "",
                     published = meta?.publishedText,
@@ -358,11 +362,17 @@ class PreviewSection(
         val avatar = avatarUrl?.let { Thumbnails.get(it) }
         if (avatar != null) {
             val iconSize = font.lineHeight
-            blitTexture(g, avatar, metaX, metaY, iconSize, iconSize)
+            blitTexture(g, avatar, metaX, metaY - 1, iconSize, iconSize)
             metaX += iconSize + 3
             metaW -= iconSize + 3
         } else if (avatarUrl != null) {
             Thumbnails.request(avatarUrl, avatarUrl)
+        }
+        if (info.isVerified) {
+            val badgeSize = font.lineHeight - 1
+            g.drawVerifiedBadge(metaX, metaY - 1, badgeSize, UiTheme.ACCENT)
+            metaX += badgeSize + 3
+            metaW -= badgeSize + 3
         }
         g.drawText(
             font, UiText.trim(font, parts.toString(), metaW),

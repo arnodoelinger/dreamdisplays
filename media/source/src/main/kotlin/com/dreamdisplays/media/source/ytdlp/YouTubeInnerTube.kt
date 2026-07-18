@@ -94,7 +94,7 @@ object YouTubeInnerTube {
         return MediaSearchResult(
             videoId, meta.title ?: return null, meta.uploader, null,
             meta.viewCountRaw, meta.likeCountRaw, meta.publishedText, meta.daysAgo,
-            channelAvatarUrl = meta.channelAvatarUrl,
+            channelAvatarUrl = meta.channelAvatarUrl, isVerified = meta.isVerified,
         )
     }
 
@@ -233,10 +233,11 @@ object YouTubeInnerTube {
                     val owner = vs.obj("owner")?.obj("videoOwnerRenderer")
                     channel = runsText(owner?.obj("title"))
                     channelAvatarUrl = largestThumbnailUrl(owner?.obj("thumbnail"))
+                    isVerified = hasVerifiedBadge(owner?.array("badges"))
                 }
             }
             if (title == null) return null
-            MetaHolder(title, channel, views, likes, publishedText, daysAgo, channelAvatarUrl)
+            MetaHolder(title, channel, views, likes, publishedText, daysAgo, channelAvatarUrl, isVerified)
         }.onFailure { e ->
             logger.warn("Watch metadata parse failed: ${e.message}")
         }.getOrNull()
