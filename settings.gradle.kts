@@ -1,5 +1,3 @@
-import java.lang.Boolean;
-
 pluginManagement {
     val activeStonecutterVersion = file("versions/active.txt").readText().trim()
     val stonecutterVersions = java.util.Properties().apply {
@@ -28,8 +26,6 @@ pluginManagement {
                 "net.fabricmc.fabric-loom" -> useVersion(loomVersion)
                 "net.fabricmc.fabric-loom-remap" -> {
                     if (isLegacy) useVersion(loomVersion)
-                    // For deobfuscated (26.x) Minecraft, fabric-loom-remap doesn't exist;
-                    // redirect to fabric-loom's artifact (declared apply false, never applied).
                     else useModule("net.fabricmc:fabric-loom:$loomVersion")
                 }
 
@@ -41,7 +37,8 @@ pluginManagement {
 
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-    id("dev.kikugie.stonecutter") version "0.9.5"
+    id("dev.kikugie.stonecutter") version "0.9.6"
+    id("dreamdisplays.stonecutter-versions")
 }
 
 dependencyResolutionManagement {
@@ -56,6 +53,12 @@ dependencyResolutionManagement {
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://oss.sonatype.org/content/groups/public/")
         maven("https://jitpack.io")
+    }
+}
+
+buildCache {
+    local {
+        isEnabled = true
     }
 }
 
@@ -77,7 +80,7 @@ include(":platform:client:fabric")
 include(":platform:server")
 
 // ModDevGradle issue, ask them wtf is going here
-if (!Boolean.getBoolean("idea.sync.active")) {
+if (!java.lang.Boolean.getBoolean("idea.sync.active")) {
     include(":platform:client:neoforge")
 }
 

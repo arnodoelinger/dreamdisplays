@@ -1,5 +1,5 @@
 subprojects {
-    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
+    val activeStonecutterVersion = gradle.extensions.getByType<StonecutterVersions>().active
 
     tasks.withType<AbstractArchiveTask>().configureEach {
         isPreserveFileTimestamps = false

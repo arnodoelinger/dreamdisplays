@@ -577,8 +577,7 @@ jobs:
             :platform:client:fabric:publishJar \
             :platform:client:neoforge:shadowJar \
             --no-daemon \
-            --parallel \
-            --build-cache
+            --parallel
         env:
           DREAMDISPLAYS_REQUIRE_NATIVES: "true"
           DREAMDISPLAYS_REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
@@ -592,8 +591,7 @@ jobs:
           ./gradlew \
             :platform:server:shadowJar \
             --no-daemon \
-            --parallel \
-            --build-cache
+            --parallel
         env:
           DREAMDISPLAYS_REQUIRE_NATIVES: "true"
           DREAMDISPLAYS_REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
