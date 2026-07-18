@@ -95,7 +95,6 @@ repositories {
         maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods"))
     }
     mavenCentral()
-    maven("https://repo.lostyy.ru/releases")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")

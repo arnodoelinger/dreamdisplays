@@ -15,7 +15,6 @@ subprojects {
         maven("https://maven.fabricmc.net/")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://maven.quiltmc.org/repository/snapshot/")
-        maven("https://repo.lostyy.ru/releases")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://oss.sonatype.org/content/groups/public/")
         maven("https://jitpack.io")
