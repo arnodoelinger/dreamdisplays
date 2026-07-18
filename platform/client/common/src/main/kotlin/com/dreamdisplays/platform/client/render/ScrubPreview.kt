@@ -21,7 +21,6 @@ import java.security.NoSuchAlgorithmException
 import java.nio.charset.StandardCharsets
 import java.util.HexFormat
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicInteger
 import javax.imageio.ImageIO
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -141,26 +140,25 @@ object ScrubPreview {
         logger.info("Generating $key: ${timestamps.size} sample(s), concurrency=$EXTRACT_CONCURRENCY, ffmpeg=$ffmpeg")
 
         val collected = java.util.Collections.synchronizedList(ArrayList<Frame>(timestamps.size))
-        val failures = AtomicInteger()
         val semaphore = Semaphore(EXTRACT_CONCURRENCY)
         FRAMES.put(key, emptyList())
-        coroutineScope {
+        val outcomes = coroutineScope {
             timestamps.map { ts ->
                 async {
                     semaphore.withPermit {
                         val bytes = extractFrame(key, ffmpeg, sourceUrl, ts)
                         val id = bytes?.let { registerFrame(key, ts, it) }
-                        if (id == null) {
-                            failures.incrementAndGet()
-                        } else {
+                        if (id != null) {
                             collected.add(Frame(ts, id))
                             FRAMES.put(key, collected.sortedBy { it.timestampNanos })
                         }
+                        id != null
                     }
                 }
             }.awaitAll()
         }
-        logger.info("Generated $key: ${collected.size} frame(s) ready, ${failures.get()} extraction failure(s)")
+        val failures = outcomes.count { !it }
+        logger.info("Generated $key: ${collected.size} frame(s) ready, $failures extraction failure(s)")
     }
 
     /** Runs a single-frame `FFmpeg` extraction at [offsetNanos] and returns the raw JPEG bytes. */

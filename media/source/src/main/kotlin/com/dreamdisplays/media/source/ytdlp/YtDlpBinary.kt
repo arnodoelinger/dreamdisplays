@@ -13,7 +13,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.atomicfu.atomic
 
 /**
  * Provisioning of the `yt-dlp` executable: locating a system install, falling back to the bundled
@@ -54,7 +54,7 @@ object YtDlpBinary {
     @Volatile
     private var resolved: String? = null
 
-    private val updateChecked = AtomicBoolean(false)
+    private val updateChecked = atomic(false)
 
     /** Cached full launch prefix (e.g. `[python3, .../yt-dlp.pyz]` or `[binaryPath]`); see [resolveCommand]. */
     @Volatile
@@ -64,7 +64,7 @@ object YtDlpBinary {
     @Volatile
     private var pythonProbe: String? = null
 
-    private val zipappUpdateChecked = AtomicBoolean(false)
+    private val zipappUpdateChecked = atomic(false)
 
     /**
      * Returns the path to a usable `yt-dlp` binary, checking the `dreamdisplays.ytdlp` override,

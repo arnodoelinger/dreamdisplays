@@ -11,7 +11,7 @@ import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.atomicfu.atomic
 
 /**
  * Everything cookie-related for YouTube access: resolving which browser to export from (opt-in via
@@ -45,7 +45,7 @@ class YtCookieManager {
     @Volatile
     private var unavailableThisSession = false
 
-    private val refreshInProgress = AtomicBoolean(false)
+    private val refreshInProgress = atomic(false)
 
     /** True when the user explicitly disabled browser cookies in the config. */
     fun disabledByConfig(): Boolean =
@@ -159,7 +159,7 @@ class YtCookieManager {
                 exportHeader()
             } catch (_: Exception) {
             } finally {
-                refreshInProgress.set(false)
+                refreshInProgress.value = false
             }
         }
     }

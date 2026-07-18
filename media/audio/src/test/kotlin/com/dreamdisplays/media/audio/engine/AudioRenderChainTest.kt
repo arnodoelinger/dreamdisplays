@@ -4,19 +4,17 @@ import com.dreamdisplays.api.media.audio.AcousticQuality
 import com.dreamdisplays.api.media.audio.ListenerPose
 import com.dreamdisplays.api.media.audio.SourceAcousticState
 import com.dreamdisplays.api.media.audio.SourcePlane
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class AudioRenderChainTest {
-    private fun newChain(quality: AcousticQuality = AcousticQuality.ADVANCED, binaural: Boolean = true) =
-        AudioRenderChain(
-            44100f,
-            AtomicReference(ListenerPose.IDENTITY),
-            AtomicReference(quality),
-            AtomicReference(binaural),
-        )
+    private fun newChain(quality: AcousticQuality = AcousticQuality.ADVANCED, binaural: Boolean = true): AudioRenderChain {
+        val engine = AcousticsEngine(44100f)
+        engine.setGlobalQuality(quality)
+        engine.setBinauralOutput(binaural)
+        return AudioRenderChain(44100f, engine)
+    }
 
     /** Encodes one S16LE stereo frame (matches [AudioRenderChain]'s own decode / encode convention). */
     private fun frame(l: Short, r: Short): ByteArray = byteArrayOf(

@@ -13,7 +13,6 @@ import com.dreamdisplays.media.audio.math.Vec3
 import com.dreamdisplays.media.audio.spatial.EmitterLayout
 import com.dreamdisplays.media.audio.spatial.ParametricBinaural
 import com.dreamdisplays.media.audio.spatial.StereoPanner
-import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.max
@@ -28,9 +27,7 @@ import kotlin.math.sqrt
  */
 internal class AudioRenderChain(
     private val sampleRate: Float,
-    private val listenerRef: AtomicReference<ListenerPose>,
-    private val qualityRef: AtomicReference<AcousticQuality>,
-    private val binauralRef: AtomicReference<Boolean>,
+    private val engine: AcousticsEngine,
 ) : AudioDspStage {
     private companion object {
         const val TARGET_LUFS = -16f
@@ -81,7 +78,7 @@ internal class AudioRenderChain(
 
     override fun process(buf: ByteArray, len: Int, legacyGain: Double) {
         val st = state
-        val tier = qualityRef.get()
+        val tier = engine.currentQuality()
         if (tier == AcousticQuality.OFF || st == null || st.bypassSpatial || !st.acousticsEnabled) {
             applyLegacyGain(buf, len, legacyGain)
             return
@@ -92,7 +89,7 @@ internal class AudioRenderChain(
         ensureCapacity(frames)
         decode(buf, frames)
 
-        val listener = listenerRef.get()
+        val listener = engine.currentListener()
         val plane = st.plane
         val center = Vec3(plane.centerX, plane.centerY, plane.centerZ)
         val normal = Vec3(plane.normalX, plane.normalY, plane.normalZ)
@@ -122,7 +119,7 @@ internal class AudioRenderChain(
         val azL = azimuthL.next(azimuthOf(leftEmitter, listenerPos, listenerForward, listenerRight), dtBlock)
         val azR = azimuthR.next(azimuthOf(rightEmitter, listenerPos, listenerForward, listenerRight), dtBlock)
 
-        val binaural = binauralRef.get() && tier != AcousticQuality.BASIC
+        val binaural = engine.currentBinaural() && tier != AcousticQuality.BASIC
         if (binaural) {
             leftBinaural.updateParams(azL.toDouble())
             rightBinaural.updateParams(azR.toDouble())

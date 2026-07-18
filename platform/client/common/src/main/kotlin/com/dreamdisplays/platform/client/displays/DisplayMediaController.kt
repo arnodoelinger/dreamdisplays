@@ -9,7 +9,7 @@ import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment
 import net.minecraft.client.Minecraft
-import java.util.concurrent.atomic.AtomicLong
+import kotlinx.atomicfu.atomic
 
 /**
  * Owns the media / player lifecycle for a single [DisplayScreen]: swapping in a fresh [MediaPlayer] on
@@ -18,7 +18,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 internal class DisplayMediaController(private val screen: DisplayScreen) {
     /** Generation counter for async callbacks. */
-    private val generation = AtomicLong()
+    private val generation = atomic(0L)
 
     /** The active media player, or null between videos and after [shutdown]. */
     @Volatile
@@ -28,7 +28,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
     var videoStarted: Boolean = false; private set
 
     /** Current player generation; bumped on every swap so stale async callbacks can be detected. */
-    val generationNow: Long get() = generation.get()
+    val generationNow: Long get() = generation.value
 
     /**
      * Stops any current player, creates a fresh [MediaPlayer] for [videoUrl], wires the texture and
@@ -89,18 +89,17 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         // A replay-bootstrap player already resumes at the saved position; restoreSavedTime()'s
         // corrective seek would cold-restart the session and destroy the seamless replay -> live bridge.
         if (!mp.isResumingFromReplay()) screen.restoreSavedTime()
-        // No bootstrap needed for sync since 1.8.0
         DisplayRegistry.recordScreen(screen)
     }
 
     /** Runs [action] once the current player is initialized; guards against stale generations. */
-    fun whenInitialized(action: () -> Unit) = whenInitialized(generation.get(), action)
+    fun whenInitialized(action: () -> Unit) = whenInitialized(generation.value, action)
 
     /** Runs [action] when the player is initialized, only if [expectedGeneration] still matches (i.e. video hasn't changed). */
     private fun whenInitialized(expectedGeneration: Long, action: () -> Unit) {
         val mp = player ?: return
         mp.whenInitialized {
-            if (expectedGeneration != generation.get()) return@whenInitialized
+            if (expectedGeneration != generation.value) return@whenInitialized
             if (mp !== player) return@whenInitialized
             if (screen.errored) return@whenInitialized
             action()

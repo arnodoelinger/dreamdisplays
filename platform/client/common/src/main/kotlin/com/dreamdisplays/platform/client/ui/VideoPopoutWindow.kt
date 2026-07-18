@@ -28,8 +28,7 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
+import kotlinx.atomicfu.atomic
 import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -131,14 +130,14 @@ class VideoPopoutWindow(
         @Volatile
         private var contentAspect = 0.0
 
-        private val frameVersion = AtomicLong(0)
+        private val frameVersion = atomic(0L)
         private var uploadedVersion = 0L
 
         @Volatile
         private var windowHandle = 0L
 
-        private val winW = AtomicInteger(0)
-        private val winH = AtomicInteger(0)
+        private val winW = atomic(0)
+        private val winH = atomic(0)
 
         private var renderer: QuadRenderer? = null
         private var popoutCaps: GLCapabilities? = null
@@ -152,8 +151,8 @@ class VideoPopoutWindow(
         private var savedH = 0
 
         override val isOpen: Boolean get() = windowHandle != 0L
-        override val width: Int get() = winW.get()
-        override val height: Int get() = winH.get()
+        override val width: Int get() = winW.value
+        override val height: Int get() = winH.value
 
         override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat) {
             if (windowHandle == 0L) return
@@ -185,11 +184,11 @@ class VideoPopoutWindow(
             val fh = frameH;
             val buf = frontBuf
             val format = frameFormat
-            val vw = winW.get();
-            val vh = winH.get()
+            val vw = winW.value;
+            val vh = winH.value
             if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
 
-            val version = frameVersion.get()
+            val version = frameVersion.value
             val haveNewFrame = version != uploadedVersion
 
             val prevCtx = GLFW.glfwGetCurrentContext()
@@ -247,7 +246,7 @@ class VideoPopoutWindow(
             }
 
             windowHandle = handle
-            winW.set(w); winH.set(h)
+            winW.value = w; winH.value = h
 
             GLFW.glfwSetWindowCloseCallback(handle) { _ -> destroyWindow() }
             GLFW.glfwSetKeyCallback(handle) { _, key, _, action, _ ->
@@ -256,12 +255,12 @@ class VideoPopoutWindow(
                     GLFW.GLFW_KEY_F -> toggleFullscreen(handle)
                 }
             }
-            GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.set(fw); winH.set(fh) }
+            GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.value = fw; winH.value = fh }
             val wa = IntArray(1);
             val ha = IntArray(1)
             GLFW.glfwGetFramebufferSize(handle, wa, ha)
             if (wa[0] > 0 && ha[0] > 0) {
-                winW.set(wa[0]); winH.set(ha[0])
+                winW.value = wa[0]; winH.value = ha[0]
             }
         }
 
@@ -291,7 +290,7 @@ class VideoPopoutWindow(
                 val xa = IntArray(1);
                 val ya = IntArray(1)
                 GLFW.glfwGetWindowPos(handle, xa, ya)
-                savedX = xa[0]; savedY = ya[0]; savedW = winW.get(); savedH = winH.get()
+                savedX = xa[0]; savedY = ya[0]; savedW = winW.value; savedH = winH.value
                 GLFW.glfwSetWindowMonitor(handle, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate())
                 fullscreen = true
             } else {

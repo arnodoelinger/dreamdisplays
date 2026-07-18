@@ -7,7 +7,7 @@ import com.dreamdisplays.api.media.audio.ListenerPose
 import com.dreamdisplays.api.media.audio.SourceAcousticState
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicReference
+import kotlinx.atomicfu.atomic
 
 /**
  * Default [AudioAcousticsService]: owns one [AudioRenderChain] per registered display and the shared
@@ -15,17 +15,21 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class AcousticsEngine(private val sampleRate: Float = 44100f) : AudioAcousticsService {
     private val chains = ConcurrentHashMap<UUID, AudioRenderChain>()
-    private val listenerRef = AtomicReference(ListenerPose.IDENTITY)
-    private val qualityRef = AtomicReference(AcousticQuality.ADVANCED)
-    private val binauralRef = AtomicReference(true)
+    private val listenerRef = atomic(ListenerPose.IDENTITY)
+    private val qualityRef = atomic(AcousticQuality.ADVANCED)
+    private val binauralRef = atomic(true)
+
+    internal fun currentListener(): ListenerPose = listenerRef.value
+    internal fun currentQuality(): AcousticQuality = qualityRef.value
+    internal fun currentBinaural(): Boolean = binauralRef.value
 
     /** Selects binaural (headphone) rendering vs. constant-power stereo pan for every source. */
     fun setBinauralOutput(binaural: Boolean) {
-        binauralRef.set(binaural)
+        binauralRef.value = binaural
     }
 
     override fun registerSource(id: UUID): AudioDspStage =
-        chains.computeIfAbsent(id) { AudioRenderChain(sampleRate, listenerRef, qualityRef, binauralRef) }
+        chains.computeIfAbsent(id) { AudioRenderChain(sampleRate, this) }
 
     override fun unregisterSource(id: UUID) {
         chains.remove(id)?.close()
@@ -36,10 +40,10 @@ class AcousticsEngine(private val sampleRate: Float = 44100f) : AudioAcousticsSe
     }
 
     override fun updateListener(pose: ListenerPose) {
-        listenerRef.set(pose)
+        listenerRef.value = pose
     }
 
     override fun setGlobalQuality(quality: AcousticQuality) {
-        qualityRef.set(quality)
+        qualityRef.value = quality
     }
 }

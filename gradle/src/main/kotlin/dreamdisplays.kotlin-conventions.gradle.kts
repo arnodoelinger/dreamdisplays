@@ -7,6 +7,7 @@ import java.util.*
 plugins {
     java
     id("org.jetbrains.kotlin.jvm")
+    id("org.jetbrains.kotlinx.atomicfu")
 }
 
 /** Shared `Stonecutter` version reader, published once by the dreamdisplays.stonecutter-versions settings plugin. */

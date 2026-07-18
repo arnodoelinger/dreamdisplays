@@ -23,7 +23,7 @@ import org.schabi.newpipe.extractor.stream.StreamType
 import org.schabi.newpipe.extractor.stream.VideoStream
 import org.slf4j.LoggerFactory
 import java.nio.charset.StandardCharsets
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlinx.atomicfu.atomic
 
 /**
  * In-process YouTube stream resolver backed by NewPipeExtractor. This is the fast path used before
@@ -36,7 +36,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object NewPipeResolver : MediaResolver {
     private val logger = LoggerFactory.getLogger("DreamDisplays/NewPipe")
 
-    private val initialized = AtomicBoolean(false)
+    private val initialized = atomic(false)
 
     /**
      * How long a resolved video is reused before `NewPipeExtractor` is hit again. Matches
@@ -88,7 +88,7 @@ object NewPipeResolver : MediaResolver {
 
     override fun resolve(source: MediaSource): ResolvedMedia {
         ensureInitialized()
-        check(initialized.get()) { "NewPipeExtractor failed to initialize" }
+        check(initialized.value) { "NewPipeExtractor failed to initialize" }
         val url = source.toResolvableUrl()
             ?: throw UnsupportedOperationException("Twitch not supported by NewPipeResolver")
         val resolved = resolveCached(url)
@@ -122,7 +122,7 @@ object NewPipeResolver : MediaResolver {
         try {
             NewPipe.init(YtHttpDownloader)
         } catch (e: Throwable) {
-            initialized.set(false)
+            initialized.value = false
             logger.warn("NewPipe init failed: ${e.message}")
         }
     }
@@ -134,7 +134,7 @@ object NewPipeResolver : MediaResolver {
      * which `NewPipeExtractor` caches globally once warmed. Best-effort; failures are ignored.
      */
     fun prewarmPlayer() {
-        if (!initialized.get()) return
+        if (!initialized.value) return
         try {
             YoutubeJavaScriptPlayerManager.getSignatureTimestamp("")
             YoutubeJavaScriptPlayerManager.getUrlWithThrottlingParameterDeobfuscated(
@@ -152,7 +152,7 @@ object NewPipeResolver : MediaResolver {
      */
     fun fetch(videoUrl: String): List<YtStream> {
         ensureInitialized()
-        if (!initialized.get()) return emptyList()
+        if (!initialized.value) return emptyList()
         return resolveCached(videoUrl)?.streams ?: emptyList()
     }
 

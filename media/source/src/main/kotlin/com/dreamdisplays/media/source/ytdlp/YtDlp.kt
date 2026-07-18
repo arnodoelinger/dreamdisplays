@@ -20,9 +20,29 @@ import java.nio.file.Files
 import java.util.Locale
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.atomicfu.atomic
 import kotlin.time.Duration.Companion.seconds
+
+/**
+ * One-shot "has the race been abandoned" flag shared between [YtDlp.fetchUncached]'s hedge coroutine
+ * and its abort path.
+ */
+private class AbandonFlag {
+    private val flag = atomic(false)
+    val isAbandoned: Boolean get() = flag.value
+    fun abandon() {
+        flag.value = true
+    }
+}
+
+/**
+ * Same rationale as [AbandonFlag]: a per-race countdown that must survive capture across the
+ * parallel client coroutines in [YtDlp.raceParallel].
+ */
+private class RemainingCountdown(initial: Int) {
+    private val remaining = atomic(initial)
+    fun decrementAndGet(): Int = remaining.decrementAndGet()
+}
 
 /**
  * `yt-dlp` orchestrator: caching and request deduplication around the NewPipe fast path and the
@@ -229,19 +249,19 @@ object YtDlp {
     @Throws(IOException::class)
     private suspend fun fetchUncached(videoUrl: String): List<YtStream> {
         val ytProcesses = CopyOnWriteArrayList<Process>()
-        val abandoned = AtomicBoolean(false)
+        val abandoned = AbandonFlag()
         val ytdlp = DreamCoroutines.clientIo.async {
             if (HEDGE_DELAY_MS > 0) delay(HEDGE_DELAY_MS)
-            if (abandoned.get()) emptyList()
+            if (abandoned.isAbandoned) emptyList()
             else raceClients(videoUrl) { proc ->
                 ytProcesses.add(proc)
-                if (abandoned.get()) Processes.destroyTree(proc) // NewPipeExtractor already won; kill
+                if (abandoned.isAbandoned) Processes.destroyTree(proc) // NewPipeExtractor already won; kill
             } ?: emptyList()
         }
 
         // Aborts the parallel yt-dlp branch and reaps any subprocess it managed to spawn.
         fun abandonYtDlp() {
-            abandoned.set(true)
+            abandoned.abandon()
             ytProcesses.forEach { runCatching { Processes.destroyTree(it) } }
             ytdlp.cancel()
         }
@@ -325,7 +345,7 @@ object YtDlp {
         val processes = CopyOnWriteArrayList<Process>()
         val results = CopyOnWriteArrayList<List<YtStream>>()
         val winner = CompletableDeferred<List<YtStream>>()
-        val remaining = AtomicInteger(clients.size)
+        val remaining = RemainingCountdown(clients.size)
 
         for (client in clients) {
             DreamCoroutines.clientIo.launch {

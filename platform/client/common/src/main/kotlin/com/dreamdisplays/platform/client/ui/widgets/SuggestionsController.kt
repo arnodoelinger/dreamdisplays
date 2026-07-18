@@ -14,7 +14,7 @@ import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.coroutines.launch
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
-import java.util.concurrent.atomic.AtomicInteger
+import kotlinx.atomicfu.atomic
 import kotlin.math.min
 
 /**
@@ -32,7 +32,7 @@ class SuggestionsController {
     /** Wall-clock start of the in-flight load, for the elapsed-seconds suffix on the loading message. */
     var loadStartedAtMs: Long = 0L; private set
 
-    private val requestSeq = AtomicInteger()
+    private val requestSeq = atomic(0)
     private var currentVideoId: String? = null
 
     /** Reload hook the panel uses to reset scroll when new results land. */
@@ -233,7 +233,7 @@ class SuggestionsController {
     /** Applies a finished request on the client thread, ignoring it if a newer request superseded it. */
     private fun publish(seq: Int, results: List<MediaSearchResult>?, error: String?) {
         Minecraft.getInstance().execute {
-            if (seq != requestSeq.get()) return@execute
+            if (seq != requestSeq.value) return@execute
             cards.clear()
             onResults()
             if (error != null) {
