@@ -3,11 +3,6 @@ plugins {
     id("dreamdisplays.serialization-conventions")
 }
 
-repositories {
-    mavenCentral()
-    maven("https://jitpack.io")
-}
-
 dependencies {
     api(project(":api"))
     api(project(":media:runtime"))
@@ -20,12 +15,5 @@ dependencies {
     api(libs.kotlinxCoroutinesCore)
     api(libs.kotlinxSerializationJson)
     compileOnly(libs.slf4jApi)
-    compileOnly(libs.kotlinStdlib)
-    testImplementation(libs.kotlinStdlib)
     testImplementation(libs.slf4jApi)
-    testImplementation(kotlin("test"))
-}
-
-tasks.test {
-    useJUnitPlatform()
 }

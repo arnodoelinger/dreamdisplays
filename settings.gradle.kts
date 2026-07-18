@@ -1,13 +1,10 @@
-import java.lang.Boolean;
-
 pluginManagement {
-    val activeStonecutterVersion = file("versions/active.txt").readText().trim()
-    val stonecutterVersions = java.util.Properties().apply {
-        file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
+    val scVersions = java.util.Properties().apply {
+        val active = file("versions/active.txt").readText().trim()
+        file("versions/$active/gradle.properties").inputStream().use(::load)
     }
 
-    fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-        ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+    fun scVersion(name: String) = scVersions.getProperty(name) ?: error("Missing Stonecutter version property '$name'.")
 
     includeBuild("gradle")
     repositories {
@@ -23,15 +20,11 @@ pluginManagement {
     resolutionStrategy {
         eachPlugin {
             val loomVersion = scVersion("loom.version")
-            val isLegacy = scVersion("minecraft.version").startsWith("1.")
             when (requested.id.id) {
                 "net.fabricmc.fabric-loom" -> useVersion(loomVersion)
-                "net.fabricmc.fabric-loom-remap" -> {
-                    if (isLegacy) useVersion(loomVersion)
-                    // For deobfuscated (26.x) Minecraft, fabric-loom-remap doesn't exist;
-                    // redirect to fabric-loom's artifact (declared apply false, never applied).
+                "net.fabricmc.fabric-loom-remap" ->
+                    if (scVersion("minecraft.version").startsWith("1.")) useVersion(loomVersion)
                     else useModule("net.fabricmc:fabric-loom:$loomVersion")
-                }
 
                 "net.neoforged.moddev" -> useVersion(scVersion("moddev.version"))
             }
@@ -41,9 +34,11 @@ pluginManagement {
 
 plugins {
     id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
-    id("dev.kikugie.stonecutter") version "0.9.5"
+    id("dev.kikugie.stonecutter") version "0.9.6"
+    id("dreamdisplays.stonecutter-versions")
 }
 
+@Suppress("UnstableApiUsage")
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_PROJECT)
     repositories {
@@ -52,7 +47,6 @@ dependencyResolutionManagement {
         maven("https://maven.parchmentmc.org")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://maven.quiltmc.org/repository/snapshot/")
-        maven("https://repo.lostyy.ru/releases")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://oss.sonatype.org/content/groups/public/")
         maven("https://jitpack.io")
@@ -77,7 +71,7 @@ include(":platform:client:fabric")
 include(":platform:server")
 
 // ModDevGradle issue, ask them wtf is going here
-if (!Boolean.getBoolean("idea.sync.active")) {
+if (!java.lang.Boolean.getBoolean("idea.sync.active")) {
     include(":platform:client:neoforge")
 }
 

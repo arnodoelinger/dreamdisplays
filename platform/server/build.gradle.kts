@@ -4,17 +4,13 @@ plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.serialization-conventions")
     id("dreamdisplays.shadow-conventions")
-    id("io.papermc.paperweight.userdev") version libs.versions.paperweight
-    id("io.github.arnodoelinger.platformweaver") version libs.versions.platformweaver
+    alias(libs.plugins.paperweight)
+    alias(libs.plugins.platformweaver)
 }
 
-val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-val stonecutterVersions = Properties().apply {
-    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-}
-
-fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+val scVersions = gradle.extensions.getByType<StonecutterVersions>()
+val activeStonecutterVersion = scVersions.active
+fun scVersion(name: String): String = scVersions.get(name)
 
 val isLegacyObfuscatedMinecraft = scVersion("minecraft.version").startsWith("1.")
 
@@ -45,12 +41,17 @@ run {
 }
 
 tasks.named("compileKotlin") {
+    // Captured as plain values here, not referenced live inside doFirst below: referencing a value
+    // declared in this script from within a task action captures the whole script object, which
+    // the configuration cache can't serialize.
+    val active = activeStonecutterVersion
+    val pin = paperPinVersion
     doFirst {
-        require(activeStonecutterVersion == paperPinVersion) {
-            "The Paper jar must be compiled with the active Stonecutter version pinned to $paperPinVersion " +
-                "(active is $activeStonecutterVersion). Run the root ':platform:server:buildPaper' task instead " +
+        require(active == pin) {
+            "The Paper jar must be compiled with the active Stonecutter version pinned to $pin " +
+                "(active is $active). Run the root ':platform:server:buildPaper' task instead " +
                 "of building this module's tasks directly, or switch with " +
-                "./gradlew \"Set active project to $paperPinVersion\" first."
+                "./gradlew \"Set active project to $pin\" first."
         }
     }
 }
@@ -64,34 +65,23 @@ if (activeStonecutterVersion == paperPinVersion) {
         group = "build"
         description = "Builds the cross-version Paper jar, pinning the active Stonecutter version to " +
             "$paperPinVersion (currently $activeStonecutterVersion) for a nested Gradle invocation."
-        // The nested invocation below always compiles at paperPinVersion (a legacy/obfuscated target),
-        // which shares :core, :util, :platform:client:common and :platform:client:fabric's chiseled
-        // source + compiled-classes directories with whatever *this* outer invocation is doing at the
-        // currently active version. Two Gradle processes writing Stonecutter-chiseled output for two
-        // different Minecraft versions into the same directory at once corrupts it silently (observed:
-        // client UI widgets resolving the wrong `//? if >=26` branch). Block until every task already
-        // in this invocation's graph for those shared projects has finished before starting the nested
-        // build, so the two never touch the same directory concurrently.
-        mustRunAfter(
-            rootProject.project(":core").tasks,
-            rootProject.project(":util").tasks,
-            rootProject.project(":platform:client:common").tasks,
-            rootProject.project(":platform:client:fabric").tasks,
-        )
+        val activeVersionFile = rootProject.file("versions/active.txt")
+        val gradlewPath = rootProject.file("gradlew").absolutePath
+        val rootDir = rootProject.projectDir
+        val pinVersion = paperPinVersion
         doLast {
-            val activeFile = rootProject.file("versions/active.txt")
-            val previousVersion = activeFile.readText()
-            activeFile.writeText(paperPinVersion)
+            val previousVersion = activeVersionFile.readText()
+            activeVersionFile.writeText(pinVersion)
             try {
-                val exitCode = ProcessBuilder(rootProject.file("gradlew").absolutePath, ":platform:server:shadowJar")
-                    .directory(rootProject.projectDir)
+                val exitCode = ProcessBuilder(gradlewPath, ":platform:server:shadowJar")
+                    .directory(rootDir)
                     .redirectOutput(ProcessBuilder.Redirect.INHERIT)
                     .redirectError(ProcessBuilder.Redirect.INHERIT)
                     .start()
                     .waitFor()
                 check(exitCode == 0) { "Nested Gradle build for the pinned Paper jar failed with exit code $exitCode." }
             } finally {
-                activeFile.writeText(previousVersion)
+                activeVersionFile.writeText(previousVersion)
             }
         }
     }
@@ -105,7 +95,6 @@ repositories {
         maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods"))
     }
     mavenCentral()
-    maven("https://repo.lostyy.ru/releases")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
@@ -155,25 +144,16 @@ dependencies {
 }
 
 sourceSets.main {
-    // Translations live once in :platform:resources and are pulled in here instead of being duplicated per platform.
-    // Only the server-message strings are needed here; client (Minecraft GUI) translations don't apply to Paper.
     resources.srcDir(project(":platform:resources").file("src/main/resources"))
     resources.exclude("assets/dreamdisplays/lang/client/**")
 }
 
 tasks.processResources {
-    // Paper's plugin.getResource("config.toml") looks up the resource root, unlike Fabric / NeoForge's
-    // classloader lookup under assets/dreamdisplays/lang/server/; both read the same shared template.
     from(project(":platform:resources").file("src/main/resources/assets/dreamdisplays/lang/server/config.toml"))
     val projectVersion = version.toString()
-    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-    val stonecutterVersions = Properties().apply {
-        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream()
-            .use { input -> load(input) }
-    }
     val props = mapOf(
         "version" to projectVersion,
-        "paperMinecraftApi" to stonecutterVersions.getProperty("paper.minecraft.api"),
+        "paperMinecraftApi" to scVersion("paper.minecraft.api"),
     )
     inputs.properties(props)
     filteringCharset = Charsets.UTF_8.name()
@@ -212,17 +192,7 @@ tasks.shadowJar {
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
-    exclude("org/sqlite/native/Linux-Android/**")
-    exclude("org/sqlite/native/Linux-Musl/x86/**")
-    exclude("org/sqlite/native/Linux/ppc64/**")
-    exclude("org/sqlite/native/Linux/riscv64/**")
-    exclude("org/sqlite/native/Linux/arm/**")
-    exclude("org/sqlite/native/Linux/armv6/**")
-    exclude("org/sqlite/native/Linux/armv7/**")
-    exclude("org/sqlite/native/Linux/x86/**")
-    exclude("org/sqlite/native/Windows/x86/**")
-    exclude("org/sqlite/native/Windows/armv7/**")
-    exclude("org/sqlite/native/Windows/aarch64/**")
+    excludeDreamDisplaysSqliteNativeExtras()
 }
 
 tasks.withType<AbstractArchiveTask>().configureEach {

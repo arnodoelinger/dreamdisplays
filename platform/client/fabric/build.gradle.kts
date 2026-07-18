@@ -1,5 +1,3 @@
-import java.util.*
-
 plugins {
     id("net.fabricmc.fabric-loom") apply false
     id("net.fabricmc.fabric-loom-remap") apply false
@@ -7,7 +5,7 @@ plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.native-resources")
     id("dreamdisplays.shadow-conventions")
-    id("io.github.arnodoelinger.platformweaver") version libs.versions.platformweaver
+    alias(libs.plugins.platformweaver)
 }
 
 // Loom plugin id depends on whether the target Minecraft is obfuscated.
@@ -15,12 +13,7 @@ plugins {
 // Year-versioned releases (26.x) ship deobfuscated -> fabric-loom.
 // The plugin version is supplied per Stonecutter version via settings.gradle.kts resolutionStrategy.
 run {
-    val active = rootProject.file("versions/active.txt").readText().trim()
-    val props = Properties().apply {
-        rootProject.file("versions/$active/gradle.properties").inputStream().use { load(it) }
-    }
-    val mcVersion = props.getProperty("minecraft.version")
-        ?: error("Missing 'minecraft.version' for $active.")
+    val mcVersion = gradle.extensions.getByType<StonecutterVersions>().get("minecraft.version")
     val isLegacyObfuscated = mcVersion.startsWith("1.")
     if (isLegacyObfuscated) apply(plugin = "net.fabricmc.fabric-loom-remap")
     else apply(plugin = "net.fabricmc.fabric-loom")
@@ -32,20 +25,15 @@ repositories {
     maven("https://maven.parchmentmc.org")
     maven("https://maven.quiltmc.org/repository/release/")
     maven("https://maven.quiltmc.org/repository/snapshot/")
-    maven("https://repo.lostyy.ru/releases")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
     maven("https://maven.neoforged.net/releases")
 }
 
-val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-val stonecutterVersions = Properties().apply {
-    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-}
-
-fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+val scVersions = gradle.extensions.getByType<StonecutterVersions>()
+val activeStonecutterVersion = scVersions.active
+fun scVersion(name: String): String = scVersions.get(name)
 
 // Legacy (obfuscated) Minecraft targets need layered Mojang+Parchment mappings and modImplementation;
 // year-versioned (deobfuscated) targets resolve the source set directly with plain implementation.
@@ -130,7 +118,7 @@ dependencies {
             // Older legacy targets (1.21.1) predate the io.papermc.parchment.data coordinates and
             // ship under org.parchmentmc.data; allow the version to override the default artifact.
             parchment(
-                stonecutterVersions.getProperty("parchment.dependency")
+                scVersions.getOrNull("parchment.dependency")
                     ?: "io.papermc.parchment.data:parchment:${scVersion("minecraft.version")}+build.3"
             )
         })
@@ -207,85 +195,9 @@ tasks.shadowJar {
         archiveClassifier.set("dev-shadow")
         destinationDirectory.set(layout.buildDirectory.dir("devlibs"))
     }
-    dependencies {
-        include(project(":platform:client:common"))
-        include(project(":core"))
-        include(project(":api"))
-        include(project(":util"))
-        include(project(":media:runtime"))
-        include(project(":media:source"))
-        include(project(":media:player"))
-        include(project(":media:audio"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-protobuf-jvm"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-json"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm"))
-        include(dependency("org.xerial:sqlite-jdbc"))
-        include(dependency("org.apache.commons:commons-compress"))
-        include(dependency("org.tukaani:xz"))
-        include(dependency("org.jetbrains.kotlin:kotlin-stdlib"))
-        include(dependency("org.jetbrains:annotations"))
-        include(dependency("org.tomlj:tomlj"))
-        include(dependency("org.antlr:antlr4-runtime"))
-        include(dependency("org.semver4j:semver4j"))
-        include(dependency("com.github.ben-manes.caffeine:caffeine"))
-        include(dependency("com.squareup.okhttp3:okhttp"))
-        include(dependency("com.squareup.okhttp3:okhttp-jvm"))
-        include(dependency("com.squareup.okio:okio"))
-        include(dependency("com.squareup.okio:okio-jvm"))
-        include(dependency("org.jetbrains.exposed:exposed-core"))
-        include(dependency("org.jetbrains.exposed:exposed-jdbc"))
-        include(dependency("org.jetbrains.exposed:exposed-migration-core"))
-        include(dependency("org.jetbrains.exposed:exposed-migration-jdbc"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm"))
-        include(dependency("org.jetbrains.kotlinx:kotlinx-datetime-jvm"))
-        include(dependency("com.zaxxer:HikariCP"))
-        include(dependency("com.github.TeamNewPipe:NewPipeExtractor"))
-        include(dependency("com.github.TeamNewPipe:nanojson"))
-        include(dependency("org.jsoup:jsoup"))
-        include(dependency("com.google.protobuf:protobuf-javalite"))
-        include(dependency("org.mozilla:rhino"))
-        include(dependency("org.mozilla:rhino-engine"))
-    }
-    val prefix = "com.dreamdisplays.libs"
-    listOf(
-        "org.apache.commons.compress",
-        "org.tukaani.xz",
-        "kotlin",
-        "kotlinx",
-        "org.jetbrains.annotations",
-        "org.intellij.lang.annotations",
-        "org.tomlj",
-        "org.antlr",
-        "org.semver4j",
-        "com.github.benmanes.caffeine",
-        "okhttp3",
-        "okio",
-        "org.jetbrains.exposed",
-        "com.zaxxer.hikari",
-        "org.schabi.newpipe",
-        "com.grack.nanojson",
-        "org.jsoup",
-        "com.google.protobuf",
-        "org.mozilla.javascript",
-        "org.mozilla.classfile",
-    ).forEach { pack ->
-        relocate(pack, "$prefix.$pack")
-    }
-    exclude("org/sqlite/native/Linux-Android/**")
-    exclude("org/sqlite/native/Linux-Musl/x86/**")
-    exclude("org/sqlite/native/FreeBSD/**")
-    exclude("org/sqlite/native/Linux/ppc64/**")
-    exclude("org/sqlite/native/Linux/riscv64/**")
-    exclude("org/sqlite/native/Linux/arm/**")
-    exclude("org/sqlite/native/Linux/armv6/**")
-    exclude("org/sqlite/native/Linux/armv7/**")
-    exclude("org/sqlite/native/Linux/x86/**")
-    exclude("org/sqlite/native/Windows/x86/**")
-    exclude("org/sqlite/native/Windows/armv7/**")
+    includeDreamDisplaysSharedContents()
+    relocateDreamDisplaysSharedPackages()
+    excludeDreamDisplaysSqliteNativeExtras()
 }
 
 // If it's a legacy version (like 1.21.11 where the shadow jar is obfuscated), we need to remap the shadow jar with

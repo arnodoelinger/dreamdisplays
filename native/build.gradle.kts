@@ -12,9 +12,11 @@ fun cargoExecutable(): String {
 tasks.register<Exec>("buildHostNatives") {
     group = "native"
     description = "Builds the host Rust native libraries (release) into native/target/release for the client to bundle."
-    workingDir = projectDir
-    commandLine(cargoExecutable(), "build", "--release")
-    doFirst { logger.lifecycle("Building host natives with '${cargoExecutable()}' in $projectDir...") }
+    val dir = projectDir
+    val cargo = cargoExecutable()
+    workingDir = dir
+    commandLine(cargo, "build", "--release")
+    doFirst { logger.lifecycle("Building host natives with '$cargo' in $dir...") }
 }
 
 /** Runs the Rust native test suite. */

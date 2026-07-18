@@ -45,3 +45,7 @@ okio = { module = "com.squareup.okio:okio", version.ref = "okio" }
 newpipeExtractor = { module = "com.github.TeamNewPipe:NewPipeExtractor", version.ref = "newpipeExtractor" }
 slf4jApi = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
 luckpermsApi = { module = "net.luckperms:api", version.ref = "luckperms" }
+
+[plugins]
+paperweight = { id = "io.papermc.paperweight.userdev", version.ref = "paperweight" }
+platformweaver = { id = "io.github.arnodoelinger.platformweaver", version.ref = "platformweaver" }
