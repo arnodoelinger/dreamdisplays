@@ -20,7 +20,7 @@ import net.minecraft.resources.Identifier
 //? if >=1.21.11 {
 import net.minecraft.util.ARGB
 //?}
-import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Vanilla-styled button with a centered mod icon. The icon is a per-frame lambda so stateful buttons
@@ -67,15 +67,13 @@ class IconButton(
         //?} else
         /*g.blitSprite(sprite, x, y, width, height)*/
 
-        g.enableScissor(x, y, x + width, y + height)
-        val iconSide = max(width - 2 * margin, height - 2 * margin)
+        val iconSide = min(width - 2 * margin, height - 2 * margin)
         val dx = x + width / 2 - iconSide / 2
         val dy = y + height / 2 - iconSide / 2
         //? if >=1.21.11 {
         g.blitSprite(RenderPipelines.GUI_TEXTURED, icon(), dx, dy, iconSide, iconSide, ARGB.white(alpha))
         //?} else
         /*g.blitSprite(icon(), dx, dy, iconSide, iconSide)*/
-        g.disableScissor()
         //? if >=1.21.11 {
         if (isHovered) {
             g.requestCursor(if (active) CursorTypes.POINTING_HAND else CursorTypes.NOT_ALLOWED)
