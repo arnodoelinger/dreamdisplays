@@ -102,6 +102,7 @@ object MediaProcess {
             addAll(
                 listOf(
                     "-an", "-frames:v", "1",
+                    "-threads", "1",
                     "-vf", pad, "-q:v", "3",
                     "-f", "image2pipe", "-vcodec", "mjpeg", "-",
                 )

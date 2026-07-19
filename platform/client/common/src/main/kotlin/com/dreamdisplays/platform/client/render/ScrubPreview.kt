@@ -57,10 +57,14 @@ object ScrubPreview {
     /** Never sample closer together than this, so short videos don't spawn a process per second. */
     private const val MIN_SAMPLE_SPACING_NANOS = 5_000_000_000L
 
-    /** Max simultaneous `FFmpeg` extractions — each opens its own connection to the source, so this
-     *  is capped well below [SAMPLE_COUNT] to avoid hammering the host while still finishing well
-     *  under a minute instead of running fully sequentially. */
-    private const val EXTRACT_CONCURRENCY = 8
+    /**
+     * Max simultaneous `FFmpeg` extractions — each opens its own connection to the source, so this
+     * is capped well below [SAMPLE_COUNT] to avoid hammering the host while still finishing well
+     * under a minute instead of running fully sequentially. Also bounds how much CPU a burst of these
+     * can take from the real-time audio pipeline: generation kicks off right as a video's duration
+     * becomes known, i.e. right as its own audio session is starting up too.
+     */
+    private const val EXTRACT_CONCURRENCY = 4
 
     private class Frame(val timestampNanos: Long, val texture: Identifier)
 
