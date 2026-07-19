@@ -21,7 +21,7 @@ class LoudnessMeterTest {
                 val x = 0.01f * sin(2.0 * PI * 440.0 * idx / sampleRate).toFloat()
                 meter.observe(x, x, dtSample)
             }
-            gain = meter.makeupGain(-16f, 12f, 0.5f, blockFrames / sampleRate)
+            gain = meter.makeupGain(-16f, 12f, 3f, 0.5f, blockFrames / sampleRate)
         }
 
         assertTrue(gain > 1f, "Expected a quiet signal to receive positive makeup gain, got $gain.")

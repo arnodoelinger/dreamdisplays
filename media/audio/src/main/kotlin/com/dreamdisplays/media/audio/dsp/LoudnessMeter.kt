@@ -35,10 +35,15 @@ class LoudnessMeter(private val sampleRate: Float) {
 
     /**
      * Computes the makeup gain (linear multiplier) needed to move the current estimate toward
-     * [targetLufs], clamped to +-[maxAdjustDb] and slew-limited to [maxSlewDbPerSecond] over [dtSeconds].
+     * [targetLufs], clamped to [-maxCutDb, +maxBoostDb] and slew-limited to [maxSlewDbPerSecond] over
+     * [dtSeconds]. The cut side is capped much tighter than the boost side: this multiplies into the
+     * same sample as the spatial chain's own distance / directivity / occlusion attenuation
+     * ([AudioRenderChain]), which is already quiet by design when the listener is far, off-axis, or
+     * behind an obstruction — stacking a full [maxCutDb] loudness cut on top of that compounds into
+     * near silence for ordinarily-loud source content. Quiet content still gets the full boost.
      */
-    fun makeupGain(targetLufs: Float, maxAdjustDb: Float, maxSlewDbPerSecond: Float, dtSeconds: Float): Float {
-        val desiredDb = (targetLufs - loudnessLufs()).coerceIn(-maxAdjustDb, maxAdjustDb)
+    fun makeupGain(targetLufs: Float, maxBoostDb: Float, maxCutDb: Float, maxSlewDbPerSecond: Float, dtSeconds: Float): Float {
+        val desiredDb = (targetLufs - loudnessLufs()).coerceIn(-maxCutDb, maxBoostDb)
         val maxStep = maxSlewDbPerSecond * dtSeconds
         val current = gainDbSmoother.value
         val next = (desiredDb - current).coerceIn(-maxStep, maxStep) + current

@@ -21,7 +21,8 @@ internal class AudioRenderChain(
 ) : AudioDspStage {
     private companion object {
         const val TARGET_LUFS = -16f
-        const val MAX_LOUDNESS_ADJUST_DB = 12f
+        const val MAX_LOUDNESS_BOOST_DB = 12f
+        const val MAX_LOUDNESS_CUT_DB = 3f
         const val MAX_LOUDNESS_SLEW_DB_PER_SEC = 0.5f
         const val GAIN_SMOOTH_SECONDS = 0.08f
         const val AZIMUTH_SMOOTH_SECONDS = 0.06f
@@ -118,7 +119,7 @@ internal class AudioRenderChain(
         val advanced = tier == AcousticQuality.ADVANCED || tier == AcousticQuality.ULTRA
         val userGain = if (st.muted) 0f else st.userVolume
         val makeup = if (advanced) {
-            loudness.makeupGain(TARGET_LUFS, MAX_LOUDNESS_ADJUST_DB, MAX_LOUDNESS_SLEW_DB_PER_SEC, dtBlock)
+            loudness.makeupGain(TARGET_LUFS, MAX_LOUDNESS_BOOST_DB, MAX_LOUDNESS_CUT_DB, MAX_LOUDNESS_SLEW_DB_PER_SEC, dtBlock)
         } else 1f
 
         val env = st.environment
