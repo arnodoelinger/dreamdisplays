@@ -12,6 +12,7 @@ import com.dreamdisplays.platform.server.utils.net.NeoForgeV2Networking
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
 import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
+import net.minecraft.core.registries.Registries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.world.level.storage.LevelResource
 import net.neoforged.bus.api.IEventBus
@@ -22,6 +23,7 @@ import net.neoforged.neoforge.common.NeoForge
 import net.neoforged.neoforge.event.server.ServerStartedEvent
 import net.neoforged.neoforge.event.server.ServerStoppingEvent
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent
+import net.neoforged.neoforge.registries.RegisterEvent
 import org.slf4j.LoggerFactory
 
 /**
@@ -39,8 +41,7 @@ class NeoForgeServer(modEventBus: IEventBus) {
         VanillaServerState.serverVersion = serverVersion
         VanillaNetworking.adapter = NeoForgeNetworkingAdapter
 
-        NeoForgeBareTokenArgumentType.register()
-
+        modEventBus.addListener(::registerArgumentTypes)
         modEventBus.addListener(::registerPayloads)
         NeoForge.EVENT_BUS.register(this)
         NeoForge.EVENT_BUS.register(NeoForgePlayerListener)
@@ -49,6 +50,17 @@ class NeoForgeServer(modEventBus: IEventBus) {
         NeoForge.EVENT_BUS.addListener(NeoForgeCommandRegistrar::register)
 
         logger.info("Server-side initialization complete.")
+    }
+
+    /**
+     * Registers [NeoForgeBareTokenArgumentType] once `NeoForge` unfreezes `COMMAND_ARGUMENT_TYPE`
+     * for this event; doing it eagerly from the constructor is too early — that registry is still
+     * frozen at mod-construction time and only opens up for this `RegisterEvent` pass.
+     */
+    private fun registerArgumentTypes(event: RegisterEvent) {
+        if (event.registryKey == Registries.COMMAND_ARGUMENT_TYPE) {
+            NeoForgeBareTokenArgumentType.register()
+        }
     }
 
     /** Registers all custom payload types for clientbound and serverbound play channels. */
