@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.search.YouTubeUrls
@@ -16,7 +17,6 @@ import kotlinx.coroutines.launch
 import kotlinx.io.IOException
 import net.minecraft.client.Minecraft
 import net.minecraft.client.renderer.texture.DynamicTexture
-import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
@@ -46,6 +46,7 @@ object Thumbnails {
     private val READY: Cache<String, Identifier> = Caffeine.newBuilder()
         .maximumSize(1_024)
         .expireAfterAccess(6, TimeUnit.HOURS)
+        .removalListener<String, Identifier> { _, id, _ -> releaseTexture(id) }
         .build()
 
     /** Average ARGB color of each decoded thumbnail, used for small flat accents (e.g. card hover tint). */
@@ -62,6 +63,7 @@ object Thumbnails {
     private val AMBIENT_TEX: Cache<String, Identifier> = Caffeine.newBuilder()
         .maximumSize(1_024)
         .expireAfterAccess(6, TimeUnit.HOURS)
+        .removalListener<String, Identifier> { _, id, _ -> releaseTexture(id) }
         .build()
 
     /** Tracks which video IDs are currently in flight (downloading or decoding). */
@@ -83,6 +85,15 @@ object Thumbnails {
 
     /** TTL for cached thumbnails, in milliseconds. */
     private const val THUMB_CACHE_TTL_MS = 7L * 24L * 60L * 60L * 1_000L
+
+    /**
+     * Frees the GPU texture behind [id] when its cache entry is evicted (by [READY] / [AMBIENT_TEX]'s
+     * size cap or 6h idle TTL.
+     */
+    private fun releaseTexture(id: Identifier?) {
+        if (id == null) return
+        Minecraft.getInstance().execute { Minecraft.getInstance().textureManager.release(id) }
+    }
 
     /**
      * A missing max-res thumbnail comes back as `HTTP 200` with a tiny grey placeholder rather than

@@ -1,8 +1,10 @@
 package com.dreamdisplays.platform.client.ui.menu
 
 //? if >=1.21.11 {
+import net.minecraft.client.renderer.RenderPipelines
 //?}
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.MediaServices
@@ -22,10 +24,8 @@ import com.dreamdisplays.platform.client.ui.widgets.SeekBar
 import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.network.chat.Component
-import net.minecraft.resources.Identifier
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*

@@ -1,9 +1,12 @@
 package com.dreamdisplays.platform.client
 
 //? if >=1.21.11 {
+import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
 //?} else
 /*import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback*/
 //? if >=26 {
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
+import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 //?} else
 /*
 //? if ==1.21.11 {
@@ -14,9 +17,11 @@ import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents
 //?}
 */
 //? if >=1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderType
 //?} else
 /*import net.minecraft.client.renderer.RenderType*/
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.platform.PlatformServices
@@ -33,14 +38,9 @@ import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderContext
-import net.fabricmc.fabric.api.client.rendering.v1.level.LevelRenderEvents
 import net.minecraft.client.Camera
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
-import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import java.lang.reflect.Proxy
 

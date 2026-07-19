@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.render
 
 //? if >=1.21.11 {
-//?}
 import com.mojang.blaze3d.opengl.GlTexture
-import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
+//?}
+import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.renderer.texture.DynamicTexture
 import org.lwjgl.opengl.GL11
 import java.lang.reflect.InvocationTargetException

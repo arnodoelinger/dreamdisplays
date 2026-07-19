@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.server.utils.net
 
 //? if >=1.21.11 {
+import net.minecraft.server.players.NameAndId
 //?}
 import com.dreamdisplays.api.playback.PlaybackAction
 import com.dreamdisplays.api.playback.PlaybackMode
@@ -26,7 +27,6 @@ import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions.context
 import kotlinx.coroutines.launch
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.server.players.NameAndId
 import org.semver4j.Semver
 
 /**

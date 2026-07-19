@@ -4,8 +4,10 @@ package com.dreamdisplays.platform.client.ui
 //?} else
 /*import com.mojang.blaze3d.systems.RenderSystem*/
 //? if >=1.21.11 {
+import net.minecraft.client.renderer.RenderPipelines
 //?}
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.playback.FullscreenMode
@@ -25,9 +27,7 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
-import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.DynamicTexture
-import net.minecraft.resources.Identifier
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.*

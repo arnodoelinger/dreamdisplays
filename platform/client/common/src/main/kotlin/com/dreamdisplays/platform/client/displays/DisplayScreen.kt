@@ -1,9 +1,11 @@
 package com.dreamdisplays.platform.client.displays
 
 //? if >=1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderType
 //?} else
 /*import net.minecraft.client.renderer.RenderType*/
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.capability.ServerFeature
@@ -32,13 +34,12 @@ import com.dreamdisplays.platform.client.render.*
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.ui.PipCorner
+import com.dreamdisplays.platform.client.ui.widgets.SuggestionsController
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import com.dreamdisplays.util.FacingUtil
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.texture.DynamicTexture
 import net.minecraft.core.BlockPos
-import net.minecraft.resources.Identifier
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.*
@@ -120,6 +121,10 @@ class DisplayScreen(
     /** Whether the local player has marked themselves ready in the current session (UI toggle state). */
     @Volatile
     var localWatchPartyReady: Boolean = false; internal set
+
+    /** Suggestions-panel state for this display; owned here (not the menu screen) so its results and
+     *  search state survive the menu being closed and reopened. */
+    val suggestionsController = SuggestionsController()
 
     /** The effective mode the player experiences — `WATCH_PARTY` while a session is live. */
     val effectiveMode: PlaybackMode get() = if (watchParty != null) PlaybackMode.WATCH_PARTY else mode

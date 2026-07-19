@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.server.utils
 
 //? if >=1.21.11 {
+import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
-import net.minecraft.resources.Identifier
 import net.minecraft.resources.ResourceKey
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerLevel

@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.source.ytdlp
 
+import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.media.source.ytdlp.YouTubeInnerTube.runsText
 import com.dreamdisplays.util.*
@@ -31,7 +32,8 @@ object YouTubeInnerTube {
     private const val CLIENT_VERSION = "2.20250501.00.00"
 
     /** User-Agent header. */
-    private const val UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+    private const val UA =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
 
     /** Pattern for parsing YouTube-style "age" strings (e.g. "2 years ago"). */
     private val AGE_PATTERN: Pattern = Pattern.compile(
@@ -45,6 +47,7 @@ object YouTubeInnerTube {
         val context: InnerTubeContext = InnerTubeContext(),
         val query: String? = null,
         val videoId: String? = null,
+        val continuation: String? = null,
     )
 
     /** `InnerTube` API response structure. */
@@ -63,9 +66,20 @@ object YouTubeInnerTube {
 
     /** Searches YouTube for [query] and returns up to [limit] video results via the InnerTube search endpoint. */
     @Throws(IOException::class)
-    fun search(query: String, limit: Int): List<MediaSearchResult> {
+    fun search(query: String, limit: Int): List<MediaSearchResult> = searchPage(query, limit).results
+
+    /** Returns the first page (up to [limit] videos) matching [query], plus a continuation token for [searchMore]. */
+    @Throws(IOException::class)
+    fun searchPage(query: String, limit: Int): MediaSearchPage {
         val root = post("search", InnerTubeRequest(query = query))
-        return extractSearchVideos(root, limit)
+        return extractSearchPage(root, limit)
+    }
+
+    /** Returns the page following [continuationToken] from a prior [searchPage]/[searchMore] call. */
+    @Throws(IOException::class)
+    fun searchMore(continuationToken: String, limit: Int): MediaSearchPage {
+        val root = post("search", InnerTubeRequest(continuation = continuationToken))
+        return extractSearchContinuationPage(root, limit)
     }
 
     /** Fetches watch-next metadata and related videos for [videoId] via the `InnerTube` `next` endpoint. */
@@ -73,8 +87,8 @@ object YouTubeInnerTube {
     fun next(videoId: String): NextResult {
         val root = post("next", InnerTubeRequest(videoId = videoId))
         val meta = extractWatchMetadata(root)
-        val related = extractRelatedVideos(root, videoId, 25)
-        return NextResult(meta?.title, meta?.uploader, meta?.viewCountRaw, meta?.likeCountRaw, related)
+        val related = extractRelatedPage(root, videoId, 25)
+        return NextResult(meta?.title, meta?.uploader, meta?.viewCountRaw, meta?.likeCountRaw, related.results)
     }
 
     /** Returns up to [limit] related videos for [videoId], excluding the video itself. */
@@ -84,6 +98,30 @@ object YouTubeInnerTube {
         val list = result.related.toMutableList()
         list.removeAll { it.id == videoId }
         return if (list.size > limit) list.subList(0, limit) else list
+    }
+
+    /**
+     * Returns the first page (up to [limit] videos) related to [videoId], plus a continuation token for
+     * [relatedMore]. Falls back to a title search when the related sidebar is empty (rare, but seen on
+     * videos with related recommendations disabled); that fallback batch has no continuation of its own
+     * since it's a one-shot substitute, not a real paginated list.
+     */
+    @Throws(IOException::class)
+    fun relatedPage(videoId: String, limit: Int): MediaSearchPage {
+        val root = post("next", InnerTubeRequest(videoId = videoId))
+        val page = extractRelatedPage(root, videoId, limit + 1)
+        val hits = page.results.filter { it.id != videoId }.take(limit)
+        if (hits.isNotEmpty()) return MediaSearchPage(hits, page.continuationToken)
+        val title = extractWatchMetadata(root)?.title ?: return MediaSearchPage(hits, null)
+        val fallback = extractSearchPage(post("search", InnerTubeRequest(query = title)), limit)
+        return MediaSearchPage(fallback.results.filter { it.id != videoId }, null)
+    }
+
+    /** Returns the page following [continuationToken] from a prior [relatedPage]/[relatedMore] call. */
+    @Throws(IOException::class)
+    fun relatedMore(continuationToken: String, limit: Int): MediaSearchPage {
+        val root = post("next", InnerTubeRequest(continuation = continuationToken))
+        return extractRelatedContinuationPage(root, limit)
     }
 
     /** Fetches title, uploader, and view / like counts for a single [videoId]; returns null if the video is unavailable. */
@@ -149,31 +187,63 @@ object YouTubeInnerTube {
         }
     }
 
-    /** Walks the `InnerTube` search response JSON and collects up to [limit] parsed video entries. */
-    private fun extractSearchVideos(root: JsonObject, limit: Int): List<MediaSearchResult> {
+    /** Walks the initial `InnerTube` search response JSON, collecting up to [limit] videos plus the next-page token. */
+    private fun extractSearchPage(root: JsonObject, limit: Int): MediaSearchPage {
         val out = ArrayList<MediaSearchResult>()
+        var token: String? = null
         runCatching {
             val sections = path(
                 root, "contents", "twoColumnSearchResultsRenderer", "primaryContents",
                 "sectionListRenderer", "contents"
             )
-            val sectionArray = sections.asJsonArrayOrNull() ?: return out
+            val sectionArray = sections.asJsonArrayOrNull() ?: return MediaSearchPage(out, null)
             for (sec in sectionArray) {
-                val isr = sec.asJsonObjectOrNull()?.obj("itemSectionRenderer") ?: continue
-                val contents = isr.array("contents") ?: continue
+                val secObj = sec.asJsonObjectOrNull() ?: continue
+                secObj.obj("continuationItemRenderer")?.let { token = token ?: continuationToken(it) }
+                val contents = secObj.obj("itemSectionRenderer")?.array("contents") ?: continue
                 for (el in contents) {
                     val vr = el.asJsonObjectOrNull()?.obj("videoRenderer") ?: continue
-                    parseVideoRenderer(vr)?.let {
-                        out.add(it)
-                        if (out.size >= limit) return out
-                    }
+                    parseVideoRenderer(vr)?.let { out.add(it) }
                 }
             }
         }.onFailure { e ->
             logger.warn("Search parse failed: ${e.message}")
         }
-        return out
+        return MediaSearchPage(if (out.size > limit) out.subList(0, limit) else out, token)
     }
+
+    /** Walks a search continuation response (`appendContinuationItemsAction`), collecting up to [limit] videos plus the next token. */
+    private fun extractSearchContinuationPage(root: JsonObject, limit: Int): MediaSearchPage {
+        val out = ArrayList<MediaSearchResult>()
+        var token: String? = null
+        runCatching {
+            val commands = path(root, "onResponseReceivedCommands").asJsonArrayOrNull() ?: return MediaSearchPage(out, null)
+            for (cmd in commands) {
+                val items = cmd.asJsonObjectOrNull()?.obj("appendContinuationItemsAction")?.array("continuationItems")
+                    ?: continue
+                for (el in items) {
+                    val itemObj = el.asJsonObjectOrNull() ?: continue
+                    itemObj.obj("continuationItemRenderer")?.let { token = token ?: continuationToken(it) }
+                    val contents = itemObj.obj("itemSectionRenderer")?.array("contents")
+                    if (contents != null) {
+                        for (c in contents) {
+                            val vr = c.asJsonObjectOrNull()?.obj("videoRenderer") ?: continue
+                            parseVideoRenderer(vr)?.let { out.add(it) }
+                        }
+                    } else {
+                        itemObj.obj("videoRenderer")?.let { vr -> parseVideoRenderer(vr)?.let { out.add(it) } }
+                    }
+                }
+            }
+        }.onFailure { e ->
+            logger.warn("Search continuation parse failed: ${e.message}")
+        }
+        return MediaSearchPage(if (out.size > limit) out.subList(0, limit) else out, token)
+    }
+
+    /** Extracts the continuation token from a `continuationItemRenderer` object, or null if malformed. */
+    private fun continuationToken(continuationItemRenderer: JsonObject): String? =
+        continuationItemRenderer.obj("continuationEndpoint")?.obj("continuationCommand")?.optString("token")
 
     /** Parses a single `videoRenderer` JSON object from search results; returns null for Shorts or missing IDs. */
     private fun parseVideoRenderer(vr: JsonObject): MediaSearchResult? {
@@ -243,27 +313,94 @@ object YouTubeInnerTube {
         }.getOrNull()
     }
 
-    /** Parses up to [limit] related videos from a `next` response, skipping the video with id [selfId]. */
-    private fun extractRelatedVideos(root: JsonObject, selfId: String, limit: Int): List<MediaSearchResult> {
+    /**
+     * Walks the initial `next` response's related-video sidebar, collecting up to [limit] videos
+     * (including [selfId] — callers filter it out) plus the next-page token. YouTube's related sidebar
+     * has migrated from `compactVideoRenderer` to `lockupViewModel`; both are handled, [lockupViewModel]
+     * first since it's the current shape.
+     */
+    private fun extractRelatedPage(root: JsonObject, selfId: String, limit: Int): MediaSearchPage {
         val out = ArrayList<MediaSearchResult>()
+        var token: String? = null
         runCatching {
             val results = path(
                 root, "contents", "twoColumnWatchNextResults", "secondaryResults",
                 "secondaryResults", "results"
             )
-            val resultArray = results.asJsonArrayOrNull() ?: return out
+            val resultArray = results.asJsonArrayOrNull() ?: return MediaSearchPage(out, null)
             for (el in resultArray) {
-                val cvr = el.asJsonObjectOrNull()?.obj("compactVideoRenderer") ?: continue
-                val info = parseCompactVideoRenderer(cvr)
-                if (info != null && info.id != selfId) {
-                    out.add(info)
-                    if (out.size >= limit) return out
-                }
+                val itemObj = el.asJsonObjectOrNull() ?: continue
+                itemObj.obj("continuationItemRenderer")?.let { token = token ?: continuationToken(it) }
+                val info = itemObj.obj("lockupViewModel")?.let(::parseLockupViewModel)
+                    ?: itemObj.obj("compactVideoRenderer")?.let(::parseCompactVideoRenderer)
+                // Keep scanning past `limit` (just stop collecting) instead of returning early — the
+                // continuationItemRenderer that carries the next-page token is the LAST element in this
+                // array, after all the real video items, so an early return here would exit before ever
+                // seeing it and permanently strand the list with no continuation.
+                if (info != null && out.size < limit) out.add(info)
             }
         }.onFailure { e ->
             logger.warn("Related parse failed: ${e.message}")
         }
-        return out
+        return MediaSearchPage(out, token)
+    }
+
+    /**
+     * Walks a related-video continuation response (`appendContinuationItemsAction` under
+     * `onResponseReceivedEndpoints`), collecting up to [limit] videos plus the next token. Continuation
+     * items are `lockupViewModel`s directly (no `itemSectionRenderer` wrapper, unlike search).
+     */
+    private fun extractRelatedContinuationPage(root: JsonObject, limit: Int): MediaSearchPage {
+        val out = ArrayList<MediaSearchResult>()
+        var token: String? = null
+        runCatching {
+            val endpoints = path(root, "onResponseReceivedEndpoints").asJsonArrayOrNull() ?: return MediaSearchPage(out, null)
+            for (ep in endpoints) {
+                val items = ep.asJsonObjectOrNull()?.obj("appendContinuationItemsAction")?.array("continuationItems")
+                    ?: continue
+                for (el in items) {
+                    val itemObj = el.asJsonObjectOrNull() ?: continue
+                    itemObj.obj("continuationItemRenderer")?.let { token = token ?: continuationToken(it) }
+                    val info = itemObj.obj("lockupViewModel")?.let(::parseLockupViewModel)
+                        ?: itemObj.obj("compactVideoRenderer")?.let(::parseCompactVideoRenderer)
+                    // See extractRelatedPage: don't return early, the token-bearing item can trail the
+                    // page's video items and an early exit would strand the list without a next token.
+                    if (info != null && out.size < limit) out.add(info)
+                }
+            }
+        }.onFailure { e ->
+            logger.warn("Related continuation parse failed: ${e.message}")
+        }
+        return MediaSearchPage(out, token)
+    }
+
+    /** Parses a `lockupViewModel` JSON object (the current related-video card shape); returns null for non-video content. */
+    private fun parseLockupViewModel(lockup: JsonObject): MediaSearchResult? {
+        val id = lockup.optString("contentId") ?: return null
+        if (lockup.optString("contentType") != "LOCKUP_CONTENT_TYPE_VIDEO") return null
+        val metadataVm = lockup.obj("metadata")?.obj("lockupMetadataViewModel") ?: return null
+        val title = metadataVm.obj("title")?.optString("content") ?: id
+        val avatarUrl = metadataVm.obj("image")
+            ?.obj("decoratedAvatarViewModel")?.obj("avatar")?.obj("avatarViewModel")
+            ?.obj("image")?.array("sources")?.lastOrNull()?.asJsonObjectOrNull()?.optString("url")
+        val rows = metadataVm.obj("metadata")?.obj("contentMetadataViewModel")?.array("metadataRows")
+        val uploader = rows?.getOrNull(0)?.asJsonObjectOrNull()
+            ?.array("metadataParts")?.firstOrNull()?.asJsonObjectOrNull()
+            ?.obj("text")?.optString("content")
+        val detailParts = rows?.getOrNull(1)?.asJsonObjectOrNull()?.array("metadataParts")
+        val views = parseViews(detailParts?.getOrNull(0)?.asJsonObjectOrNull()?.obj("text")?.optString("content"))
+        val publishedText = detailParts?.getOrNull(1)?.asJsonObjectOrNull()?.obj("text")?.optString("content")
+        val daysAgo = parseDaysAgo(publishedText)
+        val duration = parseDuration(
+            lockup.obj("contentImage")?.obj("thumbnailViewModel")?.array("overlays")
+                ?.firstOrNull()?.asJsonObjectOrNull()?.obj("thumbnailBottomOverlayViewModel")
+                ?.array("badges")?.firstOrNull()?.asJsonObjectOrNull()
+                ?.obj("thumbnailBadgeViewModel")?.optString("text")
+        )
+        return MediaSearchResult(
+            id, title, uploader, duration, views, null, publishedText, daysAgo,
+            channelAvatarUrl = avatarUrl,
+        )
     }
 
     /** Parses a `compactVideoRenderer` JSON object from the related-video sidebar; returns null for Shorts or missing IDs. */

@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.api.media.MediaServices
-import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.media.source.MediaSource
@@ -16,7 +15,6 @@ import kotlinx.coroutines.*
 import net.minecraft.client.Minecraft
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.min
 
 /**
  * Async state machine behind the suggestions panel: runs searches and related-video lookups on a
@@ -116,7 +114,7 @@ class SuggestionsController {
                         val twitchLogin = twitchLoginCandidate(q)
 
                         val ytDeferred = async {
-                            runCatching { svc.search(q, RESULT_LIMIT) }
+                            runCatching { svc.searchPage(q, PAGE_SIZE) }
                                 .onFailure { if (it is CancellationException) throw it; logger.warn("Search failed: ${it.message}") }
                                 .getOrNull()
                         }
@@ -127,7 +125,8 @@ class SuggestionsController {
                             }
                         }
 
-                        val youtubeResults = ytDeferred.await()
+                        val youtubePage = ytDeferred.await()
+                        val youtubeResults = youtubePage?.results
                         var liveTwitch = twitchDeferred.await()
 
                         if (liveTwitch == null) {
@@ -142,10 +141,12 @@ class SuggestionsController {
                             return@launchLoad
                         }
 
-                        ArrayList<MediaSearchResult>(1 + (youtubeResults?.size ?: 0)).apply {
+                        val combined = ArrayList<MediaSearchResult>(1 + (youtubeResults?.size ?: 0)).apply {
                             liveTwitch?.let(::add)
                             youtubeResults?.let(::addAll)
                         }
+                        publish(seq, combined, null, nextToken = youtubePage?.continuationToken, mode = MoreMode.Search(q))
+                        return@launchLoad
                     }
                 }
             }.onFailure { e ->
@@ -236,13 +237,45 @@ class SuggestionsController {
         val seq = requestSeq.incrementAndGet()
         launchLoad {
             runCatching {
-                DreamServices.registry.get(MediaServices.SEARCH).related(videoId, RESULT_LIMIT)
-            }.onSuccess { results ->
-                publish(seq, results, null)
+                DreamServices.registry.get(MediaServices.SEARCH).relatedPage(videoId, PAGE_SIZE)
+            }.onSuccess { page ->
+                publish(seq, page.results, null, nextToken = page.continuationToken, mode = MoreMode.Related(videoId))
             }.onFailure { e ->
                 if (e is CancellationException) throw e
                 logger.warn("Related failed $videoId: ${e.message}")
                 publish(seq, null, KEY_ERROR)
+            }
+        }
+    }
+
+    /**
+     * Appends the next page of results if the current list came from a paginable search / related load,
+     * a page isn't already in flight, and the list isn't already exhausted. Called by the panel as the
+     * user scrolls near the end of the currently loaded cards; safe to call every frame.
+     */
+    fun loadMoreIfNeeded() {
+        if (loadingMore || isLoading) return
+        val mode = moreMode ?: return
+        val token = continuationToken ?: return
+        loadingMore = true
+        val seq = requestSeq.value
+        launchLoad {
+            val page = runCatching {
+                val svc = DreamServices.registry.get(MediaServices.SEARCH)
+                when (mode) {
+                    is MoreMode.Search -> svc.searchMore(token, PAGE_SIZE)
+                    is MoreMode.Related -> svc.relatedMore(token, PAGE_SIZE)
+                }
+            }.onFailure { e ->
+                if (e is CancellationException) throw e
+                logger.warn("Load-more failed: ${e.message}")
+            }.getOrNull()
+
+            Minecraft.getInstance().execute {
+                loadingMore = false
+                if (seq != requestSeq.value || page == null) return@execute
+                continuationToken = page.continuationToken
+                appendCards(page.results)
             }
         }
     }
@@ -256,14 +289,25 @@ class SuggestionsController {
         statusKey = KEY_LOADING
         loadStartedAtMs = System.currentTimeMillis()
         cards.clear()
+        moreMode = null
+        continuationToken = null
         onResults()
     }
 
-    /** Applies a finished request on the client thread, ignoring it if a newer request superseded it. */
-    private fun publish(seq: Int, results: List<MediaSearchResult>?, error: String?) {
+    /**
+     * Applies a finished request on the client thread, ignoring it if a newer request superseded it.
+     * [nextToken]/[mode] are set for paginable loads (plain search / related-videos); left null for
+     * single-video or Twitch-only results, which have nothing more to page through.
+     */
+    private fun publish(
+        seq: Int, results: List<MediaSearchResult>?, error: String?,
+        nextToken: String? = null, mode: MoreMode? = null,
+    ) {
         Minecraft.getInstance().execute {
             if (seq != requestSeq.value) return@execute
             cards.clear()
+            moreMode = mode
+            continuationToken = nextToken
             onResults()
             if (error != null) {
                 statusKey = error
@@ -274,12 +318,24 @@ class SuggestionsController {
                 return@execute
             }
             statusKey = null
-            cards.addAll(results.subList(0, min(results.size, RESULT_LIMIT)))
-            for (info in cards) {
-                val thumbUrl = info.thumbnailUrlOverride
-                if (thumbUrl != null) Thumbnails.request(info.id, thumbUrl)
-                else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
-            }
+            appendCards(results)
+        }
+    }
+
+    /**
+     * Adds [results] to [cards] (skipping ids already shown — search / related continuation pages can
+     * overlap the previous page when the underlying list shifts between requests) and kicks off their
+     * thumbnail downloads; must run on the client thread.
+     */
+    private fun appendCards(results: List<MediaSearchResult>) {
+        val startIndex = cards.size
+        val seen = HashSet<String>(cards.size).apply { cards.mapTo(this) { it.id } }
+        for (info in results) if (seen.add(info.id)) cards.add(info)
+        for (i in startIndex until cards.size) {
+            val info = cards[i]
+            val thumbUrl = info.thumbnailUrlOverride
+            if (thumbUrl != null) Thumbnails.request(info.id, thumbUrl)
+            else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
         }
     }
 
@@ -304,8 +360,8 @@ class SuggestionsController {
     }
 
     companion object {
-        /** Maximum number of results to show in the panel. */
-        const val RESULT_LIMIT = 72
+        /** Results fetched per page; the panel loads another page as the user scrolls near the end. */
+        const val PAGE_SIZE = 15
 
         /** Translation kes for the status line. */
         private const val KEY_LOADING = "dreamdisplays.suggestions.loading"

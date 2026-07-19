@@ -1,27 +1,29 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
-//? if >=1.21.11 {
-//?}
-//? if >=1.21.11 {
-//?} else
-/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.*
 import com.dreamdisplays.platform.client.ui.widgets.SuggestionsPanel.Companion.THUMB_H
+//? if >=1.21.11 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.Font
 import net.minecraft.client.gui.components.EditBox
+//? if >=1.21.11 {
 import net.minecraft.client.input.CharacterEvent
 import net.minecraft.client.input.KeyEvent
 import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.client.renderer.RenderPipelines
+//?}
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.network.chat.Component
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.sounds.SoundEvents
 import org.lwjgl.glfw.GLFW
 import kotlin.math.max
@@ -34,12 +36,17 @@ import kotlin.math.roundToInt
  * loading lives in [SuggestionsController]; this widget is the view.
  *
  * @param onPick invoked when the user clicks a result card.
+ * @param controller the async state machine backing this panel; pass one owned by a longer-lived
+ * object (e.g. the display) so results survive this panel being recreated on menu reopen.
  */
 class SuggestionsPanel(
     private val onPick: (MediaSearchResult) -> Unit,
+    private val controller: SuggestionsController,
 ) : UiWidget(Component.translatable("dreamdisplays.button.suggestions")) {
 
-    private val controller = SuggestionsController().also { it.onResults = { scrollOffset = 0 } }
+    init {
+        controller.onResults = { scrollOffset = 0 }
+    }
     private val searchBox: EditBox
     private val clearButton: IconButton
     private val searchButton: IconButton
@@ -218,7 +225,24 @@ class SuggestionsPanel(
             }
             pos += (if (vertical) ch else cw) + CARD_GAP
         }
+        if (controller.isLoadingMore) {
+            val phantomX = if (vertical) stripLeft else pos
+            val phantomY = if (vertical) pos else rowY
+            val visibleOnAxis = if (vertical) phantomY <= stripBottom else phantomX <= stripRight
+            if (visibleOnAxis) {
+                g.drawShimmer(
+                    phantomX, phantomY, phantomX + cw, phantomY + ch,
+                    UiTheme.PLACEHOLDER_BG, UiTheme.PLACEHOLDER_SHIMMER,
+                )
+            }
+        }
         g.disableScissor()
+        // Fires once the user has scrolled within one viewport of the end of the loaded cards; cheap
+        // to call every frame since loadMoreIfNeeded() no-ops while a page is already in flight or the
+        // list is exhausted.
+        if (cards.isNotEmpty() && scrollOffset >= maxOff - viewportH) {
+            controller.loadMoreIfNeeded()
+        }
         //? if >=1.21.11 {
         if (hoveredCard in cards.indices) g.requestCursor(CursorTypes.POINTING_HAND)
         //?}

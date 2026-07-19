@@ -78,7 +78,7 @@ object VoxelAcousticsProbe {
         }
     }
 
-    /** SoundType → material coefficients, seeded from Sound Physics Remastered's default tables. */
+    /** SoundType -> material coefficients, seeded from `Sound Physics Remastered`'s default tables. */
     private val MATERIALS: Map<SoundType, AcousticMaterial> = buildMaterialTable()
 
     /**
@@ -201,7 +201,7 @@ object VoxelAcousticsProbe {
         return MATERIALS[soundType] ?: AcousticMaterial.DEFAULT
     }
 
-    /** Builds the SoundType → material map from Sound Physics Remastered's reflectivity / occlusion values. */
+    /** Builds the `SoundType` -> material map from `Sound Physics Remastered`'s reflectivity / occlusion values. */
     private fun buildMaterialTable(): Map<SoundType, AcousticMaterial> {
         fun m(reflectivity: Float, occlusion: Float = 1.0f) = AcousticMaterial(reflectivity, occlusion)
         val map = HashMap<SoundType, AcousticMaterial>()

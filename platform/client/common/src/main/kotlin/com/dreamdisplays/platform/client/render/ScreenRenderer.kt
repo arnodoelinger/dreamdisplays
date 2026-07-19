@@ -7,6 +7,7 @@ package com.dreamdisplays.platform.client.render
 //?} else
 /*import com.mojang.blaze3d.vertex.Tesselator*/
 //? if >=1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderType
 //?} else
 /*import net.minecraft.client.renderer.RenderType*/
 import com.dreamdisplays.api.display.model.ContentRotation
@@ -23,7 +24,6 @@ import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Camera
-import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sin
 

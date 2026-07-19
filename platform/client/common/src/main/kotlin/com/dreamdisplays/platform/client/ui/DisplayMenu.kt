@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.ui
 
 //? if >=1.21.11 {
+import net.minecraft.client.input.MouseButtonEvent
 //?}
 import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.api.display.service.DisplayServices
@@ -31,7 +32,6 @@ import com.dreamdisplays.platform.client.ui.widgets.*
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
 import kotlin.math.abs
 import kotlin.math.floor
@@ -331,7 +331,7 @@ class DisplayMenu private constructor(
                 })
         } else null
 
-        suggestions = addUi(SuggestionsPanel(::onPickSuggested))
+        suggestions = addUi(SuggestionsPanel(::onPickSuggested, ds.suggestionsController))
         suggestions.visibleWhen = { !ds.errored && suggestionsRect != null }
         // Locked / Broadcast / Watch party displays only let the owner / admin change the video, so
         // the panel shows an "unavailable" notice to everyone else instead of pickable suggestions.

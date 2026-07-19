@@ -1,12 +1,12 @@
 package com.dreamdisplays.platform.client.ui.menu
 
-//? if >=1.21.11 {
-//?}
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.*
+//? if >=1.21.11 {
 import com.mojang.blaze3d.platform.cursor.CursorTypes
+//?}
 import net.minecraft.client.Minecraft
 import net.minecraft.client.resources.sounds.SimpleSoundInstance
 import net.minecraft.sounds.SoundEvents
