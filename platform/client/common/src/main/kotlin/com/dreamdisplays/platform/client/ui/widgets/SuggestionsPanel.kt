@@ -49,6 +49,11 @@ class SuggestionsPanel(
     }
     private val searchBox: EditBox
     private val clearButton: IconButton
+    private val sortButton: IconButton
+    private val sortDropdown: SortDropdown = SortDropdown(
+        current = { controller.sortOption },
+        onSelect = { controller.setSort(it) },
+    )
     private val searchButton: IconButton
 
     /** When this returns false the panel is locked: it shows an "unavailable" notice and ignores input. */
@@ -86,6 +91,9 @@ class SuggestionsPanel(
             searchBox.value = ""
             searchBox.isFocused = true
         }
+        sortButton = IconButton(icon = { IconButton.modIcon("filter") }, margin = 4) {
+            sortDropdown.toggle()
+        }
         searchButton = IconButton(icon = { IconButton.modIcon("search") }, margin = 4) {
             controller.runSearch(searchBox.value)
         }
@@ -114,8 +122,9 @@ class SuggestionsPanel(
     private fun layoutChildren() {
         searchBox.x = x + 10
         searchBox.y = searchRowY()
-        searchBox.width = width - 20 - (ACTION_W + ACTION_GAP) * 2
-        clearButton.place(UiRect(x + width - 10 - ACTION_W * 2 - ACTION_GAP, searchRowY(), ACTION_W, SEARCH_H))
+        searchBox.width = width - 20 - (ACTION_W + ACTION_GAP) * 3
+        clearButton.place(UiRect(x + width - 10 - ACTION_W * 3 - ACTION_GAP * 2, searchRowY(), ACTION_W, SEARCH_H))
+        sortButton.place(UiRect(x + width - 10 - ACTION_W * 2 - ACTION_GAP, searchRowY(), ACTION_W, SEARCH_H))
         searchButton.place(UiRect(x + width - 10 - ACTION_W, searchRowY(), ACTION_W, SEARCH_H))
     }
 
@@ -150,7 +159,7 @@ class SuggestionsPanel(
     /** Total scrollable content extent along the scroll axis. */
     private fun contentExtent(viewportW: Int): Int {
         val per = (if (vertical) cardH(viewportW) else cardW(viewportW)) + CARD_GAP
-        return controller.cards.size * per - CARD_GAP
+        return controller.visibleCards.size * per - CARD_GAP
     }
 
     /** Maximum scroll offset for the current viewport. */
@@ -173,12 +182,16 @@ class SuggestionsPanel(
         layoutChildren()
         searchBox.renderChild(g, mouseX, mouseY, partialTick)
         clearButton.renderChild(g, mouseX, mouseY, partialTick)
+        sortButton.renderChild(g, mouseX, mouseY, partialTick)
         searchButton.renderChild(g, mouseX, mouseY, partialTick)
 
         val stripTop = stripTop()
         val stripBottom = stripBottom()
         val stripH = stripBottom - stripTop
-        if (stripH < 40) return
+        if (stripH < 40) {
+            drawSortDropdown(g, mouseX, mouseY)
+            return
+        }
         lastStripH = stripH
 
         controller.statusKey?.let { key ->
@@ -188,6 +201,7 @@ class SuggestionsPanel(
                 base.replace(Regex("\\.+$"), "") + " • " + elapsed + "s"
             } else base
             g.drawText(f, msg, x + 10, stripTop + 6, UiTheme.TEXT_SECONDARY, false)
+            drawSortDropdown(g, mouseX, mouseY)
             return
         }
 
@@ -201,7 +215,7 @@ class SuggestionsPanel(
         val maxOff = maxScroll(viewportW, viewportH)
         scrollOffset = scrollOffset.coerceIn(0, maxOff)
 
-        val cards = controller.cards
+        val cards = controller.visibleCards
         g.enableScissor(stripLeft, stripTop, stripRight, stripBottom)
         hoveredCard = -1
         val rowY = if (vertical) 0 else stripTop + max(0, (viewportH - ch) / 2)
@@ -253,6 +267,12 @@ class SuggestionsPanel(
             g.requestCursor(if (sbVertical) CursorTypes.RESIZE_NS else CursorTypes.RESIZE_EW)
         }
         //?}
+        drawSortDropdown(g, mouseX, mouseY)
+    }
+
+    /** Draws the sort dropdown last so it layers on top of the card strip below the search row. */
+    private fun drawSortDropdown(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int) {
+        sortDropdown.draw(g, sortButton.x + sortButton.width / 2, sortButton.y + sortButton.height, mouseX, mouseY)
     }
 
     /** Draws the thin scrollbar along the scroll axis when content overflows. */
@@ -446,7 +466,12 @@ class SuggestionsPanel(
         if (!available()) return false
         val mouseX = event.x()
         val mouseY = event.y()
+        val mx = mouseX.toInt()
+        val my = mouseY.toInt()
+        val onSortButton = sortButton.isMouseOver(mouseX, mouseY)
+        if (sortDropdown.visible && event.button() == 0 && !onSortButton && sortDropdown.handleClick(mx, my)) return true
         if (clearButton.isMouseOver(mouseX, mouseY)) return clearButton.mouseClicked(event, dbl)
+        if (onSortButton) return sortButton.mouseClicked(event, dbl)
         if (searchButton.isMouseOver(mouseX, mouseY)) return searchButton.mouseClicked(event, dbl)
         if (searchBox.isMouseOver(mouseX, mouseY)) {
             val handled = searchBox.mouseClicked(event, dbl)
@@ -460,10 +485,10 @@ class SuggestionsPanel(
             return true
         }
         val card = if (event.button() == 0) cardAt(mouseX, mouseY) else -1
-        if (card in controller.cards.indices) {
+        if (card in controller.visibleCards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
             Minecraft.getInstance().soundManager.play(s)
-            onPick(controller.cards[card])
+            onPick(controller.visibleCards[card])
             return true
         }
         return false
@@ -487,7 +512,12 @@ class SuggestionsPanel(
     //?} else
     /*override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
         if (!available()) return false
+        val mx = mouseX.toInt()
+        val my = mouseY.toInt()
+        val onSortButton = sortButton.isMouseOver(mouseX, mouseY)
+        if (sortDropdown.visible && button == 0 && !onSortButton && sortDropdown.handleClick(mx, my)) return true
         if (clearButton.isMouseOver(mouseX, mouseY)) return clearButton.mouseClicked(mouseX, mouseY, button)
+        if (onSortButton) return sortButton.mouseClicked(mouseX, mouseY, button)
         if (searchButton.isMouseOver(mouseX, mouseY)) return searchButton.mouseClicked(mouseX, mouseY, button)
         if (searchBox.isMouseOver(mouseX, mouseY)) {
             val handled = searchBox.mouseClicked(mouseX, mouseY, button)
@@ -501,10 +531,10 @@ class SuggestionsPanel(
             return true
         }
         val card = if (button == 0) cardAt(mouseX, mouseY) else -1
-        if (card in controller.cards.indices) {
+        if (card in controller.visibleCards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
             Minecraft.getInstance().soundManager.play(s)
-            onPick(controller.cards[card])
+            onPick(controller.visibleCards[card])
             return true
         }
         return false
@@ -542,7 +572,7 @@ class SuggestionsPanel(
         val ch = cardH(viewportW)
         val rowY = if (vertical) 0 else stripTop + max(0, (viewportH - ch) / 2)
         var pos = (if (vertical) stripTop else stripLeft) - scrollOffset
-        for (i in controller.cards.indices) {
+        for (i in controller.visibleCards.indices) {
             val cardX = if (vertical) stripLeft else pos
             val cardY = if (vertical) pos else rowY
             if (mouseX >= max(cardX, stripLeft) && mouseX < min(cardX + cw, stripRight) &&

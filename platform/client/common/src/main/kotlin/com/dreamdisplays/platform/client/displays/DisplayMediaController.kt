@@ -7,6 +7,7 @@ import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment
+import com.dreamdisplays.platform.client.storage.WatchedVideoStore
 import kotlinx.atomicfu.atomic
 import net.minecraft.client.Minecraft
 
@@ -79,6 +80,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
     fun start() {
         val mp = player ?: return
         videoStarted = true
+        (screen.videoUrl?.let(MediaSource::from) as? MediaSource.YouTube)?.let { WatchedVideoStore.markWatched(it.videoId) }
         screen.applyEffectiveVolume()
         mp.setBrightness(screen.brightness)
         if (screen.paused) mp.pause() else {

@@ -2,6 +2,7 @@ package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
+import com.dreamdisplays.api.media.search.SortOrder
 import com.dreamdisplays.api.media.search.YouTubeUrls
 import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.media.runtime.Processes
@@ -230,11 +231,11 @@ object YtDlp {
         }
     }
 
-    /** Fetches the first page (up to [limit] results) matching [query]; a fresh network call each time (continuation isn't cacheable). */
+    /** Fetches the first page (up to [limit] results) matching [query] in [sortOrder]; a fresh network call each time (continuation isn't cacheable). */
     @Throws(IOException::class)
-    fun searchPage(query: String, limit: Int): MediaSearchPage {
+    fun searchPage(query: String, limit: Int, sortOrder: SortOrder = SortOrder.RELEVANCE): MediaSearchPage {
         if (query.isBlank()) return MediaSearchPage(emptyList(), null)
-        return YouTubeInnerTube.searchPage(query.trim(), limit.coerceIn(1, 25))
+        return YouTubeInnerTube.searchPage(query.trim(), limit.coerceIn(1, 25), sortOrder)
     }
 
     /** Fetches the page following [continuationToken] from a prior [searchPage]/[searchMore] call. */

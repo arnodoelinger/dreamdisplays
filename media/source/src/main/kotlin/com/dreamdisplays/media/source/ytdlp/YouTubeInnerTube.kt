@@ -2,6 +2,7 @@ package com.dreamdisplays.media.source.ytdlp
 
 import com.dreamdisplays.api.media.search.MediaSearchPage
 import com.dreamdisplays.api.media.search.MediaSearchResult
+import com.dreamdisplays.api.media.search.SortOrder
 import com.dreamdisplays.media.source.ytdlp.YouTubeInnerTube.runsText
 import com.dreamdisplays.util.*
 import com.dreamdisplays.util.json.DreamJson
@@ -48,6 +49,7 @@ object YouTubeInnerTube {
         val query: String? = null,
         val videoId: String? = null,
         val continuation: String? = null,
+        val params: String? = null,
     )
 
     /** `InnerTube` API response structure. */
@@ -68,10 +70,10 @@ object YouTubeInnerTube {
     @Throws(IOException::class)
     fun search(query: String, limit: Int): List<MediaSearchResult> = searchPage(query, limit).results
 
-    /** Returns the first page (up to [limit] videos) matching [query], plus a continuation token for [searchMore]. */
+    /** Returns the first page (up to [limit] videos) matching [query] in [sortOrder], plus a continuation token for [searchMore]. */
     @Throws(IOException::class)
-    fun searchPage(query: String, limit: Int): MediaSearchPage {
-        val root = post("search", InnerTubeRequest(query = query))
+    fun searchPage(query: String, limit: Int, sortOrder: SortOrder = SortOrder.RELEVANCE): MediaSearchPage {
+        val root = post("search", InnerTubeRequest(query = query, params = sortOrder.spParam))
         return extractSearchPage(root, limit)
     }
 
@@ -262,9 +264,10 @@ object YouTubeInnerTube {
             vr.obj("channelThumbnailSupportedRenderers")?.obj("channelThumbnailWithLinkRenderer")?.obj("thumbnail")
         )
         val isVerified = hasVerifiedBadge(vr.array("ownerBadges"))
+        val isLive = hasLiveBadge(vr.array("badges"))
         return MediaSearchResult(
             id, title, uploader, duration, views, null, publishedText, daysAgo,
-            channelAvatarUrl = avatarUrl, isVerified = isVerified,
+            channelAvatarUrl = avatarUrl, isVerified = isVerified, isLive = isLive,
         )
     }
 
@@ -391,15 +394,17 @@ object YouTubeInnerTube {
         val views = parseViews(detailParts?.getOrNull(0)?.asJsonObjectOrNull()?.obj("text")?.optString("content"))
         val publishedText = detailParts?.getOrNull(1)?.asJsonObjectOrNull()?.obj("text")?.optString("content")
         val daysAgo = parseDaysAgo(publishedText)
-        val duration = parseDuration(
-            lockup.obj("contentImage")?.obj("thumbnailViewModel")?.array("overlays")
-                ?.firstOrNull()?.asJsonObjectOrNull()?.obj("thumbnailBottomOverlayViewModel")
-                ?.array("badges")?.firstOrNull()?.asJsonObjectOrNull()
-                ?.obj("thumbnailBadgeViewModel")?.optString("text")
-        )
+        // A live broadcast has no fixed length, so YouTube puts "LIVE" in the same bottom-overlay badge
+        // slot a finished video would use for its duration; parseDuration silently rejects that text.
+        val durationBadgeText = lockup.obj("contentImage")?.obj("thumbnailViewModel")?.array("overlays")
+            ?.firstOrNull()?.asJsonObjectOrNull()?.obj("thumbnailBottomOverlayViewModel")
+            ?.array("badges")?.firstOrNull()?.asJsonObjectOrNull()
+            ?.obj("thumbnailBadgeViewModel")?.optString("text")
+        val duration = parseDuration(durationBadgeText)
+        val isLive = durationBadgeText?.equals("LIVE", ignoreCase = true) == true
         return MediaSearchResult(
             id, title, uploader, duration, views, null, publishedText, daysAgo,
-            channelAvatarUrl = avatarUrl,
+            channelAvatarUrl = avatarUrl, isLive = isLive,
         )
     }
 
@@ -417,9 +422,10 @@ object YouTubeInnerTube {
         val daysAgo = parseDaysAgo(publishedText)
         val avatarUrl = largestThumbnailUrl(cvr.obj("channelThumbnail"))
         val isVerified = hasVerifiedBadge(cvr.array("ownerBadges") ?: cvr.array("channelBadges"))
+        val isLive = hasLiveBadge(cvr.array("badges"))
         return MediaSearchResult(
             id, title, uploader, duration, views, null, publishedText, daysAgo,
-            channelAvatarUrl = avatarUrl, isVerified = isVerified,
+            channelAvatarUrl = avatarUrl, isVerified = isVerified, isLive = isLive,
         )
     }
 
@@ -498,6 +504,15 @@ object YouTubeInnerTube {
         return badges.any { badge ->
             val style = badge.asJsonObjectOrNull()?.obj("metadataBadgeRenderer")?.optString("style")
             style != null && "VERIFIED" in style
+        }
+    }
+
+    /** Returns true if [badgesArray] contains a `metadataBadgeRenderer` marking the video as currently live. */
+    private fun hasLiveBadge(badgesArray: JsonArray?): Boolean {
+        val badges = badgesArray ?: return false
+        return badges.any { badge ->
+            val style = badge.asJsonObjectOrNull()?.obj("metadataBadgeRenderer")?.optString("style")
+            style != null && "LIVE_NOW" in style
         }
     }
 

@@ -47,6 +47,9 @@ data class MediaSearchResult(
 
     /** True when the uploader/channel carries a platform "verified" badge. */
     val isVerified: Boolean = false,
+
+    /** True when this result is a currently-live broadcast. */
+    val isLive: Boolean = false,
 ) {
     /** Returns true if the video was published within the last [daysWindow] days. */
     fun isRecent(daysWindow: Int): Boolean =

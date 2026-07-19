@@ -79,5 +79,11 @@
   "dreamdisplays.suggestions.loading": "Загрузка...",
   "dreamdisplays.suggestions.empty": "Ничего не найдено.",
   "dreamdisplays.suggestions.error": "Не удалось загрузить.",
-  "dreamdisplays.suggestions.unavailable": "Рекомендации недоступны."
+  "dreamdisplays.suggestions.unavailable": "Рекомендации недоступны.",
+  "dreamdisplays.sort.relevance": "Релевантность",
+  "dreamdisplays.sort.popularity": "Популярность",
+  "dreamdisplays.sort.newest": "Новые",
+  "dreamdisplays.sort.streams": "Стримы",
+  "dreamdisplays.sort.unwatched": "Не просмотрено",
+  "dreamdisplays.sort.watched": "Просмотрено"
 }

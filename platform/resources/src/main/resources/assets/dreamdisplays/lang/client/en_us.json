@@ -79,5 +79,11 @@
   "dreamdisplays.suggestions.loading": "Loading...",
   "dreamdisplays.suggestions.empty": "No results found.",
   "dreamdisplays.suggestions.error": "Failed to load.",
-  "dreamdisplays.suggestions.unavailable": "Suggestions unavailable."
+  "dreamdisplays.suggestions.unavailable": "Suggestions unavailable.",
+  "dreamdisplays.sort.relevance": "Relevance",
+  "dreamdisplays.sort.popularity": "Popularity",
+  "dreamdisplays.sort.newest": "Newest",
+  "dreamdisplays.sort.streams": "Streams",
+  "dreamdisplays.sort.unwatched": "Unwatched",
+  "dreamdisplays.sort.watched": "Watched"
 }
