@@ -2,27 +2,67 @@
 
 ## Highlights
 
-- Fixed crash on `Fabric` 1.21.11
+- 3D audio support
+- Language selector right in the display menu
+- Now recommendations are endlessly scrolling
+- [Crowdin](https://crowdin.com/project/dreamdisplays) platform integration
+- Fixed some bugs, including crash on `Fabric` 1.21.11
+- New Gradle build system
+- Some other minor improvements
 
 ## Client
 
 ### Features
 
-- Added [Crowdin integration]()
+- Added 3D acoustics for displays: sound is now muffled by walls (occlusion), loses highs over distance (air
+  absorption), and picks up room / cave reverberation raytraced from nearby blocks and their material; e.g., stone
+  reflects, wool absorbs ([#147](https://github.com/arnodoelinger/dreamdisplays/pull/147))
+- Added audio track selector, so you can select your language right in the display menu
+  ([#149](https://github.com/arnodoelinger/dreamdisplays/pull/149))
+- Added subtitles support ([#151](https://github.com/arnodoelinger/dreamdisplays/pull/151))
+- Added click sounds when clicking on buttons in the display menu
+- Added [Crowdin](https://crowdin.com/project/dreamdisplays) integration
+  ([#141](https://github.com/arnodoelinger/dreamdisplays/pull/141))
 
 ### Improvements
+
+- Enhanced UI components ([#148](https://github.com/arnodoelinger/dreamdisplays/pull/148))
+- Now recommendations are endlessly scrolling
+- Enhanced cursor handling for 1.21.11
+- Improved popout context menu positioning
+- Improved scrollbars: now you can drag them
+- Retry on "Not all references are available" error instead of fatal erroring
+- Removed greying out buttons feature when the display is not ready yet
+- Added author's avatar by their name
+- Added verified badge by author's name
+- Improved Gradle build system, so that looks less like a frankenstein
+  ([#150](https://github.com/arnodoelinger/dreamdisplays/pull/150))
+- Improved platform resources structure
+- Use more Kotlin analogues instead of Java imports
+- Optimized imports
 
 ### Fixes
 
+- Fixed "Unrecoverable stream failure" error when using Iris shaders
+  ([#146](https://github.com/arnodoelinger/dreamdisplays/issue/146))
+- Fixed a `Synced` / `Broadcast` display sometimes getting stuck on "Waiting for video..." forever
+  ([#138](https://github.com/arnodoelinger/dreamdisplays/issue/138))
+- Fixed disappearing video preview when pausing and returning to the menu
+- Fixed video sometimes freezing indefinitely
+- Fixed disappearing suggestions in some cases
+  after a stutter / lag spike, requiring a seek to unstick it
+- Fixed retries being silently unlimited when a resolved stream failed to open right away
+- Fixed some videos getting a permanently broken stream (403 Forbidden) instead of falling back to a working one
+- Loop `Local` displays on instead of freezing
+
 ## Server
-
-### Features
-
-### Improvements
 
 ### Fixes
 
 - Fixed crash on `Fabric` 1.21.11 caused by invalid `BareTokenArgumentType` registration
+  ([#137](https://github.com/arnodoelinger/dreamdisplays/issue/137))
+- Use more Kotlin analogues instead of Java imports
+- Optimized imports
 
 # 1.9.0 Preview 2
 
@@ -83,7 +123,8 @@
 - `NeoForge` server support (including single-player) ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
 - Full Twitch support ([#129](https://github.com/arnodoelinger/dreamdisplays/pull/129))
 - New Borderless and Fullscreen display modes ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
-- New command: `/display fullscreen` for events and presentations ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- New command: `/display fullscreen` for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
 - Added support for saving and restoring the last known playback position everywhere
 - Added support for saving and restoring each display's custom render distance across game restarts
 
@@ -125,7 +166,8 @@
 - `NeoForge` server support ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
 - Full `LuckPerms` support on `Fabric` / `NeoForge` servers
   ([#128](https://github.com/arnodoelinger/dreamdisplays/pull/128))
-- New command: `/display fullscreen` for events and presentations ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- New command: `/display fullscreen` for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
 
 ### Improvements
 
