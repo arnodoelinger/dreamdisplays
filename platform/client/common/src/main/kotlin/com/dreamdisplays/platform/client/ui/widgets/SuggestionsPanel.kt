@@ -340,6 +340,13 @@ class SuggestionsPanel(
         else -> null
     }
 
+    /** True when [info]'s thumbnail fetch (via whichever key [cardThumbnail] reads) has already failed. */
+    private fun cardThumbnailFailed(info: MediaSearchResult): Boolean = when {
+        info.thumbnailUrlOverride != null -> Thumbnails.isFailed(info.id)
+        info.isYouTubeResult -> Thumbnails.isFailed(info.id, Thumbnails.Quality.LOW)
+        else -> false
+    }
+
     /** Requests [info]'s card thumbnail via the path matching [cardThumbnail]'s key, if not already loaded. */
     private fun requestCardThumbnail(info: MediaSearchResult) {
         val url = info.thumbnailUrlOverride
@@ -371,7 +378,9 @@ class SuggestionsPanel(
         // A card still has an image on the way when it is a custom-art card, a YouTube result whose
         // thumbnail is downloading, or a platform result carrying a thumbnail URL. Anything else has
         // nothing to load, so a shimmer would promise an image that never arrives - draw the plate.
-        val awaitingThumbnail = info.isYouTubeResult || info.thumbnailUrlOverride != null
+        // A URL that has already failed (e.g. a Kick CDN 403) counts the same way - it is never
+        // coming, so keep showing an eternal shimmer would be a lie.
+        val awaitingThumbnail = (info.isYouTubeResult || info.thumbnailUrlOverride != null) && !cardThumbnailFailed(info)
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
         } else if (info.isCustom || !awaitingThumbnail) {

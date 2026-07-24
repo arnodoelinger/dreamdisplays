@@ -264,7 +264,10 @@ class PreviewSection(
             }
             // A custom link has no thumbnail to wait for, so a shimmer would animate forever over
             // something that is loading fine. A flat plate with the host reads as settled instead.
-            currentThumbnailKey() == null && currentSource() != null ->
+            // A key whose fetch already failed (e.g. a Kick CDN 403) counts the same way — it is
+            // never coming either.
+            (currentThumbnailKey() == null || currentThumbnailKey()?.let(Thumbnails::isFailed) == true) &&
+                    currentSource() != null ->
                 drawCustomBackdrop(g, box)
             // Something is assigned and loading, just no thumbnail decoded yet: a neat shimmer
             currentSource() != null ->

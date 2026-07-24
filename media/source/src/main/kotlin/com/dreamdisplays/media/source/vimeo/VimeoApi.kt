@@ -115,11 +115,15 @@ object VimeoApi {
         }.onFailure { logger.debug("Vimeo config fetch failed for {}: {}", videoId, it.message) }.getOrNull()
     }
 
-    /** Picks the largest thumbnail Vimeo offers in the `thumbs` map. */
+    /**
+     * Picks the largest thumbnail Vimeo offers in the `thumbs` map, falling back to the flat
+     * `thumbnail_url` field — many config responses carry only the latter (`thumbs` comes back
+     * as an empty object), so relying on `thumbs` alone silently drops the thumbnail.
+     */
     private fun bestThumbnail(video: JsonObject?): String? {
-        val thumbs = video?.obj("thumbs") ?: return null
-        return thumbs.optString("1280") ?: thumbs.optString("960") ?: thumbs.optString("640")
-            ?: thumbs.optString("base")
+        val thumbs = video?.obj("thumbs")
+        return thumbs?.optString("1280") ?: thumbs?.optString("960") ?: thumbs?.optString("640")
+            ?: thumbs?.optString("base") ?: video?.optString("thumbnail_url")
     }
 
     /** Picks the largest owner-portrait size from the numeric-keyed `portrait` map. */
