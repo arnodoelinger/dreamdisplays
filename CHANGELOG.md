@@ -3,23 +3,17 @@
 ## Highlights
 
 - Custom videos: paste a direct link to any video and play it on a display
-- Vimeo and Kick support
+- File-host share link support (Google Drive, Dropbox, imgur, etc.)
+- Kick and Vimeo support
 
 ## Client
 
 ### Features
 
-- Added Vimeo support: paste any Vimeo link (public, unlisted, or embed) to play it, with the real
-  title, uploader, and thumbnail
-- Added Kick support: paste a Kick channel or VOD link to play it — live channels also surface when
-  you search a streamer's name, alongside Twitch
-- Added custom video support: paste a direct link to a video file (`.mp4`, `.webm`, `.mkv`, …), an
-  HLS/DASH stream, or a file-host share link (Google Drive, Dropbox, GitHub, imgur, pixeldrain, …)
-  straight into the search box to play it — no YouTube required
-- Share links are rewritten to the real file automatically, extension-less CDN links are detected by
-  content, and pasted links tolerate chat wrappers and a missing `https://`
-- Added a "My links" filter that remembers every custom link you have played; right-click a card to
-  forget it
+- Added custom video support, so you can paste a direct link to any video and play it on a display
+- Addded file-host share link support (Google Drive, Dropbox, imgur, etc.)
+- Added Kick support
+- Added Vimeo support
 - Added filter button
 - Added Vietnamese translations
 - Added Swedish translations
@@ -29,7 +23,7 @@
 ### Features
 
 - Added a `[custom_media]` config section and a `dreamdisplays.custom` permission to control whether
-  players may play their own links (Vimeo, Kick, and direct files), with optional per-host allow/block
+  players may play their own links (Vimeo, Kick, and direct files), with optional per-host allow / block
   lists
 - `/display video` now accepts any supported link, not only YouTube URLs
 
