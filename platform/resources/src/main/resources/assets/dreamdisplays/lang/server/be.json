@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Прымусовыя поўнаэкранныя трансляцыі адключаны ў канфігу",
   "fullscreenNoDisplay": "&7D |&f Дысплей не знойдзены, і няма загружанага свету для трансляцыі па URL",
   "fullscreenListEmpty": "&7D |&f Няма актыўных поўнаэкранных трансляцый",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f Уласныя спасылкі на відэа адключаны на гэтым серверы",
+  "customMediaHostBlocked": "&7D |&f Відэа з гэтага сайта не дазволены на гэтым серверы",
+  "customMediaNoPermission": "&7D |&f У вас няма правоў уключаць свае спасылкі на відэа"
 }

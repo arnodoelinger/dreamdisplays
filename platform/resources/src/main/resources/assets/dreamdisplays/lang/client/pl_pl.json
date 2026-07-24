@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "Błąd wyświetlacza",
   "dreamdisplays.ui.new": "Nowy",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "lajków",
   "dreamdisplays.ui.watching": "widzów",
   "dreamdisplays.ui.views_short": "wyświetleń",
   "dreamdisplays.button.suggestions": "Sugestie",
-  "dreamdisplays.suggestions.search": "Szukaj na YouTube lub Twitch...",
+  "dreamdisplays.suggestions.search": "Szukaj lub wklej link do filmu...",
   "dreamdisplays.suggestions.loading": "Ładowanie...",
   "dreamdisplays.suggestions.empty": "Nie znaleziono żadnych wyników.",
   "dreamdisplays.suggestions.error": "Nie udało się załadować.",
-  "dreamdisplays.suggestions.unavailable": "Sugestie niedostępne."
+  "dreamdisplays.suggestions.unavailable": "Sugestie niedostępne.",
+  "dreamdisplays.ui.custom": "Link",
+  "dreamdisplays.sort.my_links": "Moje linki",
+  "dreamdisplays.suggestions.no_links": "Brak zapisanych linków. Wklej powyżej link do filmu, aby go odtworzyć."
 }

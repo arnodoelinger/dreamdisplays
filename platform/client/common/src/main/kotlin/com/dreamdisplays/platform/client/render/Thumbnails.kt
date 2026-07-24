@@ -72,6 +72,17 @@ object Thumbnails {
         .expireAfterWrite(2, TimeUnit.MINUTES)
         .build()
 
+    /**
+     * Keys whose most recent fetch failed (bad CDN response, decode error, ...). [request] is called
+     * every frame a card is visible, so without this a dead URL (a Kick CDN 403, say) gets re-fetched
+     * on every single frame forever - hammering the remote host and never letting the UI fall back to
+     * placeholder art. Expires so a merely transient failure still gets retried eventually.
+     */
+    private val FAILED: Cache<String, Boolean> = Caffeine.newBuilder()
+        .maximumSize(1_024)
+        .expireAfterWrite(5, TimeUnit.MINUTES)
+        .build()
+
     /** Deduplicates thumbnail byte loads and keeps recently used compressed bytes warm. */
     private val BYTES = AsyncMemo<String, ByteArray>(
         maxSize = 512,
@@ -127,10 +138,13 @@ object Thumbnails {
     /** Returns the blurred ambient-backdrop texture [Identifier] for [videoId], or null until decoded. */
     fun ambientTexture(videoId: String): Identifier? = AMBIENT_TEX.getIfPresent(videoId)
 
-    /** Schedules a background download of [videoId]'s thumbnail at [quality] if not already in flight or ready. */
+    /** True when [videoId]'s thumbnail at [quality] recently failed, so the UI can fall back to placeholder art instead of retrying every frame. */
+    fun isFailed(videoId: String, quality: Quality = Quality.HIGH): Boolean = FAILED.getIfPresent(key(videoId, quality)) != null
+
+    /** Schedules a background download of [videoId]'s thumbnail at [quality] if not already in flight, ready, or recently failed. */
     fun request(videoId: String, quality: Quality = Quality.HIGH) {
         val k = key(videoId, quality)
-        if (READY.getIfPresent(k) != null) return
+        if (READY.getIfPresent(k) != null || FAILED.getIfPresent(k) != null) return
         if (IN_FLIGHT.asMap().putIfAbsent(k, true) != null) return
         DreamCoroutines.clientIo.launch {
             download(videoId, k, loadBytesAsync(k) { fetchForQuality(videoId, quality) })
@@ -143,7 +157,7 @@ object Thumbnails {
      * sources (like Twitch) whose thumbnail URL is already resolved, not just an id to derive one from.
      */
     fun request(key: String, directUrl: String) {
-        if (READY.getIfPresent(key) != null) return
+        if (READY.getIfPresent(key) != null || FAILED.getIfPresent(key) != null) return
         if (IN_FLIGHT.asMap().putIfAbsent(key, true) != null) return
         DreamCoroutines.clientIo.launch { download(key, key, loadBytesAsync(key) { fetch(directUrl) }) }
     }
@@ -187,6 +201,7 @@ object Thumbnails {
                 logger.warn("Fetch failed for $cacheKey: ${e.message}.")
                 BYTES.invalidate(cacheKey)
                 IN_FLIGHT.invalidate(cacheKey)
+                FAILED.put(cacheKey, true)
             }
     }
 
@@ -279,6 +294,7 @@ object Thumbnails {
             // Runs inside a Minecraft.execute task, so nothing may escape onto the main thread
             logger.warn("Decode / register failed for $key: ${e.message}")
             BYTES.invalidate(key)
+            FAILED.put(key, true)
             // The texture manager owns the image only once registration succeeds; closing the
             // texture also closes its image, so close the bare image only when no texture exists yet.
             runCatching { tex?.close() ?: image?.close() }
@@ -332,6 +348,20 @@ object Thumbnails {
         Decoded(image, avg, ambientImage)
     }
 
+    /**
+     * The site whose thumbnail CDN sits behind Cloudflare / hotlink protection needs its own site
+     * as the `Referer`, or the image request 403s even though the URL itself is correct (seen on
+     * `stream.kick.com`). YouTube's `i.ytimg.com` and Twitch's `static-cdn.jtvnw.net` don't check it.
+     */
+    private fun refererFor(url: String): String? {
+        val host = runCatching { java.net.URI(url).host }.getOrNull()?.lowercase(Locale.ROOT) ?: return null
+        return when {
+            host.endsWith("kick.com") -> "https://kick.com/"
+            host.endsWith("vimeocdn.com") || host.endsWith("vimeo.com") -> "https://vimeo.com/"
+            else -> null
+        }
+    }
+
     /** Downloads raw image bytes from [url]; returns null on any HTTP or network error. */
     private fun fetch(url: String): ByteArray? {
         return try {
@@ -339,8 +369,9 @@ object Thumbnails {
                 url,
                 DreamHttpClient.RequestOptions(
                     headers = DreamHttpClient.headersOf(
-                        "User-Agent" to "Mozilla/5.0 Dream Displays",
-                        "Accept" to "image/jpeg,image/png",
+                        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+                        "Accept" to "image/jpeg,image/png,image/webp",
+                        *listOfNotNull(refererFor(url)?.let { "Referer" to it }).toTypedArray(),
                     ),
                     connectTimeoutMs = 8_000,
                     readTimeoutMs = 15_000,

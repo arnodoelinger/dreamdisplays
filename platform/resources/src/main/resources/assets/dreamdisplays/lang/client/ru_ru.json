@@ -71,11 +71,13 @@
   "dreamdisplays.ui.error": "Ошибка дисплея",
   "dreamdisplays.ui.new": "Новый",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "лайков",
   "dreamdisplays.ui.watching": "зрителей",
   "dreamdisplays.ui.views_short": "просмотров",
   "dreamdisplays.button.suggestions": "Рекомендации",
-  "dreamdisplays.suggestions.search": "Поиск YouTube или Twitch...",
+  "dreamdisplays.suggestions.search": "Поиск или вставьте ссылку на видео...",
   "dreamdisplays.suggestions.loading": "Загрузка...",
   "dreamdisplays.suggestions.empty": "Ничего не найдено.",
   "dreamdisplays.suggestions.error": "Не удалось загрузить.",
@@ -85,5 +87,8 @@
   "dreamdisplays.sort.newest": "Новые",
   "dreamdisplays.sort.streams": "Стримы",
   "dreamdisplays.sort.unwatched": "Не просмотрено",
-  "dreamdisplays.sort.watched": "Просмотрено"
+  "dreamdisplays.sort.watched": "Просмотрено",
+  "dreamdisplays.ui.custom": "Ссылка",
+  "dreamdisplays.sort.my_links": "Мои ссылки",
+  "dreamdisplays.suggestions.no_links": "Сохранённых ссылок пока нет. Вставьте ссылку на видео выше, чтобы включить его."
 }

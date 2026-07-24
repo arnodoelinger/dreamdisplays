@@ -1,3 +1,32 @@
+# 1.9.0 Preview 4
+
+## Highlights
+
+- Custom videos: paste a direct link to any video and play it on a display
+- File-host share link support (Google Drive, Dropbox, imgur, etc.)
+- Kick and Vimeo support
+
+## Client
+
+### Features
+
+- Added custom video support, so you can paste a direct link to any video and play it on a display
+- Addded file-host share link support (Google Drive, Dropbox, imgur, etc.)
+- Added Kick support
+- Added Vimeo support
+- Added filter button
+- Added Vietnamese translations
+- Added Swedish translations
+
+## Server
+
+### Features
+
+- Added a `[custom_media]` config section and a `dreamdisplays.custom` permission to control whether
+  players may play their own links (Vimeo, Kick, and direct files), with optional per-host allow / block
+  lists
+- `/display video` now accepts any supported link, not only YouTube URLs
+
 # 1.9.0 Preview 3
 
 ## Highlights

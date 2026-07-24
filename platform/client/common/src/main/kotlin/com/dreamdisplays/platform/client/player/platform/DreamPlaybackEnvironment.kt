@@ -6,7 +6,10 @@ import com.dreamdisplays.api.media.source.MediaResolverRegistry
 import com.dreamdisplays.api.media.stream.StreamSelector
 import com.dreamdisplays.api.runtime.get
 import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.media.source.direct.DirectStreamResolver
+import com.dreamdisplays.media.source.kick.KickResolver
 import com.dreamdisplays.media.source.twitch.TwitchResolver
+import com.dreamdisplays.media.source.vimeo.VimeoResolver
 import com.dreamdisplays.media.source.ytdlp.YtDlp
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.managers.ClientStateManager
@@ -42,10 +45,13 @@ object DreamPlaybackEnvironment : PlaybackEnvironment {
     /** Creates per-player GPU frame uploaders. */
     override val uploaderFactory: FrameUploaderFactory = FrameUploaderFactory { GpuFrameUploader() as FrameUploader }
 
-    /** Invalidates the resolved-URL caches for a stream (`yt-dlp` and the in-process Twitch path). */
+    /** Invalidates every resolved-URL cache for a stream (`yt-dlp`, Twitch, Vimeo, Kick, direct). */
     override val cacheInvalidator: CacheInvalidator = CacheInvalidator { url ->
         YtDlp.invalidateCache(url)
         TwitchResolver.invalidate(url)
+        VimeoResolver.invalidate(url)
+        KickResolver.invalidate(url)
+        DirectStreamResolver.invalidate(url)
     }
 
     /** The registered media resolver chain. */

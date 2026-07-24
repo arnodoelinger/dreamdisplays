@@ -41,8 +41,12 @@ internal object MediaPreparationService {
         )
         val selected = selector.select(resolved.streams, prefs)
 
-        val video = selected.videoStream
-            ?: throw DreamMediaException.NotFound("No usable video stream for $url.")
+        // An audio-only result is a distinct, actionable mistake (a music file / audio-only upload
+        // pointed at a screen), not the generic "nothing usable" case, so it says so.
+        val video = selected.videoStream ?: throw DreamMediaException.NotFound(
+            if (resolved.hasAudio) "This link is audio only. A display needs a video to show."
+            else "No usable video stream for $url.",
+        )
         val audio = selected.audioStream
             ?: throw DreamMediaException.NotFound("No usable audio stream for $url.")
 

@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "Помилка дисплея",
   "dreamdisplays.ui.new": "Новий",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "лайків",
   "dreamdisplays.ui.watching": "глядачів",
   "dreamdisplays.ui.views_short": "переглядів",
   "dreamdisplays.button.suggestions": "Рекомендації",
-  "dreamdisplays.suggestions.search": "Пошук на YouTube або Twitch...",
+  "dreamdisplays.suggestions.search": "Пошук або вставте посилання на відео...",
   "dreamdisplays.suggestions.loading": "Завантаження...",
   "dreamdisplays.suggestions.empty": "Нічого не знайдено.",
   "dreamdisplays.suggestions.error": "Не вдалося завантажити.",
-  "dreamdisplays.suggestions.unavailable": "Рекомендації недоступні."
+  "dreamdisplays.suggestions.unavailable": "Рекомендації недоступні.",
+  "dreamdisplays.ui.custom": "Посилання",
+  "dreamdisplays.sort.my_links": "Мої посилання",
+  "dreamdisplays.suggestions.no_links": "Збережених посилань ще немає. Вставте посилання на відео вище, щоб увімкнути його."
 }

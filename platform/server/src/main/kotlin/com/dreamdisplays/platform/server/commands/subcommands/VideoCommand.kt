@@ -1,8 +1,10 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
 import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.api.media.source.CustomMediaUrls
 import com.dreamdisplays.api.playback.PlaybackPermissions
 import com.dreamdisplays.api.security.LanguageTag
+import com.dreamdisplays.api.security.MediaUrlPolicy
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.baseMaterial
@@ -14,6 +16,8 @@ import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
+import com.dreamdisplays.platform.server.utils.net.CustomMediaGate
 import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
 import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.mojang.brigadier.context.CommandContext
@@ -48,8 +52,10 @@ class VideoCommand : SubCommand {
             return
         }
 
-        val videoId = YouTubeUrls.extractVideoIdTyped(args[1] ?: "")
-        if (videoId == null) {
+        // Any URL the mod can resolve is accepted, not just YouTube: the same custom links the
+        // menu takes work here too, subject to the same server policy applied further down.
+        val requestedUrl = canonicalUrl(args[1] ?: "")
+        if (requestedUrl == null) {
             MessageUtil.sendMessage(player, "invalidURL")
             return
         }
@@ -75,9 +81,18 @@ class VideoCommand : SubCommand {
             return
         }
 
+        CustomMediaGate.refusalKey(
+            requestedUrl,
+            PaperServer.config.settings.customMediaPolicy,
+            player.hasPermission(PaperServer.config.permissions.custom),
+        )?.let {
+            MessageUtil.sendMessage(player, it)
+            return
+        }
+
         val wasSync = data.isSync
         data.apply {
-            url = YouTubeUrls.watchUrl(videoId)
+            url = requestedUrl
             lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
         }
 
@@ -120,6 +135,20 @@ class VideoCommand : SubCommand {
 }
 
 /**
+ * Canonical URL for [raw] as typed on the command line, or null when it is not something the mod
+ * could ever play. A YouTube id or watch URL is rewritten to the canonical watch URL as before;
+ * anything else is accepted as a custom link once it passes the URL-shape policy, so the command
+ * and the menu agree on what a valid video is.
+ */
+private fun canonicalUrl(raw: String): String? {
+    val input = raw.trim()
+    if (input.isEmpty()) return null
+    YouTubeUrls.extractVideoIdTyped(input)?.let { return YouTubeUrls.watchUrl(it) }
+    val normalized = CustomMediaUrls.normalize(input) ?: return null
+    return normalized.takeIf { MediaUrlPolicy.isAllowed(it) }
+}
+
+/**
  * Shared `Fabric` / `NeoForge` implementation of the `/display video` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
@@ -138,7 +167,7 @@ object VanillaVideoCommand {
             return 0
         }
 
-        val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
+        val requestedUrl = canonicalUrl(urlRaw)
             ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
         val targetPos = RegionUtil.getTargetedBlockPos(player)
@@ -156,8 +185,21 @@ object VanillaVideoCommand {
             return 0
         }
 
+        CustomMediaGate.refusalKey(
+            requestedUrl,
+            VanillaServerState.config.settings.customMediaPolicy,
+            VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.custom,
+                VanillaPermissions.Fallback.EVERYONE,
+            ),
+        )?.let { refusal ->
+            MessageUtil.sendMessage(player, refusal)
+            return 0
+        }
+
         val wasSync = data.isSync
-        data.url = YouTubeUrls.watchUrl(videoId)
+        data.url = requestedUrl
         data.lang = LanguageTag.canonicalAudioCode(langRaw).value
         ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(data) }
 

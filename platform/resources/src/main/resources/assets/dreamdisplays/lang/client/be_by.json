@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "Памылка дысплея",
   "dreamdisplays.ui.new": "Новы",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "лайкаў",
   "dreamdisplays.ui.watching": "гледачоў",
   "dreamdisplays.ui.views_short": "праглядаў",
   "dreamdisplays.button.suggestions": "Прапановы",
-  "dreamdisplays.suggestions.search": "Пошук на YouTube або Twitch...",
+  "dreamdisplays.suggestions.search": "Пошук або ўстаўце спасылку на відэа...",
   "dreamdisplays.suggestions.loading": "Загрузка...",
   "dreamdisplays.suggestions.empty": "Нічога не знойдзена.",
   "dreamdisplays.suggestions.error": "Не ўдалося загрузіць.",
-  "dreamdisplays.suggestions.unavailable": "Рэкамендацыі недаступныя."
+  "dreamdisplays.suggestions.unavailable": "Рэкамендацыі недаступныя.",
+  "dreamdisplays.ui.custom": "Спасылка",
+  "dreamdisplays.sort.my_links": "Мае спасылкі",
+  "dreamdisplays.suggestions.no_links": "Захаваных спасылак пакуль няма. Устаўце спасылку на відэа вышэй, каб уключыць яго."
 }

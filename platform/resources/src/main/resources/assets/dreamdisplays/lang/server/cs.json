@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Vynucená celoobrazovková vysílání jsou v konfiguraci zakázána",
   "fullscreenNoDisplay": "&7D |&f Nebyl nalezen žádný displej a není načten žádný svět pro vysílání přes URL",
   "fullscreenListEmpty": "&7D |&f Neběží žádná celoobrazovková vysílání",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f Vlastní odkazy na videa jsou na tomto serveru vypnuté",
+  "customMediaHostBlocked": "&7D |&f Videa z této stránky na tomto serveru nejsou povolena",
+  "customMediaNoPermission": "&7D |&f Nemáš oprávnění přehrávat vlastní odkazy na videa"
 }

@@ -45,10 +45,21 @@ class MediaSourceTest {
         assertEquals("dQw4w9WgXcQ", source.videoId)
     }
 
+    /** An unrecognized page still goes to the extractor chain via [MediaSource.Remote]. */
     @Test
     fun unknownHostFallsBackToRemote() {
-        val url = "https://example.com/video.mp4"
+        val url = "https://example.com/watch/some-video"
         val source = assertIs<MediaSource.Remote>(MediaSource.from(url))
         assertEquals(url, source.url)
+    }
+
+    /** A URL that names a media file skips the extractors entirely (see [CustomMediaUrls]). */
+    @Test
+    fun unknownHostWithMediaFileParsesAsDirectStream() {
+        val url = "https://example.com/video.mp4"
+        val source = assertIs<MediaSource.DirectStream>(MediaSource.from(url))
+        assertEquals(url, source.streamUrl)
+        assertEquals(CustomMediaKind.PROGRESSIVE, source.kind)
+        assertEquals(url, source.toResolvableUrl())
     }
 }

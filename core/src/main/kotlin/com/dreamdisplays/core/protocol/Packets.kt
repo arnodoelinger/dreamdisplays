@@ -275,3 +275,14 @@ data class RadiusPreview(
     @ProtoNumber(5) val show: Boolean = false,
     @ProtoNumber(6) val colorArgb: Int = 0,
 ) : DreamPacket
+
+/**
+ * Client reports the resolved media duration for a display's current video, once, after its
+ * player finishes initializing. Only meaningful for a SYNCED/BROADCAST display whose server-owned
+ * Timeline needs a known duration to loop; applied first-report-wins per video.
+ */
+@Serializable
+data class ReportDuration(
+    @ProtoNumber(1) val id: @Serializable(UuidSerializer::class) UUID = ZERO_UUID,
+    @ProtoNumber(2) val durationMs: Long = 0,
+) : DreamPacket

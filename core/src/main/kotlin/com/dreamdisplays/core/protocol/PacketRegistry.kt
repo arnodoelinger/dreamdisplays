@@ -63,6 +63,7 @@ object PacketRegistry {
         Entry(ProtocolPacketType.FULLSCREEN_ACK, FullscreenAck::class, FullscreenAck.serializer()),
         Entry(ProtocolPacketType.RADIUS_PREVIEW, RadiusPreview::class, RadiusPreview.serializer()),
         Entry(ProtocolPacketType.PIP_PIN, PipPin::class, PipPin.serializer()),
+        Entry(ProtocolPacketType.REPORT_DURATION, ReportDuration::class, ReportDuration.serializer()),
     )
 
     private val byId = entries.associateBy { it.id }

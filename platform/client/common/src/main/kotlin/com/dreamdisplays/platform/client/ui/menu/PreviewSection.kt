@@ -8,8 +8,13 @@ import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.MediaServices
+import com.dreamdisplays.api.media.source.CustomMediaUrls
+import com.dreamdisplays.api.media.source.MediaPlatform
 import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.media.source.kick.KickMetadataCache
+import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
+import com.dreamdisplays.media.source.vimeo.VimeoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
 import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import com.dreamdisplays.platform.client.Initializer
@@ -257,12 +262,32 @@ class PreviewSection(
                 blitTexture(g, thumb, box.x, box.y, box.w, box.h)
                 g.fill(box.x, box.y, box.right, box.bottom, UiTheme.THUMB_DIM_SCRIM)
             }
+            // A custom link has no thumbnail to wait for, so a shimmer would animate forever over
+            // something that is loading fine. A flat plate with the host reads as settled instead.
+            // A key whose fetch already failed (e.g. a Kick CDN 403) counts the same way — it is
+            // never coming either.
+            (currentThumbnailKey() == null || currentThumbnailKey()?.let(Thumbnails::isFailed) == true) &&
+                    currentSource() != null ->
+                drawCustomBackdrop(g, box)
             // Something is assigned and loading, just no thumbnail decoded yet: a neat shimmer
             currentSource() != null ->
                 g.drawShimmer(box.x, box.y, box.right, box.bottom, UiTheme.PLACEHOLDER_BG, UiTheme.PLACEHOLDER_SHIMMER)
             // Nothing assigned to this display: leave the plain black backdrop from drawVideoArea
             else -> {}
         }
+    }
+
+    /** The custom-link stand-in for a thumbnail: a soft plate naming the host the video comes from. */
+    private fun drawCustomBackdrop(g: GuiGraphicsCompat, box: UiRect) {
+        val font = Minecraft.getInstance().font
+        g.fillVGradient(box.x, box.y, box.right, box.bottom, UiTheme.CUSTOM_ART_TOP, UiTheme.CUSTOM_ART_BOTTOM)
+        val host = ds.videoUrl?.let { CustomMediaUrls.hostOf(it) } ?: return
+        val label = UiText.trim(font, host, box.w - 12)
+        g.drawText(
+            font, label,
+            box.x + (box.w - font.width(label)) / 2, box.y + (box.h - font.lineHeight) / 2,
+            UiTheme.TEXT_SECONDARY, true,
+        )
     }
 
     /** Generic overlay text resolved for the current display URL, regardless of provider. */
@@ -275,10 +300,14 @@ class PreviewSection(
         val likes: String,
         val published: String?,
         val isNew: Boolean,
-        val isTwitch: Boolean,
+        val platform: MediaPlatform,
     )
 
-    /** Resolves [OverlayInfo] for the current display URL: YouTube via [VideoMetadataCache], Twitch via [TwitchMetadataCache]. */
+    /**
+     * Resolves [OverlayInfo] for the current display URL: YouTube via [VideoMetadataCache], Twitch
+     * via [TwitchMetadataCache], Vimeo / Kick via their platform caches, and a bare file / long-tail
+     * link from the URL alone.
+     */
     private fun overlayInfo(): OverlayInfo {
         when (val source = currentSource()) {
             is MediaSource.Twitch -> {
@@ -290,17 +319,30 @@ class PreviewSection(
                     uploader = meta?.channelName,
                     uploaderAvatarUrl = meta?.channelAvatarUrl,
                     isVerified = false,
-                    views = meta?.viewCount?.let {
-                        formatCompactCount(it) + " " + Component.translatable(
-                            if (meta.isLive) "dreamdisplays.ui.watching" else "dreamdisplays.ui.views_short"
-                        ).string
-                    } ?: "",
+                    views = watchOrViewCount(meta?.viewCount, meta?.isLive == true),
                     likes = "",
                     published = meta?.gameName,
                     isNew = false,
-                    isTwitch = true,
+                    platform = MediaPlatform.TWITCH,
                 )
             }
+
+            is MediaSource.Vimeo -> {
+                val meta = VimeoMetadataCache.get(VimeoMetadataCache.cacheKey(source))
+                if (meta == null) VimeoMetadataCache.requestAsync(source)
+                return platformOverlayInfo(source.url, MediaPlatform.VIMEO, meta)
+            }
+
+            is MediaSource.Kick -> {
+                val meta = KickMetadataCache.cacheKey(source)?.let { KickMetadataCache.get(it) }
+                if (meta == null) KickMetadataCache.requestAsync(source)
+                return platformOverlayInfo(source.url, MediaPlatform.KICK, meta)
+            }
+
+            // A custom / long-tail link carries no metadata anywhere: its file name and host are all
+            // there is to show, and both are derivable from the URL without a single request.
+            is MediaSource.DirectStream -> return customOverlayInfo(source.streamUrl)
+            is MediaSource.Remote -> return customOverlayInfo(source.url)
 
             else -> {
                 val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(ds.videoUrl ?: "")
@@ -317,11 +359,45 @@ class PreviewSection(
                     likes = meta?.formatLikes() ?: "",
                     published = meta?.publishedText,
                     isNew = meta?.isRecent(7) == true,
-                    isTwitch = false,
+                    platform = MediaPlatform.YOUTUBE,
                 )
             }
         }
     }
+
+    /** [OverlayInfo] for a Vimeo / Kick video from its [PlatformVideoMetadata]. */
+    private fun platformOverlayInfo(url: String, platform: MediaPlatform, meta: PlatformVideoMetadata?): OverlayInfo =
+        OverlayInfo(
+            title = meta?.title ?: CustomMediaUrls.displayName(url),
+            uploader = meta?.uploader ?: CustomMediaUrls.hostOf(url),
+            uploaderAvatarUrl = meta?.uploaderAvatarUrl,
+            isVerified = false,
+            views = watchOrViewCount(meta?.viewCount, meta?.isLive == true),
+            likes = "",
+            published = null,
+            isNew = false,
+            platform = platform,
+        )
+
+    /** [OverlayInfo] for a custom link: file name as the title, host in place of a channel. */
+    private fun customOverlayInfo(url: String): OverlayInfo = OverlayInfo(
+        title = CustomMediaUrls.displayName(url),
+        uploader = CustomMediaUrls.hostOf(url),
+        uploaderAvatarUrl = null,
+        isVerified = false,
+        views = "",
+        likes = "",
+        published = null,
+        isNew = false,
+        platform = MediaPlatform.DIRECT,
+    )
+
+    /** Formats a viewer / view count, labelling it "watching" while live and "views" otherwise. */
+    private fun watchOrViewCount(count: Long?, isLive: Boolean): String = count?.let {
+        formatCompactCount(it) + " " + Component.translatable(
+            if (isLive) "dreamdisplays.ui.watching" else "dreamdisplays.ui.views_short",
+        ).string
+    } ?: ""
 
     /** Draws the dark strip with the video title (+NEW tag) and channel / views / likes / date metadata. */
     private fun drawTitleOverlay(g: GuiGraphicsCompat, x: Int, y: Int, w: Int) {
@@ -343,18 +419,19 @@ class PreviewSection(
 
         var titleX = x + padX
         val titleY = boxY + padY
-        if (info.isTwitch) {
-            val tag = Component.translatable("dreamdisplays.ui.twitch").string
-            val tw = font.width(tag) + 6
-            g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_TWITCH_TAG)
-            g.drawText(font, tag, titleX + 3, titleY, UiTheme.TEXT_PRIMARY, false)
-            titleX += tw + 4
-            shown = UiText.trim(font, title, textW - tw - 4)
-        } else if (info.isNew) {
-            val tag = Component.translatable("dreamdisplays.ui.new").string
-            val tw = font.width(tag) + 6
-            g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, UiTheme.ACCENT_NEW_TAG)
-            g.drawText(font, tag, titleX + 3, titleY, UiTheme.TEXT_PRIMARY, false)
+        // The platform tag (Twitch / Vimeo / Kick / Link) takes precedence over the generic "New"
+        val badge = PlatformBadge.forPlatform(info.platform)
+        val tagText = when {
+            badge != null -> Component.translatable(badge.labelKey).string
+            info.isNew -> Component.translatable("dreamdisplays.ui.new").string
+            else -> null
+        }
+        if (tagText != null) {
+            val bg = badge?.bgColor ?: UiTheme.ACCENT_NEW_TAG
+            val fg = badge?.textColor ?: UiTheme.TEXT_PRIMARY
+            val tw = font.width(tagText) + 6
+            g.fill(titleX, titleY - 1, titleX + tw, titleY + font.lineHeight, bg)
+            g.drawText(font, tagText, titleX + 3, titleY, fg, false)
             titleX += tw + 4
             shown = UiText.trim(font, title, textW - tw - 4)
         }
@@ -408,12 +485,26 @@ class PreviewSection(
         else -> v.toString()
     }
 
-    /** The [MediaSource] for the display's current URL, or null when there's none set. */
-    private fun currentSource(): MediaSource? = ds.videoUrl?.takeIf { it.isNotEmpty() }?.let { MediaSource.from(it) }
+    // MediaSource.from parses the URL against every platform; currentSource is called several times
+    // per frame, so its result is memoized until the display's URL actually changes
+    private var sourceUrl: String? = null
+    private var sourceCache: MediaSource? = null
 
-    /** Cache key for the current source's thumbnail/metadata: a YouTube video id, or a Twitch composite key. */
+    /** The [MediaSource] for the display's current URL, or null when there's none set. */
+    private fun currentSource(): MediaSource? {
+        val url = ds.videoUrl?.takeIf { it.isNotEmpty() } ?: return null
+        if (url != sourceUrl) {
+            sourceUrl = url
+            sourceCache = MediaSource.from(url)
+        }
+        return sourceCache
+    }
+
+    /** Cache key for the current source's thumbnail/metadata: a YouTube id, or a platform composite key. */
     private fun currentThumbnailKey(): String? = when (val source = currentSource()) {
         is MediaSource.Twitch -> TwitchMetadataCache.cacheKey(source)
+        is MediaSource.Vimeo -> VimeoMetadataCache.cacheKey(source)
+        is MediaSource.Kick -> KickMetadataCache.cacheKey(source)
         is MediaSource.YouTube -> source.videoId
         else -> null
     }
@@ -429,6 +520,20 @@ class PreviewSection(
                     return
                 }
                 meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
+            }
+
+            is MediaSource.Vimeo -> {
+                val key = VimeoMetadataCache.cacheKey(source)
+                val meta = VimeoMetadataCache.get(key)
+                if (meta == null) VimeoMetadataCache.requestAsync(source)
+                else meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
+            }
+
+            is MediaSource.Kick -> {
+                val key = KickMetadataCache.cacheKey(source) ?: return
+                val meta = KickMetadataCache.get(key)
+                if (meta == null) KickMetadataCache.requestAsync(source)
+                else meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
             }
 
             is MediaSource.YouTube -> Thumbnails.request(source.videoId)

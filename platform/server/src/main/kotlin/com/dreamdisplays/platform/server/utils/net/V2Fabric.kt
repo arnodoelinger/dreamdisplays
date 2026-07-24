@@ -58,6 +58,7 @@ object FabricV2Networking {
         when (packet) {
             is ClientHello -> handleHello(player, server, packet)
             is RequestSync -> VanillaDisplayActions.requestSync(player, packet.id)
+            is ReportDuration -> VanillaDisplayActions.reportDuration(player, packet.id, packet.durationMs)
             is DisplayDelete -> VanillaDisplayActions.delete(player, server, packet.id)
             is ReportDisplay -> DisplayManager.report(packet.id, player, server)
             is SetVideo -> VanillaDisplayActions.setVideo(player, server, packet.id, packet.url, packet.lang)

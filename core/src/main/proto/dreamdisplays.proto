@@ -316,6 +316,14 @@ message PipPin {
   optional bool pinned = 2;
 }
 
+// serial name 'com.dreamdisplays.core.protocol.ReportDuration'
+message ReportDuration {
+  // WARNING: a default value decoded when value is missing
+  optional Uuid id = 1;
+  // WARNING: a default value decoded when value is missing
+  optional int64 durationMs = 2;
+}
+
 message Uuid {
   // WARNING: a default value decoded when value is missing
   optional fixed64 msb = 1;

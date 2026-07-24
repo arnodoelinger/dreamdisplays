@@ -128,6 +128,15 @@ object VanillaDisplayActions {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
         if (!MediaUrlPolicy.isAllowed(url)) return
+        CustomMediaGate.refusalKey(
+            url,
+            VanillaServerState.config.settings.customMediaPolicy,
+            VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.custom,
+                VanillaPermissions.Fallback.EVERYONE,
+            ),
+        )?.let { return MessageUtil.sendMessage(player, it) }
         if (!setVideoThrottle.tryAcquire(displayId, SET_VIDEO_COOLDOWN_MS)) return
 
         val wasSync = displayData.isSync
@@ -210,6 +219,12 @@ object VanillaDisplayActions {
         if (!requestSyncThrottle.tryAcquire(displayId to player.uuid, REQUEST_SYNC_COOLDOWN_MS)) return
         TimelineManager.sendCurrent(displayData, player.uuid)
         WatchPartyManager.sendCurrent(displayData, player.uuid)
+    }
+
+    /** Applies a client-reported media duration to the display's server timeline (SYNCED/BROADCAST only). */
+    fun reportDuration(player: ServerPlayer, displayId: java.util.UUID, durationMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.onDurationReported(displayData, durationMs)
     }
 
     /** Builds the permission context for [player] acting on [display]. */

@@ -87,9 +87,10 @@ class DefaultMediaResolverRegistry : MediaResolverRegistry {
 
     /**
      * SSRF guard: true when [source] carries a client-supplied URL whose host resolves to a
-     * non-public address. Only [MediaSource.Remote] / [MediaSource.DirectStream] are checked;
-     * [MediaSource.YouTube] is rewritten to a fixed, trusted host, and [MediaSource.Twitch] is
-     * constrained to the `twitch.tv` / `clips.twitch.tv` hosts by [MediaSource.from] itself.
+     * non-public address. Only [MediaSource.Remote] / [MediaSource.DirectStream] are checked here;
+     * the platform sources ([MediaSource.YouTube], [MediaSource.Twitch], [MediaSource.Vimeo],
+     * [MediaSource.Kick]) are constrained to their own fixed, trusted hosts by [MediaSource.from]
+     * itself, and their resolvers validate the CDN URLs they mint through the same guard at playback.
      */
     private fun isBlockedHost(source: MediaSource): Boolean {
         val url = when (source) {
