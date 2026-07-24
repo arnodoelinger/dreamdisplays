@@ -9,6 +9,7 @@ import com.dreamdisplays.media.source.twitch.TwitchMetadata
 import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.render.Thumbnails
+import com.dreamdisplays.platform.client.storage.WatchedVideoStore
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.*
@@ -25,14 +26,37 @@ class SuggestionsController {
     /** Current result cards, mutated only on the client thread. */
     val cards = ArrayList<MediaSearchResult>()
 
+    /**
+     * [cards] after applying [sortOption]'s client-side effect: [SortOption.POPULARITY] / [SortOption.NEWEST]
+     * re-sort (a no-op when the network already sorted them, a genuine sort as a related-videos
+     * fallback, since the `next` endpoint has no server-side sort), [SortOption.STREAMS] filters to
+     * live results, and [SortOption.UNWATCHED] / [SortOption.WATCHED] filter by [WatchedVideoStore] —
+     * a pure function of already-loaded data, so it needs no network round-trip.
+     */
+    val visibleCards: List<MediaSearchResult>
+        get() = when (sortOption) {
+            SortOption.RELEVANCE -> cards
+            SortOption.POPULARITY -> cards.sortedByDescending { it.viewCount ?: -1L }
+            SortOption.NEWEST -> cards.sortedBy { it.publishedDaysAgo ?: Int.MAX_VALUE }
+            SortOption.STREAMS -> cards.filter { it.isLive }
+            SortOption.UNWATCHED -> cards.filterNot { WatchedVideoStore.isWatched(it.id) }
+            SortOption.WATCHED -> cards.filter { WatchedVideoStore.isWatched(it.id) }
+        }
+
     /** Translation key of the current status line (loading/empty/error), or null when results are shown. */
     var statusKey: String? = null; private set
 
     /** Wall-clock start of the in-flight load, for the elapsed-seconds suffix on the loading message. */
     var loadStartedAtMs: Long = 0L; private set
 
+    /** Currently selected sort/filter; see [setSort]. */
+    var sortOption: SortOption = SortOption.RELEVANCE; private set
+
     private val requestSeq = atomic(0)
     private var currentVideoId: String? = null
+
+    /** The last non-empty text search query, so [setSort] knows what to re-run for a network sort change. */
+    private var lastQuery: String? = null
 
     /** How to continue the current result list when [loadMoreIfNeeded] fires; null when the current
      *  list isn't paginable (single-video / Twitch-only results). */
@@ -63,13 +87,29 @@ class SuggestionsController {
     fun setRelatedTo(videoId: String?) {
         if (videoId.isNullOrEmpty()) {
             currentVideoId = null
+            lastQuery = null
             cards.clear()
             statusKey = null
             return
         }
         if (videoId == currentVideoId && cards.isNotEmpty()) return
         currentVideoId = videoId
+        lastQuery = null
         loadRelated(videoId)
+    }
+
+    /**
+     * Changes the active sort / filter. [SortOption.UNWATCHED]/[SortOption.WATCHED] take effect purely
+     * through [visibleCards] and need no network call. The other options carry their own `YouTube` sort
+     * order, so if a text search is currently active it's re-run to fetch results in that order —
+     * related-video lists (no active query) have no server-side sort, so [visibleCards] falls back to
+     * a client-side re-sort of what's already loaded instead of re-fetching.
+     */
+    fun setSort(option: SortOption) {
+        if (option == sortOption) return
+        sortOption = option
+        onResults()
+        if (option.refetches) lastQuery?.let { runSearch(it) }
     }
 
     /**
@@ -80,10 +120,12 @@ class SuggestionsController {
         val q = query.trim()
 
         if (q.isEmpty()) {
+            lastQuery = null
             currentVideoId?.let { loadRelated(it) }
             return
         }
 
+        lastQuery = q
         startLoad()
 
         val seq = requestSeq.incrementAndGet()
@@ -114,7 +156,7 @@ class SuggestionsController {
                         val twitchLogin = twitchLoginCandidate(q)
 
                         val ytDeferred = async {
-                            runCatching { svc.searchPage(q, PAGE_SIZE) }
+                            runCatching { svc.searchPage(q, PAGE_SIZE, sortOption.networkSort) }
                                 .onFailure { if (it is CancellationException) throw it; logger.warn("Search failed: ${it.message}") }
                                 .getOrNull()
                         }
@@ -356,6 +398,7 @@ class SuggestionsController {
             watchUrlOverride = source.url,
             thumbnailUrlOverride = meta?.thumbnailUrl,
             isTwitch = true,
+            isLive = meta?.isLive ?: false,
         )
     }
 

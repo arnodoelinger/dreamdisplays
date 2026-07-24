@@ -18,6 +18,7 @@ import com.dreamdisplays.platform.client.core.modules.*
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
+import com.dreamdisplays.platform.client.storage.WatchedVideoStore
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -61,6 +62,7 @@ object ClientStartupManager {
     fun start() {
         config.reload()
         ClientSettingsStore.load()
+        WatchedVideoStore.load()
 
         val platform = DreamServices.registry.get(PlatformServices.PLATFORM)
         val application = DefaultClientApplication(DefaultClientContext(platform))

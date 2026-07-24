@@ -15,8 +15,8 @@ interface MediaSearchService {
     /** Returns up to [limit] videos related to the video identified by [videoId]. */
     fun related(videoId: String, limit: Int): List<MediaSearchResult>
 
-    /** Returns the first page (up to [limit] videos) matching [query], plus a token for [searchMore]. */
-    fun searchPage(query: String, limit: Int): MediaSearchPage
+    /** Returns the first page (up to [limit] videos) matching [query] in [sortOrder], plus a token for [searchMore]. */
+    fun searchPage(query: String, limit: Int, sortOrder: SortOrder = SortOrder.RELEVANCE): MediaSearchPage
 
     /** Returns the next page (up to [limit] videos) following [continuationToken] from a prior [searchPage]/[searchMore] call. */
     fun searchMore(continuationToken: String, limit: Int): MediaSearchPage
