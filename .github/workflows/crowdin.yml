@@ -30,8 +30,8 @@ jobs:
       - name: Drop languages we don't ship yet
         run: |
           shopt -s nullglob
-          keep_client="en_us de_de ru_ru uk_ua pl_pl cs_cz be_by he_il es_es fr_fr it_it"
-          keep_server="en de ru uk pl cs be he es fr it"
+          keep_client="en_us de_de ru_ru uk_ua pl_pl cs_cz be_by he_il es_es fr_fr it_it vi_vn sv_se"
+          keep_server="en de ru uk pl cs be he es fr it vi sv"
 
           for f in platform/resources/src/main/resources/assets/dreamdisplays/lang/client/*.json; do
             name="$(basename "$f" .json)"

@@ -303,6 +303,7 @@ private fun stringList(t: TomlTable?, key: String): List<String> =
 internal val LANGUAGE_FILES = listOf(
     "en.json", "es.json", "fr.json", "it.json", "pl.json",
     "ru.json", "uk.json", "de.json", "cs.json", "be.json", "he.json",
+    "vi.json", "sv.json",
 )
 
 /** Maps a Minecraft locale string (e.g. `ru_ru`, `ru-ru`) to the plugin's short language code (e.g. `ru`). */
