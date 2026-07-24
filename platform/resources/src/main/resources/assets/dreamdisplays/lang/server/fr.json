@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Les diffusions plein écran forcées sont désactivées dans la configuration",
   "fullscreenNoDisplay": "&7D |&f Aucun affichage trouvé et aucun monde chargé pour héberger une diffusion par URL",
   "fullscreenListEmpty": "&7D |&f Aucune diffusion plein écran en cours",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f Les liens vidéo personnalisés sont désactivés sur ce serveur",
+  "customMediaHostBlocked": "&7D |&f Les vidéos de ce site ne sont pas autorisées sur ce serveur",
+  "customMediaNoPermission": "&7D |&f Vous n'avez pas la permission de lire vos propres liens vidéo"
 }

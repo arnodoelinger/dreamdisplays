@@ -332,15 +332,21 @@ class SuggestionsPanel(
      * (e.g. Twitch) were registered under the raw id via the direct-URL path, so they're read from that
      * same slot ([Thumbnails.get] defaults to the raw-key HIGH tier); YouTube ids use the id-derived LOW tier.
      */
-    private fun cardThumbnail(info: MediaSearchResult) =
-        if (info.thumbnailUrlOverride != null) Thumbnails.get(info.id)
-        else Thumbnails.get(info.id, Thumbnails.Quality.LOW)
+    private fun cardThumbnail(info: MediaSearchResult) = when {
+        // An overridden thumbnail (Twitch / Vimeo / Kick) is registered under the raw id key
+        info.thumbnailUrlOverride != null -> Thumbnails.get(info.id)
+        // Only real YouTube results derive an image from the id; everything else has none to show
+        info.isYouTubeResult -> Thumbnails.get(info.id, Thumbnails.Quality.LOW)
+        else -> null
+    }
 
     /** Requests [info]'s card thumbnail via the path matching [cardThumbnail]'s key, if not already loaded. */
     private fun requestCardThumbnail(info: MediaSearchResult) {
         val url = info.thumbnailUrlOverride
-        if (url != null) Thumbnails.request(info.id, url)
-        else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+        when {
+            url != null -> Thumbnails.request(info.id, url)
+            info.isYouTubeResult -> Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+        }
     }
 
     /** Draws one result card: hover-pulsing background, thumbnail, NEW/duration tags, title, and meta. */
@@ -362,8 +368,14 @@ class SuggestionsPanel(
         val thumbY = y
         val thumbW = w
         val thumb = cardThumbnail(info)
+        // A card still has an image on the way when it is a custom-art card, a YouTube result whose
+        // thumbnail is downloading, or a platform result carrying a thumbnail URL. Anything else has
+        // nothing to load, so a shimmer would promise an image that never arrives - draw the plate.
+        val awaitingThumbnail = info.isYouTubeResult || info.thumbnailUrlOverride != null
         if (thumb != null) {
             blitTexture(g, thumb, thumbX, thumbY, thumbW, thumbH)
+        } else if (info.isCustom || !awaitingThumbnail) {
+            drawCustomCardArt(g, f, info, thumbX, thumbY, thumbW, thumbH)
         } else {
             // Animated shimmer while the thumbnail is still downloading, instead of a dead black box.
             g.drawShimmer(
@@ -372,18 +384,12 @@ class SuggestionsPanel(
             )
         }
 
-        if (info.isTwitch) {
-            val tag = Component.translatable("dreamdisplays.ui.twitch").string
-            val tw = f.width(tag) + 6
-            val tagH = f.lineHeight + 4
-            g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, UiTheme.ACCENT_TWITCH_TAG)
-            g.drawText(f, tag, thumbX + 5, thumbY + 4, UiTheme.TEXT_PRIMARY, true)
-        } else if (info.isRecent(7)) {
-            val tag = Component.translatable("dreamdisplays.ui.new").string
-            val tw = f.width(tag) + 6
-            val tagH = f.lineHeight + 4
-            g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, UiTheme.ACCENT_NEW_TAG)
-            g.drawText(f, tag, thumbX + 5, thumbY + 4, UiTheme.TEXT_PRIMARY, true)
+        // A platform tag (Twitch / Vimeo / Kick / Link) takes precedence over the generic "New"
+        // badge, since knowing where a result comes from matters more than its age
+        val badge = PlatformBadge.forResult(info)
+        when {
+            badge != null -> drawCardTag(g, f, Component.translatable(badge.labelKey).string, badge.bgColor, badge.textColor, thumbX, thumbY)
+            info.isRecent(7) -> drawCardTag(g, f, Component.translatable("dreamdisplays.ui.new").string, UiTheme.ACCENT_NEW_TAG, UiTheme.TEXT_PRIMARY, thumbX, thumbY)
         }
 
         val dur = info.formatDuration()
@@ -441,6 +447,29 @@ class SuggestionsPanel(
         }
     }
 
+    /** Draws a small top-left tag ([label]) on a [bg] plate with [textColor] text. */
+    private fun drawCardTag(g: GuiGraphicsCompat, f: Font, label: String, bg: Int, textColor: Int, thumbX: Int, thumbY: Int) {
+        val tw = f.width(label) + 6
+        val tagH = f.lineHeight + 4
+        g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, bg)
+        g.drawText(f, label, thumbX + 5, thumbY + 4, textColor, true)
+    }
+
+    /**
+     * Stand-in card art for a card with no thumbnail to load - a custom link, or a platform result
+     * whose metadata carried none: a soft vertical plate with the source's host / uploader centered
+     * on it, so the card still carries the one fact worth knowing at a glance instead of a dead box.
+     */
+    private fun drawCustomCardArt(
+        g: GuiGraphicsCompat, f: Font, info: MediaSearchResult,
+        x: Int, y: Int, w: Int, h: Int,
+    ) {
+        g.fillVGradient(x, y, x + w, y + h, UiTheme.CUSTOM_ART_TOP, UiTheme.CUSTOM_ART_BOTTOM)
+        val host = info.uploader.orEmpty().ifEmpty { return }
+        val label = UiText.trim(f, host, w - 8)
+        g.drawText(f, label, x + (w - f.width(label)) / 2, y + (h - f.lineHeight) / 2, UiTheme.TEXT_SECONDARY, true)
+    }
+
     private fun blitTexture(g: GuiGraphicsCompat, id: Identifier, x: Int, y: Int, w: Int, h: Int) {
         //? if >=1.21.11 {
         g.blit(RenderPipelines.GUI_TEXTURED, id, x, y, 0f, 0f, w, h, w, h)
@@ -484,6 +513,8 @@ class SuggestionsPanel(
             scrollFromPos(if (sbVertical) mouseY else mouseX)
             return true
         }
+        // Right-clicking a remembered link removes it from "My links"; a plain left-click plays it.
+        if (event.button() == 1 && forgetCardAt(mx, my)) return true
         val card = if (event.button() == 0) cardAt(mouseX, mouseY) else -1
         if (card in controller.visibleCards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
@@ -530,6 +561,8 @@ class SuggestionsPanel(
             scrollFromPos(if (sbVertical) mouseY else mouseX)
             return true
         }
+        // Right-clicking a remembered link removes it from "My links"; a plain left-click plays it.
+        if (button == 1 && forgetCardAt(mx, my)) return true
         val card = if (button == 0) cardAt(mouseX, mouseY) else -1
         if (card in controller.visibleCards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
@@ -555,6 +588,20 @@ class SuggestionsPanel(
         }
         return super.mouseReleased(mouseX, mouseY, button)
     }*/
+
+    /**
+     * Handles a right-click at ([mx], [my]): forgets the remembered custom link under the cursor,
+     * with a soft click. Returns true only when a forgettable card was actually hit, so a
+     * right-click that lands on a normal search result falls through untouched.
+     */
+    private fun forgetCardAt(mx: Int, my: Int): Boolean {
+        val card = cardAt(mx.toDouble(), my.toDouble())
+        val result = controller.visibleCards.getOrNull(card) ?: return false
+        if (!controller.forgetCustom(result)) return false
+        val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 0.7f)
+        Minecraft.getInstance().soundManager.play(s)
+        return true
+    }
 
     private fun cardAt(mouseX: Double, mouseY: Double): Int {
         if (controller.statusKey != null) return -1

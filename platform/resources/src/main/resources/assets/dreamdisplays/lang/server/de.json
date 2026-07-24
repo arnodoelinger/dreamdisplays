@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Erzwungene Vollbild-Übertragungen sind in der Konfiguration deaktiviert",
   "fullscreenNoDisplay": "&7D |&f Kein Display gefunden und keine Welt geladen, um eine URL-Übertragung zu hosten",
   "fullscreenListEmpty": "&7D |&f Es laufen keine Vollbild-Übertragungen",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f Eigene Videolinks sind auf diesem Server deaktiviert",
+  "customMediaHostBlocked": "&7D |&f Videos von dieser Seite sind auf diesem Server nicht erlaubt",
+  "customMediaNoPermission": "&7D |&f Du hast keine Berechtigung, eigene Videolinks abzuspielen"
 }

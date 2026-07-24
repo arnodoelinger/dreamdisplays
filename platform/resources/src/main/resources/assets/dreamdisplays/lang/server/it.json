@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Le trasmissioni a schermo intero forzate sono disabilitate nella configurazione",
   "fullscreenNoDisplay": "&7D |&f Nessun display trovato e nessun mondo caricato per ospitare una trasmissione via URL",
   "fullscreenListEmpty": "&7D |&f Nessuna trasmissione a schermo intero in corso",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f I link video personalizzati sono disattivati su questo server",
+  "customMediaHostBlocked": "&7D |&f I video da questo sito non sono consentiti su questo server",
+  "customMediaNoPermission": "&7D |&f Non hai il permesso di riprodurre i tuoi link video"
 }

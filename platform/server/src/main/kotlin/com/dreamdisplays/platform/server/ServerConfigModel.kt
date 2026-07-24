@@ -28,6 +28,7 @@ data class SettingsSection(
     val updates: UpdatesConfig = UpdatesConfig(),
     val display: DisplayConfig = DisplayConfig(),
     val fullscreen: FullscreenConfig = FullscreenConfig(),
+    val customMedia: CustomMediaConfig = CustomMediaConfig(),
 ) {
     // Reports
     val webhookUrl get() = reports.webhook_url
@@ -54,6 +55,14 @@ data class SettingsSection(
 
     /** Volume in [0, 1] ready for the wire; config stores 0-100 percent. */
     val defaultVolume get() = display.default_volume / 200f
+
+    // Custom media (player-pasted links)
+    val customMediaPolicy: com.dreamdisplays.api.security.CustomMediaPolicy.Settings
+        get() = com.dreamdisplays.api.security.CustomMediaPolicy.Settings(
+            enabled = customMedia.enabled,
+            allowedHosts = customMedia.allowed_hosts,
+            blockedHosts = customMedia.blocked_hosts,
+        )
 
     // Fullscreen broadcasts
     val fullscreenAllowForced get() = fullscreen.allow_forced
@@ -90,6 +99,17 @@ data class SettingsSection(
         val max_height: Int = 24,
         val max_render_distance: Double = 96.0,
         val default_volume: Int = 50,
+    )
+
+    /**
+     * Custom-media section: the policy for links players paste themselves, as opposed to the
+     * platform pages the mod resolves. Off-by-host rather than off-by-default, so the feature works
+     * out of the box while still giving an operator a switch and an allow / block list.
+     */
+    data class CustomMediaConfig(
+        val enabled: Boolean = true,
+        val allowed_hosts: List<String> = emptyList(),
+        val blocked_hosts: List<String> = emptyList(),
     )
 
     /** Fullscreen broadcast section. */
@@ -150,6 +170,7 @@ data class PermissionsSection(
     val fullscreenStart get() = permissions.fullscreen_start
     val fullscreenStop get() = permissions.fullscreen_stop
     val fullscreenList get() = permissions.fullscreen_list
+    val custom get() = permissions.custom
 
     data class PermissionsConfig(
         val create: String = "dreamdisplays.create",
@@ -173,6 +194,7 @@ data class PermissionsSection(
         val fullscreen_start: String = "dreamdisplays.fullscreen.start",
         val fullscreen_stop: String = "dreamdisplays.fullscreen.stop",
         val fullscreen_list: String = "dreamdisplays.fullscreen.list",
+        val custom: String = "dreamdisplays.custom",
     )
 }
 
@@ -212,6 +234,11 @@ fun parseServerConfig(t: TomlTable?): ParsedServerConfig = ParsedServerConfig(
             max_height = t?.getLong("display.max_height")?.toInt() ?: 24,
             max_render_distance = t?.getDouble("display.max_render_distance") ?: 96.0,
             default_volume = t?.getLong("display.default_volume")?.toInt()?.coerceIn(0, 100) ?: 50,
+        ),
+        customMedia = SettingsSection.CustomMediaConfig(
+            enabled = t?.getBoolean("custom_media.enabled") ?: true,
+            allowed_hosts = stringList(t, "custom_media.allowed_hosts"),
+            blocked_hosts = stringList(t, "custom_media.blocked_hosts"),
         ),
         fullscreen = SettingsSection.FullscreenConfig(
             default_mode = t?.getString("fullscreen.default_mode") ?: "STANDARD",
@@ -254,9 +281,23 @@ fun parseServerConfig(t: TomlTable?): ParsedServerConfig = ParsedServerConfig(
             fullscreen_start = t?.getString("permissions.fullscreen_start") ?: "dreamdisplays.fullscreen.start",
             fullscreen_stop = t?.getString("permissions.fullscreen_stop") ?: "dreamdisplays.fullscreen.stop",
             fullscreen_list = t?.getString("permissions.fullscreen_list") ?: "dreamdisplays.fullscreen.list",
+            custom = t?.getString("permissions.custom") ?: "dreamdisplays.custom",
         )
     ),
 )
+
+/**
+ * Reads [key] as a TOML array of strings, dropping blanks and non-string entries. Returns an empty
+ * list when the key is absent or is not an array, so a malformed rule never turns into a
+ * silently-empty allowlist that would block every custom link.
+ */
+private fun stringList(t: TomlTable?, key: String): List<String> =
+    t?.getArrayOrEmpty(key)
+        ?.toList()
+        ?.filterIsInstance<String>()
+        ?.map { it.trim() }
+        ?.filter { it.isNotEmpty() }
+        ?: emptyList()
 
 /** Language files bundled with every server platform's JAR. */
 internal val LANGUAGE_FILES = listOf(

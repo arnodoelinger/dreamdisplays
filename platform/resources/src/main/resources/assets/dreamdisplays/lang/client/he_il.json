@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "שגיאת תצוגה",
   "dreamdisplays.ui.new": "חדש",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "וימאו",
+  "dreamdisplays.ui.kick": "קיק",
   "dreamdisplays.ui.likes": "לייקים",
   "dreamdisplays.ui.watching": "צופים",
   "dreamdisplays.ui.views_short": "צפיות",
   "dreamdisplays.button.suggestions": "הצעות",
-  "dreamdisplays.suggestions.search": "חפש ב-YouTube או Twitch...",
+  "dreamdisplays.suggestions.search": "חפשו או הדביקו קישור לסרטון...",
   "dreamdisplays.suggestions.loading": "טוען...",
   "dreamdisplays.suggestions.empty": "לא נמצאו תוצאות.",
   "dreamdisplays.suggestions.error": "טעינה נכשלה.",
-  "dreamdisplays.suggestions.unavailable": "הצעות לא זמינות."
+  "dreamdisplays.suggestions.unavailable": "הצעות לא זמינות.",
+  "dreamdisplays.ui.custom": "קישור",
+  "dreamdisplays.sort.my_links": "הקישורים שלי",
+  "dreamdisplays.suggestions.no_links": "אין עדיין קישורים שמורים. הדביקו קישור לסרטון למעלה כדי להפעיל אותו."
 }

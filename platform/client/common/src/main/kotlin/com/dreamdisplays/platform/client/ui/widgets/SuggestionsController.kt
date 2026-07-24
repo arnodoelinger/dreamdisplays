@@ -3,12 +3,20 @@ package com.dreamdisplays.platform.client.ui.widgets
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.search.MediaSearchResult
 import com.dreamdisplays.api.media.search.YouTubeUrls
+import com.dreamdisplays.api.media.source.CustomMediaUrls
+import com.dreamdisplays.api.media.source.KickUrls
+import com.dreamdisplays.api.media.source.MediaPlatform
 import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.media.source.kick.KickApi
+import com.dreamdisplays.media.source.kick.KickMetadataCache
+import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.media.source.twitch.TwitchApi
 import com.dreamdisplays.media.source.twitch.TwitchMetadata
 import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
+import com.dreamdisplays.media.source.vimeo.VimeoMetadataCache
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.render.Thumbnails
+import com.dreamdisplays.platform.client.storage.CustomVideoStore
 import com.dreamdisplays.platform.client.storage.WatchedVideoStore
 import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.atomicfu.atomic
@@ -32,6 +40,9 @@ class SuggestionsController {
      * fallback, since the `next` endpoint has no server-side sort), [SortOption.STREAMS] filters to
      * live results, and [SortOption.UNWATCHED] / [SortOption.WATCHED] filter by [WatchedVideoStore] —
      * a pure function of already-loaded data, so it needs no network round-trip.
+     *
+     * [SortOption.MY_LINKS] is the exception: it ignores [cards] and shows the player's own custom
+     * links from [CustomVideoStore], which are local and need no request at all.
      */
     val visibleCards: List<MediaSearchResult>
         get() = when (sortOption) {
@@ -41,10 +52,23 @@ class SuggestionsController {
             SortOption.STREAMS -> cards.filter { it.isLive }
             SortOption.UNWATCHED -> cards.filterNot { WatchedVideoStore.isWatched(it.id) }
             SortOption.WATCHED -> cards.filter { WatchedVideoStore.isWatched(it.id) }
+            SortOption.MY_LINKS -> CustomVideoStore.asResults()
         }
 
-    /** Translation key of the current status line (loading/empty/error), or null when results are shown. */
-    var statusKey: String? = null; private set
+    /**
+     * Translation key of the current status line (loading/empty/error), or null when results are
+     * shown. While [SortOption.MY_LINKS] is active it reports on the local link list instead of the
+     * in-flight request, so an unrelated search still loading never hides the remembered links.
+     */
+    val statusKey: String?
+        get() = if (sortOption.isOwnList) {
+            if (CustomVideoStore.isEmpty()) KEY_NO_LINKS else null
+        } else {
+            loadStatusKey
+        }
+
+    /** Status of the current network load, independent of which list is on screen. */
+    private var loadStatusKey: String? = null
 
     /** Wall-clock start of the in-flight load, for the elapsed-seconds suffix on the loading message. */
     var loadStartedAtMs: Long = 0L; private set
@@ -72,7 +96,7 @@ class SuggestionsController {
     var onResults: () -> Unit = {}
 
     /** True while the status line is the animated loading message. */
-    val isLoading: Boolean get() = statusKey == KEY_LOADING
+    val isLoading: Boolean get() = loadStatusKey == KEY_LOADING
 
     /** True while a background "load more" request is in flight (distinct from the initial [isLoading]). */
     val isLoadingMore: Boolean get() = loadingMore
@@ -89,7 +113,7 @@ class SuggestionsController {
             currentVideoId = null
             lastQuery = null
             cards.clear()
-            statusKey = null
+            loadStatusKey = null
             return
         }
         if (videoId == currentVideoId && cards.isNotEmpty()) return
@@ -113,8 +137,24 @@ class SuggestionsController {
     }
 
     /**
+     * Forgets a remembered custom link. Only meaningful while [SortOption.MY_LINKS] shows the local
+     * list; a no-op for anything else, since only custom results back a forgettable entry. The list
+     * is read live from [CustomVideoStore], so dropping it there is all the refresh the panel needs.
+     */
+    fun forgetCustom(result: MediaSearchResult): Boolean {
+        if (!result.isCustom) return false
+        CustomVideoStore.forget(result.getWatchUrl())
+        onResults()
+        return true
+    }
+
+    /**
      * Runs a free-text or URL search for [query]; an empty query falls back to the current related
      * list. URL queries resolve metadata for the single referenced video.
+     *
+     * A pasted link never means "search for this text": a YouTube or Twitch URL resolves to that
+     * one video, and any other http(s) URL becomes a single custom-link card
+     * ([customResult]) the player can click to play it directly.
      */
     fun runSearch(query: String) {
         val q = query.trim()
@@ -125,13 +165,28 @@ class SuggestionsController {
             return
         }
 
+        // Pasting into the box is a request to play that link, so leaving a local-list filter
+        // active would hide the result the player just asked for.
+        if (sortOption.isOwnList) sortOption = SortOption.RELEVANCE
+
         lastQuery = q
         startLoad()
 
         val seq = requestSeq.incrementAndGet()
         val svc = DreamServices.registry.get(MediaServices.SEARCH)
         val maybeId = YouTubeUrls.extractVideoId(q)
-        val twitchSource = MediaSource.from(q) as? MediaSource.Twitch
+        val source = MediaSource.from(q)
+
+        // A direct / long-tail link needs no network to show its card, so publish it synchronously.
+        // Platform links (Twitch / Vimeo / Kick) instead resolve real metadata below.
+        if (maybeId == null && source !is MediaSource.Twitch &&
+            source !is MediaSource.Vimeo && source !is MediaSource.Kick
+        ) {
+            customUrlOf(source)?.let {
+                publish(seq, listOf(customResult(it)), null)
+                return
+            }
+        }
 
         launchLoad {
             val results = runCatching {
@@ -143,17 +198,37 @@ class SuggestionsController {
                         listOf(meta ?: fallbackResult(maybeId))
                     }
 
-                    twitchSource != null -> {
+                    source is MediaSource.Twitch -> {
                         val meta = runCatching {
-                            withContext(Dispatchers.IO) { TwitchMetadataCache.resolveBlocking(twitchSource) }
+                            withContext(Dispatchers.IO) { TwitchMetadataCache.resolveBlocking(source) }
                         }
                             .onFailure { if (it is CancellationException) throw it; logger.warn("Twitch meta: ${it.message}") }
                             .getOrNull()
-                        listOf(twitchResult(twitchSource, meta))
+                        listOf(twitchResult(source, meta))
+                    }
+
+                    source is MediaSource.Vimeo -> {
+                        val meta = runCatching {
+                            withContext(Dispatchers.IO) { VimeoMetadataCache.resolveBlocking(source) }
+                        }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("Vimeo meta: ${it.message}") }
+                            .getOrNull()
+                        listOf(platformResult(source.url, MediaPlatform.VIMEO, meta, fallbackTitle = "Vimeo ${source.videoId}"))
+                    }
+
+                    source is MediaSource.Kick -> {
+                        val meta = runCatching {
+                            withContext(Dispatchers.IO) { KickMetadataCache.resolveBlocking(source) }
+                        }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("Kick meta: ${it.message}") }
+                            .getOrNull()
+                        val fallback = source.channel ?: source.videoUuid ?: "Kick"
+                        listOf(platformResult(source.url, MediaPlatform.KICK, meta, fallbackTitle = fallback))
                     }
 
                     else -> {
                         val twitchLogin = twitchLoginCandidate(q)
+                        val kickSlug = KickUrls.channelSlugCandidate(q)
 
                         val ytDeferred = async {
                             runCatching { svc.searchPage(q, PAGE_SIZE, sortOption.networkSort) }
@@ -162,14 +237,16 @@ class SuggestionsController {
                         }
 
                         val twitchDeferred = async {
-                            twitchLogin?.let {
-                                runCatching { liveTwitchResult(it) }.getOrNull()
-                            }
+                            twitchLogin?.let { runCatching { liveTwitchResult(it) }.getOrNull() }
+                        }
+                        val kickDeferred = async {
+                            kickSlug?.let { runCatching { liveKickResult(it) }.getOrNull() }
                         }
 
                         val youtubePage = ytDeferred.await()
                         val youtubeResults = youtubePage?.results
                         var liveTwitch = twitchDeferred.await()
+                        val liveKick = kickDeferred.await()
 
                         if (liveTwitch == null) {
                             val fuzzyLogin = fuzzyTwitchLogin(q, youtubeResults)
@@ -178,13 +255,15 @@ class SuggestionsController {
                             }
                         }
 
-                        if (youtubeResults == null && liveTwitch == null) {
+                        if (youtubeResults == null && liveTwitch == null && liveKick == null) {
                             publish(seq, null, KEY_ERROR)
                             return@launchLoad
                         }
 
-                        val combined = ArrayList<MediaSearchResult>(1 + (youtubeResults?.size ?: 0)).apply {
+                        // Live channels lead the list, ahead of the on-demand YouTube results
+                        val combined = ArrayList<MediaSearchResult>(2 + (youtubeResults?.size ?: 0)).apply {
                             liveTwitch?.let(::add)
+                            liveKick?.let(::add)
                             youtubeResults?.let(::addAll)
                         }
                         publish(seq, combined, null, nextToken = youtubePage?.continuationToken, mode = MoreMode.Search(q))
@@ -213,6 +292,16 @@ class SuggestionsController {
         }
     }.onFailure { e ->
         logger.debug("Twitch live-channel lookup failed for '$login': ${e.message}.")
+    }.getOrNull()
+
+    /** Looks up [slug] on Kick and, if it's live, builds the card shown ahead of the YouTube results. */
+    private fun liveKickResult(slug: String): MediaSearchResult? = runCatching {
+        val playback = KickApi.resolveLive(slug)?.takeIf { it.metadata.isLive } ?: return@runCatching null
+        val source = MediaSource.Kick(url = "https://kick.com/$slug", channel = slug)
+        KickMetadataCache.put(source, playback.metadata)
+        platformResult(source.url, MediaPlatform.KICK, playback.metadata, fallbackTitle = slug)
+    }.onFailure { e ->
+        logger.debug("Kick live-channel lookup failed for '$slug': ${e.message}.")
     }.getOrNull()
 
     /**
@@ -297,6 +386,8 @@ class SuggestionsController {
      */
     fun loadMoreIfNeeded() {
         if (loadingMore || isLoading) return
+        // The local link list is complete by definition; there is no page two to fetch
+        if (sortOption.isOwnList) return
         val mode = moreMode ?: return
         val token = continuationToken ?: return
         loadingMore = true
@@ -328,7 +419,7 @@ class SuggestionsController {
 
     /** Switches the panel into the loading state and clears stale results. */
     private fun startLoad() {
-        statusKey = KEY_LOADING
+        loadStatusKey = KEY_LOADING
         loadStartedAtMs = System.currentTimeMillis()
         cards.clear()
         moreMode = null
@@ -352,14 +443,14 @@ class SuggestionsController {
             continuationToken = nextToken
             onResults()
             if (error != null) {
-                statusKey = error
+                loadStatusKey = error
                 return@execute
             }
             if (results.isNullOrEmpty()) {
-                statusKey = KEY_EMPTY
+                loadStatusKey = KEY_EMPTY
                 return@execute
             }
-            statusKey = null
+            loadStatusKey = null
             appendCards(results)
         }
     }
@@ -376,10 +467,42 @@ class SuggestionsController {
         for (i in startIndex until cards.size) {
             val info = cards[i]
             val thumbUrl = info.thumbnailUrlOverride
-            if (thumbUrl != null) Thumbnails.request(info.id, thumbUrl)
-            else Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+            when {
+                // A platform result (Twitch / Vimeo / Kick) carries its thumbnail URL directly
+                thumbUrl != null -> Thumbnails.request(info.id, thumbUrl)
+                // Only real YouTube ids derive a thumbnail; a custom link or a metadata-less platform
+                // card has none, and deriving a ytimg URL from its URL-shaped id would fetch nonsense.
+                info.isYouTubeResult -> Thumbnails.request(info.id, Thumbnails.Quality.LOW)
+            }
         }
     }
+
+    /**
+     * The playable URL behind [source] when it is a custom link (a direct media file, or any other
+     * remote page the extractor chain may know), or null when it is not a URL at all - which is how
+     * a plain search phrase stays a search phrase.
+     */
+    private fun customUrlOf(source: MediaSource): String? = when (source) {
+        is MediaSource.DirectStream -> source.streamUrl
+        is MediaSource.Remote -> CustomMediaUrls.normalize(source.url)
+        else -> null
+    }
+
+    /**
+     * The single card shown for a pasted link. Built purely from the URL - file name as the title,
+     * host as the uploader - so the card appears the instant the player hits Enter; whether the
+     * link actually plays is settled by the resolver, which reports failures through the menu's
+     * error panel rather than an empty result list.
+     */
+    private fun customResult(url: String): MediaSearchResult = MediaSearchResult(
+        id = url,
+        title = CustomMediaUrls.displayName(url),
+        uploader = CustomMediaUrls.hostOf(url),
+        durationSec = null,
+        viewCount = null,
+        watchUrlOverride = url,
+        isCustom = true,
+    )
 
     /** Minimal result used when URL metadata could not be fetched. */
     private fun fallbackResult(videoId: String) =
@@ -399,8 +522,31 @@ class SuggestionsController {
             thumbnailUrlOverride = meta?.thumbnailUrl,
             isTwitch = true,
             isLive = meta?.isLive ?: false,
+            platform = MediaPlatform.TWITCH,
         )
     }
+
+    /**
+     * Builds a single-card result for a pasted Vimeo / Kick link. The card is keyed by the watch URL
+     * (unlike Twitch, whose id is a cache key) so its thumbnail slot never collides with a YouTube id;
+     * [meta] fills in the title / uploader / thumbnail when the metadata lookup succeeded.
+     */
+    private fun platformResult(
+        url: String,
+        platform: MediaPlatform,
+        meta: PlatformVideoMetadata?,
+        fallbackTitle: String,
+    ): MediaSearchResult = MediaSearchResult(
+        id = url,
+        title = meta?.title?.takeIf { it.isNotBlank() } ?: fallbackTitle,
+        uploader = meta?.uploader,
+        durationSec = meta?.durationSec,
+        viewCount = meta?.viewCount,
+        watchUrlOverride = url,
+        thumbnailUrlOverride = meta?.thumbnailUrl,
+        isLive = meta?.isLive ?: false,
+        platform = platform,
+    )
 
     companion object {
         /** Results fetched per page; the panel loads another page as the user scrolls near the end. */
@@ -414,6 +560,9 @@ class SuggestionsController {
 
         /** Translation key for the empty status line. */
         private const val KEY_EMPTY = "dreamdisplays.suggestions.empty"
+
+        /** Translation key shown when the player has not saved any custom links yet. */
+        private const val KEY_NO_LINKS = "dreamdisplays.suggestions.no_links"
 
         /** Logger. */
         private val logger = LoggerFactory.getLogger("DreamDisplays/Suggestions")

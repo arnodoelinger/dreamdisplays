@@ -71,11 +71,13 @@
   "dreamdisplays.ui.error": "Display error",
   "dreamdisplays.ui.new": "New",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "likes",
   "dreamdisplays.ui.watching": "watching",
   "dreamdisplays.ui.views_short": "views",
   "dreamdisplays.button.suggestions": "Suggestions",
-  "dreamdisplays.suggestions.search": "Search YouTube or Twitch...",
+  "dreamdisplays.suggestions.search": "Search, or paste a video link...",
   "dreamdisplays.suggestions.loading": "Loading...",
   "dreamdisplays.suggestions.empty": "No results found.",
   "dreamdisplays.suggestions.error": "Failed to load.",
@@ -85,5 +87,8 @@
   "dreamdisplays.sort.newest": "Newest",
   "dreamdisplays.sort.streams": "Streams",
   "dreamdisplays.sort.unwatched": "Unwatched",
-  "dreamdisplays.sort.watched": "Watched"
+  "dreamdisplays.sort.watched": "Watched",
+  "dreamdisplays.ui.custom": "Link",
+  "dreamdisplays.sort.my_links": "My links",
+  "dreamdisplays.suggestions.no_links": "No saved links yet. Paste a video link above to play it."
 }

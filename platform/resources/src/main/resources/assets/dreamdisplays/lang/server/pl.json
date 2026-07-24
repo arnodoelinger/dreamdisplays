@@ -174,5 +174,8 @@
   "fullscreenForcedDisallowed": "&7D |&f Wymuszone transmisje pełnoekranowe są wyłączone w konfiguracji",
   "fullscreenNoDisplay": "&7D |&f Nie znaleziono wyświetlacza ani wczytanego świata do hostowania transmisji z URL",
   "fullscreenListEmpty": "&7D |&f Brak aktywnych transmisji pełnoekranowych",
-  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}"
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "customMediaDisabled": "&7D |&f Własne linki do filmów są wyłączone na tym serwerze",
+  "customMediaHostBlocked": "&7D |&f Filmy z tej strony nie są dozwolone na tym serwerze",
+  "customMediaNoPermission": "&7D |&f Nie masz uprawnień, aby odtwarzać własne linki do filmów"
 }

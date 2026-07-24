@@ -147,6 +147,34 @@ object DreamHttpClient {
         return response.body
     }
 
+    /**
+     * Like [execute], but stops reading the body after [maxBytes] and closes the connection.
+     *
+     * Needed wherever only the head of a response is interesting and the response may be huge -
+     * probing a remote media file's container header, for instance, where a server that ignores a
+     * `Range` request would otherwise stream a whole movie into memory. The returned response's
+     * body holds at most [maxBytes] bytes; everything else is reported unchanged.
+     */
+    @Throws(IOException::class)
+    fun executeLimited(
+        url: String,
+        maxBytes: Int,
+        options: RequestOptions = RequestOptions(),
+    ): HttpResponse {
+        require(maxBytes > 0) { "maxBytes must be positive." }
+        val request = request(url, options)
+        clientFor(options).newCall(request).execute().use { response ->
+            val body = response.bodyStream().use { it.readAtMost(maxBytes) }
+            return HttpResponse(
+                code = response.code,
+                message = response.message,
+                headers = response.headers.toMultimap(),
+                body = body,
+                finalUrl = response.request.url.toString(),
+            )
+        }
+    }
+
     @Throws(IOException::class)
     fun downloadToFile(
         url: String,
@@ -250,6 +278,20 @@ object DreamHttpClient {
 
     private fun Response.readBodyBytes(): ByteArray {
         return bodyStream().use { it.readBytes() }
+    }
+
+    /** Reads at most [maxBytes] from this stream, returning fewer when it ends first. */
+    private fun java.io.InputStream.readAtMost(maxBytes: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream(minOf(maxBytes, DEFAULT_BUFFER_SIZE))
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var remaining = maxBytes
+        while (remaining > 0) {
+            val read = read(buffer, 0, minOf(buffer.size, remaining))
+            if (read < 0) break
+            out.write(buffer, 0, read)
+            remaining -= read
+        }
+        return out.toByteArray()
     }
 
     private fun Response.bodyStream() =

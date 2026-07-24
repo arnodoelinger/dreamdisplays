@@ -128,6 +128,15 @@ object VanillaDisplayActions {
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
         if (!MediaUrlPolicy.isAllowed(url)) return
+        CustomMediaGate.refusalKey(
+            url,
+            VanillaServerState.config.settings.customMediaPolicy,
+            VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.custom,
+                VanillaPermissions.Fallback.EVERYONE,
+            ),
+        )?.let { return MessageUtil.sendMessage(player, it) }
         if (!setVideoThrottle.tryAcquire(displayId, SET_VIDEO_COOLDOWN_MS)) return
 
         val wasSync = displayData.isSync

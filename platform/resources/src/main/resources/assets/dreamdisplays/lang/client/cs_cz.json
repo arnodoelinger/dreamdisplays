@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "Chyba displeje",
   "dreamdisplays.ui.new": "Nový",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "lajků",
   "dreamdisplays.ui.watching": "diváků",
   "dreamdisplays.ui.views_short": "zhlédnutí",
   "dreamdisplays.button.suggestions": "Návrhy",
-  "dreamdisplays.suggestions.search": "Hledat na YouTube nebo Twitch...",
+  "dreamdisplays.suggestions.search": "Hledej nebo vlož odkaz na video...",
   "dreamdisplays.suggestions.loading": "Načítání...",
   "dreamdisplays.suggestions.empty": "Nenalezen žádný výsledek.",
   "dreamdisplays.suggestions.error": "Načítání se nezdařilo.",
-  "dreamdisplays.suggestions.unavailable": "Návrhy nejsou dostupné."
+  "dreamdisplays.suggestions.unavailable": "Návrhy nejsou dostupné.",
+  "dreamdisplays.ui.custom": "Odkaz",
+  "dreamdisplays.sort.my_links": "Moje odkazy",
+  "dreamdisplays.suggestions.no_links": "Zatím žádné uložené odkazy. Vlož výše odkaz na video a přehraj ho."
 }

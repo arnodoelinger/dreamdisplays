@@ -1,6 +1,7 @@
 package com.dreamdisplays.api.media.search
 
 import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import com.dreamdisplays.api.media.source.MediaPlatform
 
 /**
  * Describes a single video returned by a search or related-video query.
@@ -42,6 +43,20 @@ data class MediaSearchResult(
     /** True when this result comes from Twitch, so the UI can show a "Twitch" tag instead of/alongside "New". */
     val isTwitch: Boolean = false,
 
+    /**
+     * True when this result is a custom link the player pasted rather than a platform search hit.
+     * Such results have no thumbnail or channel to fetch, so the UI draws its own card art and
+     * stops waiting for metadata that is never going to arrive.
+     */
+    val isCustom: Boolean = false,
+
+    /**
+     * Which service this result comes from, for the card / preview badge. Defaults to
+     * [MediaPlatform.YOUTUBE] since the overwhelming majority of results are YouTube search hits;
+     * the Twitch / Vimeo / Kick / custom builders set it explicitly.
+     */
+    val platform: MediaPlatform = MediaPlatform.YOUTUBE,
+
     /** The uploader / channel's avatar image URL, or null when unavailable. */
     val channelAvatarUrl: String? = null,
 
@@ -51,6 +66,14 @@ data class MediaSearchResult(
     /** True when this result is a currently-live broadcast. */
     val isLive: Boolean = false,
 ) {
+    /**
+     * True when this result's thumbnail can be derived from its [id] as a YouTube image. Only real
+     * YouTube results qualify: every other platform (Twitch / Vimeo / Kick) carries its thumbnail in
+     * [thumbnailUrlOverride] and its [id] is a URL or a platform key, so deriving a `ytimg` URL from
+     * it would fetch a broken image.
+     */
+    val isYouTubeResult: Boolean get() = !isCustom && !isTwitch && platform == MediaPlatform.YOUTUBE
+
     /** Returns true if the video was published within the last [daysWindow] days. */
     fun isRecent(daysWindow: Int): Boolean =
         publishedDaysAgo != null && publishedDaysAgo >= 0 && publishedDaysAgo <= daysWindow

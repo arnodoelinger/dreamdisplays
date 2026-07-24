@@ -23,6 +23,7 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.platform.client.popout.PopoutManager
 import com.dreamdisplays.platform.client.render.ScrubPreview
+import com.dreamdisplays.platform.client.storage.CustomVideoStore
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
@@ -461,10 +462,22 @@ class DisplayMenu private constructor(
         val ds = displayScreen
         if (!ds.canSetVideoHere) return
         DreamServices.registry.get(DisplayServices.DISPLAY).setUrl(DisplayId(ds.uuid), info.getWatchUrl(), ds.lang)
-        VideoTitleCache.put(info.id, info.title)
-        VideoMetadataCache.put(info.id, info)
-        lastSuggestedVideoId = info.id
-        suggestions.setRelatedTo(info.id)
+
+        // A pasted link exists nowhere else, so remember it locally the moment it is used
+        if (info.isCustom) {
+            CustomVideoStore.remember(info.getWatchUrl(), info.title)
+            return
+        }
+
+        // Related videos, the title cache, and the metadata cache are all keyed by a YouTube video
+        // id. A Twitch / Vimeo / Kick card has none — its id is a URL or a platform key — so feeding
+        // those here would fire a bogus YouTube "related" lookup. Only real YouTube picks continue.
+        val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(info.getWatchUrl())
+            ?: return
+        VideoTitleCache.put(videoId, info.title)
+        VideoMetadataCache.put(videoId, info)
+        lastSuggestedVideoId = videoId
+        suggestions.setRelatedTo(videoId)
     }
 
     override fun drawScreen(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {

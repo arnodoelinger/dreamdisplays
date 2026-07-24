@@ -25,7 +25,6 @@ particles_color = "#00FFFF"
 
 # Mod detection notifications
 # Players without Dream Displays will be asked to install it
-# Note that it doesn't work on Folia for now
 mod_detection_enabled = true
 
 # Update notifications
@@ -33,6 +32,21 @@ updates = true
 
 # Default volume for new players in percent (0 to 100, default 50)
 default_volume = 50
+
+[custom_media]
+# Custom videos: links players paste themselves (direct .mp4 / .m3u8 files, file hosts,
+# and any other site the resolver can open).
+# Note that this section never affects supported platforms (YouTube, Twitch, Vimeo, Kick).
+enabled = true
+
+# Optional allowlist of hosts. Empty = every host is allowed.
+# Subdomains are included, so "example.com" also covers "cdn.example.com".
+# allowed_hosts = ["cdn.example.com", "files.myserver.net"]
+allowed_hosts = []
+
+# Hosts that are always refused, checked before allowed_hosts.
+# blocked_hosts = ["bad.example"]
+blocked_hosts = []
 
 [fullscreen]
 # Default visual sub-mode when /display fullscreen start omits one: "STANDARD" or "IMMERSIVE"
@@ -87,3 +101,4 @@ create_bypass = "dreamdisplays.create.bypass"       # Default: operator
 fullscreen_start = "dreamdisplays.fullscreen.start" # Default: operator
 fullscreen_stop = "dreamdisplays.fullscreen.stop"   # Default: operator
 fullscreen_list = "dreamdisplays.fullscreen.list"   # Default: operator
+custom = "dreamdisplays.custom"                     # Default: everyone

@@ -71,13 +71,18 @@
   "dreamdisplays.ui.error": "Errore display",
   "dreamdisplays.ui.new": "Nuovo",
   "dreamdisplays.ui.twitch": "Twitch",
+  "dreamdisplays.ui.vimeo": "Vimeo",
+  "dreamdisplays.ui.kick": "Kick",
   "dreamdisplays.ui.likes": "Mi piace",
   "dreamdisplays.ui.watching": "spettatori",
   "dreamdisplays.ui.views_short": "visualizzazioni",
   "dreamdisplays.button.suggestions": "Suggerimenti",
-  "dreamdisplays.suggestions.search": "Cerca su YouTube o Twitch...",
+  "dreamdisplays.suggestions.search": "Cerca o incolla un link a un video...",
   "dreamdisplays.suggestions.loading": "Caricamento...",
   "dreamdisplays.suggestions.empty": "Nessun risultato trovato.",
   "dreamdisplays.suggestions.error": "Caricamento fallito.",
-  "dreamdisplays.suggestions.unavailable": "Suggerimenti non disponibili."
+  "dreamdisplays.suggestions.unavailable": "Suggerimenti non disponibili.",
+  "dreamdisplays.ui.custom": "Link",
+  "dreamdisplays.sort.my_links": "I miei link",
+  "dreamdisplays.suggestions.no_links": "Nessun link salvato. Incolla sopra un link a un video per riprodurlo."
 }
