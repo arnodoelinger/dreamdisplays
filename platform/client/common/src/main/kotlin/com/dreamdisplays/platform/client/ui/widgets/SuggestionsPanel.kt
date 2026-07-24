@@ -452,7 +452,10 @@ class SuggestionsPanel(
         val tw = f.width(label) + 6
         val tagH = f.lineHeight + 4
         g.fill(thumbX + 2, thumbY + 2, thumbX + 2 + tw, thumbY + 2 + tagH, bg)
-        g.drawText(f, label, thumbX + 5, thumbY + 4, textColor, true)
+        // No drop shadow: the tag already sits on its own solid plate, and a shadow only muddies
+        // dark-on-bright tags (Vimeo / Kick) into a smeared double-stroke look. Matches PreviewSection's
+        // badge, which never shadowed its text.
+        g.drawText(f, label, thumbX + 5, thumbY + 4, textColor, false)
     }
 
     /**
