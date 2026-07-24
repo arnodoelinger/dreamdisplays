@@ -1,32 +1,32 @@
 {
-  "noDisplayTerritories": "&7D |&f עדיין לא בחרת באזורי תצוגה! אנא בחר שני נקודות עם {0} על {1}",
-  "createDisplayCommand": "&7D |&f כעת הקלד /display create כדי ליצור תצוגה",
-  "secondPointNotSelected": "&7D |&f עדיין לא בחרת את הנקודה השנייה!",
-  "displayOverlap": "&7D |&f כבר יש תצוגה באזור זה!",
-  "structureTooLarge": "&7D |&f אינך יכול ליצור תצוגה גדולה מ-%d × %d בלוקים",
-  "structureTooSmall": "&7D |&f אינך יכול ליצור תצוגה קטנה מ-%d × %d בלוקים",
-  "firstPointSelected": "&7D |&f נקודה ראשונה נבחרה! כעת בחר את הנקודה השנייה",
-  "secondPointSelected": "&7D |&f נקודה שנייה נבחרה!",
-  "structureWrongDepth": "&7D |&f הבחירה חייבת להיות באורך של לפחות 1 בלוק",
-  "wrongStructure": "&7D |&f ניתן להשתמש רק ב-{0} לתצוגות",
-  "displayTooHigh": "&7D |&f גובה התצוגה גבוה מדי (מקסימום %d)",
-  "displayTooLow": "&7D |&f התצוגה נמוכה מדי (מינימום %d)",
-  "selectionClear": "&7D |&f הבחירה נמחקה!",
-  "displayWrongCommand": "&7D |&f הקלדת משהו לא נכון!",
-  "displayCommandMissingPermission": "&7D |&f אין לך הרשאה להשתמש בפקודה זו!",
-  "commandPlayersOnly": "&7D |&f פקודה זו ניתנת לשימוש רק על ידי שחקן בתוך המשחק",
-  "successfulCreation": "&7D |&f התצוגה נוצרה! כעת התרכז בה והקלד /display video <video_url> [lang] כדי להגדיר וידאו",
-  "noDisplay": "&7D |&f התצוגה לא נמצאה!",
-  "settedURL": "&7D |&f הוידאו נטען!",
-  "invalidURL": "&7D |&f הקישור שלך לא תקין! אנא השתמש בקישור וידאו תקין (YouTube, Twitch וכו')",
-  "displayVideoWrongTargetBlock": "&7D |&f כדי להשתמש בפקודה הזו, עליך להסתכל על בלוק תצוגה!",
-  "displayVideoNotOwner": "&7D |&f אינך הבעלים של התצוגה הזו!",
-  "reportTooQuickly": "&7D |&f אתה שולח דיווחים מהר מדי! אנא המתן לפני שליחת דיווח נוסף",
-  "reportSent": "&7D |&f הדיווח נשלח!",
-  "reportFailed": "&7D |&f נכשל בשליחת הדיווח. אנא נסה שוב מאוחר יותר.",
-  "displayDeleted": "&7D |&f התצוגה נמחקה!",
-  "displayReported": "&7D |&f התצוגה דווחה!",
-  "reportNotConfigured": "&7D |&f מערכת הדיווחים מושבתת בשרת זה!",
+  "noDisplayTerritories": "&7D |&f You haven't selected any display territories yet! Please select two points using {0} on {1}",
+  "createDisplayCommand": "&7D |&f Now type /display create to create a display",
+  "secondPointNotSelected": "&7D |&f You haven't selected the second point yet!",
+  "displayOverlap": "&7D |&f There is already a display in this area!",
+  "structureTooLarge": "&7D |&f You can't create a display larger than %d × %d blocks",
+  "structureTooSmall": "&7D |&f You can't create a display smaller than %d × %d blocks",
+  "firstPointSelected": "&7D |&f First point selected! Now select the second point",
+  "secondPointSelected": "&7D |&f Second point selected!",
+  "structureWrongDepth": "&7D |&f Selection must be at least 1 block long",
+  "wrongStructure": "&7D |&f Only {0} blocks can be used for displays",
+  "displayTooHigh": "&7D |&f Display height is too high (max. %d)",
+  "displayTooLow": "&7D |&f Display is too low (min. %d)",
+  "selectionClear": "&7D |&f Selection has been cleared!",
+  "displayWrongCommand": "&7D |&f You entered something wrong!",
+  "displayCommandMissingPermission": "&7D |&f You don't have permission to use this command!",
+  "commandPlayersOnly": "&7D |&f This command can only be used by a player in-game",
+  "successfulCreation": "&7D |&f Display has been created! Now focus on it and type /display video <video_url> [lang] to set a video",
+  "noDisplay": "&7D |&f Display has not been found!",
+  "settedURL": "&7D |&f Video has been loaded!",
+  "invalidURL": "&7D |&f Your URL is invalid! Please use a valid video link (YouTube, Twitch, etc.)",
+  "displayVideoWrongTargetBlock": "&7D |&f You must look at a display block to use this command!",
+  "displayVideoNotOwner": "&7D |&f You are not the owner of this display!",
+  "reportTooQuickly": "&7D |&f You are sending reports too quickly! Please wait before sending another report",
+  "reportSent": "&7D |&f Report has been sent!",
+  "reportFailed": "&7D |&f Failed to send report. Please try again later",
+  "displayDeleted": "&7D |&f Display has been deleted!",
+  "displayReported": "&7D |&f Display has been reported!",
+  "reportNotConfigured": "&7D |&f Report system is disabled on this server!",
   "newVersion": {
     "text": "",
     "extra": [
@@ -35,11 +35,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "גרסה חדשה %s של Dream Displays זמינה! אנא ",
+        "text": "New version %s of Dream Displays is available! Please ",
         "color": "#FFFFFF"
       },
       {
-        "text": "עדכן את המוד שלך",
+        "text": "update your mod",
         "color": "#023EB6",
         "underlined": true,
         "clickEvent": {
@@ -48,7 +48,7 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "לחץ להורדת הגרסה החדשה"
+          "value": "Click to download new version"
         }
       },
       {
@@ -57,18 +57,18 @@
       }
     ]
   },
-  "newPluginVersion": "&7D |&f גרסה חדשה של תוסף Dream Displays (%s) זמינה! אנא עדכן את התוסף בשרת!",
-  "configReloaded": "&7D | &fDream Displays נטען מחדש!",
-  "configReloadFailed": "&7D |&f לא ניתן לטעון מחדש את Dream Displays. אנא בדוק את הקונסולה לשגיאות",
-  "configReloadSummary": "&7D |&f נטען מחדש: קונפיג, הודעות שפה והרשאות פקודות",
-  "noDisplaysFound": "&7D |&f לא נמצאו תצוגות",
-  "displayListHeader": "&7D |&f תצוגות:",
-  "displayListEntry": "&7D |&f {0}. בעלים: {1}, מיקום: [{2}, {3}, {4}], URL: {5}",
-  "displayListPageLine": "&7D |&7 עמוד=&f{0}/{1} &8| &7סה\"כ=&f{2}",
-  "displayListDetails": " &8| &7עולם=&f{0} &8| &7גודל=&f{1}x{2} &8| &7סנכרון=&f{3} &8| &7id=&f{4}",
-  "displayListUnknownOwner": "לא ידוע",
-  "displayListUnknownWorld": "לא ידוע",
-  "displayListUnavailableUrl": "לא זמין",
+  "newPluginVersion": "&7D |&f New version of Dream Displays plugin (%s) is available! Please update the server plugin!",
+  "configReloaded": "&7D | &fDream Displays has been reloaded!",
+  "configReloadFailed": "&7D |&f Failed to reload Dream Displays. Please check the console for errors",
+  "configReloadSummary": "&7D |&f Reloaded: config, language messages, command permissions",
+  "noDisplaysFound": "&7D |&f No displays found",
+  "displayListHeader": "&7D |&f Displays:",
+  "displayListEntry": "&7D |&f {0}. Owner: {1}, Location: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 page=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7world=&f{0} &8| &7size=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Unknown",
+  "displayListUnknownWorld": "unknown",
+  "displayListUnavailableUrl": "N/A",
   "displayListTpButton": " [TP]",
   "displayListUrlButton": " [URL]",
   "displayBlockBreak": {
@@ -79,11 +79,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "זה בלוק תצוגה. התקן את המוד ",
+        "text": "This is a display block. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -92,11 +92,11 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "לחץ להורדת Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " כדי לתקשר איתו!",
+        "text": " mod to interact with it!",
         "color": "#FFFFFF"
       }
     ]
@@ -109,11 +109,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "המוד Dream Displays נדרש כדי לראות תצוגות בשרת. אנא ",
+        "text": "This server uses in-game displays. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "הורד Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -122,60 +122,60 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "לחץ להורדת Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " למשחק מהנה!",
+        "text": " to see them!",
         "color": "#FFFFFF"
       }
     ]
   },
-  "display.enabled": "&7D |&f תצוגות מופעלות",
-  "display.disabled": "&7D |&f תצוגות מושבתות",
-  "display.already-disabled": "&7D |&f התצוגות כבר מושבתות",
-  "display.already-enabled": "&7D |&f התצוגות כבר מופעלות",
-  "displayTargetNotFound": "&7D |&f השחקן '%s' לא נמצא אונליין!",
-  "display.enabled.target": "&7D |&f התצוגות הופעלו עבור %s",
-  "display.disabled.target": "&7D |&f התצוגות הושבתו עבור %s",
-  "display.already-enabled.target": "&7D |&f התצוגות כבר מופעלות עבור %s",
-  "display.already-disabled.target": "&7D |&f התצוגות כבר מושבתות עבור %s",
-  "displayStatsHeader": "&7D |&f סטטיסטיקות שימוש במוד:",
-  "displayStatsEntry": "&7D |&f גרסה %s: %d שחקנים",
-  "displayStatsTotal": "&7D |&f סה\"כ שחקנים עם מוד: %d",
-  "displayHelpHeader": "פקודות זמינות:",
-  "displayHelpCreate": "– /display create: צור תצוגה חדשה",
-  "displayHelpVideo": "– /display video <url>: הגדר וידאו לתצוגה שלך",
-  "displayHelpInfo": "– /display info: הצג פרטים על התצוגה שאתה מסתכל עליה",
-  "displayHelpDelete": "– /display delete: מחק את התצוגה שאתה מסתכל עליה",
-  "displayHelpList": "– /display list: רשום את כל התצוגות",
-  "displayHelpStats": "– /display stats: הצג סטטיסטיקות שימוש במוד",
-  "displayHelpReload": "– /display reload: טען מחדש את התצורה",
-  "displayHelpOn": "– /display on [player]: הפעל תצוגות לעצמך או לשחקן יעד",
-  "displayHelpOff": "– /display off [player]: השבת תצוגות לעצמך או לשחקן יעד",
-  "displayHelpFullscreen": "– /display fullscreen start <id|url> [דגלים]: כפה שידור במסך מלא לשחקנים",
-  "displayHelpHelp": "– /display help: הצג עזרה זו",
-  "displayInfoHeader": "&7D |&f מידע על התצוגה:",
-  "displayInfoOwnerLine": "&7D |&7 בעלים=&f{0} &8| &7uuid=&f{1}",
-  "displayInfoUuidLine": "&7D |&7 מזהה-תצוגה=&f{0}",
-  "displayInfoPositionLine": "&7D |&7 עולם=&f{0} &8| &7נקודה1=&f[{1}, {2}, {3}] &8| &7נקודה2=&f[{4}, {5}, {6}]",
-  "displayInfoStateLine": "&7D |&7 גודל=&f{0}x{1} &8| &7צד=&f{2} &8| &7סנכרון=&f{3}",
-  "displayInfoMediaLine": "&7D |&7 שפה=&f{0} &8| &7משך=&f{1} &8| &7url=&f{2}",
-  "displayInfoUnknownOwner": "לא ידוע",
-  "displayInfoUnknownWorld": "לא ידוע",
-  "displayInfoUnknownDuration": "לא ידוע",
-  "displayInfoAutoLang": "אוטומטי",
-  "displayInfoUnavailableUrl": "לא זמין",
-  "fullscreenStarted": "&7D |&f שידור מסך מלא &b{0}&f החל (הגיע ל-{1} שחקן(ים))",
-  "fullscreenStopped": "&7D |&f נעצרו {0} שידורי מסך מלא",
-  "fullscreenStopFailed": "&7D |&f לא נמצא שידור מסך מלא תואם",
-  "fullscreenNoTargets": "&7D |&f ציין לפחות target <שחקנים> או radius <בלוקים>",
-  "fullscreenAlreadyRunning": "&7D |&f לתצוגה זו כבר יש שידור מסך מלא, או שמזהה הפעלה זה כבר תפוס",
-  "fullscreenForcedDisallowed": "&7D |&f שידורי מסך מלא כפויים מושבתים בתצורה",
-  "fullscreenNoDisplay": "&7D |&f לא נמצאה תצוגה ואין עולם טעון לשידור לפי URL",
-  "fullscreenListEmpty": "&7D |&f אין שידורי מסך מלא פעילים",
+  "display.enabled": "&7D |&f Displays enabled. Please wait for a moment...",
+  "display.disabled": "&7D |&f Displays disabled",
+  "display.already-disabled": "&7D |&f Displays are already disabled",
+  "display.already-enabled": "&7D |&f Displays are already enabled",
+  "displayTargetNotFound": "&7D |&f Player '%s' was not found online!",
+  "display.enabled.target": "&7D |&f Displays enabled for %s",
+  "display.disabled.target": "&7D |&f Displays disabled for %s",
+  "display.already-enabled.target": "&7D |&f Displays are already enabled for %s",
+  "display.already-disabled.target": "&7D |&f Displays are already disabled for %s",
+  "displayStatsHeader": "&7D |&f Mod usage statistics:",
+  "displayStatsEntry": "&7D |&f Version %s: %d players",
+  "displayStatsTotal": "&7D |&f Total players with mod: %d",
+  "displayHelpHeader": "Available commands:",
+  "displayHelpCreate": "– /display create: create a new display",
+  "displayHelpVideo": "– /display video <url>: set video for your display",
+  "displayHelpInfo": "– /display info: show details of the display you're looking at",
+  "displayHelpDelete": "– /display delete: delete the display you're looking at",
+  "displayHelpList": "– /display list: list all displays",
+  "displayHelpStats": "– /display stats: show mod usage statistics",
+  "displayHelpReload": "– /display reload: reload the configuration",
+  "displayHelpOn": "– /display on [player]: enable displays for yourself or a target player",
+  "displayHelpOff": "– /display off [player]: disable displays for yourself or a target player",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: force a fullscreen broadcast to players",
+  "displayHelpHelp": "– /display help: show this help",
+  "displayInfoHeader": "&7D |&f Display info:",
+  "displayInfoOwnerLine": "&7D |&7 owner=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 display-id=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 world=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 size=&f{0}x{1} &8| &7facing=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 lang=&f{0} &8| &7duration=&f{1} &8| &7url=&f{2}",
+  "displayInfoUnknownOwner": "Unknown",
+  "displayInfoUnknownWorld": "Unknown",
+  "displayInfoUnknownDuration": "unknown",
+  "displayInfoAutoLang": "auto",
+  "displayInfoUnavailableUrl": "N/A",
+  "fullscreenStarted": "&7D |&f Fullscreen broadcast &b{0}&f started (reached {1} player(s))",
+  "fullscreenStopped": "&7D |&f Stopped {0} fullscreen broadcast(s)",
+  "fullscreenStopFailed": "&7D |&f No matching fullscreen broadcast found",
+  "fullscreenNoTargets": "&7D |&f Specify at least one of target <players> or radius <blocks>",
+  "fullscreenAlreadyRunning": "&7D |&f That display already hosts a fullscreen broadcast, or the session ID is taken",
+  "fullscreenForcedDisallowed": "&7D |&f Forced fullscreen broadcasts are disabled in the config",
+  "fullscreenNoDisplay": "&7D |&f No display found and no world is loaded to host a URL broadcast",
+  "fullscreenListEmpty": "&7D |&f No fullscreen broadcasts are running",
   "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
-  "customMediaDisabled": "&7D |&f קישורי וידאו מותאמים אישית מושבתים בשרת הזה",
-  "customMediaHostBlocked": "&7D |&f סרטונים מאתר זה אינם מותרים בשרת הזה",
-  "customMediaNoPermission": "&7D |&f אין לך הרשאה להפעיל קישורי וידאו משלך"
+  "customMediaDisabled": "&7D |&f Custom video links are disabled on this server",
+  "customMediaHostBlocked": "&7D |&f Videos from this site are not allowed on this server",
+  "customMediaNoPermission": "&7D |&f You don't have permission to play your own video links"
 }

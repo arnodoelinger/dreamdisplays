@@ -1,32 +1,32 @@
 {
-  "noDisplayTerritories": "&7D |&f Ještě jste nevybral žádné území displeje! Vyberte prosím dva body s {0} na {1}",
-  "createDisplayCommand": "&7D |&f Nyní zadejte /display create pro vytvoření displeje",
-  "secondPointNotSelected": "&7D |&f Ještě jste nevybral druhý bod!",
-  "displayOverlap": "&7D |&f V této oblasti už je displej!",
-  "structureTooLarge": "&7D |&f Nemůžete vytvořit displej větší než %d × %d bloků",
-  "structureTooSmall": "&7D |&f Nemůžete vytvořit displej menší než %d × %d bloků",
-  "firstPointSelected": "&7D |&f První bod vybrán! Nyní vyberte druhý bod",
-  "secondPointSelected": "&7D |&f Druhý bod vybrán!",
-  "structureWrongDepth": "&7D |&f Výběr musí být alespoň 1 blok dlouhý",
-  "wrongStructure": "&7D |&f Pro displeje lze použít pouze {0}",
-  "displayTooHigh": "&7D |&f Výška displeje je příliš vysoká (max. %d)",
-  "displayTooLow": "&7D |&f Displej je příliš nízko (min. %d)",
-  "selectionClear": "&7D |&f Výběr byl vymazán!",
-  "displayWrongCommand": "&7D |&f Zadali jste něco špatného!",
-  "displayCommandMissingPermission": "&7D |&f Nemáte oprávnění k použití tohoto příkazu!",
-  "commandPlayersOnly": "&7D |&f Tento příkaz může použít pouze hráč ve hře",
-  "successfulCreation": "&7D |&f Displej byl vytvořen! Nyní se na něj zaměřte a zadejte /display video <video_url> [lang] pro nastavení videa",
-  "noDisplay": "&7D |&f Displej nebyl nalezen!",
-  "settedURL": "&7D |&f Video bylo načteno!",
-  "invalidURL": "&7D |&f Váš odkaz je neplatný! Použijte prosím platný odkaz na video (YouTube, Twitch atd.)",
-  "displayVideoWrongTargetBlock": "&7D |&f Pro použití tohoto příkazu se musíte dívat na blok displeje!",
-  "displayVideoNotOwner": "&7D |&f Nejste vlastník tohoto displeje!",
-  "reportTooQuickly": "&7D |&f Odesíláte zprávy příliš rychle! Počkejte prosím před odesláním další",
-  "reportSent": "&7D |&f Zpráva byla odeslána!",
-  "reportFailed": "&7D |&f Nepodařilo se odeslat zprávu. Zkuste to prosím později",
-  "displayDeleted": "&7D |&f Displej byl smazán!",
-  "displayReported": "&7D |&f Displej byl nahlášen!",
-  "reportNotConfigured": "&7D |&f Systém hlášení je na tomto serveru zakázán!",
+  "noDisplayTerritories": "&7D |&f You haven't selected any display territories yet! Please select two points using {0} on {1}",
+  "createDisplayCommand": "&7D |&f Now type /display create to create a display",
+  "secondPointNotSelected": "&7D |&f You haven't selected the second point yet!",
+  "displayOverlap": "&7D |&f There is already a display in this area!",
+  "structureTooLarge": "&7D |&f You can't create a display larger than %d × %d blocks",
+  "structureTooSmall": "&7D |&f You can't create a display smaller than %d × %d blocks",
+  "firstPointSelected": "&7D |&f First point selected! Now select the second point",
+  "secondPointSelected": "&7D |&f Second point selected!",
+  "structureWrongDepth": "&7D |&f Selection must be at least 1 block long",
+  "wrongStructure": "&7D |&f Only {0} blocks can be used for displays",
+  "displayTooHigh": "&7D |&f Display height is too high (max. %d)",
+  "displayTooLow": "&7D |&f Display is too low (min. %d)",
+  "selectionClear": "&7D |&f Selection has been cleared!",
+  "displayWrongCommand": "&7D |&f You entered something wrong!",
+  "displayCommandMissingPermission": "&7D |&f You don't have permission to use this command!",
+  "commandPlayersOnly": "&7D |&f This command can only be used by a player in-game",
+  "successfulCreation": "&7D |&f Display has been created! Now focus on it and type /display video <video_url> [lang] to set a video",
+  "noDisplay": "&7D |&f Display has not been found!",
+  "settedURL": "&7D |&f Video has been loaded!",
+  "invalidURL": "&7D |&f Your URL is invalid! Please use a valid video link (YouTube, Twitch, etc.)",
+  "displayVideoWrongTargetBlock": "&7D |&f You must look at a display block to use this command!",
+  "displayVideoNotOwner": "&7D |&f You are not the owner of this display!",
+  "reportTooQuickly": "&7D |&f You are sending reports too quickly! Please wait before sending another report",
+  "reportSent": "&7D |&f Report has been sent!",
+  "reportFailed": "&7D |&f Failed to send report. Please try again later",
+  "displayDeleted": "&7D |&f Display has been deleted!",
+  "displayReported": "&7D |&f Display has been reported!",
+  "reportNotConfigured": "&7D |&f Report system is disabled on this server!",
   "newVersion": {
     "text": "",
     "extra": [
@@ -35,11 +35,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Nová verze %s Dream Displays je k dispozici! Prosím ",
+        "text": "New version %s of Dream Displays is available! Please ",
         "color": "#FFFFFF"
       },
       {
-        "text": "aktualizujte svůj mod",
+        "text": "update your mod",
         "color": "#023EB6",
         "underlined": true,
         "clickEvent": {
@@ -48,7 +48,7 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Klikněte pro stažení nové verze"
+          "value": "Click to download new version"
         }
       },
       {
@@ -57,17 +57,17 @@
       }
     ]
   },
-  "newPluginVersion": "&7D |&f Nová verze pluginu Dream Displays (%s) je k dispozici! Aktualizujte prosím plugin na serveru!",
-  "configReloaded": "&7D | &fDream Displays byl znovu načten!",
-  "configReloadFailed": "&7D |&f Nepodařilo se znovu načíst Dream Displays. Zkontrolujte prosím konzoli kvůli chybám",
-  "configReloadSummary": "&7D |&f Znovu načteno: konfigurace, jazykové zprávy, oprávnění příkazů",
-  "noDisplaysFound": "&7D |&f Žádné displeje nenalezeny",
-  "displayListHeader": "&7D |&f Displeje:",
-  "displayListEntry": "&7D |&f {0}. Vlastník: {1}, Umístění: [{2}, {3}, {4}], URL: {5}",
-  "displayListPageLine": "&7D |&7 stránka=&f{0}/{1} &8| &7celkem=&f{2}",
-  "displayListDetails": " &8| &7svět=&f{0} &8| &7velikost=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
-  "displayListUnknownOwner": "Neznámý",
-  "displayListUnknownWorld": "neznámý",
+  "newPluginVersion": "&7D |&f New version of Dream Displays plugin (%s) is available! Please update the server plugin!",
+  "configReloaded": "&7D | &fDream Displays has been reloaded!",
+  "configReloadFailed": "&7D |&f Failed to reload Dream Displays. Please check the console for errors",
+  "configReloadSummary": "&7D |&f Reloaded: config, language messages, command permissions",
+  "noDisplaysFound": "&7D |&f No displays found",
+  "displayListHeader": "&7D |&f Displays:",
+  "displayListEntry": "&7D |&f {0}. Owner: {1}, Location: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 page=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7world=&f{0} &8| &7size=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Unknown",
+  "displayListUnknownWorld": "unknown",
   "displayListUnavailableUrl": "N/A",
   "displayListTpButton": " [TP]",
   "displayListUrlButton": " [URL]",
@@ -79,11 +79,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Toto je blok displeje. Nainstalujte mod ",
+        "text": "This is a display block. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -92,11 +92,11 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Klikněte pro stažení Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " pro interakci s ním!",
+        "text": " mod to interact with it!",
         "color": "#FFFFFF"
       }
     ]
@@ -109,11 +109,11 @@
         "color": "#9D9D97"
       },
       {
-        "text": "Mod Dream Displays je vyžadován pro zobrazení displejů na serveru. Prosím ",
+        "text": "This server uses in-game displays. ",
         "color": "#FFFFFF"
       },
       {
-        "text": "stáhněte Dream Displays",
+        "text": "Download Dream Displays",
         "color": "#5555FF",
         "underlined": true,
         "clickEvent": {
@@ -122,60 +122,60 @@
         },
         "hoverEvent": {
           "action": "show_text",
-          "value": "Klikněte pro stažení Dream Displays"
+          "value": "Click to download Dream Displays"
         }
       },
       {
-        "text": " pro příjemnou hru!",
+        "text": " to see them!",
         "color": "#FFFFFF"
       }
     ]
   },
-  "display.enabled": "&7D |&f Displeje povoleny",
-  "display.disabled": "&7D |&f Displeje zakázány",
-  "display.already-disabled": "&7D |&f Displeje jsou již zakázány",
-  "display.already-enabled": "&7D |&f Displeje jsou již povoleny",
-  "displayTargetNotFound": "&7D |&f Hráč '%s' nebyl online nalezen!",
-  "display.enabled.target": "&7D |&f Displeje povoleny pro %s",
-  "display.disabled.target": "&7D |&f Displeje zakázány pro %s",
-  "display.already-enabled.target": "&7D |&f Displeje jsou pro %s již povoleny",
-  "display.already-disabled.target": "&7D |&f Displeje jsou pro %s již zakázány",
-  "displayStatsHeader": "&7D |&f Statistiky používání modu:",
-  "displayStatsEntry": "&7D |&f Verze %s: %d hráčů",
-  "displayStatsTotal": "&7D |&f Celkem hráčů s modem: %d",
-  "displayHelpHeader": "Dostupné příkazy:",
-  "displayHelpCreate": "– /display create: Vytvořte nový displej",
-  "displayHelpVideo": "– /display video <url>: Nastavte video pro váš displej",
-  "displayHelpInfo": "– /display info: zobrazit detaily displeje, na který se díváte",
-  "displayHelpDelete": "– /display delete: Smažte displej, na který se díváte",
-  "displayHelpList": "– /display list: Seznam všech displejů",
-  "displayHelpStats": "– /display stats: Zobrazte statistiky používání modu",
-  "displayHelpReload": "– /display reload: Znovu načtěte konfiguraci",
-  "displayHelpOn": "– /display on [hráč]: povolte displeje sobě nebo vybranému hráči",
-  "displayHelpOff": "– /display off [hráč]: zakažte displeje sobě nebo vybranému hráči",
-  "displayHelpFullscreen": "– /display fullscreen start <id|url> [příznaky]: vynutit celoobrazovkové vysílání hráčům",
-  "displayHelpHelp": "– /display help: Zobrazte tuto nápovědu",
-  "displayInfoHeader": "&7D |&f Informace o displeji:",
-  "displayInfoOwnerLine": "&7D |&7 vlastnik=&f{0} &8| &7uuid=&f{1}",
-  "displayInfoUuidLine": "&7D |&7 id-displeje=&f{0}",
-  "displayInfoPositionLine": "&7D |&7 svet=&f{0} &8| &7bod1=&f[{1}, {2}, {3}] &8| &7bod2=&f[{4}, {5}, {6}]",
-  "displayInfoStateLine": "&7D |&7 velikost=&f{0}x{1} &8| &7strana=&f{2} &8| &7sync=&f{3}",
-  "displayInfoMediaLine": "&7D |&7 jazyk=&f{0} &8| &7delka=&f{1} &8| &7url=&f{2}",
-  "displayInfoUnknownOwner": "Neznámý",
-  "displayInfoUnknownWorld": "Neznámý",
-  "displayInfoUnknownDuration": "neznámá",
+  "display.enabled": "&7D |&f Displays enabled. Please wait for a moment...",
+  "display.disabled": "&7D |&f Displays disabled",
+  "display.already-disabled": "&7D |&f Displays are already disabled",
+  "display.already-enabled": "&7D |&f Displays are already enabled",
+  "displayTargetNotFound": "&7D |&f Player '%s' was not found online!",
+  "display.enabled.target": "&7D |&f Displays enabled for %s",
+  "display.disabled.target": "&7D |&f Displays disabled for %s",
+  "display.already-enabled.target": "&7D |&f Displays are already enabled for %s",
+  "display.already-disabled.target": "&7D |&f Displays are already disabled for %s",
+  "displayStatsHeader": "&7D |&f Mod usage statistics:",
+  "displayStatsEntry": "&7D |&f Version %s: %d players",
+  "displayStatsTotal": "&7D |&f Total players with mod: %d",
+  "displayHelpHeader": "Available commands:",
+  "displayHelpCreate": "– /display create: create a new display",
+  "displayHelpVideo": "– /display video <url>: set video for your display",
+  "displayHelpInfo": "– /display info: show details of the display you're looking at",
+  "displayHelpDelete": "– /display delete: delete the display you're looking at",
+  "displayHelpList": "– /display list: list all displays",
+  "displayHelpStats": "– /display stats: show mod usage statistics",
+  "displayHelpReload": "– /display reload: reload the configuration",
+  "displayHelpOn": "– /display on [player]: enable displays for yourself or a target player",
+  "displayHelpOff": "– /display off [player]: disable displays for yourself or a target player",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: force a fullscreen broadcast to players",
+  "displayHelpHelp": "– /display help: show this help",
+  "displayInfoHeader": "&7D |&f Display info:",
+  "displayInfoOwnerLine": "&7D |&7 owner=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 display-id=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 world=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 size=&f{0}x{1} &8| &7facing=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 lang=&f{0} &8| &7duration=&f{1} &8| &7url=&f{2}",
+  "displayInfoUnknownOwner": "Unknown",
+  "displayInfoUnknownWorld": "Unknown",
+  "displayInfoUnknownDuration": "unknown",
   "displayInfoAutoLang": "auto",
   "displayInfoUnavailableUrl": "N/A",
-  "fullscreenStarted": "&7D |&f Celoobrazovkové vysílání &b{0}&f spuštěno (dosaženo {1} hráč(ů))",
-  "fullscreenStopped": "&7D |&f Zastaveno {0} celoobrazovkových vysílání",
-  "fullscreenStopFailed": "&7D |&f Odpovídající celoobrazovkové vysílání nebylo nalezeno",
-  "fullscreenNoTargets": "&7D |&f Zadejte alespoň target <hráči> nebo radius <bloky>",
-  "fullscreenAlreadyRunning": "&7D |&f Tento displej již hostí celoobrazovkové vysílání, nebo je ID relace obsazeno",
-  "fullscreenForcedDisallowed": "&7D |&f Vynucená celoobrazovková vysílání jsou v konfiguraci zakázána",
-  "fullscreenNoDisplay": "&7D |&f Nebyl nalezen žádný displej a není načten žádný svět pro vysílání přes URL",
-  "fullscreenListEmpty": "&7D |&f Neběží žádná celoobrazovková vysílání",
+  "fullscreenStarted": "&7D |&f Fullscreen broadcast &b{0}&f started (reached {1} player(s))",
+  "fullscreenStopped": "&7D |&f Stopped {0} fullscreen broadcast(s)",
+  "fullscreenStopFailed": "&7D |&f No matching fullscreen broadcast found",
+  "fullscreenNoTargets": "&7D |&f Specify at least one of target <players> or radius <blocks>",
+  "fullscreenAlreadyRunning": "&7D |&f That display already hosts a fullscreen broadcast, or the session ID is taken",
+  "fullscreenForcedDisallowed": "&7D |&f Forced fullscreen broadcasts are disabled in the config",
+  "fullscreenNoDisplay": "&7D |&f No display found and no world is loaded to host a URL broadcast",
+  "fullscreenListEmpty": "&7D |&f No fullscreen broadcasts are running",
   "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
-  "customMediaDisabled": "&7D |&f Vlastní odkazy na videa jsou na tomto serveru vypnuté",
-  "customMediaHostBlocked": "&7D |&f Videa z této stránky na tomto serveru nejsou povolena",
-  "customMediaNoPermission": "&7D |&f Nemáš oprávnění přehrávat vlastní odkazy na videa"
+  "customMediaDisabled": "&7D |&f Custom video links are disabled on this server",
+  "customMediaHostBlocked": "&7D |&f Videos from this site are not allowed on this server",
+  "customMediaNoPermission": "&7D |&f You don't have permission to play your own video links"
 }
