@@ -153,6 +153,12 @@ object DisplayActions {
         WatchPartyManager.sendCurrent(displayData, player.uniqueId)
     }
 
+    /** Applies a client-reported media duration to the display's server timeline (SYNCED / BROADCAST only). */
+    fun reportDuration(player: Player, displayId: UUID, durationMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.onDurationReported(displayData, durationMs)
+    }
+
     /** Builds the permission context for [player] acting on [display]. */
     private fun context(display: PaperDisplayData, player: Player) =
         PlaybackContexts.of(display, player.uniqueId, player.hasPermission(PaperServer.config.permissions.delete))

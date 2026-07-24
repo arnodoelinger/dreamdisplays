@@ -7,6 +7,7 @@ import com.dreamdisplays.api.playback.Timeline
 import com.dreamdisplays.core.protocol.PlaybackCommand
 import com.dreamdisplays.core.protocol.toSync
 import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.managers.ActionThrottle
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import org.slf4j.LoggerFactory
 import java.util.*
@@ -27,6 +28,13 @@ object TimelineManager {
 
     /** Ceiling for client seeks when no duration is known, matching the v1 24h sanity limit. */
     internal const val MAX_SEEK_MS = 24L * 60 * 60 * 1_000
+
+    /** Sanity ceiling for a client-reported duration, same 24h limit as [MAX_SEEK_MS]. */
+    private const val MAX_DURATION_MS = 24L * 60 * 60 * 1_000
+
+    /** Throttles duration reports per display against packet floods. */
+    private val reportDurationThrottle = ActionThrottle()
+    private const val REPORT_DURATION_COOLDOWN_MS = 2_000L
 
     /** Live platform transport, injected at startup. */
     private lateinit var transport: PlaybackTransport
@@ -78,9 +86,10 @@ object TimelineManager {
     fun onModeChanged(display: DisplayData, positionMs: Long = -1) {
         timelines.remove(display.id)
         val now = transport.nowMs()
+        val durationMs = durationMsOf(display)
         val timeline = when (display.mode) {
-            PlaybackMode.SYNCED -> Timeline(positionMs.coerceAtLeast(0), now, paused = false)
-            PlaybackMode.BROADCAST -> Timeline(positionMs.coerceAtLeast(0), now, paused = false, loop = true)
+            PlaybackMode.SYNCED, PlaybackMode.BROADCAST ->
+                Timeline(positionMs.coerceAtLeast(0), now, paused = false, durationMs = durationMs, loop = true)
             else -> null
         }
         if (timeline != null) {
@@ -92,9 +101,27 @@ object TimelineManager {
     /** Resets the clock to 0 when the video changes (`SYNCED` / `BROADCAST` only). */
     fun onVideoChanged(display: DisplayData) {
         if (display.mode != PlaybackMode.SYNCED && display.mode != PlaybackMode.BROADCAST) return
-        val fresh = Timeline.start(transport.nowMs(), loop = display.mode == PlaybackMode.BROADCAST)
+        display.duration = null // Fresh video: let onDurationReported accept its own report.
+        val fresh = Timeline.start(transport.nowMs(), loop = true)
         timelines[display.id] = fresh
         broadcast(display, fresh)
+    }
+
+    /**
+     * Applies a client-reported media duration for [display]'s current video. First-report-wins: a
+     * no-op once [DisplayData.duration] is already known, so redundant reports from other viewers
+     * resolving the same media are cheap. Meaningless outside `SYNCED`/`BROADCAST`.
+     */
+    fun onDurationReported(display: DisplayData, durationMs: Long) {
+        if (display.mode != PlaybackMode.SYNCED && display.mode != PlaybackMode.BROADCAST) return
+        if (durationMs !in 1..MAX_DURATION_MS) return
+        if ((display.duration ?: 0L) > 0L) return
+        if (!reportDurationThrottle.tryAcquire(display.id, REPORT_DURATION_COOLDOWN_MS)) return
+
+        display.duration = durationMs * 1_000_000L
+        val current = timelines[display.id] ?: return
+        timelines[display.id] = current.copy(durationMs = durationMs, loop = true)
+        broadcast(display, timelines.getValue(display.id))
     }
 
     /** Forgets a removed display. */
@@ -119,16 +146,20 @@ object TimelineManager {
      * otherwise to [MAX_SEEK_MS], so a hostile seek can't run the shared clock off to infinity.
      */
     internal fun clampSeek(positionMs: Long, display: DisplayData): Long {
-        val durationMs = display.duration?.let { it / 1_000_000L } ?: 0L
+        val durationMs = durationMsOf(display)
         return positionMs.coerceIn(0, if (durationMs > 0) durationMs else MAX_SEEK_MS)
     }
 
-    /** Creates a running (`SYNCED`) or looping (`BROADCAST`) timeline if one is due, else clears it. */
+    /** [display]'s known duration in ms (converted from the stored ns value), or 0 if unknown. */
+    private fun durationMsOf(display: DisplayData): Long = display.duration?.let { it / 1_000_000L } ?: 0L
+
+    /** Creates a running, looping (`SYNCED` / `BROADCAST`) timeline if one is due, else clears it. */
     private fun ensureTimeline(display: DisplayData): Timeline? {
         if (WatchPartyManager.hasSession(display.id)) return null
+        val durationMs = durationMsOf(display)
         return when (display.mode) {
-            PlaybackMode.SYNCED -> timelines.getOrPut(display.id) { Timeline.start(transport.nowMs()) }
-            PlaybackMode.BROADCAST -> timelines.getOrPut(display.id) { Timeline.start(transport.nowMs(), loop = true) }
+            PlaybackMode.SYNCED, PlaybackMode.BROADCAST ->
+                timelines.getOrPut(display.id) { Timeline.start(transport.nowMs(), durationMs = durationMs, loop = true) }
             else -> {
                 timelines.remove(display.id); null
             }

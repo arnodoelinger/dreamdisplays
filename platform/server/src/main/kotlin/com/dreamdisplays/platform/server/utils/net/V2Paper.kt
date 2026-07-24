@@ -62,6 +62,7 @@ object PaperV2Networking : PluginMessageListener {
         when (packet) {
             is ClientHello -> handleHello(player, packet)
             is RequestSync -> DisplayActions.requestSync(player, packet.id)
+            is ReportDuration -> DisplayActions.reportDuration(player, packet.id, packet.durationMs)
             is DisplayDelete -> DisplayActions.delete(player, packet.id)
             is ReportDisplay -> DisplayManager.report(packet.id, player)
             is SetVideo -> DisplayActions.setVideo(player, packet.id, packet.url, packet.lang)

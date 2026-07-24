@@ -3,7 +3,10 @@ package com.dreamdisplays.platform.client.displays
 import com.dreamdisplays.api.media.MediaServices
 import com.dreamdisplays.api.media.audio.AudioAcousticsServices
 import com.dreamdisplays.api.media.source.MediaSource
+import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.core.protocol.ReportDuration
 import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.player.platform.DisplayPlaybackHost
 import com.dreamdisplays.platform.client.player.platform.DreamPlaybackEnvironment
@@ -71,6 +74,7 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
                 screen.paused = true
                 player?.pause()
             }
+            reportDurationIfNeeded()
         }
 
         Minecraft.getInstance().execute { screen.reloadTexture() }
@@ -91,6 +95,15 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         // corrective seek would cold-restart the session and destroy the seamless replay -> live bridge.
         if (!mp.isResumingFromReplay()) screen.restoreSavedTime()
         DisplayRegistry.recordScreen(screen)
+    }
+
+    /** Reports the resolved media duration once, if this display's server clock needs it to loop. */
+    private fun reportDurationIfNeeded() {
+        val mode = screen.effectiveMode
+        if (mode != PlaybackMode.SYNCED && mode != PlaybackMode.BROADCAST) return
+        val durationNanos = screen.mediaPlayerDurationNanos
+        if (durationNanos <= 0L) return // 0 for live streams and any not-yet-resolved case.
+        Initializer.sendPacket(ReportDuration(screen.uuid, durationNanos / 1_000_000L))
     }
 
     /** Runs [action] once the current player is initialized; guards against stale generations. */

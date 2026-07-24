@@ -221,6 +221,12 @@ object VanillaDisplayActions {
         WatchPartyManager.sendCurrent(displayData, player.uuid)
     }
 
+    /** Applies a client-reported media duration to the display's server timeline (SYNCED/BROADCAST only). */
+    fun reportDuration(player: ServerPlayer, displayId: java.util.UUID, durationMs: Long) {
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
+        TimelineManager.onDurationReported(displayData, durationMs)
+    }
+
     /** Builds the permission context for [player] acting on [display]. */
     private fun context(display: VanillaDisplayData, player: ServerPlayer) =
         PlaybackContexts.of(display, player.uuid, isAdmin(player))
