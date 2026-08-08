@@ -25,6 +25,14 @@ object VanillaServerState {
      */
     var serverVersion: String? = null
 
+    /**
+     * Which loader is actually running (`"fabric"` or `"neoforge"`), set once by that loader's own
+     * entrypoint — used to report [com.dreamdisplays.core.protocol.proxy.BackendHello.platform] from
+     * the shared [com.dreamdisplays.platform.server.proxy.VanillaProxyBridge], which has no other way
+     * to tell the two loaders apart.
+     */
+    var platformName: String = ""
+
     /** Set once the underlying server starts. */
     var server: MinecraftServer? = null
 

@@ -74,13 +74,18 @@ object MediaStreamSelector {
         return streams.copy(currentAudio = best)
     }
 
-    /** Pick the best video stream closest to [target] quality (height in pixels). */
+    /**
+     * Pick the best video stream at or below [target] quality (height in pixels), falling back to
+     * the closest stream above it only when nothing at-or-below is available — a quality setting is
+     * a ceiling, not just a target to get near, so this never silently serves more than asked for.
+     */
     fun pickVideo(streams: List<MediaStream>?, target: Int, preferFps60: Boolean = defaultPreferFps60): MediaStream? {
         if (streams.isNullOrEmpty()) return null
         return streams.asSequence()
             .filter { it.height != null }
             .minWithOrNull(
-                compareBy<MediaStream> { realtimeScore(it, target, preferFps60) }
+                compareBy<MediaStream> { parseQuality(it) > target }
+                    .thenBy { realtimeScore(it, target, preferFps60) }
                     .thenBy { abs(parseQuality(it) - target) }
                     .thenBy { platformCodecPenalty(it) }
                     .thenBy { fpsPenalty(it, preferFps60) }

@@ -174,6 +174,7 @@ data class PermissionsSection(
     val fullscreenStart get() = permissions.fullscreen_start
     val fullscreenStop get() = permissions.fullscreen_stop
     val fullscreenList get() = permissions.fullscreen_list
+    val fullscreenNetwork get() = permissions.fullscreen_network
     val custom get() = permissions.custom
 
     data class PermissionsConfig(
@@ -198,9 +199,20 @@ data class PermissionsSection(
         val fullscreen_start: String = "dreamdisplays.fullscreen.start",
         val fullscreen_stop: String = "dreamdisplays.fullscreen.stop",
         val fullscreen_list: String = "dreamdisplays.fullscreen.list",
+        val fullscreen_network: String = "dreamdisplays.fullscreen.network",
         val custom: String = "dreamdisplays.custom",
     )
 }
+
+/**
+ * `[proxy]` section: opt-in `BungeeCord` / `Velocity` network coordination. Deliberately has no
+ * `server_name` key — the backend learns its own name from the proxy's `ProxyWelcome` instead of
+ * being told it twice in two configs. See `ProxyBridge` / `ProxyClock`.
+ */
+data class ProxySection(
+    val enabled: Boolean = false,
+    val clock_sync_interval: Int = 5,
+)
 
 /** Parsed result of a `config.toml`. */
 data class ParsedServerConfig(
@@ -208,6 +220,7 @@ data class ParsedServerConfig(
     val settings: SettingsSection,
     val storage: StorageSection,
     val permissions: PermissionsSection,
+    val proxy: ProxySection,
 )
 
 /** Parses [t] into a [ParsedServerConfig], falling back to defaults for missing or malformed sections. */
@@ -286,8 +299,13 @@ fun parseServerConfig(t: TomlTable?): ParsedServerConfig = ParsedServerConfig(
             fullscreen_start = t?.getString("permissions.fullscreen_start") ?: "dreamdisplays.fullscreen.start",
             fullscreen_stop = t?.getString("permissions.fullscreen_stop") ?: "dreamdisplays.fullscreen.stop",
             fullscreen_list = t?.getString("permissions.fullscreen_list") ?: "dreamdisplays.fullscreen.list",
+            fullscreen_network = t?.getString("permissions.fullscreen_network") ?: "dreamdisplays.fullscreen.network",
             custom = t?.getString("permissions.custom") ?: "dreamdisplays.custom",
         )
+    ),
+    proxy = ProxySection(
+        enabled = t?.getBoolean("proxy.enabled") ?: false,
+        clock_sync_interval = t?.getLong("proxy.clock_sync_interval")?.toInt() ?: 5,
     ),
 )
 

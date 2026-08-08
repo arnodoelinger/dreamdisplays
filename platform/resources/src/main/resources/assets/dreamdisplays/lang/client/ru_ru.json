@@ -35,7 +35,7 @@
   "dreamdisplays.button.quality.tooltip.2": "Качество видео",
   "dreamdisplays.button.quality.tooltip.3": "",
   "dreamdisplays.button.quality.tooltip.4": "Сейчас: %sp",
-  "dreamdisplays.button.quality.tooltip.5": "Предупреждение: 1080p и выше может повлиять на производительность",
+  "dreamdisplays.button.quality.tooltip.5": "Предупреждение: качество выше 1080p может повлиять на производительность",
   "dreamdisplays.button.brightness": "Яркость",
   "dreamdisplays.button.brightness.tooltip.1": "Яркость",
   "dreamdisplays.button.brightness.tooltip.2": "Управляет яркостью этого дисплея",

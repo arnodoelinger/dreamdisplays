@@ -53,4 +53,16 @@ object MinecraftScreenUtil {
         //?} else
         /*mc.setScreen(screen)*/
     }
+
+    /**
+     * Simple names of vanilla screens that show blocking status text during a world / server
+     * transition.
+     */
+    private val TRANSIENT_LOADING_SCREENS = setOf(
+        "LevelLoadingScreen", "ReceivingLevelScreen", "GenericMessageScreen", "GenericWaitingScreen",
+    )
+
+    /** True for a blocking status screen our fullscreen / PiP overlays should render above instead of underneath, unlike a real menu. */
+    fun isTransientLoadingScreen(screen: Screen?): Boolean =
+        screen != null && screen.javaClass.simpleName in TRANSIENT_LOADING_SCREENS
 }

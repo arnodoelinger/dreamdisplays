@@ -4,6 +4,7 @@ import com.dreamdisplays.platform.server.PermissionsSection
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.proxy.ProxyNetwork
 import com.dreamdisplays.platform.server.registrar.VanillaCommandTree.fullscreenFlagsNode
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
@@ -237,9 +238,13 @@ object VanillaCommandTree {
             .also { idArg -> flags.forEach { idArg.then(it) } }
     )
 
-    /** The fullscreen-start flags, in the one order they may be given in. */
+    /**
+     * The fullscreen-start flags, in the one order they may be given in. `server` comes first: it
+     * picks the broadest scope (which backend, or the whole network) before `target` / `radius`
+     * narrow who within that scope actually sees it.
+     */
     private val FULLSCREEN_FLAGS =
-        listOf("target", "radius", "mode", "forced", "transient", "volume", "looped", "quality")
+        listOf("server", "target", "radius", "mode", "forced", "transient", "volume", "looped", "quality")
 
     /**
      * All fullscreen-start flags, any subset of them accepted but only in [FULLSCREEN_FLAGS] order:
@@ -269,6 +274,21 @@ object VanillaCommandTree {
         children: List<CommandNode<CommandSourceStack>>
     ): CommandNode<CommandSourceStack> =
         when (name) {
+            "server" -> Commands.literal("server")
+                .requires { requiresNode(it, { p -> p.fullscreenNetwork }, VanillaPermissions.Fallback.OP) }
+                .then(
+                    terminate(
+                        Commands.argument("name", StringArgumentType.word())
+                            .suggests { _, builder ->
+                                (ProxyNetwork.serverNames() + "global")
+                                    .filter { it.startsWith(builder.remaining, ignoreCase = true) }
+                                    .forEach { builder.suggest(it) }
+                                builder.buildFuture()
+                            },
+                        children,
+                    )
+                ).build()
+
             "target" -> Commands.literal("target").then(
                 terminate(
                     Commands.argument("players", BareTokenArgumentType)
@@ -331,6 +351,7 @@ object VanillaCommandTree {
         return VanillaFullscreenCommand.start(
             ctx,
             id = StringArgumentType.getString(ctx, "id"),
+            serverScope = tryArg(ctx, "name", String::class.java),
             players = tryArg(ctx, "players", String::class.java),
             radiusBlocks = tryArg(ctx, "blocks", java.lang.Double::class.java)?.toDouble(),
             radiusX = tryArg(ctx, "x", java.lang.Double::class.java)?.toDouble(),

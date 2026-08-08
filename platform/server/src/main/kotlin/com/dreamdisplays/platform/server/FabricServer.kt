@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.server
 
 import com.dreamdisplays.platform.client.net.Packets
+import com.dreamdisplays.platform.client.net.ProxyPayload
 import com.dreamdisplays.platform.client.net.V2Payload
 import com.dreamdisplays.platform.server.listeners.FabricPlayerListener
 import com.dreamdisplays.platform.server.listeners.FabricProtectionListener
@@ -10,6 +11,7 @@ import com.dreamdisplays.platform.server.registrar.FabricBareTokenArgumentType
 import com.dreamdisplays.platform.server.registrar.FabricCommandRegistrar
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.FabricNetworkingAdapter
+import com.dreamdisplays.platform.server.utils.net.FabricProxyNetworking
 import com.dreamdisplays.platform.server.utils.net.FabricV2Networking
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
 import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
@@ -42,6 +44,7 @@ class Server : ModInitializer {
         configInstance = VanillaConfig(FabricLoader.getInstance().configDir.resolve("dreamdisplays").toFile())
         VanillaServerState.config = configInstance
         VanillaServerState.serverVersion = serverVersion
+        VanillaServerState.platformName = "fabric"
         VanillaNetworking.adapter = FabricNetworkingAdapter
 
         FabricBareTokenArgumentType.register()
@@ -49,6 +52,7 @@ class Server : ModInitializer {
 
         VanillaServerPacketHandler.registerReceivers()
         FabricV2Networking.registerReceivers()
+        FabricProxyNetworking.registerReceivers()
         FabricCommandRegistrar.register()
         FabricPlayerListener.register()
         FabricProtectionListener.register()
@@ -78,6 +82,7 @@ class Server : ModInitializer {
         runCatching {
             payloadRegistry("clientboundPlay", "playS2C").let { clientbound ->
                 registerPayload(clientbound, V2Payload.TYPE, V2Payload.CODEC)
+                registerPayload(clientbound, ProxyPayload.TYPE, ProxyPayload.CODEC)
                 registerPayload(clientbound, Packets.Info.PACKET_ID, Packets.Info.PACKET_CODEC)
                 registerPayload(clientbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
                 registerPayload(clientbound, Packets.Premium.PACKET_ID, Packets.Premium.PACKET_CODEC)
@@ -90,6 +95,7 @@ class Server : ModInitializer {
 
             payloadRegistry("serverboundPlay", "playC2S").let { serverbound ->
                 registerPayload(serverbound, V2Payload.TYPE, V2Payload.CODEC)
+                registerPayload(serverbound, ProxyPayload.TYPE, ProxyPayload.CODEC)
                 registerPayload(serverbound, Packets.Sync.PACKET_ID, Packets.Sync.PACKET_CODEC)
                 registerPayload(serverbound, Packets.RequestSync.PACKET_ID, Packets.RequestSync.PACKET_CODEC)
                 registerPayload(serverbound, Packets.Delete.PACKET_ID, Packets.Delete.PACKET_CODEC)
@@ -143,7 +149,7 @@ class Server : ModInitializer {
         val storage: StorageManager?; get() = VanillaServerState.storage
 
         /** Copies the pre-1.8.1 global `SQLite DB` into [worldDataDir] on first startup for this world. */
-        @Deprecated("Will be removed in 1.9.0")
+        @Deprecated("Will be removed in 1.10.0")
         // TODO: remove
         private fun migrateGlobalDb(worldDataDir: File) {
             val oldDb = FabricLoader.getInstance().configDir

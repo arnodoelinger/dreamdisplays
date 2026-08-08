@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.metrics.TelemetryMetrics
 import com.dreamdisplays.platform.server.playback.*
+import com.dreamdisplays.platform.server.proxy.ProxyBridge
 import com.dreamdisplays.platform.server.registrar.ChannelRegistrar
 import com.dreamdisplays.platform.server.registrar.CommandRegistrar
 import com.dreamdisplays.platform.server.registrar.ListenerRegistrar
@@ -76,6 +77,8 @@ class PaperServer : JavaPlugin() {
         FullscreenBroadcastManager.restore()
         PipPinManager.init(PaperPlaybackTransport)
         PipPinManager.restore()
+
+        ProxyBridge.init(Companion.config.proxy.enabled, Companion.config.proxy.clock_sync_interval)
 
         ListenerRegistrar.registerListeners(this)
         ChannelRegistrar.registerChannels(this)

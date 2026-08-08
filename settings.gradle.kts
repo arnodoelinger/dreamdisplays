@@ -69,6 +69,8 @@ include(":platform:client")
 include(":platform:client:common")
 include(":platform:client:fabric")
 include(":platform:server")
+include(":platform:proxy")
+include(":platform:proxy:bungee")
 
 // ModDevGradle issue, ask them wtf is going here
 if (!java.lang.Boolean.getBoolean("idea.sync.active")) {

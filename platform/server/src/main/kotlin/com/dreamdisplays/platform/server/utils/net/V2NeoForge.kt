@@ -14,6 +14,7 @@ import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.PipPinManager
+import com.dreamdisplays.platform.server.proxy.VanillaProxyBridge
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
 import net.minecraft.server.MinecraftServer
@@ -145,5 +146,6 @@ object NeoForgeV2Networking {
         VanillaDisplayActions.sendAllDisplays(player, server)
         FullscreenBroadcastManager.onPlayerJoin(player.uuid)
         PipPinManager.onPlayerJoin(player.uuid)
+        VanillaProxyBridge.onPlayerReady(player, server)
     }
 }

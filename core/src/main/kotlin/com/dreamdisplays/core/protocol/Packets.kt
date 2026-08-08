@@ -237,6 +237,7 @@ data class FullscreenState(
     @ProtoNumber(7) val title: String = "",
     @ProtoNumber(8) val loop: Boolean = false,
     @ProtoNumber(9) val quality: String = "",
+    @ProtoNumber(10) val minimized: Boolean = false,
 ) : DreamPacket
 
 /**

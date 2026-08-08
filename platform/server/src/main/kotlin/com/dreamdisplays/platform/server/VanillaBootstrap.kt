@@ -6,6 +6,7 @@ import com.dreamdisplays.platform.server.managers.StorageManager
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.playback.*
+import com.dreamdisplays.platform.server.proxy.VanillaProxyBridge
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -39,6 +40,7 @@ object VanillaBootstrap {
         FullscreenBroadcastManager.restore()
         PipPinManager.init(VanillaPlaybackTransport)
         PipPinManager.restore()
+        VanillaProxyBridge.init(VanillaServerState.config.proxy.enabled, VanillaServerState.config.proxy.clock_sync_interval)
         startRepeatingTasks(server)
     }
 
@@ -63,6 +65,7 @@ object VanillaBootstrap {
                         TimelineManager.tick()
                         WatchPartyManager.tick()
                         FullscreenBroadcastManager.tick()
+                        VanillaProxyBridge.tick(server)
                     }
                 }
             }

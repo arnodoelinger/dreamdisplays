@@ -24,14 +24,11 @@ class VanillaConfig(private val configDir: File) {
         warn = { logger.warn(it) },
     )
 
-    lateinit var language: LanguageSection
-        private set
-    lateinit var settings: SettingsSection
-        private set
-    lateinit var storage: StorageSection
-        private set
-    lateinit var permissions: PermissionsSection
-        private set
+    lateinit var language: LanguageSection; private set
+    lateinit var settings: SettingsSection; private set
+    lateinit var storage: StorageSection; private set
+    lateinit var permissions: PermissionsSection; private set
+    lateinit var proxy: ProxySection; private set
 
     val messages get() = langStore.messages
     val languages get() = langStore.languages
@@ -66,6 +63,7 @@ class VanillaConfig(private val configDir: File) {
         settings = parsed.settings
         storage = parsed.storage
         permissions = parsed.permissions
+        proxy = parsed.proxy
     }
 
     fun reload() {

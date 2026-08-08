@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.server.registrar
 import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.commands.subcommands.*
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.proxy.ProxyNetwork
 import com.dreamdisplays.platform.server.registrar.CommandRegistrar.fullscreenFlagsNode
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.Command
@@ -39,8 +40,13 @@ object CommandRegistrar {
     /** Selector tokens suggested for the fullscreen `target` argument, alongside online player names. */
     private val TARGET_SELECTORS = listOf("@a", "@p", "@r", "@s", "@e")
 
-    /** The fullscreen-start flags, in the one order they may be given in. */
-    private val FULLSCREEN_FLAGS = listOf("target", "radius", "mode", "forced", "transient", "volume", "looped", "quality")
+    /**
+     * The fullscreen-start flags, in the one order they may be given in. `server` comes first: it
+     * picks the broadest scope (which backend, or the whole network) before `target`/`radius`
+     * narrow who within that scope actually sees it.
+     */
+    private val FULLSCREEN_FLAGS =
+        listOf("server", "target", "radius", "mode", "forced", "transient", "volume", "looped", "quality")
 
     /** Builds the full `Brigadier` tree for the `/display` command with all subcommands. */
     fun buildDisplayCommand(): LiteralCommandNode<CommandSourceStack> = Commands.literal("display")
@@ -253,6 +259,21 @@ object CommandRegistrar {
         children: List<CommandNode<CommandSourceStack>>
     ): CommandNode<CommandSourceStack> =
         when (name) {
+            "server" -> Commands.literal("server")
+                .requires { it.sender.hasPermission(PaperServer.config.permissions.fullscreenNetwork) }
+                .then(
+                    terminate(
+                        Commands.argument("name", StringArgumentType.word())
+                            .suggests { _, builder ->
+                                (ProxyNetwork.serverNames() + "global")
+                                    .filter { it.startsWith(builder.remaining, ignoreCase = true) }
+                                    .forEach { builder.suggest(it) }
+                                builder.buildFuture()
+                            },
+                        children,
+                    )
+                ).build()
+
             "target" -> Commands.literal("target").then(
                 terminate(
                     Commands.argument("players", PaperBareTokenArgumentType)
@@ -315,6 +336,7 @@ object CommandRegistrar {
         PaperFullscreenCommand.start(
             ctx.source.sender,
             id = StringArgumentType.getString(ctx, "id"),
+            serverScope = tryArg(ctx, "name", String::class.java),
             players = tryArg(ctx, "players", String::class.java),
             radiusBlocks = tryArg(ctx, "blocks", java.lang.Double::class.java)?.toDouble(),
             radiusX = tryArg(ctx, "x", java.lang.Double::class.java)?.toDouble(),

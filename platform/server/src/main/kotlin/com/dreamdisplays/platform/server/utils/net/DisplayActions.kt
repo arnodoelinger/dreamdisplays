@@ -15,6 +15,7 @@ import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.VersionState
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
@@ -169,8 +170,9 @@ object DisplayActions {
 
     /** Replies to a client's catch-up request with the current timeline and any live session. */
     fun requestSync(player: Player, displayId: UUID) {
-        val displayData = DisplayManager.getDisplayData(displayId) ?: return
         if (!requestSyncThrottle.tryAcquire(displayId to player.uniqueId, REQUEST_SYNC_COOLDOWN_MS)) return
+        if (FullscreenBroadcastManager.sendCurrentTo(displayId, player.uniqueId)) return
+        val displayData = DisplayManager.getDisplayData(displayId) ?: return
         TimelineManager.sendCurrent(displayData, player.uniqueId)
         WatchPartyManager.sendCurrent(displayData, player.uniqueId)
     }

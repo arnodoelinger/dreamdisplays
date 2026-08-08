@@ -23,25 +23,37 @@ object WatchedVideoStore {
     private val jsonFiles = JsonFileStore()
     private val idsSerializer = ListSerializer(String.serializer())
 
-    /** Insertion order = watch recency; a [LinkedHashSet] gives cheap dedup + reordering on re-watch. */
+    /**
+     * Insertion order = watch recency; a [LinkedHashSet] gives cheap dedup + reordering on re-watch.
+     *
+     * Guarded by [lock]: playback starts on the media player's own threads (via
+     * `MediaPlayer.whenInitialized`), so two displays coming up at once really do call
+     * [markWatched] concurrently — and an unsynchronized [LinkedHashSet] fails hard when a copy
+     * races a write, seeing the size shrink underneath the array it just allocated.
+     */
     private val watched = LinkedHashSet<String>()
+
+    /** Guards every access to [watched]; disk I/O deliberately happens outside it. */
+    private val lock = Any()
 
     /** Loads the watched-ID list from disk into memory, replacing any current state. */
     fun load() {
         val loaded = jsonFiles.readVersioned(jsonFiles.file(FILE_NAME), idsSerializer, SCHEMA_VERSION, logger)
             ?: return
-        watched.clear()
-        watched.addAll(loaded)
+        synchronized(lock) {
+            watched.clear()
+            watched.addAll(loaded)
+        }
     }
 
-    /** Persists the in-memory watched-ID list to disk. */
-    private fun save() {
+    /** Persists an already-taken [snapshot] of the watched-ID list to disk. */
+    private fun save(snapshot: List<String>) {
         if (!jsonFiles.ensureDir(logger)) return
-        jsonFiles.writeVersioned(jsonFiles.file(FILE_NAME), idsSerializer, watched.toList(), SCHEMA_VERSION, logger)
+        jsonFiles.writeVersioned(jsonFiles.file(FILE_NAME), idsSerializer, snapshot, SCHEMA_VERSION, logger)
     }
 
     /** Returns true if [videoId] has been marked watched. */
-    fun isWatched(videoId: String): Boolean = videoId in watched
+    fun isWatched(videoId: String): Boolean = synchronized(lock) { videoId in watched }
 
     /**
      * Marks [videoId] watched, bumping it to most-recent if already present, trimming the oldest
@@ -49,14 +61,17 @@ object WatchedVideoStore {
      */
     fun markWatched(videoId: String) {
         if (videoId.isBlank()) return
-        watched.remove(videoId)
-        watched.add(videoId)
-        while (watched.size > MAX_ENTRIES) {
-            val oldest = watched.iterator()
-            if (!oldest.hasNext()) break
-            oldest.next()
-            oldest.remove()
+        val snapshot = synchronized(lock) {
+            watched.remove(videoId)
+            watched.add(videoId)
+            while (watched.size > MAX_ENTRIES) {
+                val oldest = watched.iterator()
+                if (!oldest.hasNext()) break
+                oldest.next()
+                oldest.remove()
+            }
+            watched.toList()
         }
-        save()
+        save(snapshot)
     }
 }

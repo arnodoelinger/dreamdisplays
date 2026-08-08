@@ -89,6 +89,10 @@ loomExt.runs.configureEach {
     environmentVariable("DD_NATIVE_LOG", System.getenv("DD_NATIVE_LOG") ?: "debug")
 }
 
+loomExt.runs.named("client") {
+    programArgs("--username", "developer")
+}
+
 configurations.register("mappedFabricApiElements") {
     isCanBeConsumed = true
     isCanBeResolved = false
@@ -215,6 +219,7 @@ if (isLegacyObfuscated) {
 }
 
 tasks.register("publishJar") {
+    description = "Publish the final jar to the local Maven repository."
     dependsOn(if (isLegacyObfuscated) "remapJar" else "shadowJar")
 }
 

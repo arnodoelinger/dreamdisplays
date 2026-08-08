@@ -12,6 +12,7 @@ import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.PipPinManager
+import com.dreamdisplays.platform.server.proxy.ProxyBridge
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
@@ -120,5 +121,6 @@ object PaperV2Networking : PluginMessageListener {
         DisplayActions.sendAllDisplays(player)
         FullscreenBroadcastManager.onPlayerJoin(player.uniqueId)
         PipPinManager.onPlayerJoin(player.uniqueId)
+        ProxyBridge.onPlayerReady(player)
     }
 }

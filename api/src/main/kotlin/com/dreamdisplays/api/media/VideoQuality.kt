@@ -33,7 +33,7 @@ sealed interface VideoQuality {
         const val AUTO_LABEL = "auto"
 
         /** Client default when nothing is persisted. */
-        val DEFAULT: VideoQuality = Fixed(720)
+        val DEFAULT: VideoQuality = Fixed(1080)
 
         /**
          * Parses a raw label into a [VideoQuality]. Null, blank, or "auto" (case-insensitive) yield

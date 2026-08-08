@@ -5,6 +5,13 @@
 # Default language if no translation is available
 default_language = "en"
 
+[proxy]
+# BungeeCord / Velocity network coordination
+enabled = false
+
+# Seconds between clock-offset probes to the proxy
+clock_sync_interval = 5
+
 [display]
 # Selection tool and base material
 selection_material = "minecraft:diamond_axe"
@@ -83,25 +90,26 @@ use_ssl = false
 [permissions]
 # Permission nodes
 # LuckPerms suppor is available for all platforms
-create = "dreamdisplays.create"                     # Default: everyone
-video = "dreamdisplays.video"                       # Default: everyone
-info = "dreamdisplays.info"                         # Default: everyone
-help = "dreamdisplays.help"                         # Default: everyone
-local = "dreamdisplays.local"                       # Default: everyone
-synced = "dreamdisplays.synced"                     # Default: everyone
-broadcast = "dreamdisplays.broadcast"               # Default: everyone
-watchparty = "dreamdisplays.watchparty"             # Default: everyone
-custom = "dreamdisplays.custom"                     # Default: everyone
-lock = "dreamdisplays.lock"                         # Default: everyone
-delete = "dreamdisplays.delete"                     # Default: everyone
-delete_others = "dreamdisplays.delete.others"       # Default: operator
-list = "dreamdisplays.list"                         # Default: operator
-stats = "dreamdisplays.stats"                       # Default: operator
-premium = "dreamdisplays.premium"                   # Default: operator
-reload = "dreamdisplays.reload"                     # Default: operator
-updates = "dreamdisplays.updates"                   # Default: operator
-toggle_others = "dreamdisplays.toggle.others"       # Default: operator
-create_bypass = "dreamdisplays.create.bypass"       # Default: operator
-fullscreen_start = "dreamdisplays.fullscreen.start" # Default: operator
-fullscreen_stop = "dreamdisplays.fullscreen.stop"   # Default: operator
-fullscreen_list = "dreamdisplays.fullscreen.list"   # Default: operator
+create = "dreamdisplays.create"                         # Default: everyone
+video = "dreamdisplays.video"                           # Default: everyone
+info = "dreamdisplays.info"                             # Default: everyone
+help = "dreamdisplays.help"                             # Default: everyone
+local = "dreamdisplays.local"                           # Default: everyone
+synced = "dreamdisplays.synced"                         # Default: everyone
+broadcast = "dreamdisplays.broadcast"                   # Default: everyone
+watchparty = "dreamdisplays.watchparty"                 # Default: everyone
+custom = "dreamdisplays.custom"                         # Default: everyone
+lock = "dreamdisplays.lock"                             # Default: everyone
+delete = "dreamdisplays.delete"                         # Default: everyone
+delete_others = "dreamdisplays.delete.others"           # Default: operator
+list = "dreamdisplays.list"                             # Default: operator
+stats = "dreamdisplays.stats"                           # Default: operator
+premium = "dreamdisplays.premium"                       # Default: operator
+reload = "dreamdisplays.reload"                         # Default: operator
+updates = "dreamdisplays.updates"                       # Default: operator
+toggle_others = "dreamdisplays.toggle.others"           # Default: operator
+create_bypass = "dreamdisplays.create.bypass"           # Default: operator
+fullscreen_start = "dreamdisplays.fullscreen.start"     # Default: operator
+fullscreen_stop = "dreamdisplays.fullscreen.stop"       # Default: operator
+fullscreen_list = "dreamdisplays.fullscreen.list"       # Default: operator
+fullscreen_network = "dreamdisplays.fullscreen.network" # Default: operator

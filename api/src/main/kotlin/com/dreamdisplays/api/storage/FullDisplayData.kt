@@ -30,7 +30,7 @@ data class FullDisplayData(
     var videoUrl: String = "",
     var lang: String = "",
     var volume: Float = 0.5f,
-    var quality: String = "720",
+    var quality: String = "1080",
     var brightness: Float = 1.0f,
     var muted: Boolean = false,
     var mode: PlaybackMode? = PlaybackMode.LOCAL,

@@ -136,7 +136,8 @@ class DisplayPopoutManager(
         closeFullscreenOverlay()
         closePipOverlay()
         val overlay = PipOverlay(displayScreen, corner, interactive, initialSizeFraction)
-        if (PipOverlayManager.add(overlay)) {
+        val added = PipOverlayManager.add(overlay)
+        if (added) {
             pipOverlay = overlay
             rewireSink()
             emit(PopoutEvent.Opened(displayScreen.uuid.toString()))

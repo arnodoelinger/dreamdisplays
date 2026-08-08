@@ -388,7 +388,7 @@ class DisplayMenu private constructor(
                     Component.literal(""),
                     tooltipValue("dreamdisplays.button.quality.tooltip.4", qualityFromFraction(quality.value)),
                 )
-                if ((ds.quality.targetHeight ?: 0) >= 1080) {
+                if ((ds.quality.targetHeight ?: 0) > 1080) {
                     tip.add(
                         Component.translatable("dreamdisplays.button.quality.tooltip.5")
                             .withStyle { it.withColor(ChatFormatting.YELLOW) },
@@ -621,7 +621,7 @@ class DisplayMenu private constructor(
     private fun qualityFraction(q: String): Double {
         val list = displayScreen.qualityList
         if (list.isEmpty()) return 0.0
-        val target = q.replace("p", "").toIntOrNull() ?: 720
+        val target = q.replace("p", "").toIntOrNull() ?: 1080
         val closest = list.minByOrNull { abs(target - it) } ?: return 0.0
         return list.indexOf(closest) / max(1, list.size - 1).toDouble()
     }

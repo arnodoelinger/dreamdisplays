@@ -26,7 +26,7 @@ data class PlaybackContext(
 @DreamDisplaysUnstableApi
 object PlaybackPermissions {
     /** Max video height for [BROADCAST] displays; never exceeded, not even by the owner. */
-    const val BROADCAST_QUALITY_CAP = 360
+    const val BROADCAST_QUALITY_CAP = 720
 
     /** Owner, admin, or anyone when the display is unlocked. */
     private fun isEditor(c: PlaybackContext): Boolean = c.isOwner || c.isAdmin || !c.isLocked

@@ -40,6 +40,12 @@ object FullscreenBroadcastManager {
     /** Minimum interval between drift-correction resends of a real display's timeline to a target. */
     private const val TIMELINE_RESEND_MS = 5_000L
 
+    /** How long to wait for a delivery to be confirmed before sending it again. */
+    private const val REDELIVER_UNCONFIRMED_MS = 1_500L
+
+    /** How long a single delivery keeps being retried before the viewer is left alone. */
+    private const val DELIVERY_CONFIRM_WINDOW_MS = 20_000L
+
     private lateinit var transport: PlaybackTransport
     private val sessions = ConcurrentHashMap<String, Session>()
 
@@ -59,8 +65,11 @@ object FullscreenBroadcastManager {
         var radius: FullscreenRadiusTarget?,
         var timeline: Timeline?,
         val shownTo: MutableSet<UUID> = ConcurrentHashMap.newKeySet(),
-        /** Players who closed an unforced broadcast themselves; excluded from re-delivery for the rest of this session. */
         val dismissedBy: MutableSet<UUID> = ConcurrentHashMap.newKeySet(),
+        val minimizedBy: MutableSet<UUID> = ConcurrentHashMap.newKeySet(),
+        val confirmedBy: MutableSet<UUID> = ConcurrentHashMap.newKeySet(),
+        val deliveredAtMs: MutableMap<UUID, Long> = ConcurrentHashMap(),
+        val retryUntilMs: MutableMap<UUID, Long> = ConcurrentHashMap(),
         var lastTick: Long = 0,
         var lastTimelineResend: Long = 0,
     )
@@ -86,13 +95,39 @@ object FullscreenBroadcastManager {
      * nothing matches a display and the input isn't URL-shaped (never silently treats a mistyped id
      * as a URL), or when a virtual display is needed but no world is loaded yet.
      */
-    fun resolveOrCreateDisplay(idOrUrl: String, ownerId: UUID): Pair<DisplayData, Boolean>? {
+    fun resolveOrCreateDisplay(
+        idOrUrl: String,
+        ownerId: UUID,
+        virtualDisplayId: UUID? = null,
+    ): Pair<DisplayData, Boolean>? {
         resolveDisplayByIdOrPrefix(idOrUrl)?.let { return it to false }
         if (!looksLikeUrl(idOrUrl)) return null
-        val virtual = transport.createVirtualDisplay(UUID.randomUUID(), ownerId) ?: return null
+        val virtual = transport.createVirtualDisplay(virtualDisplayId ?: UUID.randomUUID(), ownerId) ?: return null
         virtual.url = MediaSource.from(idOrUrl).toResolvableUrl() ?: idOrUrl
         return virtual to true
     }
+
+    /**
+     * Resolves the `/display fullscreen start ... server <scope>` target argument to the actual URL
+     * to broadcast network-wide: an existing display's own currently-loaded video (by id or
+     * unambiguous id prefix, same as [resolveOrCreateDisplay]), or — only when [idOrUrl] looks like a
+     * URL — that URL itself, normalized the same way [resolveOrCreateDisplay] does.
+     */
+    fun resolveNetworkFullscreenUrl(idOrUrl: String): String? {
+        displayUrlByIdOrPrefix(idOrUrl)?.let { return it }
+        if (!looksLikeUrl(idOrUrl)) return null
+        return MediaSource.from(idOrUrl).toResolvableUrl() ?: idOrUrl
+    }
+
+    /**
+     * The video a display on this server is currently loaded with, by full id or unambiguous id
+     * prefix. Unlike [resolveNetworkFullscreenUrl] this never falls back to treating the token as a
+     * URL, so it can safely answer another backend's
+     * [com.dreamdisplays.core.protocol.proxy.ResolveDisplayToken] - only a backend that really hosts
+     * the display replies.
+     */
+    fun displayUrlByIdOrPrefix(idOrPrefix: String): String? =
+        resolveDisplayByIdOrPrefix(idOrPrefix)?.url?.takeIf(String::isNotBlank)
 
     /** Exact UUID match first, then an unambiguous case-insensitive id prefix (>= 4 chars). */
     private fun resolveDisplayByIdOrPrefix(idOrPrefix: String): DisplayData? {
@@ -114,6 +149,18 @@ object FullscreenBroadcastManager {
         Regex("^[a-zA-Z][a-zA-Z0-9+.-]*://").containsMatchIn(value) ||
                 Regex("""^[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]*[a-zA-Z0-9])?)+(?:[/?#].*)?$""")
                     .matches(value.trim())
+
+    /**
+     * Answers a client's `RequestSync` for [displayId] when a live session owns it, including a
+     * `virtual` one — those displays exist only inside this manager, so [DisplayManager] can't answer
+     * for them at all. Returns false when no session owns [displayId] and the caller should fall
+     * through to the display's own timeline.
+     */
+    fun sendCurrentTo(displayId: UUID, playerId: UUID): Boolean {
+        val session = sessions.values.firstOrNull { it.display.id == displayId } ?: return false
+        sendTimeline(session, playerId, transport.nowMs())
+        return true
+    }
 
     /** Display id short-id suggestions (the same 8-char prefix `/display list` shows) for the `target` argument. */
     fun displayIdSuggestions(): List<String> = DisplayManager.getDisplays().map { it.id.toString().take(8) }
@@ -137,6 +184,7 @@ object FullscreenBroadcastManager {
         title: String,
         namedTargets: Set<UUID>?,
         radius: FullscreenRadiusTarget?,
+        timelineAnchorMs: Long? = null,
     ): String? {
         if (namedTargets.isNullOrEmpty() && radius == null) return null
         if (sessions.containsKey(sessionId)) return null
@@ -157,7 +205,7 @@ object FullscreenBroadcastManager {
             title = title,
             namedTargets = namedTargets,
             radius = radius,
-            timeline = if (virtual) Timeline.start(now, loop = true) else null,
+            timeline = if (virtual) Timeline.start(timelineAnchorMs ?: now, loop = true) else null,
         )
         sessions[sessionId] = session
         deliverToAll(session)
@@ -202,18 +250,50 @@ object FullscreenBroadcastManager {
      */
     fun handleAck(sessionId: String, playerId: UUID, action: FullscreenAckAction) {
         val session = sessions[sessionId] ?: return
-        if (action == FullscreenAckAction.DISMISSED && !session.forced) {
-            session.shownTo.remove(playerId)
-            session.dismissedBy.add(playerId)
+        when (action) {
+            FullscreenAckAction.SHOWN -> {
+                session.confirmedBy.add(playerId)
+                session.minimizedBy.remove(playerId)
+                sendTimeline(session, playerId, transport.nowMs())
+                onMinimizedChanged?.invoke(session.sessionId, playerId, false)
+            }
+
+            FullscreenAckAction.DISMISSED -> if (!session.forced) {
+                session.shownTo.remove(playerId)
+                session.dismissedBy.add(playerId)
+            }
+
+            FullscreenAckAction.MINIMIZED -> {
+                session.confirmedBy.add(playerId)
+                session.minimizedBy.add(playerId)
+                sendTimeline(session, playerId, transport.nowMs())
+                onMinimizedChanged?.invoke(session.sessionId, playerId, true)
+            }
         }
     }
+
+    /**
+     * Fired when a viewer collapses a session to PiP or restores it, so
+     * [com.dreamdisplays.platform.server.proxy.ProxyBridge] can park the flag on the proxy — a
+     * network session's other backends never saw the ack, and the one that did forgets it the moment
+     * the player leaves it. Null on a single-server setup, where [Session.minimizedBy] is enough.
+     */
+    var onMinimizedChanged: ((sessionId: String, playerId: UUID, minimized: Boolean) -> Unit)? = null
 
     /** Forgets sessions for a player who left, so a rejoin is treated as a fresh delivery (a past dismissal doesn't carry over either). */
     fun onPlayerQuit(playerId: UUID) {
         sessions.values.forEach {
-            it.shownTo.remove(playerId)
+            forget(it, playerId)
             it.dismissedBy.remove(playerId)
         }
+    }
+
+    /** Drops every per-player delivery record, so a later re-target is treated as a fresh delivery. */
+    private fun forget(session: Session, playerId: UUID) {
+        session.shownTo.remove(playerId)
+        session.confirmedBy.remove(playerId)
+        session.deliveredAtMs.remove(playerId)
+        session.retryUntilMs.remove(playerId)
     }
 
     /** Re-sends every live session's state to [playerId] on join, in case they're still within a radius/selector. */
@@ -221,6 +301,22 @@ object FullscreenBroadcastManager {
         for (session in sessions.values) {
             if (isTargeted(session, playerId)) deliverTo(session, playerId)
         }
+    }
+
+    /**
+     * Adds [playerId] to [sessionId]'s frozen `named targets` and delivers immediately if they're
+     * online - `namedTargets` is a one-time snapshot (mirrors plain `target @a` on a single backend),
+     * so a network fullscreen session doesn't automatically pick up a player who joins *this* backend
+     * after the broadcast already started here; the proxy calls this on a seamless server switch so a
+     * player who was already watching keeps watching. Returns false if [sessionId] isn't live locally.
+     */
+    fun addTarget(sessionId: String, playerId: UUID, minimized: Boolean = false): Boolean {
+        val session = sessions[sessionId] ?: return false
+        session.namedTargets = (session.namedTargets ?: emptySet()) + playerId
+        session.dismissedBy.remove(playerId)
+        if (minimized) session.minimizedBy.add(playerId) else session.minimizedBy.remove(playerId)
+        if (playerId in transport.onlinePlayerIds()) deliverTo(session, playerId)
+        return true
     }
 
     /** Forgets a removed display's session without persisting a stop-broadcast (display is already gone). */
@@ -347,10 +443,14 @@ object FullscreenBroadcastManager {
                 title = session.title,
                 loop = session.loop,
                 quality = session.quality,
+                minimized = playerId in session.minimizedBy,
             ),
         )
-        sendTimeline(session, playerId, transport.nowMs())
-        session.shownTo.add(playerId)
+        val now = transport.nowMs()
+        sendTimeline(session, playerId, now)
+        if (session.shownTo.add(playerId)) session.retryUntilMs[playerId] = now + DELIVERY_CONFIRM_WINDOW_MS
+        session.confirmedBy.remove(playerId)
+        session.deliveredAtMs[playerId] = now
     }
 
     /** Sends the session's current playback position: the display's own clock for real displays, or the session's own looping [Timeline] for virtual ones. */
@@ -373,9 +473,12 @@ object FullscreenBroadcastManager {
                 deliverTo(session, playerId)
             } else if (!targeted && shown) {
                 transport.sendTo(playerId, FullscreenState(sessionId = session.sessionId, active = false))
-                session.shownTo.remove(playerId)
-            } else if (targeted && resendDue) {
-                sendTimeline(session, playerId, now)
+                forget(session, playerId)
+            } else if (targeted) {
+                val unconfirmed = playerId !in session.confirmedBy &&
+                        now < (session.retryUntilMs[playerId] ?: 0L) &&
+                        now - (session.deliveredAtMs[playerId] ?: now) >= REDELIVER_UNCONFIRMED_MS
+                if (unconfirmed) deliverTo(session, playerId) else if (resendDue) sendTimeline(session, playerId, now)
             }
         }
         if (resendDue) session.lastTimelineResend = now

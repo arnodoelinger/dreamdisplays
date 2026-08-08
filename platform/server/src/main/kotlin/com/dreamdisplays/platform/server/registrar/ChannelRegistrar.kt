@@ -1,6 +1,8 @@
 package com.dreamdisplays.platform.server.registrar
 
 import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.proxy.PROXY_CHANNEL
+import com.dreamdisplays.platform.server.proxy.ProxyBridge
 import com.dreamdisplays.platform.server.utils.net.PacketReceiver
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2_CHANNEL
@@ -45,5 +47,10 @@ object ChannelRegistrar {
 
         messenger.registerIncomingPluginChannel(plugin, V2_CHANNEL, PaperV2Networking)
         messenger.registerOutgoingPluginChannel(plugin, V2_CHANNEL)
+
+        if (ProxyBridge.enabled) {
+            messenger.registerIncomingPluginChannel(plugin, PROXY_CHANNEL, ProxyBridge)
+            messenger.registerOutgoingPluginChannel(plugin, PROXY_CHANNEL)
+        }
     }
 }

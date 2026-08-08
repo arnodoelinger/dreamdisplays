@@ -18,7 +18,7 @@ data class ClientDisplaySettings(
     var volume: Float = DEFAULT_VOLUME,
 
     /** Video quality, e.g. "720" or "1080". */
-    var quality: String = "720",
+    var quality: String = "1080",
 
     /** Brightness in the range [0.0, 2.0]. */
     var brightness: Float = 1.0f,
@@ -43,6 +43,16 @@ data class ClientDisplaySettings(
 
     /** Whether the viewer pinned this display to a Picture-in-Picture overlay; re-opened on rejoin regardless of render distance. */
     var pipOpen: Boolean = false,
+
+    /**
+     * Name of the [com.dreamdisplays.platform.client.ui.PipAnchor] the viewer last left this
+     * display's PiP at, or null to use the caller's default. Stored as a name rather than an ordinal
+     * so reordering the anchor enum can't silently move everyone's overlay.
+     */
+    var pipAnchor: String? = null,
+
+    /** Height of the PiP as a fraction of the screen, or `0` when the viewer never resized it. */
+    var pipSizeFraction: Float = 0f,
 
     /** Whether the 3D acoustics engine applies to this display; false forces the legacy distance-gain-only path. */
     var acousticsEnabled: Boolean = true,

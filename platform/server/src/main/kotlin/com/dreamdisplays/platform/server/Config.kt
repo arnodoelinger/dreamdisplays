@@ -41,6 +41,9 @@ class Config(private val plugin: PaperServer) {
     /** Config permissions. */
     lateinit var permissions: PermissionsSection; private set
 
+    /** Config proxy (`BungeeCord` / `Velocity` network coordination) section. */
+    lateinit var proxy: ProxySection; private set
+
     /** Config messages. */
     val messages get() = langStore.messages
 
@@ -75,6 +78,7 @@ class Config(private val plugin: PaperServer) {
         settings = parsed.settings
         storage = parsed.storage
         permissions = parsed.permissions
+        proxy = parsed.proxy
     }
 
     /** Re-reads `config.toml`, re-extracts language files and refreshes the in-memory message map. */

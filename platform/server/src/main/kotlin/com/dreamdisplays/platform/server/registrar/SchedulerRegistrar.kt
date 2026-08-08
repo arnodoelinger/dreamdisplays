@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.server.meta.Updater
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
+import com.dreamdisplays.platform.server.proxy.ProxyBridge
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import io.github.arnodoelinger.platformweaver.PaperOnly
 import java.util.concurrent.TimeUnit
@@ -45,6 +46,7 @@ object SchedulerRegistrar {
             TimelineManager.tick()
             WatchPartyManager.tick()
             FullscreenBroadcastManager.tick()
+            ProxyBridge.tick()
         }
         val settings = PaperServer.config.settings
         if (settings.updatesEnabled) {

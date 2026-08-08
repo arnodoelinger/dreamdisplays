@@ -15,6 +15,7 @@ import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.overlay.*
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.platform.client.ui.kit.UiRect
@@ -44,6 +45,10 @@ import java.util.*
  *  - Click + drag the resize grip – resize (grip is in the corner of the PiP facing screen center)
  *  - Click the close ("cross") button – closes this PiP directly (grip is in the outer corner,
  *    opposite the resize grip)
+ *
+ * Both the body-click menu and the close button are suppressed when [interactive] is false (a
+ * forced broadcast minimized from fullscreen) – the viewer can move and resize it, but can't
+ * reconfigure or dismiss settings that aren't theirs.
  */
 class PipOverlay(
     val displayScreen: DisplayScreen,
@@ -79,10 +84,10 @@ class PipOverlay(
     private var texH = 0
     private var uploader: AsyncTextureUploader? = null
     private var rgbaUploadBuffer: ByteBuffer? = null
+    var anchor: PipAnchor = savedAnchor(displayScreen) ?: PipAnchor.fromCorner(initialCorner)
 
-    var anchor: PipAnchor = PipAnchor.fromCorner(initialCorner)
-    private var sizeFraction: Float = initialSizeFraction.coerceIn(MIN_SIZE_FRAC, MAX_SIZE_FRAC)
-
+    private var sizeFraction: Float =
+        (savedSizeFraction(displayScreen) ?: initialSizeFraction).coerceIn(MIN_SIZE_FRAC, MAX_SIZE_FRAC)
     private var posX: Float = 0f
     private var posY: Float = 0f
     private var targetX: Float = 0f
@@ -95,7 +100,11 @@ class PipOverlay(
     var lastPipH = 0; private set
 
     private var animProgress = 0f
-    private var closing = false
+
+    /** True once the fade-out started; such an overlay no longer reserves its anchor. */
+    var closing = false
+        private set
+
     private var lastRenderNanos = 0L
 
     private var wasLeftPressed = false
@@ -290,7 +299,7 @@ class PipOverlay(
         hoveringResize = hovering &&
                 mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
                 mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
-        hoveringClose = hovering &&
+        hoveringClose = interactive && hovering &&
                 mouseX in (cx + closeX)..(cx + closeX + CLOSE_SZ) &&
                 mouseY in (cy + closeY)..(cy + closeY + CLOSE_SZ)
 
@@ -340,7 +349,7 @@ class PipOverlay(
         if (hovering || resizing) {
             renderResizeHandle(g, handleX, handleY, alpha)
         }
-        if (hovering) {
+        if (hovering && interactive) {
             renderCloseButton(g, closeX, closeY, alpha)
         }
 
@@ -369,7 +378,7 @@ class PipOverlay(
                 val (clx, cly) = closeButtonPixelPos(pipW, pipH)
                 pressedInResize = mx in (cx + hx)..(cx + hx + RESIZE_SZ) &&
                         my in (cy + hy)..(cy + hy + RESIZE_SZ)
-                pressedInClose = !pressedInResize &&
+                pressedInClose = interactive && !pressedInResize &&
                         mx in (cx + clx)..(cx + clx + CLOSE_SZ) &&
                         my in (cy + cly)..(cy + cly + CLOSE_SZ)
                 pressedInBody = !pressedInResize && !pressedInClose
@@ -411,9 +420,13 @@ class PipOverlay(
                     val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
                     targetX = ax.toFloat(); targetY = ay.toFloat()
                     dragging = false
+                    persistGeometry()
                 }
 
-                resizing -> resizing = false
+                resizing -> {
+                    resizing = false
+                    persistGeometry()
+                }
                 pressedInClose -> {
                     val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
                     Minecraft.getInstance().soundManager.play(s)
@@ -577,6 +590,24 @@ class PipOverlay(
         private const val CLOSE_SZ = 14
         private const val SNAP_LERP_SPEED = 8f
         private const val PIP_Z = 1_000.0
+
+        /** The anchor [ds]'s PiP was last left at, or null when the viewer never moved it. */
+        private fun savedAnchor(ds: DisplayScreen): PipAnchor? {
+            val name = ClientSettingsStore.getSettings(ds.uuid).pipAnchor ?: return null
+            return PipAnchor.entries.firstOrNull { it.name == name }
+        }
+
+        /** The size [ds]'s PiP was last left at, or null when the viewer never resized it. */
+        private fun savedSizeFraction(ds: DisplayScreen): Float? =
+            ClientSettingsStore.getSettings(ds.uuid).pipSizeFraction.takeIf { it > 0f }
+    }
+
+    /** Remembers where and how big the viewer just left this PiP. */
+    private fun persistGeometry() {
+        val settings = ClientSettingsStore.getSettings(displayScreen.uuid)
+        settings.pipAnchor = anchor.name
+        settings.pipSizeFraction = sizeFraction
+        ClientSettingsStore.save()
     }
 
     private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)

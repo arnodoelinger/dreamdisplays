@@ -7,6 +7,7 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.PauseScreen
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
 
@@ -68,13 +69,13 @@ object FullscreenOverlayManager {
     /**
      * Per-tick Esc handling: pressing Esc during gameplay opens the vanilla pause screen, so a
      * `null -> pause screen` transition while an overlay is active is treated as "Esc pressed on
-     * the fullscreen overlay" – the pause screen is dismissed and the overlay closes (or minimizes
+     * the fullscreen overlay" — the pause screen is dismissed and the overlay closes (or minimizes
      * to PiP when forced).
      */
     fun onClientTick(mc: Minecraft) {
         val screen = MinecraftScreenUtil.currentScreen(mc)
         val overlay = active
-        if (overlay != null && !screenWasOpen && screen != null && screen.isPauseScreen) {
+        if (overlay != null && !screenWasOpen && screen is PauseScreen) {
             MinecraftScreenUtil.setScreen(mc, null)
             if (overlay.forced) {
                 overlay.displayScreen.minimizeFullscreenToPip()

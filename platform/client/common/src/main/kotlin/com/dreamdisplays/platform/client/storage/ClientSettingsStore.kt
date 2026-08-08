@@ -8,6 +8,7 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * In-memory cache and JSON persistence for per-display, client-local [ClientDisplaySettings].
@@ -27,7 +28,7 @@ object ClientSettingsStore : ClientSettingsStorage {
     private val settingsSerializer = MapSerializer(String.serializer(), ClientDisplaySettings.serializer())
 
     /** In-memory cache of settings, keyed by display UUID. */
-    private val settings = HashMap<UUID, ClientDisplaySettings>()
+    private val settings = ConcurrentHashMap<UUID, ClientDisplaySettings>()
 
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */
     override fun load() {
@@ -52,7 +53,7 @@ object ClientSettingsStore : ClientSettingsStorage {
         displayUuid: UUID,
         defaultVolume: Float,
     ): ClientDisplaySettings =
-        settings.getOrPut(displayUuid) {
+        settings.computeIfAbsent(displayUuid) {
             ClientDisplaySettings(volume = defaultVolume.coerceIn(0f, 1f))
         }
 

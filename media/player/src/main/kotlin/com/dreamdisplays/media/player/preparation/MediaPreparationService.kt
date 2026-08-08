@@ -21,7 +21,7 @@ internal object MediaPreparationService {
      *
      * @param url raw media URL (YouTube, direct stream, etc.)
      * @param lang preferred audio language (empty = default)
-     * @param quality preferred video quality ([VideoQuality.Auto] caps at 720p as a sane default)
+     * @param quality preferred video quality ([VideoQuality.Auto] caps at 1080p as a sane default)
      * @throws DreamMediaException if no usable streams are found
      */
     fun prepare(url: String, lang: String, quality: VideoQuality, env: PlaybackEnvironment): PreparedMedia {
@@ -33,7 +33,7 @@ internal object MediaPreparationService {
         if (resolved.streams.isEmpty()) throw DreamMediaException.NotFound("No streams available for $url.")
 
         val prefs = StreamPreferences(
-            maxHeight = (quality.targetHeight ?: 720).takeIf { it > 0 },
+            maxHeight = (quality.targetHeight ?: 1080).takeIf { it > 0 },
             preferFps60 = System.getProperty("dreamdisplays.stream.prefer60", "false").toBoolean(),
             preferredAudioTrack = null,
             preferredAudioLanguage = lang.ifEmpty { null },

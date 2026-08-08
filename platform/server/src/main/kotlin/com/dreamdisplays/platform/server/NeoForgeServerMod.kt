@@ -8,6 +8,7 @@ import com.dreamdisplays.platform.server.managers.StorageManager
 import com.dreamdisplays.platform.server.registrar.NeoForgeBareTokenArgumentType
 import com.dreamdisplays.platform.server.registrar.NeoForgeCommandRegistrar
 import com.dreamdisplays.platform.server.utils.net.NeoForgeNetworkingAdapter
+import com.dreamdisplays.platform.server.utils.net.NeoForgeProxyNetworking
 import com.dreamdisplays.platform.server.utils.net.NeoForgeV2Networking
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
 import com.dreamdisplays.platform.server.utils.net.VanillaServerPacketHandler
@@ -39,6 +40,7 @@ class NeoForgeServer(modEventBus: IEventBus) {
         configInstance = VanillaConfig(FMLPaths.CONFIGDIR.get().resolve("dreamdisplays").toFile())
         VanillaServerState.config = configInstance
         VanillaServerState.serverVersion = serverVersion
+        VanillaServerState.platformName = "neoforge"
         VanillaNetworking.adapter = NeoForgeNetworkingAdapter
 
         modEventBus.addListener(::registerArgumentTypes)
@@ -67,6 +69,7 @@ class NeoForgeServer(modEventBus: IEventBus) {
     private fun registerPayloads(event: RegisterPayloadHandlersEvent) {
         val registrar = event.registrar(Initializer.MOD_ID).optional().versioned("1")
         NeoForgeV2Networking.registerReceivers(registrar)
+        NeoForgeProxyNetworking.registerReceivers(registrar)
         VanillaServerPacketHandler.registerReceivers(registrar)
     }
 

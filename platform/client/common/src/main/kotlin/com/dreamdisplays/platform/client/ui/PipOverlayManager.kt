@@ -22,10 +22,18 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 object PipOverlayManager : OverlayManager {
     private val overlays = mutableListOf<PipOverlay>()
 
-    /** Adds the overlay, snapping to a free anchor if the requested one is taken. Returns false if all 8 anchors are occupied. */
+    /**
+     * Adds the overlay, snapping to a free anchor if the requested one is taken. Returns false if all
+     * 8 anchors are occupied.
+     *
+     * An overlay that is already fading out does not reserve its anchor: on a proxy server switch the
+     * outgoing PiP is still closing while the incoming one opens, and counting it as taken pushed the
+     * replacement into whatever slot came first in [PipAnchor] (the top-left corner) instead of the
+     * corner the viewer actually left it in.
+     */
     fun add(overlay: PipOverlay): Boolean {
-        if (overlays.size >= PipAnchor.entries.size) return false
-        val taken = overlays.map { it.anchor }.toSet()
+        if (overlays.count { !it.closing } >= PipAnchor.entries.size) return false
+        val taken = overlays.filter { !it.closing }.map { it.anchor }.toSet()
         if (overlay.anchor in taken) {
             val free = PipAnchor.entries.firstOrNull { it !in taken } ?: return false
             overlay.anchor = free

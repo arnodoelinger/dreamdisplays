@@ -13,6 +13,7 @@ import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.PipPinManager
+import com.dreamdisplays.platform.server.proxy.VanillaProxyBridge
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking
 import net.minecraft.server.MinecraftServer
@@ -119,5 +120,6 @@ object FabricV2Networking {
         VanillaDisplayActions.sendAllDisplays(player, server)
         FullscreenBroadcastManager.onPlayerJoin(player.uuid)
         PipPinManager.onPlayerJoin(player.uuid)
+        VanillaProxyBridge.onPlayerReady(player, server)
     }
 }

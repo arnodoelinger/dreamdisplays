@@ -13,7 +13,10 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.input.*
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
+import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.multiplayer.ClientLevel
 import org.lwjgl.glfw.GLFW
 import java.util.*
@@ -22,6 +25,8 @@ import java.util.*
  * Handles per-tick client display state: level changes, hover, unloading, and shortcuts.
  */
 object ClientTickManager {
+    private val logger = org.slf4j.LoggerFactory.getLogger("DreamDisplays/ClientTickManager")
+
     /**
      * Deadband around a display's renderDistance so a player lingering near the boundary doesn't
      * flip park / wake every tick (block-quantized position drift across a single threshold).
@@ -58,6 +63,7 @@ object ClientTickManager {
 
         FullscreenOverlayManager.onClientTick(minecraft)
         FullscreenController.onClientTick()
+        DisplayRegistry.tickReconfirm()
 
         val level = minecraft.level
         if (level != null && (minecraft.currentServer != null || minecraft.isLocalServer)) {
@@ -67,15 +73,15 @@ object ClientTickManager {
             }
             if (level !== lastLevel) {
                 lastLevel = level
-                DisplayRegistry.unloadAll()
-                DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
-                FullscreenOverlayManager.closeAll()
+                DisplayRegistry.unloadAllForServerSwitch()
                 hoveredDisplayScreen = null
                 checkVersionAndSendPacket()
             }
             wasInMultiplayer = true
         } else {
-            if (wasInMultiplayer) {
+            val screen = MinecraftScreenUtil.currentScreen(minecraft)
+            val leftForGood = screen is TitleScreen || screen is JoinMultiplayerScreen
+            if (wasInMultiplayer && leftForGood) {
                 wasInMultiplayer = false
                 DisplayRegistry.unloadAll()
                 DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
@@ -84,6 +90,8 @@ object ClientTickManager {
                 lastLevel = null
                 return
             }
+            lastLevel = null
+            return
         }
 
         // Display under the crosshair, resolved through the DisplayInteractionService contract
@@ -112,7 +120,8 @@ object ClientTickManager {
                 displayScreen.renderDistance + DORMANT_HYSTERESIS_BLOCKS
             }
             val outOfRange = threshold < displayScreen.getDistanceToScreen(playerPos)
-            val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) && !displayScreen.isPopoutActive
+            val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) &&
+                    !displayScreen.isPopoutActive && !displayScreen.virtual
 
             // Already parked warm: wake it when back in range, or tear it down once it has been dormant
             // past the pool TTL (freeing its decoder + texture; the snapshot cache then bridges a return).

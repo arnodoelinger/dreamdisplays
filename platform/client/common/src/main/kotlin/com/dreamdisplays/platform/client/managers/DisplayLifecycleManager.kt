@@ -41,6 +41,7 @@ object DisplayLifecycleManager {
         }
 
         DisplayRegistry.screens[packet.id]?.let {
+            DisplayRegistry.markReconfirmed(packet.id)
             it.updateData(packet)
             DisplayRegistry.recordScreen(it)
             return
@@ -77,6 +78,7 @@ object DisplayLifecycleManager {
             packet.width, packet.height, packet.url, packet.lang,
             mode, packet.qualityCap, ContentRotation.fromQuarterTurns(packet.rotation),
         )
+        DisplayRegistry.screens[packet.id]?.virtual = packet.virtual
     }
 
     /**

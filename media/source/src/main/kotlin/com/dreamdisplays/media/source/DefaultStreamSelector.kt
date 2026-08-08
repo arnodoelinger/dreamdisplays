@@ -26,7 +26,7 @@ class DefaultStreamSelector : StreamSelector {
         val videoStreams = streams.filter { it.type.hasVideo }
         val audioStreams = streams.filter { it.type == MediaStreamType.AUDIO }
 
-        val targetHeight = preferences.maxHeight ?: 720
+        val targetHeight = preferences.maxHeight ?: 1080
         val lang = preferences.preferredAudioLanguage ?: ""
 
         val video = MediaStreamSelector.pickVideo(videoStreams, targetHeight, preferences.preferFps60)

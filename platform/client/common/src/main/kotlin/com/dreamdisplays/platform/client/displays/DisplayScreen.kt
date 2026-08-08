@@ -242,11 +242,39 @@ class DisplayScreen(
     /**
      * In Broadcast ([qualityCap] > 0) every client is pinned to the highest allowed quality (the
      * cap, e.g. 360p) regardless of the user's saved setting; otherwise the user's [requested]
-     * quality is used unchanged.
+     * quality is used unchanged. The result is then stepped down further by [distanceQualitySteps]
+     * (see [updateDistanceQuality]).
      */
     private fun effectiveQuality(requested: VideoQuality = quality): VideoQuality {
-        if (qualityCap <= 0) return requested
-        return VideoQuality.Fixed(qualityCap)
+        val base = if (qualityCap > 0) VideoQuality.Fixed(qualityCap) else requested
+        return applyDistanceSteps(base)
+    }
+
+    /** How many rungs down [QUALITY_LADDER] the current distance has pushed the effective quality; 0 when close. */
+    private var distanceQualitySteps = 0
+
+    /**
+     * Re-derives [distanceQualitySteps] from [fraction] (distance to the screen as a fraction of
+     * [renderDistance], `0` at the screen and `1` at the render-distance edge) and re-pushes the
+     * effective quality if it changed.
+     */
+    private fun updateDistanceQuality(fraction: Float) {
+        var steps = distanceQualitySteps
+        while (steps < DISTANCE_STEP_THRESHOLDS.size && fraction >= DISTANCE_STEP_THRESHOLDS[steps]) steps++
+        while (steps > 0 && fraction < DISTANCE_STEP_THRESHOLDS[steps - 1] - DISTANCE_STEP_HYSTERESIS) steps--
+        if (steps == distanceQualitySteps) return
+        val previousSteps = distanceQualitySteps
+        distanceQualitySteps = steps
+        reloadQuality()
+    }
+
+    /** Moves [base] down [distanceQualitySteps] rungs in [QUALITY_LADDER]; a no-op at 0 steps. */
+    private fun applyDistanceSteps(base: VideoQuality): VideoQuality {
+        if (distanceQualitySteps <= 0) return base
+        val baseHeight = base.targetHeight ?: DEFAULT_QUALITY
+        val idx = QUALITY_LADDER.indexOfFirst { it <= baseHeight }.let { if (it < 0) QUALITY_LADDER.lastIndex else it }
+        val target = QUALITY_LADDER[(idx + distanceQualitySteps).coerceAtMost(QUALITY_LADDER.lastIndex)]
+        return VideoQuality.Fixed(target)
     }
 
     /** True once the controller has applied the screen's initial state to the current player. */
@@ -379,6 +407,9 @@ class DisplayScreen(
 
     /** True while a PiP or window popout is open for this display. */
     val isPopoutActive: Boolean; get() = popoutManager.isActive
+
+    /** True for a fullscreen broadcast's synthetic display. */
+    var virtual: Boolean = false
 
     /** Anchor block position of the display (cached). */
     val pos: BlockPos; get() = blockPos ?: BlockPos(x, y, z).also { blockPos = it }
@@ -517,6 +548,7 @@ class DisplayScreen(
 
     /** Updates position, dimensions, and video URL from an incoming [DisplayInfo] packet. */
     fun updateData(packet: DisplayInfo) {
+        virtual = packet.virtual
         x = packet.x
         y = packet.y
         z = packet.z
@@ -714,6 +746,15 @@ class DisplayScreen(
 
     /** Whether the active fullscreen overlay should stay open (re-showing) past the video's end instead of auto-closing. */
     private var fullscreenLoop = false
+
+    /**
+     * The last [FullscreenState] [FullscreenController] actually applied to this screen. Lives and
+     * dies with this instance, so it naturally survives a carried-over server switch (same screen
+     * object, per [DisplayRegistry.unloadAllForServerSwitch]) but never leaks into a genuinely new
+     * screen for the same display id — that one starts with `null` and always applies fresh.
+     */
+    @Volatile
+    internal var lastFullscreenState: FullscreenState? = null
 
     /** Shows this display's video as a fullscreen overlay in [mode]. Closes PiP if active. */
     fun activateFullscreenMode(
@@ -992,7 +1033,7 @@ class DisplayScreen(
 
     /**
      * Resolves the current quality to a target pixel height, clamped to [qualityCap] when set
-     * ([VideoQuality.Auto] falls back to [DEFAULT_QUALITY]). Broadcast caps every client at 360p.
+     * ([VideoQuality.Auto] falls back to [DEFAULT_QUALITY]). Broadcast caps every client at 720p.
      */
     private fun parseQualityOrDefault(): Int {
         if (qualityCap > 0) return qualityCap
@@ -1008,7 +1049,16 @@ class DisplayScreen(
     /** Called every game tick to update distance-based volume attenuation from [pos]. */
     fun tick(pos: BlockPos) {
         val maxRadius = if (isPopoutActive) Double.MAX_VALUE else ClientStateManager.config.defaultDistance.toDouble()
-        mediaPlayer?.tick(getDistanceToScreen(pos), maxRadius)
+        val distance = getDistanceToScreen(pos)
+        mediaPlayer?.tick(distance, maxRadius)
+        if (isPopoutActive) {
+            if (distanceQualitySteps != 0) {
+                distanceQualitySteps = 0
+                reloadQuality()
+            }
+        } else {
+            updateDistanceQuality((distance / renderDistance.coerceAtLeast(1)).toFloat())
+        }
         if (ClientStateManager.config.audioAcoustics == AcousticQuality.OFF) return
         val plane = toSourcePlane()
         DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.updateSource(
@@ -1068,7 +1118,23 @@ class DisplayScreen(
         }
 
         /** Fallback target quality (pixel height) when none is resolvable. */
-        private const val DEFAULT_QUALITY = 720
+        private const val DEFAULT_QUALITY = 1080
+
+        /** Quality rungs [applyDistanceSteps] moves down through, highest to lowest. */
+        private val QUALITY_LADDER = intArrayOf(2160, 1440, 1080, 720, 480, 360, 240, 144)
+
+        /**
+         * Down-thresholds (as a fraction of [renderDistance]) for each successive step: index 0 is
+         * where step 1 kicks in (66%), index 1 is where step 2 kicks in (75%), and so on if the
+         * ladder ever grows more steps.
+         */
+        private val DISTANCE_STEP_THRESHOLDS = floatArrayOf(0.66f, 0.75f)
+
+        /**
+         * Subtracted from a step's down-threshold to get its recovery (up) threshold, so a viewer
+         * oscillating right around a boundary doesn't flip the quality back and forth every tick.
+         */
+        private const val DISTANCE_STEP_HYSTERESIS = 0.05f
 
         /** Skip the restore seek when already within this tolerance of the saved position. */
         private const val RESTORE_SEEK_TOLERANCE_NS = 250_000_000L
