@@ -1,18 +1,16 @@
 package com.dreamdisplays.media.player.managers
 
-import com.dreamdisplays.media.player.pipeline.AudioSink
-import com.dreamdisplays.media.player.process.FFmpegBinary
-import com.dreamdisplays.media.player.process.MediaProcess
+import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.util.daemon
 import org.slf4j.LoggerFactory
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** An audio track eligible for pre-warming, and how its process has to reach a position. */
+/** An audio track eligible for pre-warming, and how its session has to reach a position. */
 internal data class WarmTrack(val url: String, val seekByDecoding: Boolean)
 
 /**
- * Keeps `FFmpeg` processes running for the audio tracks the viewer has not selected, so picking a
- * different dub promotes an already-decoding line.
+ * Keeps native audio sessions open (paused) for the audio tracks the viewer has not selected, so
+ * picking a different dub promotes an already-decoding session.
  */
 internal class AudioTrackWarmPool(
     private val debugLabel: String,
@@ -24,11 +22,11 @@ internal class AudioTrackWarmPool(
     /** True only while an ordinary, un-parked VOD session is playing. */
     private val eligible: () -> Boolean,
 ) {
-    /** A shadow process, holding PCM that begins at [contentStartNanos]. */
+    /** A shadow session, paused, holding a position at [contentStartNanos]. */
     class Warm(
         val url: String,
-        val process: Process,
-        val stop: AtomicBoolean,
+        val handle: Long,
+        val isHls: Boolean,
         val contentStartNanos: Long,
     )
 
@@ -54,16 +52,14 @@ internal class AudioTrackWarmPool(
     }
 
     /**
-     * Hands the warm line for [url] over to the caller, which takes ownership of its process and stop
-     * flag, or returns null when nothing usable is pooled. A shadow that died, has not produced any PCM
-     * yet, or sits on the wrong side of a seek is dropped instead of returned.
+     * Hands the warm session for [url] over to the caller, which takes ownership of its handle, or
+     * returns null when nothing usable is pooled. A shadow that errored, or sits on the wrong side of
+     * a seek, is dropped instead of returned.
      */
     fun take(url: String): Warm? {
         val w = synchronized(lock) { warm.remove(url) } ?: return null
         val drift = positionNanos() - w.contentStartNanos
-        val usable = w.process.isAlive &&
-                drift >= 0L && drift <= MAX_TAKE_DRIFT_NANOS &&
-                runCatching { w.process.inputStream.available() > 0 }.getOrDefault(false)
+        val usable = drift in 0L..MAX_TAKE_DRIFT_NANOS && NativeMedia.lavAudioError(w.handle).isEmpty()
         if (!usable) {
             discardAsync(listOf(w))
             return null
@@ -111,7 +107,6 @@ internal class AudioTrackWarmPool(
             dropAll()
             return
         }
-        val ffmpeg = FFmpegBinary.getPath() ?: return
         val keep = tracks.mapTo(HashSet()) { it.url }
         val now = positionNanos()
 
@@ -122,8 +117,8 @@ internal class AudioTrackWarmPool(
                 val w = entries.next().value
                 val drift = now - w.contentStartNanos
                 // A negative drift means the viewer seeked back behind this shadow's own start, so its
-                // PCM is ahead of the playhead and no forward catch-up could ever line it up again.
-                if (w.url !in keep || !w.process.isAlive || drift < 0L || drift > MAX_STALENESS_NANOS) {
+                // decode is ahead of the playhead and no forward catch-up could ever line it up again.
+                if (w.url !in keep || drift < 0L || drift > MAX_STALENESS_NANOS || NativeMedia.lavAudioError(w.handle).isNotEmpty()) {
                     drop += w
                     entries.remove()
                 }
@@ -134,25 +129,26 @@ internal class AudioTrackWarmPool(
         for (track in tracks) {
             if (closed.get() || terminated.get() || !eligible()) return
             if (synchronized(lock) { warm.containsKey(track.url) }) continue
-            spawn(ffmpeg, track)
+            spawn(track)
         }
     }
 
-    /** Starts one shadow at the current playhead and files it under its track URL. */
-    private fun spawn(ffmpeg: String, track: WarmTrack) {
+    /** Opens one shadow session (paused) at the current playhead and files it under its track URL. */
+    private fun spawn(track: WarmTrack) {
         val at = positionNanos().coerceAtLeast(0L)
-        val stop = AtomicBoolean()
-        val proc = runCatching {
-            MediaProcess.buildAudio(
-                ffmpeg, track.url, at, AudioSink.SAMPLE_RATE, seekByDecoding = track.seekByDecoding,
-            )
-        }.getOrElse {
-            logger.debug("$debugLabel [audio-warm] could not pre-warm a track: ${it.message}")
+        val handle = if (track.seekByDecoding) {
+            NativeMedia.lavAudioOpenHls(track.url, at)
+        } else {
+            NativeMedia.lavAudioOpen(track.url, at / 1000L)
+        }
+        if (handle == 0L) {
+            logger.debug("$debugLabel [audio-warm] could not pre-warm a track.")
             return
         }
-        val warmed = Warm(track.url, proc, stop, at)
+        NativeMedia.lavAudioPause(handle)
+        val warmed = Warm(track.url, handle, track.seekByDecoding, at)
         // The pool can close, and a racing pass can file its own shadow, while the spawn above runs;
-        // either way exactly one process per track survives and the loser is torn down here.
+        // either way exactly one session per track survives and the loser is torn down here.
         val discard = ArrayList<Warm>(1)
         synchronized(lock) {
             if (closed.get()) discard += warmed else warm.put(track.url, warmed)?.let { discard += it }
@@ -166,19 +162,19 @@ internal class AudioTrackWarmPool(
         discardAsync(all)
     }
 
-    /** Stops and destroys [items] on a throwaway thread, so no caller waits on process teardown. */
+    /** Kills and closes [items]' native handles on a throwaway thread, so no caller waits on it. */
     private fun discardAsync(items: List<Warm>) {
         if (items.isEmpty()) return
         daemon({
             items.forEach {
-                it.stop.set(true)
-                MediaProcess.gracefulDestroy(it.process)
+                NativeMedia.lavAudioKill(it.handle)
+                NativeMedia.lavAudioClose(it.handle)
             }
         }, "MediaPlayer-audio-warm-drop").start()
     }
 
     private companion object {
-        /** Most shadows held at once; each is an idle FFmpeg holding a socket and a pipe buffer. */
+        /** Most shadows held at once; each is a paused native session decoding a couple seconds ahead. */
         const val MAX_WARM = 3
 
         /** How often the refresh pass runs. */

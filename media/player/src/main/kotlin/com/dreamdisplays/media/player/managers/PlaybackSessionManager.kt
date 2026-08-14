@@ -11,7 +11,6 @@ import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.pipeline.*
 import com.dreamdisplays.media.player.process.FFmpegBinary
-import com.dreamdisplays.media.player.process.HlsAudioFeeder
 import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.player.stream.ActiveStreams
@@ -29,7 +28,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Manages `FFmpeg` session (processes, threads, pipes). Quality switch runs parallel video channel.
+ * Manages a playback session: video decode channels plus the native audio session. Quality switch runs
+ * a parallel video channel.
  */
 internal class PlaybackSessionManager(
     private val debugLabel: String,
@@ -47,7 +47,7 @@ internal class PlaybackSessionManager(
     /** Invoked when quality switch fails before promotion (can drop staged texture) */
     private val onQualitySwitchAborted: (appliedAnyway: Boolean) -> Unit = {},
 
-    /** Invoked when live audio process ends unexpectedly (called on audio reader thread). */
+    /** Invoked when the native audio session ends unexpectedly (called on the watcher thread). */
     private val onAudioFailure: (stderr: String) -> Unit = {},
 
     /** Invoked once an in-flight [beginAudioTrackSwitch] settles, either way (promoted or gave up). */
@@ -82,10 +82,10 @@ internal class PlaybackSessionManager(
                     size > SILENT_MEMO_LIMIT
             }.let { Collections.synchronizedMap(it) },
         )
-    }
 
-    /** Audio half of session: process, thread, stop flag. */
-    private class AudioHalf(val process: Process?, val thread: Thread, val stop: AtomicBoolean)
+        /** True when [url] looks like an HLS playlist (Twitch live weaver URLs carry no `.m3u8` suffix). */
+        fun isLiveHlsUrl(url: String): Boolean = url.contains(".m3u8") || url.contains(".ttvnw.net/")
+    }
 
     /**
      * One decode channel: video pipe + process/thread/stop (independent instances per channel).
@@ -186,84 +186,50 @@ internal class PlaybackSessionManager(
         }
     }
 
-    private val audio = AudioSink(debugLabel)
+    private val audio = NativeAudioSink(debugLabel, terminated, audioStage)
 
     /**
      * True while the current session plays a live stream; set by [start], reused by every audio
-     * (re)launch in the same session to pick the transport for the audio process.
+     * (re)launch in the same session to pick the transport for the audio session.
      */
     @Volatile
     private var liveSession = false
 
-    /**
-     * The [HlsAudioFeeder] feeding the current audio process, or null on the direct-URL path.
-     * Its first PES PTS anchors A / V pacing exactly (see [pacingClockNanos]).
-     */
-    @Volatile
-    private var audioFeeder: HlsAudioFeeder? = null
-
-    /** Spawns audio `FFmpeg` process (live HLS via JVM feeder, everything else via direct URL). */
-    @Throws(IOException::class)
-    private fun buildAudioProcess(
-        ffmpeg: String, streamSet: ActiveStreams, offsetNanos: Long, stopFlag: AtomicBoolean,
-    ): Process? {
+    /** Resolves [streamSet]'s audio URL/HLS-routing, or null when this source is already known silent. */
+    private fun resolveAudio(streamSet: ActiveStreams): Pair<String, Boolean>? {
         val url = streamSet.currentAudio.url
         if (url in SILENT_SOURCES) {
             silentSession = true
-            audioFeeder = null
             return null
         }
-        if (liveSession && HlsAudioFeeder.supports(url)) {
-            // Same SSRF gate the FFmpeg URL path applies in MediaProcess.baseCommand
-            val safeUrl = MediaHostGuard.resolveSafeUrl(url)
-            val proc = MediaProcess.buildAudioPiped(ffmpeg, AudioSink.SAMPLE_RATE)
-            audioFeeder = HlsAudioFeeder(safeUrl, proc.outputStream, stopFlag, terminated, debugLabel)
-                .also { it.start() }
-            return proc
-        }
-        audioFeeder = null
-        return MediaProcess.buildAudio(
-            ffmpeg, url, offsetNanos, AudioSink.SAMPLE_RATE,
-            seekByDecoding = streamSet.currentAudio.seekByDecoding,
-        )
+        val isHls = streamSet.currentAudio.seekByDecoding || (liveSession && isLiveHlsUrl(url))
+        return url to isHls
     }
 
-    /** True if audio starts at known position (real -ss seek, not live HLS join). */
-    private fun audioOriginKnown(): Boolean = !liveSession && audioFeeder == null
-
-    /** True once source has no audio (separate from transient gap between processes). */
+    /** True once source has no audio (separate from transient gap between sessions). */
     @Volatile
     private var silentSession = false
 
-    /** Marks URL as silent source (no process spawned, returns true on first mark). */
+    /** Marks URL as silent source (no session opened, returns true on first mark). */
     fun markSourceSilent(audioUrl: String): Boolean {
         silentSession = true
         return SILENT_SOURCES.add(audioUrl)
     }
 
-    /** Single-line bridge audio session while prelude plays (before live process attached) */
-    @Volatile
-    private var bridgeAudio: AudioHalf? = null
-
-    /** When true, threads idle in place keeping decoder / line open for instant resume. */
+    /** When true, threads idle in place keeping decoder open for instant resume. */
     private val parkFlag = AtomicBoolean(false)
 
-    /** Pre-warmed shadow processes for the audio tracks that are not playing; see [AudioTrackWarmPool]. */
+    /** Pre-warmed shadow sessions for the audio tracks that are not playing; see [AudioTrackWarmPool]. */
     private val audioWarmPool = AudioTrackWarmPool(
         debugLabel = debugLabel,
         terminated = terminated,
         positionNanos = { clock.currentTime() },
-        eligible = { isPlaying && !terminated.get() && !parkFlag.get() && audioOriginKnown() },
+        eligible = { isPlaying && !terminated.get() && !parkFlag.get() && !liveSession },
     )
 
     /** Declares the audio tracks to keep pre-warmed; the one currently playing must not be among them. */
     fun setWarmAudioTracks(tracks: List<WarmTrack>) =
         audioWarmPool.setTracks(tracks.filter { it.url !in SILENT_SOURCES })
-
-    init {
-        audio.setParkFlag(parkFlag)
-        audio.setDspStage(audioStage)
-    }
 
     /** Guards the live/incoming channel transitions across the control, render, and reader threads. */
     private val switchLock = Any()
@@ -276,9 +242,6 @@ internal class PlaybackSessionManager(
 
     @Volatile
     private var incomingGeneration: Long = 0L
-
-    @Volatile
-    private var audioHalf: AudioHalf? = null
 
     /** Fallback timestamp source when no channel is live (the watchdog guards against reading it then). */
     private val noFrames = AtomicLong(0)
@@ -360,7 +323,7 @@ internal class PlaybackSessionManager(
         active?.pipe?.popoutFrameSink = sink
     }
 
-    /** Stops any running session, then launches new FFmpeg processes for [streamSet] starting at [offsetNanos]. */
+    /** Stops any running session, then launches new decode channels for [streamSet] starting at [offsetNanos]. */
     fun start(
         streamSet: ActiveStreams, offsetNanos: Long, lastQuality: Int, hwAccel: HwAccelBackend, live: Boolean = false,
         onFirstFrame: () -> Unit = {},
@@ -387,24 +350,11 @@ internal class PlaybackSessionManager(
                 firstVideoFrame.countDown()
                 onFirstFrame()
             }, onEos = onStreamEnd, parkFlag = parkFlag)
-            val aStop = AtomicBoolean()
-            val ap = try {
-                buildAudioProcess(ffmpeg, streamSet, offsetNanos, aStop)
-            } catch (e: IOException) {
-                // The video side is already running; tear it down before propagating
-                channel.teardownProcess()
-                throw e
-            }
             active = channel
-            audioHalf = ap?.let {
-                AudioHalf(
-                    it,
-                    audio.start(
-                        it, terminated, aStop,
-                        contentStartNanos = offsetNanos, originKnown = audioOriginKnown(),
-                        startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
-                    ),
-                    aStop,
+            resolveAudio(streamSet)?.let { (url, isHls) ->
+                audio.start(
+                    url, isHls, contentStartNanos = offsetNanos,
+                    startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
                 )
             }
             updateRawFrameSink()
@@ -428,16 +378,6 @@ internal class PlaybackSessionManager(
 
         if (old.inProcess && old.nativePipe?.expectedW == w && old.nativePipe.expectedH == h) {
             val firstVideoFrame = CountDownLatch(1)
-            val aStop = AtomicBoolean()
-            val ap = try {
-                buildAudioProcess(ffmpeg, streamSet, offsetNanos, aStop)
-            } catch (e: IOException) {
-                logger.error("$debugLabel Failed to start seek audio session.", e)
-                return false
-            }
-            val oldAudio = audioHalf
-            audioHalf = null
-            oldAudio?.stop?.set(true)
             audio.stop()
             clock.reset(offsetNanos)
 
@@ -446,24 +386,16 @@ internal class PlaybackSessionManager(
                 firstVideoFrame.countDown()
             }
             if (seeked) {
-                audioHalf = ap?.let {
-                    AudioHalf(
-                        it,
-                        audio.start(
-                            it, terminated, aStop,
-                            contentStartNanos = offsetNanos, originKnown = audioOriginKnown(),
-                            startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
-                        ),
-                        aStop,
+                resolveAudio(streamSet)?.let { (url, isHls) ->
+                    audio.start(
+                        url, isHls, contentStartNanos = offsetNanos,
+                        startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
                     )
                 }
                 updateRawFrameSink()
-                discardHalvesAsync(null, oldAudio)
                 return true
             }
             logger.warn("$debugLabel In-place seek rejected by the pipe; falling back to a channel reopen.")
-            MediaProcess.gracefulDestroy(ap)
-            discardHalvesAsync(null, oldAudio)
         } else {
             logger.warn(
                 "$debugLabel Seek can't go in place (inProcess=${old.inProcess}, " +
@@ -476,9 +408,6 @@ internal class PlaybackSessionManager(
         // poll (the GPU texture keeps the last frame on screen), and the clock parks at the target so the
         // UI reads the seeked position immediately.
         old.stop.set(true)
-        val oldAudio = audioHalf
-        audioHalf = null
-        oldAudio?.stop?.set(true)
         audio.stop()
         clock.reset(offsetNanos)
 
@@ -489,91 +418,54 @@ internal class PlaybackSessionManager(
                 clock.markFirstFrame()
                 firstVideoFrame.countDown()
             }, onEos = onStreamEnd, parkFlag = parkFlag)
-            val aStop = AtomicBoolean()
-            val ap = try {
-                buildAudioProcess(ffmpeg, streamSet, offsetNanos, aStop)
-            } catch (e: IOException) {
-                channel.teardownProcess()
-                renderExecutor.execute { channel.pipe.cleanup() }
-                throw e
-            }
             synchronized(switchLock) { active = channel }
-            audioHalf = ap?.let {
-                AudioHalf(
-                    it,
-                    audio.start(
-                        it, terminated, aStop,
-                        contentStartNanos = offsetNanos, originKnown = audioOriginKnown(),
-                        startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
-                    ),
-                    aStop,
+            resolveAudio(streamSet)?.let { (url, isHls) ->
+                audio.start(
+                    url, isHls, contentStartNanos = offsetNanos,
+                    startGate = firstVideoFrame, onUnexpectedEnd = onAudioFailure,
                 )
             }
             updateRawFrameSink()
-            // The old halves are already stopping; finish dismantling them off-thread so the new decode
+            // The old channel is already stopping; finish dismantling it off-thread so the new decode
             // never waits on process destruction or reader joins.
-            discardHalvesAsync(old, oldAudio)
+            discardChannelAsync(old)
             return true
         } catch (e: IOException) {
             logger.error("$debugLabel Failed to start seek session.", e)
             // Leave the old (stopping) channel as active: the caller's full restart will tear it down.
-            discardHalvesAsync(null, oldAudio)
             return false
         }
     }
 
-    /** Replaces audio half of playing session with fresh process on same audio URL, leaving video unchanged. */
+    /** Replaces the audio session with a fresh one on the same audio URL, leaving video unchanged. */
     fun restartAudio(streamSet: ActiveStreams, offsetNanos: Long): Boolean {
         if (!isPlaying || terminated.get() || parkFlag.get()) return false
-        if (bridgeCeilingNanos != Long.MAX_VALUE || bridgeAudio != null) return false
+        if (bridgeCeilingNanos != Long.MAX_VALUE) return false
         synchronized(switchLock) { if (incoming != null) return false }
-        val ffmpeg = FFmpegBinary.getPath() ?: return false
-        val oldAudio = audioHalf
-        audioHalf = null
-        oldAudio?.stop?.set(true)
         audio.stop()
-        val aStop = AtomicBoolean()
-        val ap = try {
-            buildAudioProcess(ffmpeg, streamSet, offsetNanos, aStop)
-        } catch (e: IOException) {
-            logger.error("$debugLabel Failed to start replacement audio process.", e)
-            discardHalvesAsync(null, oldAudio)
-            return false
-        }
-        discardHalvesAsync(null, oldAudio)
-        if (ap == null) {
+        val target = resolveAudio(streamSet)
+        if (target == null) {
             // The source has no audio track: there is nothing to restart, and the session is healthy
             logger.debug("$debugLabel Audio restart skipped: this source plays silently.")
             return true
         }
-        val originKnown = audioOriginKnown()
-        val at = audio.start(
-            ap, terminated, aStop,
-            contentStartNanos = offsetNanos, originKnown = originKnown,
-            startGate = null, onUnexpectedEnd = onAudioFailure,
-            catchUp = if (originKnown) AudioSink.CatchUp(offsetNanos) { clock.currentTime() } else null,
-        )
-        audioHalf = AudioHalf(ap, at, aStop)
-        logger.debug("$debugLabel Audio half restarted in place at ${offsetNanos / 1_000_000} ms.")
+        val (url, isHls) = target
+        audio.start(url, isHls, contentStartNanos = offsetNanos, onUnexpectedEnd = onAudioFailure)
+        logger.debug("$debugLabel Audio restarted in place at ${offsetNanos / 1_000_000} ms.")
         return true
     }
-
-    /** Warm-up budget for a replacement audio-track process before the switch gives up and keeps the
-     *  current track (better a stale language than indefinite silence on a dead URL). */
-    private val audioSwitchWarmupTimeoutNanos = 15_000_000_000L
 
     /** Generation counter for in-flight audio-track switches: only the newest may complete its swap,
      *  so rapid re-picks and a session [stop] (which bumps it) safely orphan older warm-ups. */
     private val audioSwitchGeneration = AtomicLong()
 
-    /** Seamless audio-track switch for seekable content: spawns new track's FFmpeg on background thread, then swaps. */
+    /** Seamless audio-track switch for seekable content: warms up the replacement natively, then swaps. */
     fun beginAudioTrackSwitch(streamSet: ActiveStreams): Boolean {
         if (!isPlaying || terminated.get() || parkFlag.get()) return false
-        if (bridgeCeilingNanos != Long.MAX_VALUE || bridgeAudio != null) return false
+        if (bridgeCeilingNanos != Long.MAX_VALUE) return false
         synchronized(switchLock) { if (incoming != null) return false }
-        val ffmpeg = FFmpegBinary.getPath() ?: return false
         val generation = audioSwitchGeneration.incrementAndGet()
-        daemon({ runAudioTrackSwitch(ffmpeg, streamSet, generation) }, "MediaPlayer-audio-switch").start()
+        daemon({ runAudioTrackSwitch(streamSet, generation) }, "MediaPlayer-audio-switch").start()
         return true
     }
 
@@ -581,136 +473,58 @@ internal class PlaybackSessionManager(
     private fun audioSwitchStillCurrent(generation: Long): Boolean =
         audioSwitchGeneration.get() == generation && !terminated.get() && isPlaying && !parkFlag.get()
 
-    /** A replacement audio line ready to promote: its process, stop flag, and where its PCM begins. */
-    private class PreparedAudioLine(
-        val process: Process,
-        val stop: AtomicBoolean,
-        val contentStartNanos: Long,
-    )
-
     /**
-     * Claims the pre-warmed line for the target track, or null when none is pooled. Its PCM starts at
-     * the position it was spawned at rather than at the playhead, which is exactly what the catch-up
-     * skip in [AudioSink.startSwitch] exists to absorb — so this only applies where that skip runs
-     * ([audioOriginKnown]); a live join anchors on its own PES PTS and must always start fresh.
+     * Claims the pre-warmed session for the target track, or null when none is pooled. Warm shadows are
+     * only kept for non-live tracks (see [audioWarmPool]'s `eligible`), matching the guard here.
      */
-    private fun takeWarmAudioLine(streamSet: ActiveStreams): PreparedAudioLine? {
-        if (!audioOriginKnown()) return null
+    private fun takeWarmAudioLine(streamSet: ActiveStreams): AudioTrackWarmPool.Warm? {
+        if (liveSession) return null
         val w = audioWarmPool.take(streamSet.currentAudio.url) ?: return null
         logger.debug(
             "$debugLabel Audio-track switch served from the warm pool " +
                     "(spawned at ${w.contentStartNanos / 1_000_000} ms)."
         )
-        return PreparedAudioLine(w.process, w.stop, w.contentStartNanos)
+        return w
     }
 
-    /** Spawns a replacement line at the playhead and waits for its first PCM, the un-warmed path. */
-    private fun coldStartAudioLine(
-        ffmpeg: String, streamSet: ActiveStreams, generation: Long,
-    ): PreparedAudioLine? {
-        val seekNanos = clock.currentTime().coerceAtLeast(0L)
-        val aStop = AtomicBoolean()
-        val ap = try {
-            buildAudioProcess(ffmpeg, streamSet, seekNanos, aStop)
-        } catch (e: IOException) {
-            logger.error("$debugLabel Failed to start replacement audio-track process.", e)
-            return null
-        } ?: return null
-        // Old track keeps playing while the replacement warms up; wait for its first stdout bytes
-        val deadline = System.nanoTime() + audioSwitchWarmupTimeoutNanos
-        var ready = false
-        while (System.nanoTime() < deadline && audioSwitchStillCurrent(generation)) {
-            try {
-                if (ap.inputStream.available() > 0) {
-                    ready = true
-                    break
-                }
-            } catch (_: IOException) {
-                break
+    /** Background body of [beginAudioTrackSwitch]: adopt a warm session, or open + prime one, then swap. */
+    private fun runAudioTrackSwitch(streamSet: ActiveStreams, generation: Long) {
+        val warm = takeWarmAudioLine(streamSet)
+        if (warm != null) {
+            if (!audioSwitchStillCurrent(generation)) {
+                NativeMedia.lavAudioKill(warm.handle)
+                NativeMedia.lavAudioClose(warm.handle)
+                onAudioTrackSwitchSettled()
+                return
             }
-            if (!ap.isAlive) break
-            try {
-                Thread.sleep(15)
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt()
-                break
-            }
-        }
-        if (!ready) {
-            aStop.set(true)
-            MediaProcess.gracefulDestroy(ap)
-            if (audioSwitchGeneration.get() == generation) {
-                logger.warn("$debugLabel Audio-track switch delivered no PCM in time; keeping the current track.")
-            }
-            return null
-        }
-        return PreparedAudioLine(ap, aStop, seekNanos)
-    }
-
-    /** Background body of [beginAudioTrackSwitch]: warm up the replacement, then swap lines. */
-    private fun runAudioTrackSwitch(ffmpeg: String, streamSet: ActiveStreams, generation: Long) {
-        val line = takeWarmAudioLine(streamSet) ?: coldStartAudioLine(ffmpeg, streamSet, generation)
-        if (line == null || !audioSwitchStillCurrent(generation)) {
-            line?.let {
-                it.stop.set(true)
-                MediaProcess.gracefulDestroy(it.process)
-            }
+            audio.adopt(warm.handle, warm.isHls, warm.contentStartNanos, onUnexpectedEnd = onAudioFailure)
+            logger.debug("$debugLabel Audio track switched seamlessly from the warm pool at ${warm.contentStartNanos / 1_000_000} ms.")
             onAudioTrackSwitchSettled()
             return
         }
-        val ap = line.process
-        val aStop = line.stop
-        val seekNanos = line.contentStartNanos
-        // Seamless swap: the replacement line pre-buffers (silent) while the OLD one keeps playing,
-        // then flips in with no audible gap (see [AudioSink.startSwitch]) — this removes the silence
-        // the old stop-then-start swap left while the new line opened and filled. A catch-up skip
-        // drops the span the new track fell behind the live clock so it joins already lip-synced. The
-        // HLS-feeder path (live) carries its own exact PES-PTS anchor instead, so no byte skip there.
-        val originKnown = audioOriginKnown()
-        val catchUp = if (originKnown) AudioSink.CatchUp(seekNanos) { clock.currentTime() } else null
-        val oldAudio = audioHalf
+        if (!audioSwitchStillCurrent(generation)) {
+            onAudioTrackSwitchSettled()
+            return
+        }
+        val target = resolveAudio(streamSet)
+        if (target == null) {
+            onAudioTrackSwitchSettled()
+            return
+        }
+        val (url, isHls) = target
+        val seekNanos = clock.currentTime().coerceAtLeast(0L)
+        // Seamless swap: the replacement session pre-buffers (paused) while the OLD one keeps playing,
+        // then flips in with no audible gap (see NativeAudioSink.startSwitch).
         audio.startSwitch(
-            ap, terminated, aStop,
-            contentStartNanos = seekNanos, originKnown = originKnown, catchUp = catchUp,
+            url, isHls, seekNanos,
             shouldPromote = { audioSwitchStillCurrent(generation) },
             onPromoted = {
-                // Runs on the switch thread the instant the new line goes live: take ownership and
-                // retire the old half. The promoted line publishes its own content origin, so the
-                // master clock picks the new session up exactly, with no anchoring guess.
-                audioHalf = AudioHalf(ap, Thread.currentThread(), aStop)
-                oldAudio?.stop?.set(true)
-                discardHalvesAsync(null, oldAudio)
                 logger.debug("$debugLabel Audio track switched seamlessly at ${seekNanos / 1_000_000} ms.")
-                // A stop() that raced the warm-up couldn't know this half yet: honor it retroactively
-                if (terminated.get() || !isPlaying) {
-                    aStop.set(true)
-                    audio.stop()
-                    MediaProcess.gracefulDestroy(ap)
-                }
                 onAudioTrackSwitchSettled()
             },
-            onAborted = {
-                // The replacement never went live; keep the current track and drop the new process
-                aStop.set(true)
-                MediaProcess.gracefulDestroy(ap)
-                onAudioTrackSwitchSettled()
-            },
+            onAborted = { onAudioTrackSwitchSettled() },
             onUnexpectedEnd = onAudioFailure,
         )
-    }
-
-    /** Dismantles a superseded video channel and / or audio half on a background thread. */
-    private fun discardHalvesAsync(video: VideoChannel?, audioHalf: AudioHalf?) {
-        daemon({
-            audioHalf?.let {
-                MediaProcess.gracefulDestroy(it.process)
-                joinSafely(it.thread)
-            }
-            video?.let { ch ->
-                ch.teardownProcess()
-                renderExecutor.execute { ch.pipe.cleanup() }
-            }
-        }, "MediaPlayer-session-discard").start()
     }
 
     /** Starts cached replay video alone (no audio, no network) so reappearing display shows frames instantly. */
@@ -718,7 +532,9 @@ internal class PlaybackSessionManager(
         snapshot: ByteArray,
         resumeNanos: Long,
         liveEdgeNanos: Long,
-        audioPcm: ByteArray?
+        audioPcm: ByteArray?,
+        audioSampleRate: Int,
+        audioChannels: Int,
     ): Boolean {
         stop()
         if (terminated.get()) return false
@@ -742,14 +558,11 @@ internal class PlaybackSessionManager(
         ) ?: run { bridgeCeilingNanos = Long.MAX_VALUE; return false }
         channel.thread = vt
         active = channel
-        // Open the single bridge line now and play the cached audio window on it; the live PCM is later
-        // attached to this very line ([attachLiveAfterReplay]) so the cached -> live seam is continuous.
-        if (audioPcm != null && audioPcm.size >= AudioSink.BYTES_PER_FRAME) {
-            val aStop = AtomicBoolean()
-            val at = audio.startBridge(
-                audioPcm, liveEdgeNanos, terminated, aStop, onUnexpectedEnd = onAudioFailure,
-            )
-            bridgeAudio = AudioHalf(null, at, aStop)
+        // Open the single bridge session now and play the cached audio window on it; the live PCM is
+        // later attached to this very session ([attachLiveAfterReplay]) so the cached -> live seam is
+        // continuous.
+        if (audioPcm != null && audioPcm.isNotEmpty() && audioChannels > 0 && audioSampleRate > 0) {
+            audio.startBridge(audioPcm, audioSampleRate, audioChannels, liveEdgeNanos, onUnexpectedEnd = onAudioFailure)
         }
         updateRawFrameSink()
         isPlaying = true
@@ -795,9 +608,10 @@ internal class PlaybackSessionManager(
                 onFirstFrame = {
                     // Live reached the edge: re-anchor the clock there (matching the audio offset), lift the
                     // bridge clamp, then open the live audio gate. The cached bridge audio is not stopped here
-                    // — it streams the live PCM straight on, on its own line, so the audio seam is continuous.
+                    // — it streams the live PCM straight on, on its own native session, so the audio seam is
+                    // continuous.
                     clock.rebaseTo(liveOffsetNanos)
-                    audio.onBridgeHandoff() // Let the bridge line's (live-relative) clock drive pacing now
+                    audio.onBridgeHandoff() // Let the bridge session's (live-relative) clock drive pacing now
                     bridgeCeilingNanos = Long.MAX_VALUE
                     firstLiveFrame.countDown()
                     logger.debug(
@@ -818,37 +632,22 @@ internal class PlaybackSessionManager(
             )
 
             val audioUrl = streamSet.currentAudio.url
-            val ap =
-                if (audioUrl in SILENT_SOURCES) null
-                else MediaProcess.buildAudio(
-                    ffmpeg, audioUrl, liveOffsetNanos, AudioSink.SAMPLE_RATE,
-                    seekByDecoding = streamSet.currentAudio.seekByDecoding,
-                )
-            // This path builds its process directly rather than through buildAudioProcess, so the
-            // previous session's feeder would otherwise linger and be consulted for A / V anchoring.
-            audioFeeder = null
-            silentSession = ap == null
-            val bridge = bridgeAudio
-            if (ap == null) {
-                // Silent source: nothing to bridge into, so retire the (silent) prelude line
-                bridge?.stop?.set(true)
-                bridgeAudio = null
-                audioHalf = null
-            } else if (bridge != null) {
-                // Cached prelude is playing on the bridge line: feed the live PCM to that same line, so it
-                // continues sample-continuously off the prelude (no gate, no flush, no second line).
-                audio.provideLiveInput(ap, bridge.stop)
-                audioHalf = AudioHalf(ap, bridge.thread, bridge.stop)
-                bridgeAudio = null
+            silentSession = audioUrl in SILENT_SOURCES
+            if (silentSession) {
+                // Silent source: nothing to bridge into, so retire the (silent) prelude session
+                audio.stop()
             } else {
-                // No cached prelude: live audio joins at the edge, gated on the first live frame (as in start()).
-                val aStop = AtomicBoolean()
-                val at = audio.start(
-                    ap, terminated, aStop,
-                    contentStartNanos = liveOffsetNanos, originKnown = true,
-                    startGate = firstLiveFrame, onUnexpectedEnd = onAudioFailure,
-                )
-                audioHalf = AudioHalf(ap, at, aStop)
+                // Whether or not a cached prelude is still playing, provideLiveInput hands the live URL
+                // to whatever native session is current: a bridge session continues on it sample-
+                // continuously (no gate, no flush, no second session); if there was no prelude, this is
+                // a no-op and the fallback below opens a fresh, gated session instead.
+                if (!audio.provideLiveInput(audioUrl)) {
+                    val at = audio.start(
+                        audioUrl, isHls = false, contentStartNanos = liveOffsetNanos,
+                        startGate = firstLiveFrame, onUnexpectedEnd = onAudioFailure,
+                    )
+                    if (!at) logger.warn("$debugLabel [reappear] failed to open live audio after replay.")
+                }
             }
 
             if (terminated.get()) {
@@ -891,22 +690,21 @@ internal class PlaybackSessionManager(
 
     /**
      * Whether this session can be parked warm for out-of-render-distance dormancy: steady
-     * in-process-libav playback only, since a dormant pool member should not keep an external
-     * `FFmpeg` process and its connection tied up for an unbounded time.
+     * in-process-libav playback only, since a dormant pool member should not keep a decode session
+     * tied up for an unbounded time.
      */
     fun canPark(): Boolean = canHoldWarm() && active?.inProcess == true
 
     /** Whether the session can hold its position warm at all: something is playing, and no replay bridge or quality switch is currently in flight. */
     private fun canHoldWarm(): Boolean =
         isPlaying && !terminated.get() && active != null &&
-                bridgeCeilingNanos == Long.MAX_VALUE && incoming == null &&
-                (audioHalf != null || silentSession)
+                bridgeCeilingNanos == Long.MAX_VALUE && incoming == null
 
-    /** Parks live session: reader threads idle in place (decoder + audio line stay open, position frozen). */
+    /** Parks live session: reader threads idle in place (decoder + audio session stay open, position frozen). */
     fun suspend(allowExternalProcess: Boolean = false): Boolean {
         if (!(if (allowExternalProcess) canHoldWarm() else canPark()) || parkFlag.get()) return false
         parkFlag.set(true)
-        // Nothing may switch tracks while dormant, so holding idle FFmpeg processes would be pure cost.
+        // Nothing may switch tracks while dormant, so holding idle sessions would be pure cost.
         audioWarmPool.invalidateAll()
         audio.pauseForPark()
         active?.pipe?.trimForPark()
@@ -934,9 +732,10 @@ internal class PlaybackSessionManager(
     fun parkedPositionNanos(): Long? = frozenPositionNanos.takeIf { parkFlag.get() && it >= 0 }
 
     /** Captures up to [maxNanos] of recently played PCM for the reappearance audio bridge, or null. */
-    fun captureAudioPcm(maxNanos: Long): ByteArray? {
-        val maxBytes = (maxNanos / 1_000_000_000.0 * AudioSink.SAMPLE_RATE * AudioSink.BYTES_PER_FRAME).toInt()
-        return audio.snapshotPcm(maxBytes).takeIf { it.isNotEmpty() }
+    fun captureAudioPcm(maxNanos: Long): NativeMedia.PcmSnapshot? {
+        val guessRate = 48_000 // Upper-bound guess; snapshotPcm's own device format governs the actual count.
+        val maxBytes = (maxNanos / 1_000_000_000.0 * guessRate * 2 * 4).toInt()
+        return audio.snapshotPcm(maxBytes)?.takeIf { it.pcm.isNotEmpty() }
     }
 
     /**
@@ -951,20 +750,11 @@ internal class PlaybackSessionManager(
         // overruns the handoff point (otherwise the live channel's first frame arrives "late" and is
         // dropped instead of presented, and the audio gate never opens).
         val wall = if (clock.isRunning) clock.currentTime().coerceAtMost(bridgeCeilingNanos) else -1L
-        return masterClock.nanos(audio.sampleClock(), wall, parkFlag.get(), ::exactAvBiasNanos)
+        return masterClock.nanos(audio.sampleClock(), wall, parkFlag.get()) { null }
     }
 
     /** The position playback is actually at, for callers that need to freeze or save it. */
     fun currentPacingNanos(): Long = pacingClockNanos()
-
-    /** Exact audio-vs-video offset from shared PTS: audio feeder's first PES PTS minus video first raw PTS. */
-    private fun exactAvBiasNanos(): Long? {
-        val a0 = audioFeeder?.firstPtsNanos ?: return null
-        if (a0 < 0) return null
-        val r0 = active?.nativePipe?.firstRawPtsNanos ?: return null
-        if (r0 == Long.MIN_VALUE) return null
-        return a0 - r0
-    }
 
     /** Resolves the decode dimensions: the current/target texture size when known, else from quality. */
     private fun targetDims(streamSet: ActiveStreams?, lastQuality: Int = 0): Pair<Int, Int> {
@@ -1115,19 +905,15 @@ internal class PlaybackSessionManager(
     }
 
     /**
-     * Signals all stop flags, destroys the `FFmpeg` processes, closes the audio line, and joins the
-     * reader threads. Tears down any in-flight quality switch too. Safe to call when idle.
+     * Signals all stop flags, closes the native audio session, and joins the video reader threads.
+     * Tears down any in-flight quality switch too. Safe to call when idle.
      */
     fun stop() {
         isPlaying = false
         audioWarmPool.invalidateAll()
         bridgeCeilingNanos = Long.MAX_VALUE
-        audioFeeder = null
         masterClock.reset()
         parkFlag.set(false) // Release any parked readers so they observe the stop flags and exit
-        // A reappearance bridge whose live process never attached: flag it; audio.stop() below releases the
-        // line and the pending live-input gate, and the thread is joined at the end.
-        bridgeAudio?.stop?.set(true)
         val inc = synchronized(switchLock) {
             incomingGeneration += 1
             incoming.also { incoming = null }
@@ -1136,29 +922,24 @@ internal class PlaybackSessionManager(
 
         val a = active
         active = null
-        audioHalf?.stop?.set(true)
         a?.let { it.stop.set(true); it.nativePipe?.kill() }
-        audioHalf?.let { MediaProcess.gracefulDestroy(it.process) }
-        audio.stop()
+        audio.stop() // Releases a pending bridge live-input gate too; blocks until the decode thread joins
         a?.let {
             MediaProcess.gracefulDestroy(it.process)
             it.thread?.let { t -> joinSafely(t) }
             it.nativePipe?.release()
             renderExecutor.execute { it.pipe.cleanup() }
         }
-        audioHalf?.thread?.let { joinSafely(it) }
-        audioHalf = null
-        // Join a still-pending bridge thread (live never attached, so it never moved into audioHalf)
-        bridgeAudio?.thread?.let { joinSafely(it) }
-        bridgeAudio = null
     }
 
     /**
-     * Releases any remaining pipe GL resources. Called once when this session manager is permanently
-     * discarded (the owning `MediaPlayer` is stopping for good). [stop] normally clears channels first.
+     * Releases any remaining pipe GL resources and stops the audio watcher thread. Called once when
+     * this session manager is permanently discarded (the owning `MediaPlayer` is stopping for good).
+     * [stop] normally clears channels first.
      */
     fun cleanup() {
         audioWarmPool.close()
+        audio.close()
         synchronized(switchLock) { incoming.also { incoming = null } }?.let { discardChannelBlocking(it) }
         active?.let { ch ->
             active = null

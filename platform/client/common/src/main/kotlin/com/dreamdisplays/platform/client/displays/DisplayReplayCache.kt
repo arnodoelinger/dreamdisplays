@@ -20,12 +20,15 @@ internal object DisplayReplayCache {
     /** Maximum allowed difference between requested and actual replay position. */
     private const val POSITION_TOLERANCE_NS = 1_000_000_000L
 
-    /** One retained replay snapshot: the encoded video bytes, optional audio PCM, and resolved streams. */
+    /** One retained replay snapshot: the encoded video bytes, optional audio PCM, and resolved streams.
+     *  [audioSampleRate] / [audioChannels] describe [audioPcm]'s raw interleaved f32 format. */
     private data class Entry(
         val url: String,
         val positionNanos: Long,
         val snapshot: ByteArray,
         val audioPcm: ByteArray?,
+        val audioSampleRate: Int,
+        val audioChannels: Int,
         val prepared: PreparedMedia?,
     )
 
@@ -54,10 +57,12 @@ internal object DisplayReplayCache {
         positionNanos: Long,
         snapshot: ByteArray,
         audioPcm: ByteArray?,
+        audioSampleRate: Int,
+        audioChannels: Int,
         prepared: PreparedMedia?
     ) {
         if (snapshot.isEmpty() || !cacheEnabled) return
-        entries.put(uuid, Entry(url, positionNanos, snapshot, audioPcm, prepared))
+        entries.put(uuid, Entry(url, positionNanos, snapshot, audioPcm, audioSampleRate, audioChannels, prepared))
         entries.cleanUp()
     }
 
@@ -68,8 +73,9 @@ internal object DisplayReplayCache {
         if (entry.url != url || abs(entry.positionNanos - positionNanos) > POSITION_TOLERANCE_NS) {
             return null
         }
-        return MediaPlayer.ReplayBootstrap(entry.snapshot, entry.positionNanos, entry.audioPcm)
-            .also { it.prepared = entry.prepared }
+        return MediaPlayer.ReplayBootstrap(
+            entry.snapshot, entry.positionNanos, entry.audioPcm, entry.audioSampleRate, entry.audioChannels,
+        ).also { it.prepared = entry.prepared }
     }
 
     /** Total retained bytes for an entry (video snapshot + optional cached audio PCM). */

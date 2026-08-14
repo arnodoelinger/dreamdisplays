@@ -139,35 +139,6 @@ object MediaProcess {
     }
 
     /**
-     * Builds an `FFmpeg` process to read audio samples from [url] at the given [offsetNanos], resampled to [sampleRate] Hz.
-     * @throws IOException if the process fails to start. The caller is responsible for destroying the process when done.
-     */
-    @Throws(IOException::class)
-    fun buildAudio(
-        ffmpeg: String, url: String, offsetNanos: Long, sampleRate: Int, seekByDecoding: Boolean = false,
-    ): Process {
-        val cmd = baseCommand(
-            ffmpeg, url, offsetNanos, HwAccelBackend.NONE, seekByDecoding = seekByDecoding,
-        ).apply {
-            addAll(listOf("-vn", "-f", "s16le", "-ar", sampleRate.toString(), "-ac", "2", "-"))
-        }
-        return ProcessBuilder(cmd).start()
-    }
-
-    /** Builds `FFmpeg` process that decodes audio from MPEG-TS piped to stdin. */
-    @Throws(IOException::class)
-    fun buildAudioPiped(ffmpeg: String, sampleRate: Int): Process {
-        val cmd = listOf(
-            ffmpeg,
-            "-hide_banner", "-loglevel", "error", "-nostats",
-            "-probesize", "1M", "-analyzeduration", "1000000",
-            "-f", "mpegts", "-i", "pipe:0",
-            "-vn", "-f", "s16le", "-ar", sampleRate.toString(), "-ac", "2", "-",
-        )
-        return ProcessBuilder(cmd).start()
-    }
-
-    /**
      * Closes the process's output stream and destroys it. Waits up to 1 second for graceful termination, then forcibly destroys if needed.
      * Safe to call multiple times or from any thread. Does nothing if [proc] is null.
      */

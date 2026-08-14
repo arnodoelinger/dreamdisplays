@@ -2,6 +2,9 @@
 
 package com.dreamdisplays.media.player.nativebridge
 
+import com.dreamdisplays.api.media.audio.AcousticQuality
+import com.dreamdisplays.api.media.audio.ListenerPose
+import com.dreamdisplays.api.media.audio.SourceAcousticState
 import com.dreamdisplays.util.OsInfo
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -32,7 +35,10 @@ object NativeMedia {
     private const val LIB_BASE_NAME = "dreamdisplays_native"
     private const val LAV_BASE_NAME = "dreamdisplays_lav"
     private const val LAV_SURFACE_ABI_VERSION = 1
+    private const val LAV_AUDIO_ABI_VERSION = 1
     private const val LAV_SURFACE_DESC_BYTES = 80L
+    private const val ACOUSTIC_STATE_BYTES = 112L
+    private const val LISTENER_POSE_BYTES = 72L
     private const val CACHE_ROOT = "./dreamdisplays/native"
     private const val STDERR_CAP = 128L * 1024L
 
@@ -62,6 +68,23 @@ object NativeMedia {
     private var lavReadSurfaceHandle: MethodHandle? = null
     private var lavBindSurfacePlaneGlHandle: MethodHandle? = null
     private var lavReleaseSurfaceHandle: MethodHandle? = null
+    private var lavAudioOpenHandle: MethodHandle? = null
+    private var lavAudioOpenHlsHandle: MethodHandle? = null
+    private var lavAudioSeekHandle: MethodHandle? = null
+    private var lavAudioSetVolumeHandle: MethodHandle? = null
+    private var lavAudioPauseHandle: MethodHandle? = null
+    private var lavAudioResumeHandle: MethodHandle? = null
+    private var lavAudioPositionNanosHandle: MethodHandle? = null
+    private var lavAudioErrorHandle: MethodHandle? = null
+    private var lavAudioKillHandle: MethodHandle? = null
+    private var lavAudioCloseHandle: MethodHandle? = null
+    private var lavAudioOpenBridgeHandle: MethodHandle? = null
+    private var lavAudioProvideLiveHandle: MethodHandle? = null
+    private var lavAudioSnapshotPcmHandle: MethodHandle? = null
+    private var lavAudioSetListenerHandle: MethodHandle? = null
+    private var lavAudioSetQualityHandle: MethodHandle? = null
+    private var lavAudioSetBinauralHandle: MethodHandle? = null
+    private var lavAudioSetAcousticsHandle: MethodHandle? = null
     private var videoStderr: MethodHandle? = null
     private var videoExitCode: MethodHandle? = null
     private var videoKill: MethodHandle? = null
@@ -120,6 +143,17 @@ object NativeMedia {
                 && lavOpenReplayHandle != null
                 && lavEnableCacheHandle != null
                 && lavRingSnapshotAtHandle != null
+
+    /**
+     * True when `dreamdisplays_lav` exports the additive audio ABI: in-process audio decode +
+     * `cpal` playback, replacing the external `ffmpeg`-process audio path entirely.
+     */
+    val lavAudioAvailable: Boolean
+        get() = lavAvailable
+                && lavAudioOpenHandle != null
+                && lavAudioSeekHandle != null
+                && lavAudioPositionNanosHandle != null
+                && lavAudioCloseHandle != null
 
     data class LavSurfaceDescriptor(
         val handle: Long,
@@ -306,6 +340,209 @@ object NativeMedia {
         lavCloseHandle!!.invoke(handle)
     }
 
+    /**
+     * Opens an in-process audio session for [url]: decode AND `cpal` playback both start
+     * immediately on the native side (returns a handle, or 0 on failure). No PCM ever crosses
+     * back into the JVM; see [lavAudioPositionNanos] for the playback clock.
+     */
+    fun lavAudioOpen(url: String, startMicros: Long): Long {
+        val open = lavAudioOpenHandle ?: return 0L
+        val bytes = url.toByteArray(Charsets.UTF_8)
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(bytes.size.toLong())
+            MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
+            return open.invoke(seg, bytes.size.toLong(), startMicros) as Long
+        }
+    }
+
+    /**
+     * Opens an in-process HLS (VOD or live, fMP4-safe) audio session decoded segment-by-segment,
+     * starting [startNanos] into the playlist. Returns a handle, or 0 on failure.
+     */
+    fun lavAudioOpenHls(playlistUrl: String, startNanos: Long): Long {
+        val openHls = lavAudioOpenHlsHandle ?: return 0L
+        val bytes = playlistUrl.toByteArray(Charsets.UTF_8)
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(bytes.size.toLong())
+            MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
+            return openHls.invoke(seg, bytes.size.toLong(), startNanos) as Long
+        }
+    }
+
+    /**
+     * Repositions an audio [handle]. For a direct-URL session [target] is `AV_TIME_BASE`
+     * microseconds; for an HLS session it is nanoseconds into the playlist (picks a different
+     * starting segment rather than asking a demuxer to seek). Asynchronous: lands on the decode
+     * thread's next loop iteration.
+     */
+    fun lavAudioSeek(handle: Long, target: Long): Boolean {
+        val seek = lavAudioSeekHandle ?: return false
+        return (seek.invoke(handle, target) as Int) == READ_OK
+    }
+
+    /** Sets linear playback gain (0.0 = silent, 1.0 = unity); applied in the real-time callback. */
+    fun lavAudioSetVolume(handle: Long, volume: Float) {
+        lavAudioSetVolumeHandle?.invoke(handle, volume)
+    }
+
+    /** Pauses the output stream without closing it or losing decode progress. */
+    fun lavAudioPause(handle: Long) {
+        lavAudioPauseHandle?.invoke(handle)
+    }
+
+    /** Resumes an audio session paused via [lavAudioPause]. */
+    fun lavAudioResume(handle: Long) {
+        lavAudioResumeHandle?.invoke(handle)
+    }
+
+    /**
+     * Playback position in nanoseconds, derived from frames actually handed to the output device
+     * (silence included) — the clock [com.dreamdisplays.media.player.pipeline.AudioMasterClock]
+     * reads to pace video.
+     */
+    fun lavAudioPositionNanos(handle: Long): Long =
+        (lavAudioPositionNanosHandle?.invoke(handle) as? Long) ?: -1L
+
+    /** Returns the audio session's last error description, or an empty string. */
+    fun lavAudioError(handle: Long): String {
+        val error = lavAudioErrorHandle ?: return ""
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(STDERR_CAP)
+            val n = error.invoke(handle, seg, STDERR_CAP) as Int
+            if (n <= 0) return ""
+            val bytes = ByteArray(n)
+            MemorySegment.copy(seg, 0L, MemorySegment.ofArray(bytes), 0L, n.toLong())
+            return String(bytes, Charsets.UTF_8)
+        }
+    }
+
+    /** Interrupts the audio session's decode loop, unblocking a reader stuck on a network read. */
+    fun lavAudioKill(handle: Long) {
+        lavAudioKillHandle?.invoke(handle)
+    }
+
+    /**
+     * Frees the audio session: stops the output stream, signals the decode thread to exit, and
+     * joins it before returning (blocking; do not call from a real-time thread).
+     */
+    fun lavAudioClose(handle: Long) {
+        lavAudioCloseHandle?.invoke(handle)
+    }
+
+    /** Result of [lavAudioSnapshotPcm]: raw interleaved PCM plus the format it was captured at. */
+    data class PcmSnapshot(val pcm: ByteArray, val sampleRate: Int, val channels: Int)
+
+    /**
+     * Opens a reappearance bridge: plays [prelude] (raw interleaved f32 PCM at [preludeSampleRate]/
+     * [preludeChannels], typically from a prior [lavAudioSnapshotPcm]) immediately, then blocks on
+     * the native side waiting for [lavAudioProvideLive] to supply a URL and continues decoding it
+     * on the same session — sample-continuous, same acoustics chain state. Returns a handle, or 0
+     * on failure.
+     */
+    fun lavAudioOpenBridge(prelude: ByteArray, preludeSampleRate: Int, preludeChannels: Int, liveEdgeNanos: Long): Long {
+        val openBridge = lavAudioOpenBridgeHandle ?: return 0L
+        Arena.ofConfined().use { arena ->
+            val seg = if (prelude.isEmpty()) MemorySegment.NULL else arena.allocate(prelude.size.toLong())
+            if (prelude.isNotEmpty()) MemorySegment.copy(MemorySegment.ofArray(prelude), 0L, seg, 0L, prelude.size.toLong())
+            return openBridge.invoke(seg, prelude.size.toLong(), preludeSampleRate, preludeChannels, liveEdgeNanos) as Long
+        }
+    }
+
+    /** Supplies a bridge session's live URL once known, unblocking [lavAudioOpenBridge]'s wait. */
+    fun lavAudioProvideLive(handle: Long, url: String): Boolean {
+        val provideLive = lavAudioProvideLiveHandle ?: return false
+        val bytes = url.toByteArray(Charsets.UTF_8)
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(bytes.size.toLong())
+            MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
+            return (provideLive.invoke(handle, seg, bytes.size.toLong()) as Int) == READ_OK
+        }
+    }
+
+    /**
+     * Returns up to [maxBytes] of [handle]'s raw (pre-DSP, pre-volume) interleaved PCM cache —
+     * the reappearance bridge's prelude source — or null when unavailable. The returned
+     * [PcmSnapshot.sampleRate]/[PcmSnapshot.channels] must be threaded back into a later
+     * [lavAudioOpenBridge] call, since the default output device (and so the capture format) is
+     * not guaranteed to stay the same across a reappearance gap.
+     */
+    fun lavAudioSnapshotPcm(handle: Long, maxBytes: Int): PcmSnapshot? {
+        val snapshot = lavAudioSnapshotPcmHandle ?: return null
+        if (maxBytes <= 0) return null
+        Arena.ofConfined().use { arena ->
+            val dst = arena.allocate(maxBytes.toLong())
+            val sampleRateSeg = arena.allocate(ValueLayout.JAVA_INT)
+            val channelsSeg = arena.allocate(ValueLayout.JAVA_INT)
+            val n = snapshot.invoke(handle, dst, maxBytes.toLong(), sampleRateSeg, channelsSeg) as Int
+            if (n <= 0) return null
+            val out = ByteArray(n)
+            MemorySegment.copy(dst, 0L, MemorySegment.ofArray(out), 0L, n.toLong())
+            return PcmSnapshot(out, sampleRateSeg.get(ValueLayout.JAVA_INT, 0L), channelsSeg.get(ValueLayout.JAVA_INT, 0L))
+        }
+    }
+
+    /** Publishes the listener's current world pose, shared by every audio session's acoustics chain. */
+    fun lavAudioSetListener(pose: ListenerPose) {
+        val setListener = lavAudioSetListenerHandle ?: return
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(LISTENER_POSE_BYTES)
+            var off = 0L
+            for (v in doubleArrayOf(
+                pose.x, pose.y, pose.z,
+                pose.forwardX, pose.forwardY, pose.forwardZ,
+                pose.upX, pose.upY, pose.upZ,
+            )) {
+                seg.set(ValueLayout.JAVA_DOUBLE, off, v); off += 8L
+            }
+            setListener.invoke(seg)
+        }
+    }
+
+    /** Sets the global acoustics quality ceiling for every audio session's chain. */
+    fun lavAudioSetQuality(quality: AcousticQuality) {
+        lavAudioSetQualityHandle?.invoke(quality.ordinal)
+    }
+
+    /** Selects binaural (headphone) rendering vs. constant-power stereo pan for every acoustics-active session. */
+    fun lavAudioSetBinaural(enabled: Boolean) {
+        lavAudioSetBinauralHandle?.invoke(if (enabled) 1 else 0)
+    }
+
+    /**
+     * Publishes the latest geometry / mix state for [handle]'s acoustics chain, or clears it back to
+     * the legacy-gain bypass when [state] is null.
+     */
+    fun lavAudioSetAcoustics(handle: Long, state: SourceAcousticState?) {
+        val setAcoustics = lavAudioSetAcousticsHandle ?: return
+        if (state == null) {
+            setAcoustics.invoke(handle, MemorySegment.NULL)
+            return
+        }
+        Arena.ofConfined().use { arena ->
+            val seg = arena.allocate(ACOUSTIC_STATE_BYTES)
+            val plane = state.plane
+            var off = 0L
+            for (v in doubleArrayOf(
+                plane.centerX, plane.centerY, plane.centerZ,
+                plane.normalX, plane.normalY, plane.normalZ,
+                plane.uAxisX, plane.uAxisY, plane.uAxisZ,
+                plane.width, plane.height,
+            )) {
+                seg.set(ValueLayout.JAVA_DOUBLE, off, v); off += 8L
+            }
+            seg.set(ValueLayout.JAVA_FLOAT, off, state.userVolume); off += 4L
+            seg.set(ValueLayout.JAVA_BYTE, off, if (state.muted) 1 else 0); off += 1L
+            seg.set(ValueLayout.JAVA_BYTE, off, if (state.bypassSpatial) 1 else 0); off += 1L
+            seg.set(ValueLayout.JAVA_BYTE, off, if (state.acousticsEnabled) 1 else 0); off += 1L
+            seg.set(ValueLayout.JAVA_BYTE, off, 0); off += 1L // padding
+            val env = state.environment
+            for (v in floatArrayOf(env.occlusion, env.reverbDecaySeconds, env.reverbWetGain, env.reverbDamping)) {
+                seg.set(ValueLayout.JAVA_FLOAT, off, v); off += 4L
+            }
+            setAcoustics.invoke(handle, seg)
+        }
+    }
+
     /** Returns the FFmpeg stderr captured so far for [handle] (capped at 128 KiB). */
     fun videoStderr(handle: Long): String {
         Arena.ofConfined().use { arena ->
@@ -471,7 +708,35 @@ object NativeMedia {
             val replayCache = lavOpenReplayHandle != null
                     && lavEnableCacheHandle != null
                     && lavRingSnapshotAtHandle != null
-            logger.info("In-process libav backend available: $lib (surfaceInterop=$surfaceInterop, replayCache=$replayCache).")
+
+            val audioAbi = bindOptional("dd_lav_audio_abi_version", FunctionDescriptor.of(int))
+            if (audioAbi != null && audioAbi.invoke() as Int == LAV_AUDIO_ABI_VERSION) {
+                lavAudioOpenHandle = bindOptional("dd_lav_audio_open", FunctionDescriptor.of(long, addr, long, long))
+                lavAudioOpenHlsHandle = bindOptional("dd_lav_audio_open_hls", FunctionDescriptor.of(long, addr, long, long))
+                lavAudioSeekHandle = bindOptional("dd_lav_audio_seek", FunctionDescriptor.of(int, long, long))
+                lavAudioSetVolumeHandle = bindOptional("dd_lav_audio_set_volume", FunctionDescriptor.of(int, long, ValueLayout.JAVA_FLOAT))
+                lavAudioPauseHandle = bindOptional("dd_lav_audio_pause", FunctionDescriptor.of(int, long))
+                lavAudioResumeHandle = bindOptional("dd_lav_audio_resume", FunctionDescriptor.of(int, long))
+                lavAudioPositionNanosHandle = bindOptional("dd_lav_audio_position_nanos", FunctionDescriptor.of(long, long))
+                lavAudioErrorHandle = bindOptional("dd_lav_audio_error", FunctionDescriptor.of(int, long, addr, long))
+                lavAudioKillHandle = bindOptional("dd_lav_audio_kill", FunctionDescriptor.ofVoid(long))
+                lavAudioCloseHandle = bindOptional("dd_lav_audio_close", FunctionDescriptor.ofVoid(long))
+                lavAudioOpenBridgeHandle = bindOptional("dd_lav_audio_open_bridge", FunctionDescriptor.of(long, addr, long, int, int, long))
+                lavAudioProvideLiveHandle = bindOptional("dd_lav_audio_provide_live", FunctionDescriptor.of(int, long, addr, long))
+                lavAudioSnapshotPcmHandle = bindOptional("dd_lav_audio_snapshot_pcm", FunctionDescriptor.of(int, long, addr, long, addr, addr))
+                lavAudioSetListenerHandle = bindOptional("dd_lav_audio_set_listener", FunctionDescriptor.ofVoid(addr))
+                lavAudioSetQualityHandle = bindOptional("dd_lav_audio_set_quality", FunctionDescriptor.ofVoid(int))
+                lavAudioSetBinauralHandle = bindOptional("dd_lav_audio_set_binaural", FunctionDescriptor.ofVoid(int))
+                lavAudioSetAcousticsHandle = bindOptional("dd_lav_audio_set_acoustics", FunctionDescriptor.of(int, long, addr))
+            }
+            val audioAvailable = lavAudioOpenHandle != null
+                    && lavAudioSeekHandle != null
+                    && lavAudioPositionNanosHandle != null
+                    && lavAudioCloseHandle != null
+            logger.info(
+                "In-process libav backend available: $lib " +
+                        "(surfaceInterop=$surfaceInterop, replayCache=$replayCache, audio=$audioAvailable)."
+            )
             true
         } catch (t: Throwable) {
             // Typically UnsatisfiedLinkError when the system FFmpeg dylibs are missing.

@@ -1,6 +1,6 @@
 [package]
 name = "dreamdisplays-lav"
-version = "1.1.5"
+version = "1.2.0"
 edition = "2024"
 authors = ["arnodoelinger"]
 description = "In-process libav decode backend for Dream Displays."
@@ -12,6 +12,10 @@ crate-type = ["cdylib", "lib"]
 
 [dependencies]
 anyhow = "1.0.103"
+cpal = "0.18.1"
 dreamdisplays-logging = { path = "../logging" }
 ffmpeg-next = { version = "8.1.0", default-features = false, features = ["codec", "format", "software-scaling", "software-resampling"] }
 log = "0.4.33"
+rtrb = "0.3.4"
+ureq = "3.4.0"
+url = "2.5.8"

@@ -262,7 +262,7 @@ jobs:
         run: |
           set -euo pipefail
           sudo apt-get update
-          sudo apt-get install -y clang libclang-dev patchelf pkg-config xz-utils curl
+          sudo apt-get install -y clang libclang-dev patchelf pkg-config xz-utils curl libasound2-dev
           case "${{ matrix.native.target }}" in
             x86_64-*) ffmpeg_arch=linux64 ;;
             aarch64-*) ffmpeg_arch=linuxarm64 ;;

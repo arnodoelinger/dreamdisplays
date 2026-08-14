@@ -3,8 +3,8 @@ package com.dreamdisplays.media.player.pipeline
 import org.slf4j.LoggerFactory
 
 /**
- * Turns [AudioSink]'s per-session line clock into the single master clock every video pipe paces
- * against.
+ * Turns [NativeAudioSink]'s per-session native clock into the single master clock every video pipe
+ * paces against.
  */
 internal class AudioMasterClock(
     /** Debug label. */
@@ -22,7 +22,7 @@ internal class AudioMasterClock(
     private val logger = LoggerFactory.getLogger("DreamDisplays/AudioMasterClock")
 
     private companion object {
-        /** No epoch seen yet ([AudioSink] epochs start at 1). */
+        /** No epoch seen yet ([NativeAudioSink] epochs start at 1). */
         const val NO_EPOCH = 0
 
         /**
@@ -55,7 +55,7 @@ internal class AudioMasterClock(
 
     private val lock = Any()
 
-    /** [AudioSink.ClockSample.epoch] the current anchor was computed for. */
+    /** [NativeAudioSink.ClockSample.epoch] the current anchor was computed for. */
     private var epoch = NO_EPOCH
 
     /** Offset added to the raw line clock to put it on the video timeline; 0 for a known origin. */
@@ -88,7 +88,7 @@ internal class AudioMasterClock(
      * jumps backwards or stalls. The caller must hold [lock] while calling this.
      */
     fun nanos(
-        sample: AudioSink.ClockSample,
+        sample: NativeAudioSink.ClockSample,
         wallNanos: Long,
         suspended: Boolean,
         exactBias: () -> Long?,
@@ -128,7 +128,7 @@ internal class AudioMasterClock(
     }
 
     /** Starts driving the clock from wall time because it has stopped moving on its own. Caller holds [lock]. */
-    private fun beginTakeover(sample: AudioSink.ClockSample, now: Long) {
+    private fun beginTakeover(sample: NativeAudioSink.ClockSample, now: Long) {
         val stalledForMs = (now - lastOutAdvanceNanos) / 1_000_000
         takeover = true
         takeoverAnchorWall = now
@@ -141,7 +141,7 @@ internal class AudioMasterClock(
     }
 
     /** Leaves the wall-time takeover now that the line clock is moving again. Caller holds [lock]. */
-    private fun reconcileTakeover(sample: AudioSink.ClockSample, now: Long) {
+    private fun reconcileTakeover(sample: NativeAudioSink.ClockSample, now: Long) {
         val ramp = takeoverAnchorOut + (now - takeoverAnchorWall)
         val behind = ramp - (sample.nanos + bias)
         if (behind <= MIN_RESYNC_NANOS) {
@@ -177,7 +177,7 @@ internal class AudioMasterClock(
 
     /** Computes the anchor for a freshly observed audio session. Caller holds [lock]. */
     private fun beginEpoch(
-        sample: AudioSink.ClockSample,
+        sample: NativeAudioSink.ClockSample,
         wallNanos: Long,
         exactBias: () -> Long?,
         now: Long,

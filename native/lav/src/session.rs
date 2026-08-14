@@ -37,12 +37,12 @@ pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
 pub const NO_PTS_NANOS: i64 = i64::MIN;
 
-const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
+pub(crate) const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
                           (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /// Some CDNs 403 a correct URL unless `Referer` matches their own site (seen on Bilibili's
 /// `bilivideo.com`); mirrors the host mapping in the client's `Thumbnails.refererFor`.
-fn referer_for(url: &str) -> &'static str {
+pub(crate) fn referer_for(url: &str) -> &'static str {
     let host = url
         .split("://")
         .nth(1)
@@ -74,7 +74,7 @@ static FFMPEG_LOG_INIT: Once = Once::new();
 
 /// libav I/O interrupt callback: returns non-zero to abort a blocked read. The opaque pointer is the
 /// session's `interrupted` flag (an `AtomicBool` kept alive for the format context's lifetime).
-unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
+pub(crate) unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
     if opaque.is_null() {
         return 0;
     }
@@ -84,7 +84,7 @@ unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
     if flag.load(Ordering::Relaxed) { 1 } else { 0 }
 }
 
-fn init_ffmpeg() -> Result<()> {
+pub(crate) fn init_ffmpeg() -> Result<()> {
     ffmpeg::init().context("initialize libav")?;
     FFMPEG_LOG_INIT.call_once(|| {
         let level = match log::max_level() {
@@ -98,7 +98,7 @@ fn init_ffmpeg() -> Result<()> {
 
 /// Strips the query string (stream URLs carry expiring tokens) and caps the length, keeping log
 /// lines readable and free of secrets.
-fn url_for_log(url: &str) -> &str {
+pub(crate) fn url_for_log(url: &str) -> &str {
     let base = url.split('?').next().unwrap_or(url);
     match base.char_indices().nth(120) {
         Some((i, _)) => &base[..i],

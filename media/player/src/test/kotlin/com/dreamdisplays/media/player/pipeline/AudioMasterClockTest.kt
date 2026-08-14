@@ -15,7 +15,7 @@ class AudioMasterClockTest {
     }
 
     private fun sample(nanos: Long, epoch: Int = 1, originKnown: Boolean = true) =
-        AudioSink.ClockSample(nanos, epoch, originKnown)
+        NativeAudioSink.ClockSample(nanos, epoch, originKnown)
 
     @Test
     fun `a known content origin is used verbatim`() {
@@ -189,8 +189,8 @@ class AudioMasterClockTest {
     @Test
     fun `no line clock falls through to the wall clock`() {
         val clock = AudioMasterClock("test")
-        assertEquals(7 * second, clock.nanos(AudioSink.ClockSample.NONE, 7 * second, suspended = false) { null })
-        assertEquals(-1L, clock.nanos(AudioSink.ClockSample.NONE, -1L, suspended = false) { null })
+        assertEquals(7 * second, clock.nanos(NativeAudioSink.ClockSample.NONE, 7 * second, suspended = false) { null })
+        assertEquals(-1L, clock.nanos(NativeAudioSink.ClockSample.NONE, -1L, suspended = false) { null })
     }
 
     @Test

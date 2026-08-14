@@ -872,15 +872,19 @@ class DisplayScreen(
         val position = currentTimeNanos
         val started = System.nanoTime()
         val snapshot = mp.captureReplaySnapshot() ?: return
-        val audioPcm = mp.captureReplayAudio()
+        val audioSnapshot = mp.captureReplayAudio()
         val prepared = mp.capturePreparedMedia()
-        DisplayReplayCache.put(uuid, url, position, snapshot, audioPcm, prepared)
+        DisplayReplayCache.put(
+            uuid, url, position, snapshot,
+            audioSnapshot?.pcm, audioSnapshot?.sampleRate ?: 0, audioSnapshot?.channels ?: 0,
+            prepared,
+        )
         val elapsedMs = (System.nanoTime() - started) / 1_000_000.0
         logger.debug(
             "{} captured replay snapshot bytes={} audioPcm={}B at {} ms in {} ms.",
             uuid,
             snapshot.size,
-            audioPcm?.size ?: 0,
+            audioSnapshot?.pcm?.size ?: 0,
             "%.1f".format(position / 1_000_000.0),
             "%.1f".format(elapsedMs)
         )
