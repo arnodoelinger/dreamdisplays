@@ -22,9 +22,7 @@ fun fancyModLoaderVersion(neoForgeVersion: String): String = when (neoForgeVersi
     else -> "11.0.13"
 }
 
-if (isLegacyObfuscatedMinecraft) {
-    evaluationDependsOn(":platform:client:fabric")
-}
+evaluationDependsOn(":platform:client:fabric")
 
 // The Paper jar is one cross-version artifact (dispatches 1.21.1 through 26.x at runtime via
 // ServerVersion), so it must always be compiled against this pinned Minecraft version: the oldest
@@ -135,11 +133,7 @@ dependencies {
     compileOnly("net.neoforged:bus:8.0.5")
     compileOnly("net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7")
     compileOnly("net.neoforged.fancymodloader:loader:${fancyModLoaderVersion(scVersion("neoforge.version"))}")
-    if (isLegacyObfuscatedMinecraft) {
-        compileOnly(project(path = ":platform:client:fabric", configuration = "mappedFabricApiElements"))
-    } else {
-        compileOnly("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
-    }
+    compileOnly(project(path = ":platform:client:fabric", configuration = "mappedFabricApiElements"))
 
     implementation(project(":core"))
     implementation(project(":util"))

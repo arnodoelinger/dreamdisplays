@@ -131,6 +131,11 @@ object VanillaDisplayActions {
 
     /** Applies a client-supplied URL / language to a display, broadcasting and resetting the timeline. */
     fun setVideo(player: ServerPlayer, server: MinecraftServer, displayId: java.util.UUID, url: String, lang: String) {
+        val perms = VanillaServerState.config.permissions
+        if (!VanillaPermissions.has(player, perms.video, VanillaPermissions.Fallback.EVERYONE)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
         val displayData = DisplayManager.getDisplayData(displayId) as? VanillaDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
         if (!MediaUrlPolicy.isAllowed(url)) return

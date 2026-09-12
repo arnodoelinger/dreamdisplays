@@ -7,10 +7,7 @@ import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
 import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
-import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry.registerArgumentType
 import net.minecraft.commands.synchronization.ArgumentTypeInfos
-import net.minecraft.commands.synchronization.SingletonArgumentInfo
-import net.minecraft.core.Registry
 import net.minecraft.core.registries.BuiltInRegistries
 //? if >=1.21.11 {
 import net.minecraft.resources.Identifier
@@ -37,7 +34,8 @@ object BareTokenArgumentType : ArgumentType<String> {
 }
 
 /**
- * Registers [BareTokenArgumentType]'s sync info via `Fabric` API's public `ArgumentTypeRegistry`.
+ * Registers [BareTokenArgumentType]'s sync via reflection to alias it to [StringArgumentType].
+ * This avoids registering a custom ID in `COMMAND_ARGUMENT_TYPE`, which would kick vanilla clients.
  */
 @FabricOnly
 object FabricBareTokenArgumentType {
@@ -47,15 +45,22 @@ object FabricBareTokenArgumentType {
     fun register() {
         if (registered) return
         registered = true
-        val info = SingletonArgumentInfo.contextFree { BareTokenArgumentType }
-        registerArgumentType(
-            BareTokenArgumentType.ID, BareTokenArgumentType::class.java, info,
-        )
+        try {
+            val field = ArgumentTypeInfos::class.java.getDeclaredField("BY_CLASS")
+            field.isAccessible = true
+            val byClass = field.get(null)!!
+            val fallbackInfo = ArgumentTypeInfos.byClass(StringArgumentType.greedyString())
+            byClass.javaClass.getMethod("putIfAbsent", Any::class.java, Any::class.java)
+                .invoke(byClass, BareTokenArgumentType::class.java, fallbackInfo)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }
 
 /**
- * Registers [BareTokenArgumentType]'s sync via `NeoForge` reflection.
+ * Registers [BareTokenArgumentType]'s sync via reflection to alias it to [StringArgumentType].
+ * This avoids registering a custom ID in `COMMAND_ARGUMENT_TYPE`, which would kick vanilla clients.
  */
 @NeoForgeOnly
 object NeoForgeBareTokenArgumentType {
@@ -65,12 +70,15 @@ object NeoForgeBareTokenArgumentType {
     fun register() {
         if (registered) return
         registered = true
-        val field = ArgumentTypeInfos::class.java.getDeclaredField("BY_CLASS")
-        field.isAccessible = true
-        val byClass = field.get(null)!!
-        val info = SingletonArgumentInfo.contextFree { BareTokenArgumentType }
-        byClass.javaClass.getMethod("putIfAbsent", Any::class.java, Any::class.java)
-            .invoke(byClass, BareTokenArgumentType::class.java, info)
-        Registry.register(BuiltInRegistries.COMMAND_ARGUMENT_TYPE, BareTokenArgumentType.ID, info)
+        try {
+            val field = ArgumentTypeInfos::class.java.getDeclaredField("BY_CLASS")
+            field.isAccessible = true
+            val byClass = field.get(null)!!
+            val fallbackInfo = ArgumentTypeInfos.byClass(StringArgumentType.greedyString())
+            byClass.javaClass.getMethod("putIfAbsent", Any::class.java, Any::class.java)
+                .invoke(byClass, BareTokenArgumentType::class.java, fallbackInfo)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 }

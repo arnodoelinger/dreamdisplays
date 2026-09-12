@@ -19,7 +19,7 @@ pluginManagement {
         maven("https://oss.sonatype.org/content/repositories/snapshots")
         maven("https://maven.neoforged.net/releases")
         maven("https://maven.fabricmc.net/")
-        maven("https://maven.parchmentmc.org")
+        maven("https://ldtteam.jfrog.io/artifactory/parchmentmc-public/")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://repo.papermc.io/repository/maven-public/")
     }
@@ -50,7 +50,7 @@ dependencyResolutionManagement {
     repositories {
         mavenCentral()
         maven("https://maven.fabricmc.net/")
-        maven("https://maven.parchmentmc.org")
+        maven("https://ldtteam.jfrog.io/artifactory/parchmentmc-public/")
         maven("https://maven.quiltmc.org/repository/release/")
         maven("https://maven.quiltmc.org/repository/snapshot/")
         maven("https://repo.papermc.io/repository/maven-public/")
@@ -82,7 +82,7 @@ include(":platform:proxy:bungeecord")
 
 // Not my problem
 if (!java.lang.Boolean.getBoolean("idea.sync.active")) {
-    include(":platform:client:neoforge")
+//    include(":platform:client:neoforge")
 }
 
 @Suppress("UNCHECKED_CAST")

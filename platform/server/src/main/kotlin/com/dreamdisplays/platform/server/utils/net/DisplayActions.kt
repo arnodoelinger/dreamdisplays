@@ -83,6 +83,10 @@ object DisplayActions {
 
     /** Applies a client-supplied URL / language to a display, broadcasting and resetting the timeline. */
     fun setVideo(player: Player, displayId: UUID, url: String, lang: String) {
+        if (!player.hasPermission(PaperServer.config.permissions.video)) {
+            MessageUtil.sendMessage(player, "displayCommandMissingPermission")
+            return
+        }
         val displayData = DisplayManager.getDisplayData(displayId) as? PaperDisplayData ?: return
         if (!PlaybackPermissions.canSetVideo(context(displayData, player))) return
         if (!MediaUrlPolicy.isAllowed(url)) return

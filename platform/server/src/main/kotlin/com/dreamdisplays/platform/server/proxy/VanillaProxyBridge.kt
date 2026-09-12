@@ -38,6 +38,7 @@ import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.utils.net.VanillaNetworking
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.slf4j.LoggerFactory
@@ -345,6 +346,13 @@ object VanillaProxyBridge {
             is PlayerTransferring -> {
                 val uuid = runCatching { UUID.fromString(packet.playerId) }.getOrNull() ?: return
                 TransferTracker.markTransferring(uuid)
+                val playerObj = server.playerList.getPlayer(uuid)
+                if (playerObj != null) {
+                    val allDisplays = DisplayManager.getDisplays().map { it.id }
+                    allDisplays.chunked(250).forEach { chunk ->
+                        VanillaPacketUtil.sendClearCache(listOf(playerObj), chunk)
+                    }
+                }
             }
 
             is PlayerLeftNetwork -> {

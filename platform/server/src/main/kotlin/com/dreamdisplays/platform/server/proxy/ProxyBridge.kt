@@ -348,6 +348,13 @@ object ProxyBridge : PluginMessageListener {
             is PlayerTransferring -> {
                 val uuid = runCatching { UUID.fromString(packet.playerId) }.getOrNull() ?: return
                 TransferTracker.markTransferring(uuid)
+                val playerObj = Bukkit.getPlayer(uuid)
+                if (playerObj != null) {
+                    val allDisplays = DisplayManager.getDisplays().map { it.id }
+                    allDisplays.chunked(250).forEach { chunk ->
+                        com.dreamdisplays.platform.server.utils.net.PacketUtil.sendClearCache(listOf(playerObj), chunk)
+                    }
+                }
             }
 
             is PlayerLeftNetwork -> {

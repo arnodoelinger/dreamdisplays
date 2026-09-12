@@ -9,6 +9,9 @@ import com.dreamdisplays.util.OsInfo
  * video decode block (`NVDEC` on NVIDIA, `VCE` on AMD, `QuickSync` on Intel, the Apple VT block on macOS).
  */
 enum class HwAccelBackend(val ffmpegName: String?, val hwOutputFormat: String?, val lavCode: Int) {
+    /** Auto-detects the best hardware backend. */
+    AUTO("auto", null, 1),
+
     /** Apple platforms. Handles h264, hevc, vp9, prores. */
     VIDEOTOOLBOX("videotoolbox", "videotoolbox_vld", 2),
 
@@ -31,9 +34,9 @@ enum class HwAccelBackend(val ffmpegName: String?, val hwOutputFormat: String?, 
          * decode is worse than a stream that decodes a bit slower.
          */
         fun detectDefault(): HwAccelBackend = when {
-            OsInfo.isMac -> VIDEOTOOLBOX
-            OsInfo.isWindows -> D3D11VA
-            OsInfo.isLinux -> VAAPI
+            OsInfo.isMac -> AUTO
+            OsInfo.isWindows -> AUTO
+            OsInfo.isLinux -> AUTO
             else -> NONE
         }
 

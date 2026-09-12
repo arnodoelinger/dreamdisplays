@@ -27,7 +27,7 @@ run {
 repositories {
     mavenCentral()
     maven("https://maven.fabricmc.net/")
-    maven("https://maven.parchmentmc.org")
+    maven("https://ldtteam.jfrog.io/artifactory/parchmentmc-public/")
     maven("https://maven.quiltmc.org/repository/release/")
     maven("https://maven.quiltmc.org/repository/snapshot/")
     maven("https://repo.papermc.io/repository/maven-public/")

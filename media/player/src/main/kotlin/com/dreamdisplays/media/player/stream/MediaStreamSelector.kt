@@ -130,7 +130,7 @@ object MediaStreamSelector {
         return when {
             isMac -> when (codec(stream)) {
                 SupportedCodec.H264 -> 0
-                SupportedCodec.HEVC -> if (height <= 2160) 80 else 300
+                SupportedCodec.HEVC -> 0
                 SupportedCodec.AV1 -> if (isAppleSilicon && height <= 2160) 160 else 1200
                 SupportedCodec.VP9 -> when {
                     height <= 1080 -> 220
@@ -143,7 +143,7 @@ object MediaStreamSelector {
 
             isWindows -> when (codec(stream)) {
                 SupportedCodec.H264 -> 0
-                SupportedCodec.HEVC -> 90
+                SupportedCodec.HEVC -> 10 // Greatly lowered so hardware capable PCs can use HEVC
                 SupportedCodec.VP9 -> 140
                 SupportedCodec.AV1 -> 220
                 SupportedCodec.UNKNOWN -> 900
