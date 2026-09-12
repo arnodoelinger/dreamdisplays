@@ -1,18 +1,15 @@
 package com.dreamdisplays.api.capability
 
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOfOrNull
 
 /**
- * Server capabilities advertised to clients during negotiation.
+ * Server capabilities advertised during negotiation; string tokens stay centralized in this enum.
  *
- * Wire protocols may keep these as strings for compatibility; runtime code should build and query
- * features through this enum so feature tokens remain centralized.
- *
- * @since 1.8.4
+ * @since 1.8.x
  */
-@DreamDisplaysUnstableApi
+@Unstable
 enum class ServerFeature(override val wire: String) : WireEnum {
     /** Server supports selecting playback modes. */
     MODES("modes"),
@@ -21,10 +18,16 @@ enum class ServerFeature(override val wire: String) : WireEnum {
     WATCH_PARTY("watch_party"),
 
     /** Server supports broadcast playback. */
-    BROADCAST("broadcast");
+    BROADCAST("broadcast"),
+
+    /**
+     * Server can resolve region membership (i.e. `WorldGuard` is installed), so the region access
+     * level is a real choice. Absent, the level would let nobody in and isn't worth offering.
+     */
+    REGION_ACCESS("region_access");
 
     companion object {
-        /** Playback-related features enabled by the current server implementation. */
+        /** Playback-related features every server implementation supports unconditionally. */
         val playbackFeatures: List<ServerFeature> = listOf(MODES, WATCH_PARTY, BROADCAST)
 
         /** Playback-related feature tokens for string-based wire protocols. */
@@ -36,5 +39,5 @@ enum class ServerFeature(override val wire: String) : WireEnum {
 }
 
 /** Converts feature enums to their wire tokens. */
-@DreamDisplaysUnstableApi
+@Unstable
 fun Iterable<ServerFeature>.toWire(): List<String> = map { it.wire }

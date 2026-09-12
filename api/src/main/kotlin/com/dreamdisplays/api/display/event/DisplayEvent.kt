@@ -1,18 +1,18 @@
 package com.dreamdisplays.api.display.event
 
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
+import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.Display
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.display.model.DisplayRuntimeState
-import com.dreamdisplays.api.display.model.DisplaySettings
-import com.dreamdisplays.api.media.DreamMediaException
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayState
+import com.dreamdisplays.api.display.model.settings.DisplaySettings
+import com.dreamdisplays.api.media.model.DreamMediaException
 
 /**
  * Represents an event that occurred on a display.
  *
- * @since 1.8.0
+ * @since 1.8.x
  */
-@DreamDisplaysUnstableApi
+@Unstable
 sealed interface DisplayEvent {
     /** The ID of the display that the event occurred on. */
     val displayId: DisplayId
@@ -33,8 +33,8 @@ sealed interface DisplayEvent {
     /** Signifies that the display's state has changed. */
     data class StateChanged(
         override val displayId: DisplayId,
-        val previous: DisplayRuntimeState,
-        val current: DisplayRuntimeState,
+        val previous: DisplayState,
+        val current: DisplayState,
     ) : DisplayEvent
 
     /** Signifies that the display's URL has changed. */
@@ -42,12 +42,4 @@ sealed interface DisplayEvent {
 
     /** Signifies that the display's media has encountered an error. */
     data class MediaError(override val displayId: DisplayId, val cause: DreamMediaException) : DisplayEvent
-
-    /** Signifies that the display's media has been loaded and is now within range. */
-    data class LoadedIntoRange(override val displayId: DisplayId) : DisplayEvent
-
-    /** Signifies that the display's media has been unloaded and is now out of range. */
-    data class UnloadedOutOfRange(override val displayId: DisplayId) : DisplayEvent
-
-    // TODO: add more events like quality change, render distance change, etc.
 }

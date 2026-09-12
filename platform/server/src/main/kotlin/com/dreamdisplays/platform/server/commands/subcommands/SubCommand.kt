@@ -1,20 +1,11 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.command.CommandSender
 
 /**
- * Sub-command that can be executed by a command sender.
- * Each sub-command has a name, an optional permission requirement,
- * and an execute method that defines the command's behavior.
- *
- * @property name the name of the sub-command.
- * @property permission the permission required to execute the sub-command, or null if no permission is
- * required.
- * @function execute executes the sub-command with the given command sender and arguments.
- * @param sender the command sender executing the sub-command.
- * @param args the arguments passed to the sub-command.
- * @see CommandSender
+ * Sub-command that can be executed by a command sender. Each sub-command has a name, an optional permission requirement,
+ * and its own execution logic.
  */
 @PaperOnly
 interface SubCommand {

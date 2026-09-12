@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client
 
-import com.dreamdisplays.media.source.ytdlp.CookieSource
+import com.dreamdisplays.api.media.audio.model.AcousticQuality
+import com.dreamdisplays.media.source.youtube.cookie.CookieSource
 import java.io.File
 import kotlin.math.roundToInt
 
@@ -12,7 +13,7 @@ class Config(private val baseDir: File) {
     /** Whether to mute all displays while the game window is not focused. */
     var muteOnAltTab: Boolean = false
 
-    /** Default render distance for new displays, in blocks (snapped to a multiple of 16). */
+    /** Max radius (blocks) for audio distance falloff; display visibility itself follows the client's own render distance option. */
     var defaultDistance: Int = 96
 
     /** Default volume for new displays, in range `0.0`..`1.0`. */
@@ -29,6 +30,14 @@ class Config(private val baseDir: File) {
 
     /** Whether to use hardware-accelerated video decoding. */
     var useHwAccel: Boolean = true
+
+    var unshadedDisplays: Boolean = true
+
+    /** 3D acoustics rendering tier applied to every display's audio (`off` / `basic` / `advanced` / `ultra`). */
+    var audioAcoustics: AcousticQuality = AcousticQuality.ADVANCED
+
+    /** Output profile for spatialized audio: `true` renders binaural for headphones, `false` a plain stereo pan for speakers. */
+    var audioBinauralOutput: Boolean = true
 
     init {
         load()
@@ -66,6 +75,15 @@ class Config(private val baseDir: File) {
             ?: ytdlpCookieSource
         ytdlpProxy = data["ytdlp-proxy"] ?: ytdlpProxy
         useHwAccel = data["use-hw-accel"]?.toBooleanStrictOrNull() ?: useHwAccel
+        unshadedDisplays = data["unshaded-displays"]?.toBooleanStrictOrNull() ?: unshadedDisplays
+        audioAcoustics = data["audio-acoustics"]?.let { token ->
+            AcousticQuality.entries.firstOrNull { it.name.equals(token, ignoreCase = true) }
+        } ?: audioAcoustics
+        audioBinauralOutput = when (data["audio-output-profile"]?.lowercase()) {
+            "speakers" -> false
+            "headphones", "auto" -> true
+            else -> audioBinauralOutput
+        }
     }
 
     /** Persists the current configuration values to disk. */
@@ -79,6 +97,9 @@ class Config(private val baseDir: File) {
             appendLine("ytdlp-cookies-from-browser: ${ytdlpCookieSource.configToken.yamlQuoted()}")
             appendLine("ytdlp-proxy: ${ytdlpProxy.yamlQuoted()}")
             appendLine("use-hw-accel: $useHwAccel")
+            appendLine("unshaded-displays: $unshadedDisplays")
+            appendLine("audio-acoustics: ${audioAcoustics.name.lowercase()}")
+            appendLine("audio-output-profile: ${if (audioBinauralOutput) "headphones" else "speakers"}")
         })
     }
 

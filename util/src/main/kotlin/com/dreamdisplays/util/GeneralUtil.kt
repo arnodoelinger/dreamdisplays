@@ -1,9 +1,18 @@
 package com.dreamdisplays.util
 
-import java.io.IOException
+import kotlinx.io.IOException
 
 /** General utility functions for the mod. */
 object GeneralUtil {
+    /** Developer version. */
+    private val DEV_VERSION = Regex("""^([0-9]+(?:\.[0-9]+)*)-dev$""")
+
+    /** Preview version (uses .1, .2, etc. index) */
+    private val PREVIEW_VERSION = Regex("""^([0-9]+(?:\.[0-9]+)*)-preview\.([0-9]+)$""")
+
+    /** Release version */
+    private val RELEASE_VERSION = Regex("""^[0-9]+(?:\.[0-9]+)*$""")
+
     /** Reads the classpath resource at [resourcePath] and returns its content as a UTF-8 string. */
     @Throws(IOException::class)
     fun readResource(resourcePath: String): String {
@@ -16,4 +25,13 @@ object GeneralUtil {
     fun getModVersion(): String =
         runCatching { readResource("/assets/dreamdisplays/version.txt").trim() }
             .getOrDefault("unknown")
+
+    /** Formats version to human-readable label: `1.8.5-dev` -> `1.8.5 Developer`, `1.9.0-preview` -> `1.9.0 Preview`. */
+    fun getPrettyModVersion(): String {
+        val version = getModVersion()
+        DEV_VERSION.matchEntire(version)?.let { return "${it.groupValues[1]} Developer" }
+        PREVIEW_VERSION.matchEntire(version)?.let { return "${it.groupValues[1]} Preview ${it.groupValues[2]}" }
+        if (RELEASE_VERSION.matches(version)) return "$version Release"
+        return version
+    }
 }

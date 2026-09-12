@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.render.TextureUploaderFactory
-import com.dreamdisplays.api.render.TextureUploaderProvider
+import com.dreamdisplays.api.render.texture.service.TextureUploaderFactory
+import com.dreamdisplays.api.render.texture.service.TextureUploaderProvider
 
 /** Supplies a [TextureUploaderFactory] backed by [AsyncTextureUploader]. */
 object DefaultTextureUploaderProvider : TextureUploaderProvider {

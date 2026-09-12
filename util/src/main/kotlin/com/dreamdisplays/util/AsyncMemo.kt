@@ -2,46 +2,27 @@ package com.dreamdisplays.util
 
 import com.github.benmanes.caffeine.cache.Cache
 import com.github.benmanes.caffeine.cache.Caffeine
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
-import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
-import java.io.IOException
+import kotlinx.coroutines.*
+import kotlinx.io.IOException
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ConcurrentMap
 import java.util.concurrent.TimeUnit
 import kotlin.time.Duration.Companion.seconds
 
-/**
- * TTL-bounded LRU memoizer with in-flight request deduplication: concurrent callers for the same key
- * share one background load instead of spawning duplicate work, and fresh results are served from
- * memory until they expire.
- *
- * Centralizes the cache + `ConcurrentMap<K, Deferred>` + exception-unwrapping pattern that was
- * hand-rolled three times inside `yt-dlp` (format fetch, search, related).
- *
- * @param maxSize LRU capacity; least-recently-used entries beyond this are evicted.
- * @param ttlMs entry freshness window in milliseconds.
- * @param scope coroutine scope loads run in (e.g. [DreamCoroutines.clientIo]).
- * @param tag human-readable name used in error messages.
- */
+/** TTL-bounded LRU memoizer with in-flight request deduplication. */
 class AsyncMemo<K : Any, V : Any>(
     maxSize: Int,
-    private val ttlMs: Long,
+    ttlMs: Long,
     private val scope: CoroutineScope,
     private val tag: String,
 ) {
     private val cacheEnabled = maxSize > 0 && ttlMs > 0
 
-    /** Fresh values. */
     private val cache: Cache<K, V> = Caffeine.newBuilder()
         .maximumSize(if (cacheEnabled) maxSize.toLong() else 0L)
         .expireAfterWrite(ttlMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
         .build()
 
-    /** Deferreds for in-flight loads. */
     private val inFlight: ConcurrentMap<K, Deferred<V>> = ConcurrentHashMap()
 
     /** Returns the cached value for [key] if present and younger than the TTL, else null. */
@@ -53,6 +34,7 @@ class AsyncMemo<K : Any, V : Any>(
     }
 
     /** Drops [key] from both the cache and the in-flight map. */
+    @Suppress("DeferredResultUnused")
     fun invalidate(key: K) {
         cache.invalidate(key)
         inFlight.remove(key)

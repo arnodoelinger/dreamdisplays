@@ -1,45 +1,45 @@
-//! In-process libav decode backend, shipped as its own cdylib so the main
-//! `dreamdisplays_native` library stays free of libav link dependencies (this one fails to
-//! load on machines without the `FFmpeg` shared libraries, and the JVM treats that as
-//! "feature unavailable" instead of losing the whole native pipeline).
-//!
-//! One session replaces the video `FFmpeg` process: libavformat reads the network stream,
-//! libavcodec decodes (VideoToolbox / D3D11VA / VAAPI / CUDA where available, software otherwise),
-//! libswscale aspect-fits into the target size, and the frame lands in the caller's direct
-//! buffer as tightly packed I420 — the same wire format `dd_video_read_frame_i420` produces,
-//! so the JVM render path is identical from there on.
-//!
-//! The additive surface ABI keeps decoder hardware frames alive and lets the render thread import
-//! their planes into platform GL textures. macOS VideoToolbox is implemented through
-//! CVPixelBuffer/IOSurface/CGLTexImageIOSurface2D; unsupported platforms/formats cleanly fall back
-//! to the I420 path above.
-//!
-//! ABI mirrors the main library's conventions: panic-safe entry points, opaque `i64`
-//! handles, blocking reads unblocked by `dd_lav_kill`.
+//! In-process libav decode backend.
 
 pub mod cache;
+pub mod chunked;
+pub mod scale;
 pub mod session;
 pub mod surface;
 
-use session::{LavSessions, ERR_BAD_ARGS, ERR_IO, NO_PTS_NANOS};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use session::{ERR_BAD_ARGS, ERR_IO, LavSessions, NO_PTS_NANOS};
+use std::any::Any;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::OnceLock;
 use surface::{LavSurfaceDesc, SURFACE_ABI_VERSION};
 
 /// Bumped on any breaking change of this ABI.
-pub const LAV_ABI_VERSION: u32 = 4;
+pub const LAV_ABI_VERSION: u32 = 5;
 
 /// Global state, one per process.
 static SESSIONS: OnceLock<LavSessions> = OnceLock::new();
 
 /// Returns the global state.
 fn sessions() -> &'static LavSessions {
+    dreamdisplays_logging::init();
     SESSIONS.get_or_init(LavSessions::new)
+}
+
+/// Fallback for a caught panic in an ABI entry point: logs the panic message (panics must never
+/// cross the C boundary silently) and substitutes `code` as the return value.
+fn on_panic<T: Copy>(entry: &'static str, code: T) -> impl FnOnce(Box<dyn Any + Send>) -> T {
+    move |payload| {
+        log::error!(
+            "{entry} panicked: {}.",
+            dreamdisplays_logging::panic_message(&*payload)
+        );
+        code
+    }
 }
 
 /// Returns [`LAV_ABI_VERSION`]; the JVM bridge calls this first as a sanity check.
 #[unsafe(no_mangle)]
 pub extern "C" fn dd_lav_abi_version() -> u32 {
+    dreamdisplays_logging::init();
     LAV_ABI_VERSION
 }
 
@@ -70,12 +70,16 @@ pub unsafe extern "C" fn dd_lav_open(
     if url.is_null() || url_len == 0 || w == 0 || h == 0 {
         return 0;
     }
-    let bytes = std::slice::from_raw_parts(url, url_len as usize);
+    let bytes = unsafe {
+        // Safety: the caller guarantees url points to url_len readable bytes; null and
+        // zero-length inputs are rejected above.
+        std::slice::from_raw_parts(url, url_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         let url = String::from_utf8_lossy(bytes).into_owned();
         sessions().open(&url, w as usize, h as usize, start_micros, hw_accel)
     }))
-        .unwrap_or(0)
+    .unwrap_or_else(on_panic("dd_lav_open", 0))
 }
 
 /// Opens a replay decode session from a serialized packet-ring snapshot.
@@ -97,11 +101,15 @@ pub unsafe extern "C" fn dd_lav_open_replay(
     if blob.is_null() || blob_len == 0 || w == 0 || h == 0 {
         return 0;
     }
-    let bytes = std::slice::from_raw_parts(blob, blob_len as usize);
+    let bytes = unsafe {
+        // Safety: the caller guarantees blob points to blob_len readable bytes; null and
+        // zero-length inputs are rejected above.
+        std::slice::from_raw_parts(blob, blob_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         sessions().open_replay(bytes, w as usize, h as usize, resume_nanos)
     }))
-        .unwrap_or(0)
+    .unwrap_or_else(on_panic("dd_lav_open_replay", 0))
 }
 
 /// Blocking decode of the next frame into `dst` as tightly packed I420 (Y, then U, then V),
@@ -117,8 +125,12 @@ pub unsafe extern "C" fn dd_lav_read_frame_i420(handle: i64, dst: *mut u8, dst_l
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
-    catch_unwind(AssertUnwindSafe(|| sessions().read_frame(handle, dst))).unwrap_or(ERR_IO)
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().read_frame(handle, dst)))
+        .unwrap_or_else(on_panic("dd_lav_read_frame_i420", ERR_IO))
 }
 
 /// Blocking decode of the next frame into `dst` as I420 and writes the frame's normalized
@@ -141,18 +153,38 @@ pub unsafe extern "C" fn dd_lav_read_frame_i420_pts(
         return ERR_BAD_ARGS;
     }
     if !pts_nanos.is_null() {
-        *pts_nanos = NO_PTS_NANOS;
+        unsafe {
+            // Safety: non-null pts_nanos is guaranteed by the caller to point to one writable
+            // i64 for the duration of this call.
+            *pts_nanos = NO_PTS_NANOS;
+        }
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         let mut pts = NO_PTS_NANOS;
         let rc = sessions().read_frame_with_pts(handle, dst, &mut pts);
         if !pts_nanos.is_null() {
-            *pts_nanos = pts;
+            unsafe {
+                // Safety: non-null pts_nanos is guaranteed by the caller to point to one
+                // writable i64 for the duration of this call.
+                *pts_nanos = pts;
+            }
         }
         rc
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_lav_read_frame_i420_pts", ERR_IO))
+}
+
+/// Seeks a live in-process decode session to `target_micros` (AV_TIME_BASE / microseconds),
+/// flushes decoder buffers, and resumes future reads from the requested position. Returns 0 on
+/// success or a negative error code. Replay sessions are not seekable.
+#[unsafe(no_mangle)]
+pub extern "C" fn dd_lav_seek(handle: i64, target_micros: i64) -> i32 {
+    catch_unwind(AssertUnwindSafe(|| sessions().seek(handle, target_micros)))
+        .unwrap_or_else(on_panic("dd_lav_seek", ERR_IO))
 }
 
 /// Blocking decode of the next hardware frame as a retained GPU-importable surface.
@@ -167,10 +199,13 @@ pub unsafe extern "C" fn dd_lav_read_surface(handle: i64, desc: *mut LavSurfaceD
     if desc.is_null() {
         return ERR_BAD_ARGS;
     }
-    catch_unwind(AssertUnwindSafe(|| {
-        sessions().read_surface(handle, &mut *desc)
-    }))
-        .unwrap_or(ERR_IO)
+    let desc = unsafe {
+        // Safety: the caller guarantees desc points to writable memory for one
+        // LavSurfaceDesc; null is rejected above.
+        &mut *desc
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().read_surface(handle, desc)))
+        .unwrap_or_else(on_panic("dd_lav_read_surface", ERR_IO))
 }
 
 /// Imports one retained surface plane into an existing OpenGL texture object.
@@ -187,7 +222,7 @@ pub extern "C" fn dd_lav_bind_surface_plane_gl(
     catch_unwind(AssertUnwindSafe(|| {
         sessions().bind_surface_plane_gl(surface_handle, plane, texture_id)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_lav_bind_surface_plane_gl", ERR_IO))
 }
 
 /// Releases a surface returned by [`dd_lav_read_surface`]. Safe to call with 0 or stale handles.
@@ -207,8 +242,12 @@ pub unsafe extern "C" fn dd_lav_error(handle: i64, dst: *mut u8, dst_len: u64) -
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
-    catch_unwind(AssertUnwindSafe(|| sessions().error(handle, dst))).unwrap_or(ERR_IO)
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().error(handle, dst)))
+        .unwrap_or_else(on_panic("dd_lav_error", ERR_IO))
 }
 
 /// Enables the rolling encoded-packet cache on `handle`: retains roughly the most recent
@@ -226,7 +265,7 @@ pub extern "C" fn dd_lav_enable_cache(handle: i64, window_ms: u32, max_bytes: u6
     catch_unwind(AssertUnwindSafe(|| {
         sessions().enable_cache(handle, window_nanos, max_bytes)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_lav_enable_cache", ERR_IO))
 }
 
 /// Copies the cache snapshot for `handle` into `dst` and returns the total blob length. When the
@@ -242,9 +281,14 @@ pub unsafe extern "C" fn dd_lav_ring_snapshot(handle: i64, dst: *mut u8, dst_len
     let dst_slice: &mut [u8] = if dst.is_null() || dst_len == 0 {
         &mut []
     } else {
-        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+        unsafe {
+            // Safety: non-null dst is guaranteed by the caller to point to dst_len writable
+            // bytes for this call.
+            std::slice::from_raw_parts_mut(dst, dst_len as usize)
+        }
     };
-    catch_unwind(AssertUnwindSafe(|| sessions().snapshot(handle, dst_slice))).unwrap_or(ERR_IO)
+    catch_unwind(AssertUnwindSafe(|| sessions().snapshot(handle, dst_slice)))
+        .unwrap_or_else(on_panic("dd_lav_ring_snapshot", ERR_IO))
 }
 
 /// Like [`dd_lav_ring_snapshot`], but the native side first tops the packet ring up toward
@@ -262,16 +306,20 @@ pub unsafe extern "C" fn dd_lav_ring_snapshot_at(
     let dst_slice: &mut [u8] = if dst.is_null() || dst_len == 0 {
         &mut []
     } else {
-        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+        unsafe {
+            // Safety: non-null dst is guaranteed by the caller to point to dst_len writable
+            // bytes for this call.
+            std::slice::from_raw_parts_mut(dst, dst_len as usize)
+        }
     };
     let top_up = dst_len == 0;
     catch_unwind(AssertUnwindSafe(|| {
         sessions().snapshot_at(handle, position_nanos, dst_slice, top_up)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_lav_ring_snapshot_at", ERR_IO))
 }
 
-/// Interrupts the session's network/decode loop, unblocking any reader stuck in
+/// Interrupts the session's network / decode loop, unblocking any reader stuck in
 /// [`dd_lav_read_frame_i420`]. The handle stays valid until [`dd_lav_close`].
 #[unsafe(no_mangle)]
 pub extern "C" fn dd_lav_kill(handle: i64) {

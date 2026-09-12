@@ -1,13 +1,12 @@
 package com.dreamdisplays.platform.server.managers
 
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Main.Companion.config
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.PaperServer.Companion.config
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
 import com.dreamdisplays.platform.server.managers.SelectionManager.selectionPoints
 import com.dreamdisplays.platform.server.utils.OutlinerUtil.showOutline
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.Bukkit
 
 /**
@@ -20,7 +19,7 @@ object SelectionVisualizer {
      * Starts a repeating task that draws particle outlines around every ready selection.
      * No-ops if particles are disabled in config or the server is `Folia` (unsupported there).
      */
-    fun startParticleTask(plugin: Main) {
+    fun startParticleTask(plugin: PaperServer) {
         if (!config.settings.particlesEnabled) return
         if (isFolia) return
 

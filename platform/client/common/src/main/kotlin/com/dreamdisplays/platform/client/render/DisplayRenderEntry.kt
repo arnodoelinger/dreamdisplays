@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.display.model.DisplayBounds
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.render.TextureHandle
+import com.dreamdisplays.api.display.model.property.DisplayBounds
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.render.texture.model.TextureHandle
 
 /**
  * Represents an entry for rendering a display. This data class encapsulates all the necessary information for rendering a

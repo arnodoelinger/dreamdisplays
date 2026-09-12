@@ -1,0 +1,16 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.dreamdisplays.platform.server.mixins",
+  "compatibilityLevel": "JAVA_${javaVersion}",
+  "server": [
+    "BareTokenArgumentTypeSyncMixin"
+  ],
+  "mixins": [
+    "ExplosionProtectionMixin",
+    "PistonProtectionMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

@@ -1,0 +1,208 @@
+{
+  "noDisplayTerritories": "&7D |&f Вы ещё не выбрали территории дисплея! Выберите две точки с {0} на {1}",
+  "createDisplayCommand": "&7D |&f Теперь введите /display create чтобы создать дисплей",
+  "secondPointNotSelected": "&7D |&f Вы ещё не выбрали вторую точку!",
+  "displayOverlap": "&7D |&f В этой области уже есть дисплей!",
+  "displayLimitReached": "&7D |&f Вы достигли лимита в %d дисплей(ев) на игрока!",
+  "structureTooLarge": "&7D |&f Вы не можете создать дисплей больше %d × %d блоков",
+  "structureTooSmall": "&7D |&f Вы не можете создать дисплей меньше %d × %d блоков",
+  "firstPointSelected": "&7D |&f Первая точка выбрана! Теперь выберите вторую точку",
+  "secondPointSelected": "&7D |&f Вторая точка выбрана!",
+  "structureWrongDepth": "&7D |&f Выбор должен быть хотя бы 1 блок в длину",
+  "wrongStructure": "&7D |&f Для дисплеев можно использовать только {0}",
+  "displayTooHigh": "&7D |&f Высота дисплея слишком высока (макс. %d)",
+  "displayTooLow": "&7D |&f Дисплей слишком низко (мин. %d)",
+  "selectionClear": "&7D |&f Выбор очищен!",
+  "displayWrongCommand": "&7D |&f Вы ввели что-то неправильно!",
+  "displayCommandMissingPermission": "&7D |&f У вас нет разрешения на использование этой команды!",
+  "commandPlayersOnly": "&7D |&f Эту команду может использовать только игрок в игре",
+  "successfulCreation": "&7D |&f Дисплей создан! Зажмите Shift и нажмите ПКМ, глядя на него, чтобы открыть его меню",
+  "noDisplay": "&7D |&f Дисплей не найден!",
+  "settedURL": "&7D |&f Видео загружено!",
+  "invalidURL": "&7D |&f Ваша ссылка недействительна! Пожалуйста, используйте действительную ссылку на видео (YouTube, Twitch и т.д.)",
+  "settedName": "&7D |&f Имя дисплея установлено!",
+  "currentName": "&7D |&f Имя этого дисплея: %s",
+  "noNameSet": "&7D |&f У этого дисплея нет имени",
+  "invalidName": "&7D |&f Неверное имя! Используйте до 32 букв, цифр, - или _, без пробелов",
+  "nameTaken": "&7D |&f Это имя уже используется другим дисплеем!",
+  "scheduleSet": "&7D |&f Сейчас у вас {0}. Дисплей {1} {2} в {3} ({4})",
+  "scheduleCurrentSet": "&7D |&f Этот дисплей запланирован: {0} в {1}",
+  "scheduleNoneSet": "&7D |&f У этого дисплея нет запланированного действия",
+  "scheduleCancelled": "&7D |&f Запланированное действие отменено",
+  "scheduleInvalidTime": "&7D |&f Неверное время! Используйте формат ЧЧ:мм или ЧЧ:мм:сс (24ч), например 23:51 или 23:51:30",
+  "scheduleNeedsTime": "&7D |&f Сейчас у вас {0}. Введите время (ЧЧ:мм), чтобы запланировать",
+  "scheduleActionPlay": "запустится",
+  "scheduleActionPause": "поставится на паузу",
+  "scheduleCountdownSeconds": "через {0} сек",
+  "scheduleCountdownMinutes": "через {0} мин {1} сек",
+  "scheduleCountdownHours": "через {0} ч {1} мин",
+  "displayVideoWrongTargetBlock": "&7D |&f Чтобы использовать эту команду, смотрите на блок дисплея!",
+  "displayVideoNotOwner": "&7D |&f Вы не владелец этого дисплея!",
+  "reportTooQuickly": "&7D |&f Вы отправляете жалобы слишком быстро! Подождите перед отправкой следующей",
+  "reportSent": "&7D |&f Жалоба отправлена!",
+  "reportFailed": "&7D |&f Не удалось отправить жалобу. Пожалуйста, попробуйте позже",
+  "displayDeleted": "&7D |&f Дисплей удалён!",
+  "displayReported": "&7D |&f Жалоба на дисплей отправлена!",
+  "reportNotConfigured": "&7D |&f Система жалоб не настроена на этом сервере!",
+  "newVersion": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Доступна новая версия %s Dream Displays! Пожалуйста, ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "обновите ваш мод",
+        "color": "#023EB6",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays/versions"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать новую версию"
+        }
+      },
+      {
+        "text": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "newPluginVersion": "&7D |&f Доступна новая версия плагина Dream Displays (%s)! Пожалуйста, обновите плагин на сервере!",
+  "configReloaded": "&7D | &fDream Displays перезагружен!",
+  "configReloadFailed": "&7D |&f Не удалось перезагрузить Dream Displays. Пожалуйста, проверьте консоль на наличие ошибок",
+  "configReloadSummary": "&7D |&f Перезагружено: конфиг, языковые сообщения, права команд",
+  "noDisplaysFound": "&7D |&f Дисплеи не найдены",
+  "displayListHeader": "&7D |&f Дисплеи:",
+  "displayListEntry": "&7D |&f {0}. Владелец: {1}, Расположение: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 страница=&f{0}/{1} &8| &7всего=&f{2}",
+  "displayListDetails": " &8| &7мир=&f{0} &8| &7размер=&f{1}x{2} &8| &7синхр=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Неизвестно",
+  "displayListUnknownWorld": "неизвестно",
+  "displayListUnavailableUrl": "Н/Д",
+  "displayListTpButton": " [ТП]",
+  "displayListUrlButton": " [URL]",
+  "displayBlockBreak": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Это блок дисплея. Установите мод ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать Dream Displays"
+        }
+      },
+      {
+        "text": ", чтобы взаимодействовать с ним!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "modRequired": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Мод Dream Displays необходим для отображения дисплеев на сервере. Пожалуйста, ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "скачайте Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Кликните, чтобы скачать Dream Displays"
+        }
+      },
+      {
+        "text": ", чтобы увидеть их!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "display.enabled": "&7D |&f Дисплеи включены. Подождите немного...",
+  "display.disabled": "&7D |&f Дисплеи отключены",
+  "display.already-disabled": "&7D |&f Дисплеи уже отключены",
+  "display.already-enabled": "&7D |&f Дисплеи уже включены",
+  "displayTargetNotFound": "&7D |&f Игрок '%s' не найден онлайн!",
+  "display.enabled.target": "&7D |&f Дисплеи включены для %s",
+  "display.disabled.target": "&7D |&f Дисплеи отключены для %s",
+  "display.already-enabled.target": "&7D |&f У %s дисплеи уже включены",
+  "display.already-disabled.target": "&7D |&f У %s дисплеи уже отключены",
+  "displayStatsHeader": "&7D |&f Статистика использования мода:",
+  "displayStatsEntry": "&7D |&f Версия %s: %d игроков",
+  "displayStatsTotal": "&7D |&f Всего игроков с модом: %d",
+  "displayHelpHeader": "Доступные команды:",
+  "displayHelpCreate": "– /display create: создать новый дисплей",
+  "displayHelpVideo": "– /display video <url>: установить видео для вашего дисплея",
+  "displayHelpName": "– /display name this|<id> <name>: задать дисплею имя без пробелов, которое можно использовать как id",
+  "displayHelpInfo": "– /display info: показать детали дисплея, на который вы смотрите",
+  "displayHelpDelete": "– /display delete: удалить дисплей, на который вы смотрите",
+  "displayHelpList": "– /display list: список всех дисплеев",
+  "displayHelpStats": "– /display stats: показать статистику использования мода",
+  "displayHelpReload": "– /display reload: перезагрузить конфигурацию",
+  "displayHelpOn": "– /display on [игрок]: включить дисплеи себе или выбранному игроку",
+  "displayHelpOff": "– /display off [игрок]: отключить дисплеи себе или выбранному игроку",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [флаги]: принудительно запустить полноэкранную трансляцию игрокам",
+  "displayHelpHelp": "– /display help: показать эту справку",
+  "displayInfoHeader": "&7D |&f Информация о дисплее:",
+  "displayInfoOwnerLine": "&7D |&7 владелец=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 id-дисплея=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 мир=&f{0} &8| &7точка1=&f[{1}, {2}, {3}] &8| &7точка2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 размер=&f{0}x{1} &8| &7сторона=&f{2} &8| &7синхр=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 язык=&f{0} &8| &7длительность=&f{1} &8| &7url=&f{2}",
+  "displayInfoScheduleLine": "&7D |&7 запланировано: {0} в &f{1}",
+  "displayInfoUnknownOwner": "Неизвестно",
+  "displayInfoUnknownWorld": "Неизвестно",
+  "displayInfoUnknownDuration": "неизвестно",
+  "displayInfoAutoLang": "авто",
+  "displayInfoUnavailableUrl": "Н/Д",
+  "fullscreenStarted": "&7D |&f Полноэкранная трансляция &b{0}&f запущена (охват {1} игрок(ов))",
+  "fullscreenStopped": "&7D |&f Остановлено {0} полноэкранных трансляций",
+  "fullscreenStopFailed": "&7D |&f Подходящая полноэкранная трансляция не найдена",
+  "fullscreenNoTargets": "&7D |&f Укажите хотя бы target <игроки> или radius <блоки>",
+  "fullscreenAlreadyRunning": "&7D |&f На этом дисплее уже идёт полноэкранная трансляция, либо ID сессии занят",
+  "fullscreenForcedDisallowed": "&7D |&f Принудительные полноэкранные трансляции отключены в конфиге",
+  "fullscreenNoDisplay": "&7D |&f Дисплей не найден, и нет загруженного мира для трансляции по URL",
+  "fullscreenNetworkNoProxy": "&7D |&f Этот сервер не подключён к прокси Dream Displays, проверьте [proxy] в config.toml.",
+  "fullscreenNetworkNotYetSupported": "&7D |&f Полноэкранная трансляция на всю сеть (server <имя>/<global>) пока не реализована",
+  "fullscreenNetworkUrlOnly": "&7D |&f Полноэкранная трансляция на всю сеть поддерживает только URL видео, а не id существующего дисплея",
+  "fullscreenNetworkRadiusUnsupported": "&7D |&f radius не поддерживается вместе с server — он действует только на этом сервере, запустите трансляцию с radius локально здесь",
+  "fullscreenNetworkQueued": "&7D |&f Сетевая полноэкранная трансляция поставлена в очередь. Она скоро начнётся на всех подходящих серверах",
+  "fullscreenNetworkStopQueued": "&7D |&f Отправлен запрос на остановку этой сессии по всей сети",
+  "fullscreenListEmpty": "&7D |&f Нет активных полноэкранных трансляций",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "fullscreenListNetworkEntry": "&7D |&7 {0} &8| &7scope=&f{1} &8| &7network-reach=&f{2}",
+  "customMediaDisabled": "&7D |&f Свои ссылки на видео отключены на этом сервере",
+  "customMediaHostBlocked": "&7D |&f Видео с этого сайта не разрешены на этом сервере",
+  "customMediaNoPermission": "&7D |&f У вас нет прав включать свои ссылки на видео",
+  "customMediaTooFast": "&7D |&f Вы слишком часто меняете ссылки на видео. Подождите немного"
+}

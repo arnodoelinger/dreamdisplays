@@ -1,18 +1,11 @@
 package com.dreamdisplays.platform.client.displays
 
+import com.dreamdisplays.api.playback.model.WatchPartyAction
+import com.dreamdisplays.core.protocol.common.packets.WatchPartyControl
+import com.dreamdisplays.core.protocol.common.packets.WatchPartyStart
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.playback.WatchPartyAction
-import com.dreamdisplays.core.protocol.WatchPartyControl
-import com.dreamdisplays.core.protocol.WatchPartyStart
 
-/**
- * Emits the local player's watch-party control intents for a [DisplayScreen]. Pure outbound command
- * emission: the server enforces participant / host rules and echoes authoritative state back through
- * [DisplayScreen.updateWatchParty]; nothing here mutates session state except the local ready toggle.
- *
- * Pulled out of [DisplayScreen] (like [DisplayMediaController] / [TimelineFollower]) so the screen no
- * longer interleaves command emission with render and sync state.
- */
+/** Emits the local player's watch-party control intents for a [DisplayScreen]. Pure outbound command emission: no local state mutation, the server echoes back the authoritative state. */
 internal class WatchPartyController(private val screen: DisplayScreen) {
     /** Starts a watch party here with the current (or given) video; the local player becomes host. */
     fun start(url: String, lang: String) {

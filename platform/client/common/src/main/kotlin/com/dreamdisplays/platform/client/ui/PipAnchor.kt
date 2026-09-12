@@ -1,10 +1,8 @@
 package com.dreamdisplays.platform.client.ui
 
 /**
- * The 8 magnetic snap zones a Picture-in-Picture overlay can dock to (4 corners + 4 edge midpoints).
- * A dragged overlay snaps to the nearest free anchor on release; [position] resolves an anchor to a
- * concrete pixel offset, and [centerFacingCorner] reports which corner of the PiP faces the screen
- * center (used to place the resize grip).
+ * The 8 magnetic snap zones a Picture-in-Picture overlay can dock to (4 corners + 4 edge midpoints); a dragged overlay
+ * snaps to the nearest one on release.
  */
 enum class PipAnchor {
     /** Top-left corner. */

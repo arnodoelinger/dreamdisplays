@@ -13,9 +13,6 @@ object ClientStateManager : ClientMutableState {
     /** Whether a display menu / screen is currently open. */
     override var isOnScreen: Boolean = false
 
-    /** Whether focus mode is active. */
-    override var focusMode: Boolean = false
-
     /** Whether displays are enabled. */
     override var displaysEnabled: Boolean = true
 

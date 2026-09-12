@@ -9,9 +9,6 @@ interface ClientState {
     /** Whether the client is currently on screen. This may be used to pause or reduce resource usage when the client is not visible. */
     val isOnScreen: Boolean
 
-    /** Whether the client is currently in focus mode. */
-    val focusMode: Boolean
-
     /** Whether displays are currently enabled. */
     val displaysEnabled: Boolean
 

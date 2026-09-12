@@ -1,15 +1,19 @@
 package com.dreamdisplays.api.display.model
 
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.api.watchparty.WatchPartySession
+import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.display.model.property.DisplayBounds
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayState
+import com.dreamdisplays.api.display.model.settings.DisplaySettings
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.api.watchparty.model.WatchPartySession
 
 /**
  * Represents a display that can be rendered on the client.
  *
- * @since 1.0.0
+ * @since 1.0.x
  */
-@DreamDisplaysUnstableApi
+@Unstable
 data class Display(
     /** The unique identifier of the display. */
     val id: DisplayId,
@@ -24,7 +28,7 @@ data class Display(
     val url: String?,
 
     /** The current runtime state of the display. */
-    val state: DisplayRuntimeState,
+    val state: DisplayState,
 
     /** The effective playback mode (`WATCH_PARTY` while a session is live, otherwise the base mode). */
     val mode: PlaybackMode = PlaybackMode.LOCAL,
@@ -33,13 +37,13 @@ data class Display(
     val watchParty: WatchPartySession? = null,
 ) {
     /** Returns true if the display is currently playing. */
-    val isPlaying: Boolean get() = state is DisplayRuntimeState.Playing
+    val isPlaying: Boolean get() = state is DisplayState.Playing
 
     /** Returns true if the display is currently paused. */
-    val isPaused: Boolean get() = state is DisplayRuntimeState.Paused
+    val isPaused: Boolean get() = state is DisplayState.Paused
 
     /** Returns true if the display is currently idle. */
-    val isIdle: Boolean get() = state is DisplayRuntimeState.Idle
+    val isIdle: Boolean get() = state is DisplayState.Idle
 
     /** Returns true if the display has a URL set. */
     val hasUrl: Boolean get() = !url.isNullOrBlank()

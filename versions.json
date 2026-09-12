@@ -1,0 +1,71 @@
+{
+  "active": "1.21.11",
+  "versions": {
+    "1.21.1": {
+      "minecraft.version": "1.21.1",
+      "java.version": "21",
+      "commons.compress.version": "1.26.0",
+      "loom.version": "1.17.13",
+      "moddev.version": "2.0.141",
+      "fabric.loader.version": "0.19.3",
+      "quilt.loader.version": "0.30.0-beta.7",
+      "fabric.api.version": "0.116.12+1.21.1",
+      "fabric.minecraft.version": "1.21.1",
+      "fabric.minecraft.dependency": "1.21.1",
+      "parchment.dependency": "org.parchmentmc.data:parchment-1.21.1:2024.11.17",
+      "neoforge.version": "21.1.233",
+      "paper.api.version": "1.21.1-R0.1-SNAPSHOT",
+      "paper.minecraft.api": "1.21.1",
+      "neoforge.loader.range": "[21.1,)",
+      "neoforge.minecraft.range": "[1.21.1]"
+    },
+    "1.21.11": {
+      "minecraft.version": "1.21.11",
+      "java.version": "21",
+      "loom.version": "1.17.13",
+      "moddev.version": "2.0.141",
+      "fabric.loader.version": "0.19.3",
+      "quilt.loader.version": "0.30.0-beta.7",
+      "fabric.api.version": "0.141.4+1.21.11",
+      "fabric.minecraft.version": "1.21.11",
+      "fabric.minecraft.dependency": "1.21.11",
+      "neoforge.version": "21.11.42",
+      "paper.api.version": "1.21.11-R0.1-SNAPSHOT",
+      "paper.minecraft.api": "1.21.11",
+      "neoforge.loader.range": "[1,)",
+      "neoforge.minecraft.range": "[1.21.11]"
+    },
+    "26.1.2": {
+      "minecraft.version": "26.1.2",
+      "java.version": "25",
+      "loom.version": "1.17.13",
+      "moddev.version": "2.0.141",
+      "fabric.loader.version": "0.19.3",
+      "quilt.loader.version": "0.30.1-beta.2",
+      "fabric.api.version": "0.155.2+26.1.2",
+      "fabric.minecraft.version": "26.1.2",
+      "fabric.minecraft.dependency": "26.1.2",
+      "neoforge.version": "26.1.2.95",
+      "paper.api.version": "26.1.2.build.72-stable",
+      "paper.minecraft.api": "26.1.2",
+      "neoforge.loader.range": "[26.1.2.0,)",
+      "neoforge.minecraft.range": "[26.1.2]"
+    },
+    "26.2": {
+      "minecraft.version": "26.2",
+      "java.version": "25",
+      "loom.version": "1.17.13",
+      "moddev.version": "2.0.141",
+      "fabric.loader.version": "0.19.3",
+      "quilt.loader.version": "0.30.0-beta.8",
+      "fabric.api.version": "0.157.0+26.2",
+      "fabric.minecraft.version": "26.2",
+      "fabric.minecraft.dependency": "26.2",
+      "neoforge.version": "26.2.0.59",
+      "paper.api.version": "26.2.build.112-stable",
+      "paper.minecraft.api": "26.2",
+      "neoforge.loader.range": "[26.2.0.0-beta,)",
+      "neoforge.minecraft.range": "[26.2]"
+    }
+  }
+}

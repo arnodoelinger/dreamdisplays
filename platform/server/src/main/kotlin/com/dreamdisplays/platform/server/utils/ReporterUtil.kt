@@ -1,18 +1,15 @@
 package com.dreamdisplays.platform.server.utils
 
-import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.util.json.DreamJson
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
+import com.dreamdisplays.util.net.DreamHttpClient
+import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.io.IOException
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.encodeToString
-import java.io.IOException
-import java.nio.charset.StandardCharsets
-import java.time.OffsetDateTime
-import java.time.format.DateTimeFormatter
-import java.util.*
 import org.bukkit.Location
 import org.bukkit.entity.Player
+import java.nio.charset.StandardCharsets
+import java.util.*
+import kotlin.time.Clock
 
 /**
  * Utility for sending moderation reports to a Discord webhook. Rate limiting (per-display and
@@ -26,10 +23,10 @@ object ReporterUtil {
     private const val EMBED_TITLE = "# 🛡️ New report"
 
     /**
-     * Sends a report to Discord. `Fabric` overload. Accepts a pre-formatted [locationStr]
-     * because `Fabric` server code already converts [BlockPos] and world key to a readable string.
+     * Sends a report to Discord. `Fabric`/`NeoForge` overload. Accepts a pre-formatted
+     * [locationStr] because vanilla server code already converts [BlockPos] and world key to a
+     * readable string.
      */
-    @FabricOnly
     fun sendReport(
         locationStr: String,
         videoLink: String?,
@@ -71,7 +68,7 @@ object ReporterUtil {
         val embed = WebhookEmbed(
             description = EMBED_TITLE,
             color = EMBED_COLOR,
-            timestamp = OffsetDateTime.now().format(DateTimeFormatter.ISO_OFFSET_DATE_TIME),
+            timestamp = Clock.System.now().toString(),
             fields = listOf(
                 createField("Location", locationStr),
                 createField("Video", videoLink),

@@ -1,3 +1,4 @@
+//? if >=1.21.11 {
 package com.dreamdisplays.platform.client.render
 
 import com.mojang.blaze3d.pipeline.RenderPipeline
@@ -21,6 +22,7 @@ internal object RenderPipelineCompat {
             .withCull(false)
 
         configureDepth(builder)
+        configureBlend(builder)
         if (supportsBindGroupLayouts()) {
             configure262(builder, samplers)
         } else {
@@ -30,6 +32,33 @@ internal object RenderPipelineCompat {
         return builder.build()
     }
 
+    fun configureBlend(builder: RenderPipeline.Builder) {
+        val builderClass = builder.javaClass
+        val blendFunctionClass = runCatching {
+            Class.forName("com.mojang.blaze3d.pipeline.BlendFunction")
+        }.getOrNull() ?: return
+        val translucent = blendFunctionClass.getField("TRANSLUCENT").get(null)
+
+        val colorTargetStateClass = runCatching {
+            Class.forName("com.mojang.blaze3d.pipeline.ColorTargetState")
+        }.getOrNull()
+        if (colorTargetStateClass != null) {
+            val state = colorTargetStateClass.getConstructor(blendFunctionClass).newInstance(translucent)
+            builderClass.getMethod("withColorTargetState", colorTargetStateClass).invoke(builder, state)
+            return
+        }
+
+        runCatching {
+            builderClass.getMethod("withBlend", blendFunctionClass).invoke(builder, translucent)
+        }
+    }
+
+    /**
+     * Constant term of the GPU polygon-offset bias applied to display quads (see [configureDepth]).
+     * Matches vanilla's own depth-bias constant.
+     */
+    private const val DEPTH_BIAS = 3.0f
+
     /** Configures the depth state of the pipeline. */
     fun configureDepth(builder: RenderPipeline.Builder) {
         val builderClass = builder.javaClass
@@ -38,7 +67,8 @@ internal object RenderPipelineCompat {
         }.getOrNull()
         if (depthStencilStateClass != null) {
             val defaultDepth = depthStencilStateClass.getField("DEFAULT").get(null)
-            builderClass.getMethod("withDepthStencilState", depthStencilStateClass).invoke(builder, defaultDepth)
+            val biasedDepth = withPolygonOffset(depthStencilStateClass, defaultDepth)
+            builderClass.getMethod("withDepthStencilState", depthStencilStateClass).invoke(builder, biasedDepth)
             return
         }
 
@@ -46,12 +76,32 @@ internal object RenderPipelineCompat {
             Class.forName("com.mojang.blaze3d.platform.DepthTestFunction")
         }.getOrNull() ?: return
 
-        @Suppress("UNCHECKED_CAST")
-        val lequalDepth = java.lang.Enum.valueOf(depthTestFunctionClass as Class<out Enum<*>>, "LEQUAL_DEPTH_TEST")
+        val lequalDepth = reflectiveEnumValue(depthTestFunctionClass, "LEQUAL_DEPTH_TEST")
         builderClass.getMethod("withDepthTestFunction", depthTestFunctionClass).invoke(builder, lequalDepth)
         runCatching {
             builderClass.getMethod("withDepthWrite", Boolean::class.javaPrimitiveType).invoke(builder, true)
         }
+    }
+
+    /**
+     * Rebuilds [defaultDepth] with a small GPU polygon-offset bias (`depthBiasScaleFactor` /
+     * `depthBiasConstant`) so the display quad wins the depth test against the block face directly
+     * behind it.
+     */
+    private fun withPolygonOffset(depthStencilStateClass: Class<*>, defaultDepth: Any): Any {
+        val depthTest = depthStencilStateClass.getMethod("depthTest").invoke(defaultDepth)
+        val writeDepth = depthStencilStateClass.getMethod("writeDepth").invoke(defaultDepth) as Boolean
+        val reversedZ = (depthTest as Enum<*>).name == "GREATER_THAN_OR_EQUAL"
+        val bias = if (reversedZ) DEPTH_BIAS else -DEPTH_BIAS
+
+        val compareOpClass = Class.forName("com.mojang.blaze3d.platform.CompareOp")
+        val ctor = depthStencilStateClass.getConstructor(
+            compareOpClass,
+            Boolean::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType,
+            Float::class.javaPrimitiveType,
+        )
+        return ctor.newInstance(depthTest, writeDepth, bias, bias)
     }
 
     /** True if the current version of Minecraft supports `BindGroupLayout`s. */
@@ -72,10 +122,9 @@ internal object RenderPipelineCompat {
         }
 
         //? if >=26 {
-        val modeClass = Class.forName("com.mojang.blaze3d.vertex.VertexFormat\$Mode")
+        val modeClass = Class.forName($$"com.mojang.blaze3d.vertex.VertexFormat$Mode")
 
-        @Suppress("UNCHECKED_CAST")
-        val quads = java.lang.Enum.valueOf(modeClass as Class<out Enum<*>>, "QUADS")
+        val quads = reflectiveEnumValue(modeClass, "QUADS")
         builderClass.getMethod("withVertexFormat", VertexFormat::class.java, modeClass)
             .invoke(builder, DefaultVertexFormat.POSITION_TEX_COLOR, quads)
         //?} else
@@ -104,8 +153,7 @@ internal object RenderPipelineCompat {
 
         val topologyClass = Class.forName("com.mojang.blaze3d.PrimitiveTopology")
 
-        @Suppress("UNCHECKED_CAST")
-        val quads = java.lang.Enum.valueOf(topologyClass as Class<out Enum<*>>, "QUADS")
+        val quads = reflectiveEnumValue(topologyClass, "QUADS")
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)
     }
 
@@ -123,4 +171,9 @@ internal object RenderPipelineCompat {
     /** Gets the `BindGroupLayout` for the given name. */
     private fun vanillaLayout(name: String): Any =
         Class.forName("net.minecraft.client.renderer.BindGroupLayouts").getField(name).get(null)
+
+    /** Resolves enum constant [name] on [enumClass], whose static type is not known at compile time. */
+    fun reflectiveEnumValue(enumClass: Class<*>, name: String): Any =
+        enumClass.enumConstants.first { (it as Enum<*>).name == name }
 }
+//?}

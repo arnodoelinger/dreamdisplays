@@ -1,15 +1,14 @@
 package com.dreamdisplays.platform.server.storage
 
-import com.dreamdisplays.api.storage.FullDisplayData
-import com.dreamdisplays.core.storage.DisplayStorage
+import com.dreamdisplays.api.storage.model.FullDisplayData
+import com.dreamdisplays.core.services.DisplayStorage
 import com.dreamdisplays.util.json.JsonFileStore
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.security.MessageDigest
-import java.util.Locale
-import java.util.UUID
+import java.util.*
 
 /**
  * In-memory registry and JSON persistence for the server-authoritative [FullDisplayData] of every display,
@@ -19,7 +18,7 @@ import java.util.UUID
  */
 object ServerDisplayStore {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/ServerDisplayStore")
+    private val logger = LoggerFactory.getLogger(javaClass)
     private const val SCHEMA_VERSION = 1
     private val jsonFiles = JsonFileStore()
     private val displayMapSerializer = MapSerializer(String.serializer(), FullDisplayData.serializer())

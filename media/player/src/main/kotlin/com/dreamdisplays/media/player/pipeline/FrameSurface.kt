@@ -1,10 +1,10 @@
 package com.dreamdisplays.media.player.pipeline
 
-import com.dreamdisplays.api.media.FramePixelFormat
-import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.api.media.model.FramePixelFormat
 import com.dreamdisplays.api.media.player.FrameUploader
 import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import com.dreamdisplays.api.media.player.GpuTextureRef
+import com.dreamdisplays.media.player.MediaPlayer
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -14,19 +14,15 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Render-facing half of a frame pipe, shared by [VideoFramePipe] and [NativeVideoFramePipe]:
- * the reusable direct-buffer pool, the ready-frame swap slot, and the GPU upload path.
- *
- * The reader thread fills a "spare" buffer and [publish]es it; the render thread consumes it
- * via [updateFrame] without ever blocking the reader. The actual GPU upload is delegated to a
- * platform-supplied [FrameUploader] so this class stays free of any rendering API.
+ * Render-facing half of a frame pipe, shared by [VideoFramePipe] and [NativeVideoFramePipe]: the reusable direct-buffer
+ * pool and GPU upload plumbing.
  */
 internal class FrameSurface(
     private val debugLabel: String,
     uploaderFactory: FrameUploaderFactory,
     private val pixelFormat: FramePixelFormat = FramePixelFormat.RGB24,
 ) {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/FrameSurface")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** Platform GPU upload sink for this channel; holds persistent upload state (e.g. a PBO ring). */
     private val uploader: FrameUploader = uploaderFactory.create()
@@ -59,15 +55,8 @@ internal class FrameSurface(
     fun textureFilled(): Boolean = textureReady.get() || readyBufferRef.get() != null
 
     /**
-     * Uploads the ready frame to [target] if one is available.
-     * [actualW] / [actualH] must match [expectedW] / [expectedH] the pipe was started with.
-     *
-     * Returns true when a frame was actually uploaded to [target] (used by the dual-texture
-     * quality handoff to detect when the new-resolution texture has received its first frame).
-     *
-     * Warning: this is one of the most expensive operations in the pipeline. It's critical to call this as soon as
-     * possible after [textureFilled] returns true, to minimize the chance of the reader thread overwriting the ready
-     * buffer before upload.
+     * Uploads the ready frame to [target] if one is available. [actualW] / [actualH] must match [expectedW] / [expectedH]
+     * or the frame is dropped.
      */
     fun updateFrame(target: GpuTextureRef, actualW: Int, actualH: Int, expectedW: Int, expectedH: Int): Boolean {
         val buf = readyBufferRef.getAndSet(null) ?: return false
@@ -139,12 +128,6 @@ internal class FrameSurface(
     fun cleanup() {
         clear()
         uploader.cleanup()
-    }
-
-    /** Drops the ready frame and the buffer pool without recycling (used when the frame size changes). */
-    fun resetPool() {
-        readyBufferRef.set(null)
-        reusableFrameBuffers.clear()
     }
 
     /**

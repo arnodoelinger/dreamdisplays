@@ -1,0 +1,208 @@
+{
+  "noDisplayTerritories": "&7D |&f ¡Aún no has seleccionado territorios de pantalla! Selecciona dos puntos con {0} en {1}",
+  "createDisplayCommand": "&7D |&f Ahora escribe /display create para crear una pantalla",
+  "secondPointNotSelected": "&7D |&f ¡Aún no has seleccionado el segundo punto!",
+  "displayOverlap": "&7D |&f ¡Ya hay una pantalla en esta zona!",
+  "displayLimitReached": "&7D |&f ¡Has alcanzado el límite de %d pantalla(s) por jugador!",
+  "structureTooLarge": "&7D |&f No puedes crear una pantalla mayor de %d × %d bloques",
+  "structureTooSmall": "&7D |&f No puedes crear una pantalla menor de %d × %d bloques",
+  "firstPointSelected": "&7D |&f ¡Primer punto seleccionado! Ahora selecciona el segundo punto",
+  "secondPointSelected": "&7D |&f ¡Segundo punto seleccionado!",
+  "structureWrongDepth": "&7D |&f La selección debe tener al menos 1 bloque de profundidad",
+  "wrongStructure": "&7D |&f Solo se puede usar {0} para las pantallas",
+  "displayTooHigh": "&7D |&f La altura de la pantalla es demasiado alta (máx. %d)",
+  "displayTooLow": "&7D |&f La pantalla está demasiado baja (mín. %d)",
+  "selectionClear": "&7D |&f ¡La selección ha sido limpiada!",
+  "displayWrongCommand": "&7D |&f ¡Has introducido algo incorrecto!",
+  "displayCommandMissingPermission": "&7D |&f ¡No tienes permiso para usar este comando!",
+  "commandPlayersOnly": "&7D |&f Este comando solo puede ser usado por un jugador dentro del juego",
+  "successfulCreation": "&7D |&f ¡La pantalla ha sido creada! Mantén pulsado Shift y haz clic derecho mirándola para abrir su menú",
+  "noDisplay": "&7D |&f ¡No se encontró la pantalla!",
+  "settedURL": "&7D |&f ¡El video ha sido cargado!",
+  "invalidURL": "&7D |&f ¡Tu URL no es válida! Usa un enlace de vídeo válido (YouTube, Twitch, etc.)",
+  "settedName": "&7D |&f ¡El nombre de la pantalla ha sido establecido!",
+  "currentName": "&7D |&f Nombre de esta pantalla: %s",
+  "noNameSet": "&7D |&f Esta pantalla no tiene nombre",
+  "invalidName": "&7D |&f ¡Nombre inválido! Usa hasta 32 letras, dígitos, - o _, sin espacios",
+  "nameTaken": "&7D |&f ¡Ese nombre ya lo usa otra pantalla!",
+  "scheduleSet": "&7D |&f Ahora son las {0} para ti. La pantalla {1} {2} a las {3} ({4})",
+  "scheduleCurrentSet": "&7D |&f Esta pantalla está programada: {0} a las {1}",
+  "scheduleNoneSet": "&7D |&f Esta pantalla no tiene ninguna acción programada",
+  "scheduleCancelled": "&7D |&f Acción programada cancelada",
+  "scheduleInvalidTime": "&7D |&f ¡Hora inválida! Usa HH:mm o HH:mm:ss (formato 24h), por ejemplo 23:51 o 23:51:30",
+  "scheduleNeedsTime": "&7D |&f Ahora son las {0} para ti. Escribe una hora (HH:mm) para programar esto",
+  "scheduleActionPlay": "se reproducirá",
+  "scheduleActionPause": "se pausará",
+  "scheduleCountdownSeconds": "en {0}s",
+  "scheduleCountdownMinutes": "en {0}m {1}s",
+  "scheduleCountdownHours": "en {0}h {1}m",
+  "displayVideoWrongTargetBlock": "&7D |&f ¡Debes mirar un bloque de pantalla para usar este comando!",
+  "displayVideoNotOwner": "&7D |&f ¡No eres el propietario de esta pantalla!",
+  "reportTooQuickly": "&7D |&f ¡Estás enviando reportes demasiado rápido! Espera antes de enviar otro reporte",
+  "reportSent": "&7D |&f ¡El reporte ha sido enviado!",
+  "reportFailed": "&7D |&f No se pudo enviar el reporte. Inténtalo de nuevo más tarde",
+  "displayDeleted": "&7D |&f ¡La pantalla ha sido eliminada!",
+  "displayReported": "&7D |&f ¡La pantalla ha sido reportada!",
+  "reportNotConfigured": "&7D |&f ¡El sistema de reportes está desactivado en este servidor!",
+  "newVersion": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "¡Hay disponible una nueva versión %s de Dream Displays! Por favor ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "actualiza tu mod",
+        "color": "#023EB6",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays/versions"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Haz clic para descargar la nueva versión"
+        }
+      },
+      {
+        "text": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "newPluginVersion": "&7D |&f ¡Hay disponible una nueva versión del plugin Dream Displays (%s)! ¡Actualiza el plugin del servidor!",
+  "configReloaded": "&7D | &f¡Dream Displays se ha recargado!",
+  "configReloadFailed": "&7D |&f No se pudo recargar Dream Displays. Revisa la consola para ver errores",
+  "configReloadSummary": "&7D |&f Recargado: configuración, mensajes de idioma, permisos de comandos",
+  "noDisplaysFound": "&7D |&f No se encontraron pantallas",
+  "displayListHeader": "&7D |&f Pantallas:",
+  "displayListEntry": "&7D |&f {0}. Propietario: {1}, Ubicación: [{2}, {3}, {4}], URL: {5}",
+  "displayListPageLine": "&7D |&7 página=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7mundo=&f{0} &8| &7tamaño=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Desconocido",
+  "displayListUnknownWorld": "desconocido",
+  "displayListUnavailableUrl": "N/D",
+  "displayListTpButton": " [TP]",
+  "displayListUrlButton": " [URL]",
+  "displayBlockBreak": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Este es un bloque de pantalla. Instala el mod ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Haz clic para descargar Dream Displays"
+        }
+      },
+      {
+        "text": " para interactuar con él!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "modRequired": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Este servidor usa pantallas dentro del juego. ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Descarga Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Haz clic para descargar Dream Displays"
+        }
+      },
+      {
+        "text": " para verlas!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "display.enabled": "&7D |&f Pantallas activadas. Espera un momento...",
+  "display.disabled": "&7D |&f Pantallas desactivadas",
+  "display.already-disabled": "&7D |&f Las pantallas ya están desactivadas",
+  "display.already-enabled": "&7D |&f Las pantallas ya están activadas",
+  "displayTargetNotFound": "&7D |&f ¡El jugador '%s' no está conectado!",
+  "display.enabled.target": "&7D |&f Pantallas activadas para %s",
+  "display.disabled.target": "&7D |&f Pantallas desactivadas para %s",
+  "display.already-enabled.target": "&7D |&f Las pantallas ya están activadas para %s",
+  "display.already-disabled.target": "&7D |&f Las pantallas ya están desactivadas para %s",
+  "displayStatsHeader": "&7D |&f Estadísticas de uso del mod:",
+  "displayStatsEntry": "&7D |&f Versión %s: %d jugadores",
+  "displayStatsTotal": "&7D |&f Total de jugadores con el mod: %d",
+  "displayHelpHeader": "Comandos disponibles:",
+  "displayHelpCreate": "– /display create: crear una nueva pantalla",
+  "displayHelpVideo": "– /display video <url>: establecer video para tu pantalla",
+  "displayHelpName": "– /display name this|<id> <name>: dar a una pantalla un alias sin espacios usable como su id",
+  "displayHelpInfo": "– /display info: mostrar detalles de la pantalla que estás mirando",
+  "displayHelpDelete": "– /display delete: eliminar la pantalla que estás mirando",
+  "displayHelpList": "– /display list: listar todas las pantallas",
+  "displayHelpStats": "– /display stats: mostrar estadísticas de uso del mod",
+  "displayHelpReload": "– /display reload: recargar la configuración",
+  "displayHelpOn": "– /display on [jugador]: activar pantallas para ti o un jugador objetivo",
+  "displayHelpOff": "– /display off [jugador]: desactivar pantallas para ti o un jugador objetivo",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags]: fuerza una transmisión a pantalla completa a los jugadores",
+  "displayHelpHelp": "– /display help: mostrar esta ayuda",
+  "displayInfoHeader": "&7D |&f Información de la pantalla:",
+  "displayInfoOwnerLine": "&7D |&7 propietario=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 id-pantalla=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 mundo=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 tamaño=&f{0}x{1} &8| &7frente=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 idioma=&f{0} &8| &7duración=&f{1} &8| &7url=&f{2}",
+  "displayInfoScheduleLine": "&7D |&7 programado={0} a las &f{1}",
+  "displayInfoUnknownOwner": "Desconocido",
+  "displayInfoUnknownWorld": "Desconocido",
+  "displayInfoUnknownDuration": "desconocido",
+  "displayInfoAutoLang": "auto",
+  "displayInfoUnavailableUrl": "N/D",
+  "fullscreenStarted": "&7D |&f Transmisión a pantalla completa &b{0}&f iniciada (alcanzó {1} jugador(es))",
+  "fullscreenStopped": "&7D |&f Se detuvieron {0} transmisión(es) a pantalla completa",
+  "fullscreenStopFailed": "&7D |&f No se encontró ninguna transmisión a pantalla completa coincidente",
+  "fullscreenNoTargets": "&7D |&f Especifica al menos target <jugadores> o radius <bloques>",
+  "fullscreenAlreadyRunning": "&7D |&f Esa pantalla ya tiene una transmisión a pantalla completa, o el ID de sesión ya está en uso",
+  "fullscreenForcedDisallowed": "&7D |&f Las transmisiones a pantalla completa forzadas están desactivadas en la configuración",
+  "fullscreenNoDisplay": "&7D |&f No se encontró ninguna pantalla ni hay un mundo cargado para transmitir una URL",
+  "fullscreenNetworkNoProxy": "&7D |&f Este servidor no está conectado a un proxy de Dream Displays, comprueba [proxy] en config.toml.",
+  "fullscreenNetworkNotYetSupported": "&7D |&f La pantalla completa en red (server <nombre>/<global>) aún no está implementada.",
+  "fullscreenNetworkUrlOnly": "&7D |&f La pantalla completa en red solo admite una URL de vídeo, no un id de pantalla existente",
+  "fullscreenNetworkRadiusUnsupported": "&7D |&f radius no es compatible con server — solo se aplica a este servidor, inícialo localmente aquí en su lugar",
+  "fullscreenNetworkQueued": "&7D |&f Transmisión de pantalla completa en red en cola. Comenzará en breve en todos los servidores coincidentes",
+  "fullscreenNetworkStopQueued": "&7D |&f Solicitud de detención en red enviada para esa sesión",
+  "fullscreenListEmpty": "&7D |&f No hay transmisiones a pantalla completa activas",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "fullscreenListNetworkEntry": "&7D |&7 {0} &8| &7scope=&f{1} &8| &7network-reach=&f{2}",
+  "customMediaDisabled": "&7D |&f Los enlaces de vídeo personalizados están desactivados en este servidor",
+  "customMediaHostBlocked": "&7D |&f Los vídeos de este sitio no están permitidos en este servidor",
+  "customMediaNoPermission": "&7D |&f No tienes permiso para reproducir tus propios enlaces de vídeo",
+  "customMediaTooFast": "&7D |&f Estás cambiando de enlace de vídeo demasiado rápido. Espera un momento"
+}

@@ -1,0 +1,208 @@
+{
+  "noDisplayTerritories": "&7D |&f Vous n'avez pas encore sélectionné de zones d'affichage ! Veuillez sélectionner deux points avec {0} sur {1}",
+  "createDisplayCommand": "&7D |&f Tapez maintenant /display create pour créer un affichage",
+  "secondPointNotSelected": "&7D |&f Vous n'avez pas encore sélectionné le deuxième point !",
+  "displayOverlap": "&7D |&f Un affichage existe déjà dans cette zone !",
+  "displayLimitReached": "&7D |&f Vous avez atteint la limite de %d affichage(s) par joueur !",
+  "structureTooLarge": "&7D |&f Vous ne pouvez pas créer un affichage supérieur à %d × %d blocs",
+  "structureTooSmall": "&7D |&f Vous ne pouvez pas créer un affichage inférieur à %d × %d bloc",
+  "firstPointSelected": "&7D |&f Premier point sélectionné ! Sélectionnez maintenant le deuxième point",
+  "secondPointSelected": "&7D |&f Deuxième point sélectionné !",
+  "structureWrongDepth": "&7D |&f La sélection doit avoir une profondeur d'au moins 1 bloc",
+  "wrongStructure": "&7D |&f Seul {0} peut être utilisé pour les affichages",
+  "displayTooHigh": "&7D |&f La hauteur de l'affichage est trop élevée (max. %d)",
+  "displayTooLow": "&7D |&f L'affichage est trop bas (min. %d)",
+  "selectionClear": "&7D |&f La sélection a été effacée !",
+  "displayWrongCommand": "&7D |&f Vous avez saisi quelque chose d'incorrect !",
+  "displayCommandMissingPermission": "&7D |&f Vous n'avez pas la permission d'utiliser cette commande !",
+  "commandPlayersOnly": "&7D |&f Cette commande ne peut être utilisée que par un joueur en jeu",
+  "successfulCreation": "&7D |&f L'affichage a été créé ! Maintenez Shift et faites un clic droit en le regardant pour ouvrir son menu",
+  "noDisplay": "&7D |&f Affichage introuvable !",
+  "settedURL": "&7D |&f La vidéo a été chargée !",
+  "invalidURL": "&7D |&f Votre URL est invalide ! Utilisez un lien vidéo valide (YouTube, Twitch, etc.)",
+  "settedName": "&7D |&f Le nom de l'affichage a été défini !",
+  "currentName": "&7D |&f Nom de cet affichage : %s",
+  "noNameSet": "&7D |&f Cet affichage n'a pas de nom",
+  "invalidName": "&7D |&f Nom invalide ! Utilisez jusqu'à 32 lettres, chiffres, - ou _, sans espaces",
+  "nameTaken": "&7D |&f Ce nom est déjà utilisé par un autre affichage !",
+  "scheduleSet": "&7D |&f Il est {0} chez vous. L'affichage {1} {2} à {3} ({4})",
+  "scheduleCurrentSet": "&7D |&f Cet affichage est programmé : {0} à {1}",
+  "scheduleNoneSet": "&7D |&f Cet affichage n'a aucune action programmée",
+  "scheduleCancelled": "&7D |&f Action programmée annulée",
+  "scheduleInvalidTime": "&7D |&f Heure invalide ! Utilisez HH:mm ou HH:mm:ss (format 24h), par ex. 23:51 ou 23:51:30",
+  "scheduleNeedsTime": "&7D |&f Il est {0} chez vous. Entrez une heure (HH:mm) pour programmer ceci",
+  "scheduleActionPlay": "démarrera",
+  "scheduleActionPause": "se mettra en pause",
+  "scheduleCountdownSeconds": "dans {0}s",
+  "scheduleCountdownMinutes": "dans {0}m {1}s",
+  "scheduleCountdownHours": "dans {0}h {1}m",
+  "displayVideoWrongTargetBlock": "&7D |&f Vous devez regarder un bloc d'affichage pour utiliser cette commande !",
+  "displayVideoNotOwner": "&7D |&f Vous n'êtes pas le propriétaire de cet affichage !",
+  "reportTooQuickly": "&7D |&f Vous envoyez des signalements trop rapidement ! Veuillez attendre avant d'en envoyer un autre",
+  "reportSent": "&7D |&f Le signalement a été envoyé !",
+  "reportFailed": "&7D |&f Échec de l'envoi du signalement. Veuillez réessayer plus tard",
+  "displayDeleted": "&7D |&f L'affichage a été supprimé !",
+  "displayReported": "&7D |&f L'affichage a été signalé !",
+  "reportNotConfigured": "&7D |&f Le système de signalement est désactivé sur ce serveur !",
+  "newVersion": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Une nouvelle version %s de Dream Displays est disponible ! Veuillez ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "mettre à jour votre mod",
+        "color": "#023EB6",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays/versions"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Cliquez pour télécharger la nouvelle version"
+        }
+      },
+      {
+        "text": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "newPluginVersion": "&7D |&f Une nouvelle version du plugin Dream Displays (%s) est disponible ! Veuillez mettre à jour le plugin du serveur !",
+  "configReloaded": "&7D | &fDream Displays a été rechargé !",
+  "configReloadFailed": "&7D |&f Échec du rechargement de Dream Displays. Veuillez vérifier la console pour les erreurs",
+  "configReloadSummary": "&7D |&f Rechargé : configuration, messages de langue, permissions de commandes",
+  "noDisplaysFound": "&7D |&f Aucun affichage trouvé",
+  "displayListHeader": "&7D |&f Affichages :",
+  "displayListEntry": "&7D |&f {0}. Propriétaire : {1}, Position : [{2}, {3}, {4}], URL : {5}",
+  "displayListPageLine": "&7D |&7 page=&f{0}/{1} &8| &7total=&f{2}",
+  "displayListDetails": " &8| &7monde=&f{0} &8| &7taille=&f{1}x{2} &8| &7sync=&f{3} &8| &7id=&f{4}",
+  "displayListUnknownOwner": "Inconnu",
+  "displayListUnknownWorld": "inconnu",
+  "displayListUnavailableUrl": "N/D",
+  "displayListTpButton": " [TP]",
+  "displayListUrlButton": " [URL]",
+  "displayBlockBreak": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "C'est un bloc d'affichage. Installez le mod ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Cliquez pour télécharger Dream Displays"
+        }
+      },
+      {
+        "text": " pour interagir avec lui!",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "modRequired": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Ce serveur utilise des affichages en jeu. ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "Téléchargez Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "Cliquez pour télécharger Dream Displays"
+        }
+      },
+      {
+        "text": " pour les voir !",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "display.enabled": "&7D |&f Affichages activés. Veuillez patienter un instant...",
+  "display.disabled": "&7D |&f Affichages désactivés",
+  "display.already-disabled": "&7D |&f Les affichages sont déjà désactivés",
+  "display.already-enabled": "&7D |&f Les affichages sont déjà activés",
+  "displayTargetNotFound": "&7D |&f Le joueur '%s' est introuvable en ligne !",
+  "display.enabled.target": "&7D |&f Affichages activés pour %s",
+  "display.disabled.target": "&7D |&f Affichages désactivés pour %s",
+  "display.already-enabled.target": "&7D |&f Les affichages sont déjà activés pour %s",
+  "display.already-disabled.target": "&7D |&f Les affichages sont déjà désactivés pour %s",
+  "displayStatsHeader": "&7D |&f Statistiques d'utilisation du mod :",
+  "displayStatsEntry": "&7D |&f Version %s : %d joueurs",
+  "displayStatsTotal": "&7D |&f Total des joueurs avec le mod : %d",
+  "displayHelpHeader": "Commandes disponibles :",
+  "displayHelpCreate": "– /display create : créer un nouvel affichage",
+  "displayHelpVideo": "– /display video <url> : définir la vidéo de votre affichage",
+  "displayHelpName": "– /display name this|<id> <name> : donner à un affichage un alias sans espace utilisable comme id",
+  "displayHelpInfo": "– /display info : afficher les détails de l'affichage que vous regardez",
+  "displayHelpDelete": "– /display delete : supprimer l'affichage que vous regardez",
+  "displayHelpList": "– /display list : lister tous les affichages",
+  "displayHelpStats": "– /display stats : afficher les statistiques d'utilisation du mod",
+  "displayHelpReload": "– /display reload : recharger la configuration",
+  "displayHelpOn": "– /display on [joueur] : activer les affichages pour vous ou un joueur cible",
+  "displayHelpOff": "– /display off [joueur] : désactiver les affichages pour vous ou un joueur cible",
+  "displayHelpFullscreen": "– /display fullscreen start <id|url> [flags] : force une diffusion plein écran aux joueurs",
+  "displayHelpHelp": "– /display help : afficher cette aide",
+  "displayInfoHeader": "&7D |&f Infos affichage :",
+  "displayInfoOwnerLine": "&7D |&7 propriétaire=&f{0} &8| &7uuid=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 id-affichage=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 monde=&f{0} &8| &7pos1=&f[{1}, {2}, {3}] &8| &7pos2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 taille=&f{0}x{1} &8| &7face=&f{2} &8| &7sync=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 langue=&f{0} &8| &7durée=&f{1} &8| &7url=&f{2}",
+  "displayInfoScheduleLine": "&7D |&7 programmé={0} à &f{1}",
+  "displayInfoUnknownOwner": "Inconnu",
+  "displayInfoUnknownWorld": "Inconnu",
+  "displayInfoUnknownDuration": "inconnu",
+  "displayInfoAutoLang": "auto",
+  "displayInfoUnavailableUrl": "N/D",
+  "fullscreenStarted": "&7D |&f Diffusion plein écran &b{0}&f démarrée (atteint {1} joueur(s))",
+  "fullscreenStopped": "&7D |&f {0} diffusion(s) plein écran arrêtée(s)",
+  "fullscreenStopFailed": "&7D |&f Aucune diffusion plein écran correspondante trouvée",
+  "fullscreenNoTargets": "&7D |&f Spécifiez au moins target <joueurs> ou radius <blocs>",
+  "fullscreenAlreadyRunning": "&7D |&f Cet affichage héberge déjà une diffusion plein écran, ou l'ID de session est déjà pris",
+  "fullscreenForcedDisallowed": "&7D |&f Les diffusions plein écran forcées sont désactivées dans la configuration",
+  "fullscreenNoDisplay": "&7D |&f Aucun affichage trouvé et aucun monde chargé pour héberger une diffusion par URL",
+  "fullscreenNetworkNoProxy": "&7D |&f Ce serveur n'est pas connecté à un proxy Dream Displays, vérifiez [proxy] dans config.toml.",
+  "fullscreenNetworkNotYetSupported": "&7D |&f Le plein écran réseau (server <nom>/<global>) n'est pas encore implémenté.",
+  "fullscreenNetworkUrlOnly": "&7D |&f Le plein écran réseau ne prend en charge qu'une URL vidéo, pas un id d'affichage existant",
+  "fullscreenNetworkRadiusUnsupported": "&7D |&f radius n'est pas pris en charge avec server — il ne s'applique qu'à ce serveur, démarrez-le localement ici à la place",
+  "fullscreenNetworkQueued": "&7D |&f Diffusion plein écran réseau mise en file d'attente. Elle démarrera bientôt sur tous les serveurs correspondants",
+  "fullscreenNetworkStopQueued": "&7D |&f Demande d'arrêt réseau envoyée pour cette session",
+  "fullscreenListEmpty": "&7D |&f Aucune diffusion plein écran en cours",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7display=&f{1} &8| &7virtual=&f{2} &8| &7reach=&f{3}",
+  "fullscreenListNetworkEntry": "&7D |&7 {0} &8| &7scope=&f{1} &8| &7network-reach=&f{2}",
+  "customMediaDisabled": "&7D |&f Les liens vidéo personnalisés sont désactivés sur ce serveur",
+  "customMediaHostBlocked": "&7D |&f Les vidéos de ce site ne sont pas autorisées sur ce serveur",
+  "customMediaNoPermission": "&7D |&f Vous n'avez pas la permission de lire vos propres liens vidéo",
+  "customMediaTooFast": "&7D |&f Vous changez de lien vidéo trop vite. Patientez un instant"
+}

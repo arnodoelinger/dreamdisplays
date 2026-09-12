@@ -5,13 +5,9 @@ use std::collections::VecDeque;
 /// One cached encoded packet plus the metadata the replay decoder needs to place it on the timeline.
 #[derive(Clone, Debug)]
 pub struct CachedPacket {
-    /// Raw encoded packet payload (one `AVPacket`'s data).
     pub data: Vec<u8>,
-    /// Normalized presentation timestamp in nanoseconds, or [`NO_PTS`] when libav gave none.
     pub pts_nanos: i64,
-    /// Normalized decode timestamp in nanoseconds, or [`NO_PTS`] when unavailable.
     pub dts_nanos: i64,
-    /// True for keyframes (GOP boundaries); the ring may only start at one.
     pub keyframe: bool,
 }
 
@@ -19,25 +15,21 @@ pub struct CachedPacket {
 pub const NO_PTS: i64 = i64::MIN;
 
 /// Decoder parameters captured alongside the packet ring so a replay session can rebuild the exact
-/// decoder without a container/demuxer. Mirrors the fields of `AVCodecParameters` we need.
+/// decoder without a container / demuxer.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CodecParams {
-    /// `AVCodecID` as i32.
     pub codec_id: i32,
     pub width: i32,
     pub height: i32,
-    /// Stream time base (so packet PTS/DTS in ticks can be reproduced if needed).
     pub time_base_num: i32,
     pub time_base_den: i32,
-    /// Codec extradata (SPS/PPS etc.) required to open many decoders (H.264/HEVC).
     pub extradata: Vec<u8>,
 }
 
-/// Magic prefix for a serialized ring snapshot (`"DDR1"`).
+/// Magic prefix for a serialized ring snapshot.
 const SNAPSHOT_MAGIC: u32 = 0x44_44_52_31;
 
 impl CachedPacket {
-    /// Best available ordering timestamp: PTS when present, else DTS, else [`NO_PTS`].
     fn order_ts(&self) -> i64 {
         ts_opt(self.pts_nanos).unwrap_or(self.dts_nanos)
     }
@@ -52,8 +44,6 @@ pub struct PacketRing {
 }
 
 impl PacketRing {
-    /// Creates an empty ring retaining up to `window_nanos` of stream (clamped to >= 0) and never
-    /// more than `max_bytes` (clamped to >= 1) of packet payload.
     pub fn new(window_nanos: i64, max_bytes: usize) -> PacketRing {
         PacketRing {
             window_nanos: window_nanos.max(0),
@@ -63,23 +53,18 @@ impl PacketRing {
         }
     }
 
-    /// Number of retained packets.
     pub fn len(&self) -> usize {
         self.packets.len()
     }
 
-    /// True when no packets are retained.
     pub fn is_empty(&self) -> bool {
         self.packets.is_empty()
     }
 
-    /// Total retained packet payload in bytes.
     pub fn total_bytes(&self) -> usize {
         self.bytes
     }
 
-    /// Timestamp span (newest — oldest order timestamp) currently retained, in nanoseconds.
-    /// Zero when fewer than two timestamped packets are present.
     pub fn span_nanos(&self) -> i64 {
         let first = self.packets.iter().find_map(|p| ts_opt(p.order_ts()));
         let last = self.packets.iter().rev().find_map(|p| ts_opt(p.order_ts()));
@@ -89,7 +74,6 @@ impl PacketRing {
         }
     }
 
-    /// PTS of the newest retained packet, or [`NO_PTS`] when empty / untimed.
     pub fn newest_ts(&self) -> i64 {
         self.packets
             .iter()
@@ -98,33 +82,24 @@ impl PacketRing {
             .unwrap_or(NO_PTS)
     }
 
-    /// Target retention window in nanoseconds.
     pub fn window_nanos(&self) -> i64 {
         self.window_nanos
     }
 
-    /// Appends `packet`, then evicts whole leading GOPs to honor the window and byte budget while
-    /// keeping the ring keyframe-aligned.
     pub fn push(&mut self, packet: CachedPacket) {
         self.bytes += packet.data.len();
         self.packets.push_back(packet);
         self.evict();
     }
 
-    /// Drops whole leading GOPs while either (a) the second keyframe still leaves >= `window_nanos`
-    /// covered, or (b) the byte budget is exceeded. Never drops below a single GOP, so the ring stays
-    /// decodable from its front.
     fn evict(&mut self) {
         let newest = self.newest_ts();
         loop {
-            // Index of the second keyframe; everything before it is the droppable leading GOP
             let Some(second_kf) = self.second_keyframe_index() else {
                 break; // 0 or 1 keyframes: nothing we can drop without losing the decodable prefix
             };
 
             let over_bytes = self.bytes > self.max_bytes;
-            // The leading GOP is only redundant for the window if the *next* keyframe is already old
-            // enough that dropping everything before it still leaves >= window_nanos covered.
             let next_kf_ts = self.packets[second_kf].order_ts();
             let window_redundant = newest != NO_PTS
                 && next_kf_ts != NO_PTS
@@ -141,8 +116,6 @@ impl PacketRing {
         }
     }
 
-    /// Index of the second keyframe in the ring (the start of the second GOP), or `None` when the
-    /// ring holds fewer than two keyframes.
     fn second_keyframe_index(&self) -> Option<usize> {
         self.packets
             .iter()
@@ -152,11 +125,6 @@ impl PacketRing {
             .map(|(i, _)| i)
     }
 
-    /// Returns the packets needed to resume playback at `position_nanos`: everything from a safe
-    /// keyframe at or before `position_nanos` to the end. For codecs that may use open GOPs, this
-    /// intentionally backs up one extra keyframe when available; replay discards the decoded pre-roll
-    /// before `position_nanos`. When `position_nanos` precedes the ring, replay starts at the first
-    /// retained keyframe. Returns empty when the ring has no keyframe.
     pub fn drain_from(&self, position_nanos: i64) -> Vec<CachedPacket> {
         let start = self.start_index_for(position_nanos);
         match start {
@@ -165,7 +133,6 @@ impl PacketRing {
         }
     }
 
-    /// Index of the keyframe to start replay from for `position_nanos` (see [`drain_from`]).
     fn start_index_for(&self, position_nanos: i64) -> Option<usize> {
         let mut previous: Option<usize> = None;
         let mut chosen: Option<usize> = None;
@@ -175,7 +142,6 @@ impl PacketRing {
                 continue;
             }
             let ts = p.order_ts();
-            // First keyframe is the floor; then advance while keyframes stay at / under the position
             if chosen.is_none() {
                 chosen = Some(i);
                 chosen_at_or_before = ts == NO_PTS || ts <= position_nanos;
@@ -195,7 +161,6 @@ impl PacketRing {
         }
     }
 
-    /// Drops all retained packets.
     pub fn clear(&mut self) {
         self.packets.clear();
         self.bytes = 0;
@@ -352,7 +317,6 @@ mod tests {
         }
     }
 
-    /// One GOP every 5 frames, `bytes` here is the sum of all frames' data lengths.
     fn fill(ring: &mut PacketRing, frames: i64, bytes: usize) {
         for i in 0..frames {
             ring.push(pkt(i * 33, i % 5 == 0, bytes));
@@ -380,7 +344,6 @@ mod tests {
 
     #[test]
     fn enforces_byte_budget_by_dropping_gops() {
-        // Window huge, but cap bytes so the budget is the binding constraint
         let mut ring = PacketRing::new(i64::MAX / 4, 1_000);
         fill(&mut ring, 300, 100);
         assert!(ring.total_bytes() <= 1_000, "Must honor byte budget.");
@@ -393,21 +356,17 @@ mod tests {
 
     #[test]
     fn never_drops_below_one_gop() {
-        // Absurdly tight budget; a single GOP (5 frames) still exceeds it but must be retained
         let mut ring = PacketRing::new(0, 1);
         fill(&mut ring, 7, 100);
         assert!(!ring.is_empty(), "Cannot drop the only decodable GOP.");
         assert!(ring.packets.front().unwrap().keyframe);
-        // At most the current partial GOP plus the previous one's tail is kept
         assert!(ring.len() <= 7);
     }
 
     #[test]
     fn drain_from_backs_up_one_keyframe_for_decoder_context() {
         let mut ring = PacketRing::new(i64::MAX / 4, usize::MAX);
-        fill(&mut ring, 30, 100); // keyframes at frame 0,5,10,15,20,25 ⇒ 0,165,330,495,660,825 ms
-        // Resume at 500 ms -> last keyframe <= 500 ms is frame 15 (495 ms), but replay backs up
-        // one GOP for H.264/open-GOP decoder references.
+        fill(&mut ring, 30, 100);
         let out = ring.drain_from(500 * MS);
         assert!(!out.is_empty());
         assert!(out[0].keyframe, "Replay must begin on a keyframe.");

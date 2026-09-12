@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.render.RenderContext
+import com.dreamdisplays.api.render.backend.service.RenderContext
 
 /**
  * A hook that can be registered to be called during the rendering process. This allows for custom rendering logic to be

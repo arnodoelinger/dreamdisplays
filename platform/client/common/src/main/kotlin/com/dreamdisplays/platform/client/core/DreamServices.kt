@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.core
 
-import com.dreamdisplays.api.runtime.ServiceRegistry
+import com.dreamdisplays.api.runtime.registry.service.ServiceRegistry
 import com.dreamdisplays.core.runtime.DefaultServiceRegistry
 
 /**

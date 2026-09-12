@@ -1,14 +1,15 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.api.display.service.DisplaySystem
-import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.api.display.event.DisplayEvent
-import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.service.DisplaySystem
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.media.audio.service.keys.AudioAcousticsServices
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
+import com.dreamdisplays.api.storage.model.FullDisplayData
+import com.dreamdisplays.core.services.DisplayStorage
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.storage.ClientSettingsStore
-import com.dreamdisplays.api.storage.FullDisplayData
-import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.api.media.VideoQuality
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
@@ -30,18 +31,8 @@ object DisplayRegistry {
     /** Returns a snapshot of all currently registered screens. */
     fun getScreens(): Collection<DisplayScreen> = screens.values
 
-    /** Number of screens currently parked warm (dormant), used to bound the warm-park pool. */
-    fun dormantCount(): Int = screens.values.count { it.isDormant }
-
     /** Snapshot of screens currently parked fully warm, used by the adaptive warm-park budget. */
     fun dormantScreens(): List<DisplayScreen> = screens.values.filter { it.isDormant }
-
-    /** Subscribes [listener] to display lifecycle events; returns an [AutoCloseable] to unsubscribe. */
-    fun addListener(listener: (DisplayEvent) -> Unit): AutoCloseable {
-        displaySystem?.let { return it.onDisplayEvent(listener) }
-        eventListeners.add(listener)
-        return AutoCloseable { eventListeners.remove(listener) }
-    }
 
     /** Dispatches [event] to all registered listeners. */
     fun emit(event: DisplayEvent) {
@@ -60,45 +51,98 @@ object DisplayRegistry {
 
         val clientSettings = ClientSettingsStore.getSettings(
             displayScreen.uuid,
-            DisplayScreen.defaultVolumeFor(displayScreen.mode),
+            DisplayScreen.defaultVolume(),
         )
         displayScreen.volume = clientSettings.volume
         displayScreen.quality = VideoQuality.parse(clientSettings.quality)
         displayScreen.muted = clientSettings.muted
+        displayScreen.acousticsEnabled = clientSettings.acousticsEnabled
+        // Disk-persisted fallback (survives a full game restart); overridden below by the
+        // same-session cache when present, which is fresher.
+        displayScreen.savedTimeNanos = clientSettings.savedTimeNanos
 
         DisplayStorage.getDisplayData(displayScreen.uuid)?.let { saved ->
-            displayScreen.renderDistance = saved.renderDistance
             displayScreen.savedTimeNanos = saved.currentTimeNanos
         }
 
         screens[displayScreen.uuid] = displayScreen
         recordScreen(displayScreen)
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.registerSource(displayScreen.uuid)
     }
 
-    /** Unregisters a display screen, saving its data for later re-registration. */
+    /** Unregisters a display; caches world-anchored ones for distance-triggered re-load. */
     fun unregisterScreen(displayScreen: DisplayScreen) {
-        unloadedScreens[displayScreen.uuid] = displayScreen.toFullDisplayData()
+        if (displayScreen.virtual) {
+            ClientSettingsStore.remove(displayScreen.uuid)
+        } else {
+            unloadedScreens[displayScreen.uuid] = displayScreen.toFullDisplayData()
+            ClientSettingsStore.setSavedTimeNanos(displayScreen.uuid, displayScreen.currentTimeNanos)
+        }
         screens.remove(displayScreen.uuid)
         displayScreen.unregister()
         displaySystem?.removeDisplay(DisplayId(displayScreen.uuid))
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.unregisterSource(displayScreen.uuid)
     }
 
     /** Unregisters all display screens. */
     fun unloadAll() {
-        screens.values.forEach { it.unregister() }
+        val acoustics = DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)
+        screens.values.forEach { it.unregister(); acoustics?.unregisterSource(it.uuid) }
         screens.clear()
         unloadedScreens.clear()
+        awaitingReconfirm.clear()
         displaySystem?.clearDisplays()
+    }
+
+    /** How long a carried-over display waits to be re-announced by the new server before it is dropped. */
+    private const val RECONFIRM_GRACE_MS = 12_000L
+
+    /** Display id -> instant after which an unconfirmed carry-over is torn down. */
+    private val awaitingReconfirm = ConcurrentHashMap<UUID, Long>()
+
+    /** Server-switch teardown: world-anchored displays go immediately, popout-active ones held for reconfirm grace. */
+    fun unloadAllForServerSwitch() {
+        val now = System.currentTimeMillis()
+        val carried = mutableSetOf<UUID>()
+        for (screen in screens.values.toList()) {
+            if (screen.isPopoutActive) {
+                carried += screen.uuid
+                awaitingReconfirm[screen.uuid] = now + RECONFIRM_GRACE_MS
+            } else {
+                // Per-display removal, never displaySystem.clearDisplays(): that one wipes every
+                // display it knows about, and the removal event closes the very popout being carried.
+                unregisterScreen(screen)
+            }
+        }
+        unloadedScreens.keys.removeAll(carried)
+        awaitingReconfirm.keys.retainAll(carried)
+    }
+
+    /** The new server re-announced [displayId]; it is no longer provisional. */
+    fun markReconfirmed(displayId: UUID) {
+        awaitingReconfirm.remove(displayId)
+    }
+
+    /** Drops carried-over displays the new server never re-announced. Called once per client tick. */
+    fun tickReconfirm() {
+        if (awaitingReconfirm.isEmpty()) return
+        val now = System.currentTimeMillis()
+        for ((displayId, deadline) in awaitingReconfirm.entries.toList()) {
+            if (deadline > now) continue
+            awaitingReconfirm.remove(displayId)
+            screens[displayId]?.let { unregisterScreen(it) }
+        }
     }
 
     /** Saves the display screen data to disk. */
     fun saveScreenData(displayScreen: DisplayScreen) {
         DisplayStorage.saveDisplayData(displayScreen.uuid, displayScreen.toFullDisplayData())
+        ClientSettingsStore.setSavedTimeNanos(displayScreen.uuid, displayScreen.currentTimeNanos)
     }
 
-    /** Loads all display screens for a given server from disk. */
+    /** Restores the display snapshot cached for [serverId] (e.g. saved timecodes) from a prior session. */
     fun loadScreensForServer(serverId: String) {
-        DisplayStorage.load(serverId)
+        DisplayStorage.load(serverId, DisplayStorage.snapshot(serverId))
     }
 
     /** Saves all display screens to disk. */

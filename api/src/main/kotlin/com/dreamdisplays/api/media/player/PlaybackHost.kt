@@ -1,19 +1,17 @@
 package com.dreamdisplays.api.media.player
 
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.playback.PlaybackMode
-import java.util.UUID
+import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.media.model.DreamMediaException
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import java.util.*
 
 /**
- * The display a [com.dreamdisplays.media.player.MediaPlayer] drives, abstracted away from the Minecraft
- * `DisplayScreen`. The platform layer implements this; the player reads playback-relevant state and
- * signals render-side transitions through it.
+ * Display abstraction for [com.dreamdisplays.media.player.MediaPlayer]; platform-side implementation.
  *
- * @since 1.8.0
+ * @since 1.8.x
  */
-@DreamDisplaysUnstableApi
+@Unstable
 interface PlaybackHost {
     /** Stable identifier of this display, used for log labels. */
     val uuid: UUID
@@ -32,6 +30,12 @@ interface PlaybackHost {
 
     /** Effective playback mode (Watch Party overrides the display's own mode). */
     val effectiveMode: PlaybackMode
+
+    /**
+     * False when a non-looping fullscreen mode should stop at the end of the VOD instead of
+     * restarting it; true everywhere else.
+     */
+    val shouldLoopOnEnd: Boolean
 
     /** Content aspect ratio of the resolved video; the player updates this on (re)resolve. */
     var videoContentAspect: Double

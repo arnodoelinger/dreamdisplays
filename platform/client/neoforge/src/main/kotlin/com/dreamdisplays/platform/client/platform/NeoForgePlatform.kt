@@ -1,12 +1,12 @@
 package com.dreamdisplays.platform.client.platform
 
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.platform.Platform
-import com.dreamdisplays.api.platform.PlatformId
-import com.dreamdisplays.api.platform.PlatformLogger
-import com.dreamdisplays.api.platform.PlatformPaths
-import com.dreamdisplays.api.platform.PlatformScheduler
-import com.dreamdisplays.api.platform.PlatformSide
+import com.dreamdisplays.api.platform.identity.Platform
+import com.dreamdisplays.api.platform.identity.PlatformId
+import com.dreamdisplays.api.platform.capability.PlatformLogger
+import com.dreamdisplays.api.platform.capability.PlatformPaths
+import com.dreamdisplays.api.platform.capability.PlatformScheduler
+import com.dreamdisplays.api.platform.identity.PlatformSide
 import com.dreamdisplays.util.GeneralUtil
 import net.neoforged.fml.ModList
 import net.neoforged.fml.loading.FMLEnvironment
@@ -44,5 +44,9 @@ object NeoForgePlatform : Platform {
     }
 
     override val isDevEnvironment: Boolean
-        get() = !FMLEnvironment.isProduction()
+        get() =
+            //? if >=1.21.11 {
+            !FMLEnvironment.isProduction()
+    //?} else
+    /*!FMLEnvironment.production*/
 }

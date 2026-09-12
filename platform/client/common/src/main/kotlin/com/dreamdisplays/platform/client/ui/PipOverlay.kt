@@ -1,38 +1,51 @@
 package com.dreamdisplays.platform.client.ui
 
+//? if >=1.21.11 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
+//? if >=1.21.11 {
+import net.minecraft.client.renderer.RenderPipelines
+//?}
+//? if >=1.21.11 {
+import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.platform.client.overlay.Overlay
-import com.dreamdisplays.platform.client.overlay.OverlayBounds
-import com.dreamdisplays.platform.client.overlay.OverlayEvent
-import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.overlay.*
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.platform.client.render.TextureUploadUtil
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawOutline
+import com.dreamdisplays.platform.client.ui.kit.scaleAlpha
+import com.dreamdisplays.platform.client.ui.widgets.IconButton
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
-import net.minecraft.client.renderer.RenderPipelines
 import net.minecraft.client.renderer.texture.DynamicTexture
-import net.minecraft.resources.Identifier
+import net.minecraft.client.resources.sounds.SimpleSoundInstance
+import net.minecraft.sounds.SoundEvents
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.UUID
+import java.util.*
 
 /**
- * In-game Picture-in-Picture overlay for one display screen.
- *
- *  - Click on body (no drag) – `DisplayMenu`
- *  - Click + drag the body – free move; on release snaps smoothly to nearest free anchor
- *  - Click + drag the resize grip – resize (grip is in the corner of the PiP facing screen center)
+ * In-game Picture-in-Picture overlay for one display screen. Click on the body (no drag) opens `DisplayMenu`;
+ * click-and-drag moves or resizes the overlay.
  */
 class PipOverlay(
     val displayScreen: DisplayScreen,
     initialCorner: PipCorner = PipCorner.BOTTOM_RIGHT,
+    private val interactive: Boolean = true,
+    initialSizeFraction: Float = 0.33f,
 ) : Overlay {
     @Volatile
     private var frontBuf: ByteBuffer = EMPTY_DIRECT
@@ -62,10 +75,10 @@ class PipOverlay(
     private var texH = 0
     private var uploader: AsyncTextureUploader? = null
     private var rgbaUploadBuffer: ByteBuffer? = null
+    var anchor: PipAnchor = savedAnchor(displayScreen) ?: PipAnchor.fromCorner(initialCorner)
 
-    var anchor: PipAnchor = PipAnchor.fromCorner(initialCorner)
-    private var sizeFraction: Float = 0.25f
-
+    private var sizeFraction: Float =
+        (savedSizeFraction(displayScreen) ?: initialSizeFraction).coerceIn(MIN_SIZE_FRAC, MAX_SIZE_FRAC)
     private var posX: Float = 0f
     private var posY: Float = 0f
     private var targetX: Float = 0f
@@ -78,13 +91,18 @@ class PipOverlay(
     var lastPipH = 0; private set
 
     private var animProgress = 0f
-    private var closing = false
+
+    /** True once the fade-out started; such an overlay no longer reserves its anchor. */
+    var closing = false
+        private set
+
     private var lastRenderNanos = 0L
 
     private var wasLeftPressed = false
     private var pressed = false
     private var pressedInBody = false
     private var pressedInResize = false
+    private var pressedInClose = false
     private var dragging = false
     private var resizing = false
     private var pressMouseX = 0
@@ -95,11 +113,12 @@ class PipOverlay(
 
     private var hovering = false
     private var hoveringResize = false
+    private var hoveringClose = false
 
     val isFinished: Boolean get() = closing && animProgress < 0.01f
     val isDragging: Boolean get() = dragging
 
-    /** Stable identity usable with [Overlay] / [com.dreamdisplays.platform.client.overlay.OverlayManager] contracts. */
+    /** Stable identity usable with [Overlay] / [OverlayManager] contracts. */
     override val displayId: DisplayId get() = DisplayId(displayScreen.uuid)
 
     /** Visible until the close animation has fully played out. */
@@ -184,7 +203,10 @@ class PipOverlay(
             tex?.close()
             textureId?.let { mc.textureManager.release(it) }
             val img = NativeImage(NativeImage.Format.RGBA, fw, fh, false)
+            //? if >=1.21.11 {
             tex = DynamicTexture({ "dreamdisplays:pip" }, img)
+            //?} else
+            /*tex = DynamicTexture(img)*/
             textureId = Identifier.fromNamespaceAndPath(
                 Initializer.MOD_ID, "pip/${displayScreen.uuid}-${UUID.randomUUID()}"
             )
@@ -192,8 +214,8 @@ class PipOverlay(
             dynamicTexture = tex; texW = fw; texH = fh
         }
 
-        TextureUploadUtil.upload(
-            texture = tex.getTexture(),
+        TextureUploadUtil.uploadDynamicTexture(
+            texture = tex,
             src = buf,
             w = fw,
             h = fh,
@@ -262,22 +284,36 @@ class PipOverlay(
         lastPipX = cx; lastPipY = cy; lastPipW = pipW; lastPipH = pipH
 
         val (handleX, handleY) = handlePixelPos(pipW, pipH)
+        val (closeX, closeY) = closeButtonPixelPos(pipW, pipH)
 
         hovering = mouseX in cx..(cx + pipW) && mouseY in cy..(cy + pipH) && animProgress > 0.6f
         hoveringResize = hovering &&
                 mouseX in (cx + handleX)..(cx + handleX + RESIZE_SZ) &&
                 mouseY in (cy + handleY)..(cy + handleY + RESIZE_SZ)
+        hoveringClose = interactive && hovering &&
+                mouseX in (cx + closeX)..(cx + closeX + CLOSE_SZ) &&
+                mouseY in (cy + closeY)..(cy + closeY + CLOSE_SZ)
 
         val scale = 0.94f + 0.06f * animProgress
         val alpha = animProgress
 
         val matrices = g.pose()
+        //? if >=1.21.11 {
         matrices.pushMatrix()
         matrices.translate(cx + pipW / 2f, cy + pipH / 2f)
         matrices.scale(scale, scale)
         matrices.translate(-pipW / 2f, -pipH / 2f)
+        //?} else
+        /*matrices.pushPose()
+        matrices.translate((cx + pipW / 2f).toDouble(), (cy + pipH / 2f).toDouble(), PIP_Z)
+        matrices.scale(scale, scale, 1f)
+        matrices.translate((-pipW / 2f).toDouble(), (-pipH / 2f).toDouble(), 0.0)*/
 
         // Video content only. The main display texture is padded to fit the in-world display.
+        // On 1.21.1 the legacy blit draws with the POSITION_TEX shader (alpha comes from the shader
+        // color) but does not enable blending, so the fade alpha is invisible without enableBlend.
+        // 1.21.11+ uses a render pipeline that already blends, and bakes alpha into the blit color.
+        //? if >=1.21.11 {
         g.blit(
             RenderPipelines.GUI_TEXTURED,
             id,
@@ -291,19 +327,27 @@ class PipOverlay(
             content.h,
             fw,
             fh,
-            blendColor(0xFFFFFFFF.toInt(), alpha),
+            scaleAlpha(0xFFFFFFFF.toInt(), alpha),
         )
+        //?} else
+        /*RenderSystem.enableBlend(); RenderSystem.defaultBlendFunc(); g.setColor(1f, 1f, 1f, alpha); g.blit(id, 0, 0, pipW, pipH, content.x.toFloat(), content.y.toFloat(), content.w, content.h, fw, fh); g.setColor(1f, 1f, 1f, 1f)*/
 
         // Border
         val active = hovering || dragging || resizing
-        val borderColor = blendColor(if (active) ACCENT else PANEL_BORDER, alpha)
-        outline(g, 0, 0, pipW, pipH, borderColor)
+        val borderColor = scaleAlpha(if (active) UiTheme.ACCENT else UiTheme.PANEL_BORDER, alpha)
+        g.drawOutline(UiRect(0, 0, pipW, pipH), borderColor)
 
         if (hovering || resizing) {
             renderResizeHandle(g, handleX, handleY, alpha)
         }
+        if (hovering && interactive) {
+            renderCloseButton(g, closeX, closeY, alpha)
+        }
 
+        //? if >=1.21.11 {
         matrices.popMatrix()
+        //?} else
+        /*matrices.popPose()*/
         return true
     }
 
@@ -322,9 +366,13 @@ class PipOverlay(
                 pressed = true
                 pressMouseX = mx; pressMouseY = my
                 val (hx, hy) = handlePixelPos(pipW, pipH)
+                val (clx, cly) = closeButtonPixelPos(pipW, pipH)
                 pressedInResize = mx in (cx + hx)..(cx + hx + RESIZE_SZ) &&
                         my in (cy + hy)..(cy + hy + RESIZE_SZ)
-                pressedInBody = !pressedInResize
+                pressedInClose = interactive && !pressedInResize &&
+                        mx in (cx + clx)..(cx + clx + CLOSE_SZ) &&
+                        my in (cy + cly)..(cy + cly + CLOSE_SZ)
+                pressedInBody = !pressedInResize && !pressedInClose
                 dragOffsetX = mx - cx
                 dragOffsetY = my - cy
                 resizeStartFrac = sizeFraction
@@ -363,14 +411,26 @@ class PipOverlay(
                     val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
                     targetX = ax.toFloat(); targetY = ay.toFloat()
                     dragging = false
+                    persistGeometry()
                 }
 
-                resizing -> resizing = false
-                pressedInBody -> DisplayMenu.open(displayScreen)
+                resizing -> {
+                    resizing = false
+                    persistGeometry()
+                }
+
+                pressedInClose -> {
+                    val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
+                    Minecraft.getInstance().soundManager.play(s)
+                    displayScreen.deactivatePopout()
+                }
+
+                pressedInBody -> if (interactive) DisplayMenu.open(displayScreen)
             }
             pressed = false
             pressedInBody = false
             pressedInResize = false
+            pressedInClose = false
         }
 
         wasLeftPressed = leftPressed
@@ -424,18 +484,46 @@ class PipOverlay(
         return x to y
     }
 
+    /** Returns the (x, y) top-left position of the close button, in the corner opposite the resize handle. */
+    private fun closeButtonPixelPos(pipW: Int, pipH: Int): Pair<Int, Int> {
+        val (cfx, cfy) = anchor.centerFacingCorner()
+        val sx = -cfx
+        val sy = -cfy
+        val x = when {
+            sx > 0 -> pipW - CLOSE_SZ - RESIZE_INSET
+            sx < 0 -> RESIZE_INSET
+            else -> (pipW - CLOSE_SZ) / 2
+        }
+        val y = when {
+            sy > 0 -> pipH - CLOSE_SZ - RESIZE_INSET
+            sy < 0 -> RESIZE_INSET
+            else -> (pipH - CLOSE_SZ) / 2
+        }
+        return x to y
+    }
+
+    /** Draws the close ("cross") icon at ([hx], [hy]), tinted red on hover. */
+    private fun renderCloseButton(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
+        val tint = scaleAlpha(if (hoveringClose) UiTheme.ACCENT_UPDATE else 0xFFFFFFFF.toInt(), alpha)
+        val margin = 2
+        //? if >=1.21.11 {
+        g.blitSprite(
+            RenderPipelines.GUI_TEXTURED, IconButton.modIcon("cross"),
+            hx + margin, hy + margin, CLOSE_SZ - margin * 2, CLOSE_SZ - margin * 2, tint,
+        )
+        //?} else
+        /*g.blitSprite(IconButton.modIcon("cross"), hx + margin, hy + margin, CLOSE_SZ - margin * 2, CLOSE_SZ - margin * 2)*/
+    }
+
     private fun renderResizeHandle(g: GuiGraphicsCompat, hx: Int, hy: Int, alpha: Float) {
         val (sx, sy) = anchor.centerFacingCorner()
-        val color = blendColor(if (hoveringResize) ACCENT else 0xFFFFFFFF.toInt(), alpha)
+        val color = scaleAlpha(if (hoveringResize) UiTheme.ACCENT else 0xFFFFFFFF.toInt(), alpha)
         drawCornerBracket(g, hx, hy, sx, sy, 8, 0, color)
         drawCornerBracket(g, hx, hy, sx, sy, 5, 4, color)
     }
 
     private fun drawCornerBracket(
-        //? if >=26 {
-        g: GuiGraphicsExtractor,
-        //?} else
-        /*g: GuiGraphics,*/
+        g: GuiGraphicsCompat,
         baseX: Int, baseY: Int,
         sx: Int, sy: Int,
         len: Int,
@@ -491,22 +579,27 @@ class PipOverlay(
         private const val MAX_SIZE_FRAC = 0.6f
         private const val RESIZE_SZ = 14
         private const val RESIZE_INSET = 6
+        private const val CLOSE_SZ = 14
         private const val SNAP_LERP_SPEED = 8f
+        private const val PIP_Z = 1_000.0
 
-        private const val PANEL_BORDER = 0xFF606060.toInt()
-        private const val ACCENT = 0xFF4A90E2.toInt()
-
-        private fun outline(g: GuiGraphicsCompat, x1: Int, y1: Int, x2: Int, y2: Int, color: Int) {
-            g.fill(x1, y1, x2, y1 + 1, color)
-            g.fill(x1, y2 - 1, x2, y2, color)
-            g.fill(x1, y1, x1 + 1, y2, color)
-            g.fill(x2 - 1, y1, x2, y2, color)
+        /** The anchor [ds]'s PiP was last left at, or null when the viewer never moved it. */
+        private fun savedAnchor(ds: DisplayScreen): PipAnchor? {
+            val name = ClientSettingsStore.getSettings(ds.uuid).pipAnchor ?: return null
+            return PipAnchor.entries.firstOrNull { it.name == name }
         }
 
-        private fun blendColor(color: Int, alpha: Float): Int {
-            val a = ((color ushr 24 and 0xFF) * alpha).toInt().coerceIn(0, 255)
-            return (a shl 24) or (color and 0x00FFFFFF)
-        }
+        /** The size [ds]'s PiP was last left at, or null when the viewer never resized it. */
+        private fun savedSizeFraction(ds: DisplayScreen): Float? =
+            ClientSettingsStore.getSettings(ds.uuid).pipSizeFraction.takeIf { it > 0f }
+    }
+
+    /** Remembers where and how big the viewer just left this PiP. */
+    private fun persistGeometry() {
+        val settings = ClientSettingsStore.getSettings(displayScreen.uuid)
+        settings.pipAnchor = anchor.name
+        settings.pipSizeFraction = sizeFraction
+        ClientSettingsStore.save()
     }
 
     private data class ContentRect(val x: Int, val y: Int, val w: Int, val h: Int)

@@ -1,22 +1,13 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.render.DisplayRenderer
-import com.dreamdisplays.api.render.RenderContext
-import com.dreamdisplays.api.render.RenderStats
-import com.dreamdisplays.api.render.RenderSurface
+import com.dreamdisplays.api.render.service.DisplayRenderer
+import com.dreamdisplays.api.render.backend.service.RenderContext
+import com.dreamdisplays.api.render.model.RenderStats
+import com.dreamdisplays.api.render.backend.service.RenderSurface
 import java.util.concurrent.CopyOnWriteArrayList
 
-/**
- * Default [DisplayRenderer]: an orchestrator for externally registered, self-rendering
- * [RenderSurface]s. The mod's own world screens keep their dedicated [ScreenRenderer] path; this
- * renderer sequences API-registered surfaces during the same world render pass (see the hook in
- * [ScreenRenderer.render]).
- *
- * [stats] reports only what an orchestrator can observe: the surface-pass rate and the duration of
- * the last pass. Decode / upload figures belong to the per-display video pipeline and stay zero here.
- */
+/** Default [DisplayRenderer]: orchestrator for externally registered, self-rendering [RenderSurface]s. */
 class DefaultDisplayRenderer : DisplayRenderer {
-
     /** Registered self-rendering surfaces, drawn each pass. */
     private val surfaces = CopyOnWriteArrayList<RenderSurface>()
 

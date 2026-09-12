@@ -1,13 +1,12 @@
 package com.dreamdisplays.platform.server.meta
 
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.utils.PlatformUtil.isFolia
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.entity.Player
 import org.bukkit.plugin.Plugin
 import org.jspecify.annotations.NullMarked
-import java.util.UUID
+import java.util.*
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -142,6 +141,6 @@ object Scheduler {
     /** Updates the tracked player snapshot for [player]. */
     private fun refreshPlayerSnapshot(player: Player) {
         trackedNames[player.uniqueId] = player.name
-        trackedAdmins[player.uniqueId] = player.hasPermission(Main.config.permissions.delete)
+        trackedAdmins[player.uniqueId] = player.hasPermission(PaperServer.config.permissions.deleteOthers)
     }
 }

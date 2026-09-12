@@ -1,9 +1,13 @@
 package com.dreamdisplays.platform.client.render
 
+//? if >=1.21.11 {
 import com.mojang.blaze3d.opengl.GlTexture
-import com.mojang.blaze3d.platform.NativeImage
 import com.mojang.blaze3d.systems.RenderSystem
 import com.mojang.blaze3d.textures.GpuTexture
+//?}
+import com.mojang.blaze3d.platform.NativeImage
+import net.minecraft.client.renderer.texture.DynamicTexture
+import org.lwjgl.opengl.GL11
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.nio.ByteBuffer
@@ -11,6 +15,46 @@ import java.nio.ByteOrder
 
 /** Uploads raw video frames to Minecraft textures on `OpenGL` and backend-neutral renderers. */
 object TextureUploadUtil {
+    /** Enables bilinear filtering on a texture (default is nearest-neighbor). */
+    fun applyBilinearFilter(tex: DynamicTexture) {
+        if (!RenderBackendCompat.canUseDirectOpenGl()) return
+        //? if >=1.21.11 {
+        val glId = (tex.getTexture() as? GlTexture)?.glId() ?: return
+        //?} else
+        /*val glId = tex.getId()*/
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, glId)
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
+        GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+    }
+
+    /** Uploads raw pixels into a [DynamicTexture] across both legacy GL-id and new GpuTexture APIs. */
+    fun uploadDynamicTexture(
+        texture: DynamicTexture,
+        src: ByteBuffer,
+        w: Int,
+        h: Int,
+        format: UploadPixelFormat,
+        glUploader: () -> AsyncTextureUploader,
+        rgbaScratch: ByteBuffer?,
+        setRgbaScratch: (ByteBuffer) -> Unit,
+    ) {
+        //? if >=1.21.11 {
+        upload(
+            texture = texture.getTexture(),
+            src = src,
+            w = w,
+            h = h,
+            format = format,
+            glUploader = glUploader,
+            rgbaScratch = rgbaScratch,
+            setRgbaScratch = setRgbaScratch,
+        )
+        //?} else
+        /*glUploader().upload(texture.getId(), src, w, h, format)*/
+    }
+
+    //? if >=1.21.11 {
     /** Uploads a raw RGB24 video frame to a Minecraft texture. */
     fun uploadRgb(
         texture: GpuTexture,
@@ -61,6 +105,43 @@ object TextureUploadUtil {
         writeToTexture(texture, rgba, w, h, NativeImage.Format.RGBA)
     }
 
+    /**
+     * Uploads one packed I420 frame from [src] into the three plane textures. On the direct-GL
+     * backend all three planes go through a single PBO pass ([AsyncTextureUploader.uploadPlanar]);
+     * otherwise each plane falls back to the command-encoder write.
+     */
+    fun uploadPlanar(
+        y: GpuTexture, u: GpuTexture, v: GpuTexture,
+        src: ByteBuffer,
+        glUploader: () -> AsyncTextureUploader,
+    ) {
+        if (y.isClosed || u.isClosed || v.isClosed) return
+        if (y is GlTexture && u is GlTexture && v is GlTexture && RenderBackendCompat.canUseDirectOpenGl()) {
+            glUploader().uploadPlanar(
+                y.glId(), y.getWidth(0), y.getHeight(0),
+                u.glId(), u.getWidth(0), u.getHeight(0),
+                v.glId(), v.getWidth(0), v.getHeight(0),
+                src,
+            )
+            return
+        }
+
+        var offset = 0
+        for (texture in arrayOf(y, u, v)) {
+            val planeBytes = texture.getWidth(0) * texture.getHeight(0)
+            val view = src.duplicate()
+            view.position(src.position() + offset).limit(src.position() + offset + planeBytes)
+            writeToTexture(
+                texture,
+                view,
+                texture.getWidth(0),
+                texture.getHeight(0),
+                UploadPixelFormat.R8.nativeImageFormat
+            )
+            offset += planeBytes
+        }
+    }
+
     /** Write to a Minecraft texture using the `writeToTexture` method. */
     private fun writeToTexture(texture: GpuTexture, pixels: ByteBuffer, w: Int, h: Int, format: NativeImage.Format) {
         val encoder = RenderSystem.getDevice().createCommandEncoder()
@@ -108,6 +189,7 @@ object TextureUploadUtil {
             throw e.targetException
         }
     }
+    //?}
 
     /** RGB24 -> RGBA32 conversion. */
     private fun rgbToRgba(src: ByteBuffer, dst: ByteBuffer, w: Int, h: Int) {

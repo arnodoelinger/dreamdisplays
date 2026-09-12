@@ -1,5 +1,6 @@
 package com.dreamdisplays.media.player.preparation
 
+import com.dreamdisplays.api.media.stream.model.SubtitleTrack
 import com.dreamdisplays.media.player.stream.ActiveStreams
 
 /**
@@ -11,4 +12,5 @@ data class PreparedMedia(
     val isLive: Boolean,
     val isSeekable: Boolean,
     val durationNanos: Long,
+    val availableSubtitles: List<SubtitleTrack> = emptyList(),
 )

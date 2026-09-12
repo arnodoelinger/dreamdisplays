@@ -1,4 +1,813 @@
-# Version 1.8.4
+# 1.10.0 Preview 1
+
+## Highlights
+
+- Subtitles support
+- Added `WorldGuard` support
+- Replaced the display lock with three access levels: `Everyone`, `Region members` (WorldGuard) and `Locked`
+- Added Simplified Chinese translation
+- Fixes and improvements (like CPU reduction and displays being unaffected by outlines)
+
+## Client
+
+### Features
+
+- Added subtitles support
+- Added support for `WorldGuard` ([#194](https://github.com/arnodoelinger/dreamdisplays/issues/194))
+- Replaced the display lock with three access levels: `Everyone`, `Region members` (WorldGuard) and `Locked`
+- Removed per-display render distance setting; now displays use client's render distance instead
+- Added Simplified Chinese translation ([#180](https://github.com/arnodoelinger/dreamdisplays/pull/180))
+
+### Improvements
+
+- Reduced CPU use of video playback
+- Now displays are unaffected by outlines
+
+### Fixes
+
+- Fixed playback restarting itself a second after start when the first frame took longer to arrive
+- Fixed the game crashing when the server crashes while a display is playing
+- Fixed bad command suggestion syntax after creating a display
+
+## Server
+
+### Features
+
+- Added support for `WorldGuard` ([#194](https://github.com/arnodoelinger/dreamdisplays/issues/194))
+- Added Simplified Chinese translation ([#180](https://github.com/arnodoelinger/dreamdisplays/pull/180))
+
+### Fixes
+
+- Filter out drop-column statements during schema migration
+- Fixed the database connection pool leaking on plugin reload
+- Fixed coroutine error when stopping the server
+- Fixed rare `bStats` JSON warnings
+
+# 1.9.6 Release
+
+## Highlights
+
+- Minor display menu improvements and fixes
+- Fixed bad selection logic when trying to create a display
+- Fixed the picked audio track (language) not being remembered after rejoining
+- Codebase improvements, minor refactor and updated dependencies
+
+## Client
+
+### Improvements
+
+- Improved video suggestions panel scale on high GUI scale
+- Next suggestions now loads earlier instead of right before you hit the end
+- Smoother scrolling for video suggestions and the audio track dropdown
+- Enhanced versionizing mechanism ([#210](https://github.com/arnodoelinger/dreamdisplays/pull/210))
+- Codebase style improvements and minor refactor
+- Updated `FFmpeg` from 8.1.0 to 9.0.0
+- Updated project dependencies
+
+### Fixes
+
+- Fixed the picked audio track (language) not being remembered after rejoining, and videos now load directly on that track instead of switching to it right after starting
+- Fixed no audio for players whose network setup can't reach the TLS ([#209](https://github.com/arnodoelinger/dreamdisplays/issues/209))
+- Fixed videos failing to play entirely for players running an HTTP(S) proxy ([#218](https://github.com/arnodoelinger/dreamdisplays/issues/218))
+- Fixed HUD elements (hotbar, health / hunger, chat, minimaps, ...) staying visible over fullscreen videos ([#213](https://github.com/arnodoelinger/dreamdisplays/issues/213))
+- Fixed fullscreen videos looping forever even without the looped flag ([#214](https://github.com/arnodoelinger/dreamdisplays/issues/214))
+- Pressing Esc on a non-forced fullscreen video now fully stops it (audio included) instead of just hiding it and reappearing 
+  on rejoin ([#215](https://github.com/arnodoelinger/dreamdisplays/issues/215)) (server must be 1.9.6 or higher)
+- Fixed suggestion thumbnails looking squashed on a squeezed strip on high GUI scale
+- Fixed suggestion cards touching the scrollbar with no breathing room on a squeezed strip on high GUI scale
+- Fixed video suggestions being covered by a black bar on `1.21.1` ([#208](https://github.com/arnodoelinger/dreamdisplays/issues/208))
+- Use actual clicked block face for selection instead of player look direction ([#217](https://github.com/arnodoelinger/dreamdisplays/pull/217))
+  (server must be 1.9.6 or higher)
+- Resolve other platforms than YouTube using `/display video` command ([#207](https://github.com/arnodoelinger/dreamdisplays/pull/207))
+  (server must be 1.9.6 or higher)
+
+## Server
+
+### Fixes
+
+- Use actual clicked block face for selection instead of player look direction ([#217](https://github.com/arnodoelinger/dreamdisplays/pull/217))
+- Resolve other platforms than YouTube using `/display video` command ([#207](https://github.com/arnodoelinger/dreamdisplays/pull/207))
+- Pressing Esc on a non-forced fullscreen video now fully stops the session once nobody's left watching, instead of
+  leaving it dismissed-but-alive to reappear on rejoin ([#215](https://github.com/arnodoelinger/dreamdisplays/issues/215))
+
+# 1.9.5 Release
+
+## Highlights
+
+- Enhanced README file
+- Rendering enhancements and fixes
+- `NeoForge` `sqlite-jdbc` fix
+
+## Client
+
+### Improvements
+
+- Enhanced README file ([#186](https://github.com/arnodoelinger/dreamdisplays/pull/186))
+
+### Fixes
+
+- Fixed displays turning into a black rectangle when seen through water or glass
+- Fixed persistently mapped PBO frame uploads occasionally corrupting or freezing display textures on Windows ([#199](https://github.com/arnodoelinger/dreamdisplays/issues/199))
+
+## Server
+
+### Fixes
+
+- Fixed the `NeoForge` server failing to start with a module resolution error when another mod also bundles `sqlite-jdbc` ([#201](https://github.com/arnodoelinger/dreamdisplays/issues/201))
+
+# 1.9.4 Release
+
+## Highlights
+
+- Added support for Bilibili bangumi URLs (episodes and seasons / movies)
+- Some visual and config fixes
+
+## Client
+
+### Improvements
+
+- Added support for Bilibili bangumi URLs (episodes and seasons / movies) ([#188](https://github.com/arnodoelinger/dreamdisplays/issues/188))
+
+### Fixes
+
+- Fixed displays created in one dimension appearing at the same coordinates in every other dimension ([#192](https://github.com/arnodoelinger/dreamdisplays/issues/192))
+
+## Server
+
+### Fixes
+
+- Fixed server config default volume not applied correctly ([#190](https://github.com/arnodoelinger/dreamdisplays/issues/190))
+- Fixed user-edited language files being overwritten on every server start / reload
+
+# 1.9.3 Release
+
+## Highlights
+
+- Hotfix: fixed displays being visible through blocks and losing their fog
+- Fixed "Couldn't place player in world" error on some `Fabric` / `NeoForge` servers
+- Live streams fixes
+
+## Client
+
+### Improvements
+
+- Enlarged default Picture-in-Picture mode from 25% to 33% of screen width
+- Improved shader support (now displays use shader's fog)
+- Update `yt-dlp` binary every day instead of once per weak
+- Shortened the drop-out when a live stream stops serving segments
+- Bumped `NewPipeExtractor` version
+
+### Fixes
+
+- Fixed displays being visible through blocks and losing their fog
+- Fixed live streams jittering in `Synced` / `Broadcast` playback mode ([#191](https://github.com/arnodoelinger/dreamdisplays/issues/191))
+- Keep live streams playing past the first manifest and stop timeline drift correction on them ([#191](https://github.com/arnodoelinger/dreamdisplays/issues/191))
+
+## Server
+
+### Fixes
+
+- Fixed "Couldn't place player in world" error on some `Fabric` / `NeoForge` servers
+
+# 1.9.2 Release
+
+## Highlights
+
+- Performance improvements to frame scaling and pause / resume
+- Displays now render on top of shaders instead of being affected by them
+- Some improvements like a crash on newer `Velocity` versions
+- Minor fixes and codebase refactoring
+
+## Client
+
+### Improvements
+
+- Displays are no longer affected by shaders
+- Pausing and resuming playback is now instant
+- YouTube connections are pre-warmed on server join, cutting the delay before the first frame resolves
+- Frame scaling now runs band-parallel across cores instead of on a single core
+- Added `LuckPerms` as an optional dependency in the release workflow
+- Removed unused suppression annotations and refactored minor stuff ([#183](https://github.com/arnodoelinger/dreamdisplays/pull/183))
+- General codebase improvements ([#184](https://github.com/arnodoelinger/dreamdisplays/pull/184))
+
+### Fixes
+
+- Fixed clock jumps when pausing
+- Fixed a frame nudge / jump right after resuming from pause
+- Fixed duplicated translations on Crowdin
+
+## Server
+
+### Fixes
+
+- Fixed `Velocity` support by using the correct inject annotation for newer versions ([#182](https://github.com/arnodoelinger/dreamdisplays/pull/182))
+
+# 1.9.1 Release
+
+## Highlights
+
+- Native playback improvements, more smooth playback and near-instant seeking
+- Low connection client improvements
+- Minor fixes and improvements
+
+## Client
+
+### Improvements
+
+- Native playback improvements
+- Seeking is now near-instant, even when jumping far ahead or across a long video
+- Videos now start playing with a small head start instead of racing the stream from the first frame, so an
+  uneven connection no longer shows up as stutter
+- Reduced the CPU work a playing display costs per video frame
+- Stability improvements for low connection clients
+- Security improvements for custom media
+- Updated project dependencies and its usages
+- Simplified codebase documentation
+- Some codebase improvements and refactoring
+
+### Fixes
+
+- Fixed stuttering during the first seconds of playback, and again for several seconds after each seek
+- Fixed the picture freezing, or crawling at a few frames per second, whenever playback fell behind the sound
+- Fixed playback occasionally stopping with an unrecoverable stream error after seeking
+
+## Server
+
+### Improvements
+
+- Security improvements for custom media
+
+# 1.9.0 Release
+
+## Highlights
+
+- Custom media support: paste a direct link, or file-host (Google Drive, Dropbox, imgur, etc.) share link, and play it on
+  a display
+- Full Twitch, Vimeo, Kick, and Bilibili support
+- `NeoForge` server support, including single-player
+- New `Fullscreen` and `Borderless` display modes, with a new `/display fullscreen` command for events and presentations
+- Proxy support: `Bungeecord` & `Velocity` for all popular server software
+- 3D acoustics for displays: occlusion, air absorption, and raytraced room reverb
+- Audio track selector: select your language right in the display menu!
+- Filter button: filter out unwanted suggestions
+- New `/display schedule` and `/display name` commands
+- Full `LuckPerms` support on `Fabric` / `NeoForge` servers
+- Added YouTube chapter markers
+- Improved `Dream Displays` wiki
+- Various other fixes and improvements
+
+## Client
+
+### Features
+
+- `NeoForge` server support (including single-player) ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- Full Twitch support
+- New Borderless and Fullscreen display modes, with a new `/display fullscreen` command for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- Added custom video support and file-host share link support (Google Drive, Dropbox, imgur, etc.) — paste a direct link
+  to any video and play it on a display (server must be 1.9.0 or higher)
+- Added Twitch, Kick, Vimeo, and Bilibili support ([#129](https://github.com/arnodoelinger/dreamdisplays/pull/129), [#129](https://github.com/arnodoelinger/dreamdisplays/pull/156), [#173](https://github.com/arnodoelinger/dreamdisplays/issues/173))
+- Added 3D acoustics for displays: sound is muffled by walls (occlusion), loses highs over distance (air absorption),
+  and picks up room / cave reverberation raytraced from nearby blocks and their material; e.g., stone reflects, wool
+  absorbs ([#147](https://github.com/arnodoelinger/dreamdisplays/pull/147))
+- Added an audio track selector, so you can pick your language right in the display menu
+  ([#149](https://github.com/arnodoelinger/dreamdisplays/pull/149))
+- Added `/display schedule` command to schedule a video to play at a specific time
+- Added `/display name` command ([#151](https://github.com/arnodoelinger/dreamdisplays/pull/151))
+- Changed some display commands syntax: now you can choose the display by its ID or by looking at it and typing "this"
+- Added support for saving and restoring the last known playback position everywhere, and each display's custom render
+  distance across game restarts
+- Added distance-based quality: a display now steps its video quality down as you move away from it (one step at 66% of
+  its render distance, two steps at 75%)
+- Added YouTube chapter markers
+- Added a filter button
+- Added click sounds when clicking buttons in the display menu
+- Gray-out only seekbar and near buttons when the display isn't ready yet, instead of the whole menu
+- Added [Crowdin](https://crowdin.com/project/dreamdisplays) integration
+  ([#141](https://github.com/arnodoelinger/dreamdisplays/pull/141))
+- Brought back `NeoForge` 1.21.11 releases to the [corporate ad dispenser](https://www.curseforge.com/)
+
+### Improvements
+
+- Improved displays performance ([#131](https://github.com/arnodoelinger/dreamdisplays/pull/131))
+- Reduced native decode-path overhead on every frame, for smoother in-process playback
+- Increased stall watchdog threshold from 30 to 45 seconds to avoid false positives on slow networks
+- Added scrubbing preview on the seek bar (frame preview on hover)
+- Repeat all videos for all platforms on every playback mode (server must be 1.9.0 or higher)
+- Renamed the `Synchronization` setting to `Playback mode` and its tooltip now briefly explains each mode (`Local`,
+  `Synced`, `Broadcast`)
+- Default video quality is now 1080p instead of 720p, falling back to the closest available lower quality when 1080p
+  isn't offered
+- Raised the `Broadcast` quality cap from 360p to 720p
+- The quality performance warning in the display menu now only appears above 1080p instead of at 1080p and up
+- Enhanced UI components ([#148](https://github.com/arnodoelinger/dreamdisplays/pull/148))
+- Now recommendations are endlessly scrolling
+- Enhanced ambient grid ([#136](https://github.com/arnodoelinger/dreamdisplays/pull/136))
+- All sliders now have snap behavior and fixed subdivisions for better precision
+- Improved popout context menu positioning
+- Improved scrollbars: now you can drag them
+- Retry on "Not all references are available" error instead of fatal erroring
+- Removed the greyed-out buttons state while a display isn't ready yet
+- Added an author's avatar and a verified badge next to their name
+- Enhanced cursor handling for 1.21.11
+- Improved `Gradle` build system, so it looks less like a frankenstein
+  ([#150](https://github.com/arnodoelinger/dreamdisplays/pull/150))
+- Improved platform resources structure
+- Codebase improvements: more Kotlin analogues instead of Java imports, optimized imports
+- Improved KDoc documentation in the codebase
+- Improved wiki
+
+### Fixes
+
+- Fixed video sometimes freezing indefinitely
+- Fixed a `Synced` / `Broadcast` display sometimes getting stuck on "Waiting for video..." forever
+  ([#138](https://github.com/arnodoelinger/dreamdisplays/issue/138))
+- Fixed "Unrecoverable stream failure" error when using Iris shaders
+  ([#146](https://github.com/arnodoelinger/dreamdisplays/issue/146))
+- Fixed live resume, live quality switches, and stall recovery blocking every other play / pause / seek / etc. action on
+  the display for the whole network re-resolve
+- Fixed some videos getting a permanently broken stream (403 Forbidden) instead of falling back to a working one
+- Fixed retries being silently unlimited when a resolved stream failed to open right away
+- Fixed the background quality refresher endlessly restarting a live stream when the closest available rendition didn't
+  exactly match the requested quality
+- Fixed video getting stuck when seeking right after changing quality
+  ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
+- Fixed a failed quality switch permanently blocking re-selecting that same quality
+- Loop `Local` displays on instead of freezing
+- Fixed disappearing suggestions in some cases after a stutter / lag spike, requiring a seek to unstick it
+- Fixed disappearing video preview when pausing and returning to the menu
+- Fixed restoring display snapshots from prior sessions
+- Fixed a display first sighted outside the client's render distance staying invisible until the server's next periodic
+  broadcast
+- Fixed a stale pre-seek frame occasionally slipping through and briefly rewinding the picture right after a seek
+- Fixed the reappearance bridge occasionally playing audio from just before a seek instead of the resumed position
+- Fixed occasional stutter and dropped opening frames right after opening or seeking a video, caused by a leftover
+  `FFmpeg` buffering flag
+- Fixed the warm-park pool TTL being too short
+- Fixed the display menu's video preview being fit to the display's own block shape instead of the video's aspect ratio
+- Fixed audio diagnostics from a just-ended session occasionally being spliced into the next one's error report
+- Suppressed repeat media errors for 15 s after retry
+
+## Server
+
+### Features
+
+- Support `Bungeecord` and `Velocity`
+- `NeoForge` server support ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- New command: `/display fullscreen` for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- Full `LuckPerms` support on `Fabric` / `NeoForge` servers
+  ([#128](https://github.com/arnodoelinger/dreamdisplays/pull/128))
+- Added a `[custom_media]` config section and a `dreamdisplays.custom` permission to control whether players may play
+  their own links (Vimeo, Kick, and direct files), with optional per-host allow / blocklists
+- `/display video` now accepts any supported link, not only YouTube URLs
+- Added `max_displays_per_player` config limit and wired up the `create_bypass` permission and
+  `fullscreen.quality_cap` setting
+- Added explosion protection for `Fabric` and `NeoForge` servers
+
+### Improvements
+
+- Reduced per-player memory overhead on long-running servers with many unique joins
+- `Dream Displays` security improvements
+- Added a `storage.use_ssl` option in `config.toml` to enable TLS on the `MySQL` connection (was hardcoded off)
+- Repeat all videos for all platforms on every playback mode
+  ([#127](https://github.com/arnodoelinger/dreamdisplays/pull/127))
+- `Fabric` / `NeoForge` server display deletion now notifies nearby clients itself, matching `Paper`, so a future caller
+  can't forget to broadcast
+- `/display delete` is now available to everyone for their own displays
+- Added hover and preview fade effects, plus a ghost handle, to the seekbar
+- More modularization and cleanup, more Kotlin analogues instead of Java imports, optimized imports
+- Improved KDoc documentation in the codebase
+- Improved wiki
+
+### Fixes
+
+- Fixed display areas not being protected from enderman pickup, wither / silverfish breaking blocks, fire, and
+  self-exploding blocks (beds, respawn anchors)
+- Fixed some display commands being accepted from a player who isn't actually near the display
+- Fixed a forced-locked `Broadcast` display being switchable back to another mode
+- Fixed a reported video duration being trusted from any player anywhere on the server
+- Fixed the Picture-in-Picture pin packet being able to flood the server with disk writes
+- Now fullscreen command flags are fixed to stop command-tree blowup on join
+  ([#164](https://github.com/arnodoelinger/dreamdisplays/issue/164))
+- Fixed displays removed by the startup material-validation sweep not telling online players to forget them, leaving
+  ghost displays until reconnect
+- Fixed deleted displays leaking their legacy v1 sync state, which kept being carried by the periodic broadcast
+- Fixed the staggered display list send to a joining player not stopping when the player disconnected mid-send
+
+# 1.9.0 Preview 5
+
+## Highlights
+
+- Hotfix: fixed explosion display protection mixin crash
+- Fixed audio issues in `Fabric` 1.21.1 & 1.21.11 versions
+
+## Client
+
+### Fixes
+
+- Fixed audio issues when in `Enhanced` / `Advanced` 3D audio mode for `Fabric` 1.21.1 & 1.21.11 versions
+- Fixed playback picked the lowest-bitrate rendition of an untagged track
+
+## Server
+
+### Fixes
+
+- Fixed explosion display protection mixin crash ([#161](https://github.com/arnodoelinger/dreamdisplays/issue/161))
+
+# 1.9.0 Preview 4
+
+## Highlights
+
+- Custom videos: paste a direct link to any video and play it on a display
+- File-host share link support — Google Drive, Dropbox, imgur, etc.
+- Kick and Vimeo support
+- Filter button
+- Some fixes and improvements
+
+## Client
+
+### Features
+
+- Added custom video support, so you can paste a direct link to any video and play it on a display (server must be 1.9.0
+  or higher)
+- Added file-host share link support — Google Drive, Dropbox, imgur, etc. (server must be 1.9.0 or higher)
+- Added Kick support
+- Added Vimeo support
+- Added filter button
+
+### Improvements
+
+- Repeat all videos for all platforms on every playback mode (server must be 1.9.0 or higher)
+
+## Server
+
+### Features
+
+- Added a `[custom_media]` config section and a `dreamdisplays.custom` permission to control whether players may play
+  their own links (Vimeo, Kick, and direct files), with optional per-host allow / blocklists
+- `/display video` now accepts any supported link, not only YouTube URLs
+- Added `max_displays_per_player` config limit and wired up the `create_bypass` permission and `fullscreen.quality_cap`
+  setting
+- Add explosion protection for `Fabric` and `NeoForge` servers
+
+### Improvements
+
+- Repeat all videos for all platforms on every playback mode
+
+### Fixes
+
+- Fixed the Picture-in-Picture pin packet being able to flood the server with disk writes
+- Fixed a reported video duration being trusted from any player anywhere on the server
+- Fixed some display commands being accepted from a player who isn't actually near the display
+- Fixed a forced-locked `Broadcast` display being switchable back to another mode
+- Fixed display areas not being protected from enderman pickup, wither / silverfish breaking blocks, fire, and
+  self-exploding blocks (beds, respawn anchors)
+- Fixed HTTP responses (media metadata, thumbnails, resolved segments) being buffered into memory with no size limit
+- Fixed Velocity / proxy disconnect from unsynced fullscreen command argument type
+  ([#138](https://github.com/arnodoelinger/dreamdisplays/issue/153))
+
+# 1.9.0 Preview 3
+
+## Highlights
+
+- 3D audio support
+- Language selector right in the display menu
+- Now recommendations are endlessly scrolling
+- [Crowdin](https://crowdin.com/project/dreamdisplays) platform integration
+- Fixed some bugs, including crash on `Fabric` 1.21.11
+- New Gradle build system
+- Some other minor improvements
+
+## Client
+
+### Features
+
+- Added 3D acoustics for displays: sound is now muffled by walls (occlusion), loses highs over distance (air
+  absorption), and picks up room / cave reverberation raytraced from nearby blocks and their material; e.g., stone
+  reflects, wool absorbs ([#147](https://github.com/arnodoelinger/dreamdisplays/pull/147))
+- Added audio track selector, so you can select your language right in the display menu
+  ([#149](https://github.com/arnodoelinger/dreamdisplays/pull/149))
+- Added subtitles support ([#151](https://github.com/arnodoelinger/dreamdisplays/pull/151))
+- Added click sounds when clicking on buttons in the display menu
+- Added [Crowdin](https://crowdin.com/project/dreamdisplays) integration
+  ([#141](https://github.com/arnodoelinger/dreamdisplays/pull/141))
+
+### Improvements
+
+- Enhanced UI components ([#148](https://github.com/arnodoelinger/dreamdisplays/pull/148))
+- Now recommendations are endlessly scrolling
+- Enhanced cursor handling for 1.21.11
+- Improved popout context menu positioning
+- Improved scrollbars: now you can drag them
+- Retry on "Not all references are available" error instead of fatal erroring
+- Removed greying out buttons feature when the display is not ready yet
+- Added author's avatar by their name
+- Added verified badge by author's name
+- Improved Gradle build system, so that looks less like a frankenstein
+  ([#150](https://github.com/arnodoelinger/dreamdisplays/pull/150))
+- Improved platform resources structure
+- Use more Kotlin analogues instead of Java imports
+- Optimized imports
+
+### Fixes
+
+- Fixed "Unrecoverable stream failure" error when using Iris shaders
+  ([#146](https://github.com/arnodoelinger/dreamdisplays/issue/146))
+- Fixed a `Synced` / `Broadcast` display sometimes getting stuck on "Waiting for video..." forever
+  ([#138](https://github.com/arnodoelinger/dreamdisplays/issue/138))
+- Fixed disappearing video preview when pausing and returning to the menu
+- Fixed video sometimes freezing indefinitely
+- Fixed disappearing suggestions in some cases after a stutter / lag spike, requiring a seek to unstick it
+- Fixed retries being silently unlimited when a resolved stream failed to open right away
+- Fixed some videos getting a permanently broken stream (403 Forbidden) instead of falling back to a working one
+- Loop `Local` displays on instead of freezing
+
+## Server
+
+### Fixes
+
+- Fixed crash on `Fabric` 1.21.11 caused by invalid `BareTokenArgumentType` registration
+  ([#137](https://github.com/arnodoelinger/dreamdisplays/issue/137))
+- Use more Kotlin analogues instead of Java imports
+- Optimized imports
+
+# 1.9.0 Preview 2
+
+## Highlights
+
+- Hotfix: fixed an issue that could significantly increase world loading times for all players
+- Brought back `NeoForge` 1.21.11 releases to the [corporate ad dispenser](https://www.curseforge.com/)
+- Now you can set video URL in `/display fullscreen` command
+- Some other minor improvements
+
+## Client
+
+### Features
+
+- Brought back `NeoForge` 1.21.11 releases to the [corporate ad dispenser](https://www.curseforge.com/)
+
+### Improvements
+
+- Renamed the `Synchronization` setting to `Playback mode` and its tooltip now briefly explains each mode
+- (`Local`, `Synced`, `Broadcast`)
+- Fullscreen displays in Picture-in-Picture mode are now 33% bigger
+- Now fullscreen and Picture-in-Picture displays survive rejoins
+- Updated messages mentioning `YouTube` to also reflect `Twitch` support
+
+## Server
+
+### Improvements
+
+- Enhanced target selector format for `/display fullscreen` (e.g. `@a` no longer needs quotes)
+- Added `url` option for `/display fullscreen`
+- Added `/display fullscreen` to `/display help`, and incomplete `/display fullscreen` commands now show its usage
+  instead of a generic error
+- Updated messages mentioning `YouTube` to also reflect `Twitch` support
+- Added hover and preview fade effects to seekbar
+- Added ghost handle when seeking
+
+### Fixes
+
+- Fixed an issue that could significantly increase world loading times
+- Fixed players being unable to join at all right after the previous fix, caused by the new `/display fullscreen`
+  selector format
+
+# 1.9.0 Preview 1
+
+## Highlights
+
+- `NeoForge` server support, including single-player
+- Full Twitch support alongside YouTube
+- New `/display fullscreen` command, great for events and presentations
+- Scrubbing preview on the seek bar
+- Full `LuckPerms` integration
+- UI, resolving, codebase improvements and some bugfixes
+
+## Client
+
+### Features
+
+- `NeoForge` server support (including single-player) ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- Full Twitch support ([#129](https://github.com/arnodoelinger/dreamdisplays/pull/129))
+- New Borderless and Fullscreen display modes ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- New command: `/display fullscreen` for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+- Added support for saving and restoring the last known playback position everywhere
+- Added support for saving and restoring each display's custom render distance across game restarts
+
+### Improvements
+
+- Enhanced UI components
+- Now all sliders have snap behavior and fixed subdivisions for better precision
+- Improved displays performance ([#131](https://github.com/arnodoelinger/dreamdisplays/pull/131))
+- Added scrubbing preview on the seek bar (frame preview on hover)
+- Reduced native decode-path overhead on every frame, for smoother in-process playback
+- Increased stall watchdog threshold from 30 to 45 seconds to avoid false positives on slow networks
+- Enhanced ambient grid ([#136](https://github.com/arnodoelinger/dreamdisplays/pull/136))
+- Codebase improvements
+
+### Fixes
+
+- Fixed restoring display snapshots from prior sessions
+- Fixed the background quality refresher endlessly restarting a live stream when the closest available rendition didn't
+  exactly match the requested quality
+- Fixed the display menu's video preview being fit to the display's own block shape instead of the video's aspect ratio
+- Fixed video getting stuck when seeking right after changing quality
+  ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
+- Fixed a stale pre-seek frame occasionally slipping through and briefly rewinding the picture right after a seek
+- Fixed a failed quality switch permanently blocking re-selecting that same quality
+- Fixed the reappearance bridge occasionally playing audio from just before a seek instead of the resumed position
+- Fixed live resume, live quality switches, and stall recovery blocking every other play / pause / seek / etc. action on
+  the display for the whole network re-resolve
+- Fixed a display first sighted outside the client's render distance staying invisible until the server's next periodic
+  broadcast
+- Fixed audio diagnostics from a just-ended session occasionally being spliced into the next one's error report
+- Fixed occasional stutter and dropped opening frames right after opening or seeking a video, caused by a leftover
+  `FFmpeg` buffering flag
+- Fixed the warm-park pool TTL being too short
+
+## Server
+
+### Features
+
+- `NeoForge` server support ([#95](https://github.com/arnodoelinger/dreamdisplays/issues/95))
+- Full `LuckPerms` support on `Fabric` / `NeoForge` servers
+  ([#128](https://github.com/arnodoelinger/dreamdisplays/pull/128))
+- New command: `/display fullscreen` for events and presentations
+  ([#135](https://github.com/arnodoelinger/dreamdisplays/pull/135))
+
+### Improvements
+
+- `/display delete` is now available to everyone for their own displays
+- Codebase improvements: more modularization and cleanup
+  ([#127](https://github.com/arnodoelinger/dreamdisplays/pull/127))
+- `Fabric` / `NeoForge` server display deletion now notifies nearby clients itself, matching `Paper`, so a future caller
+  can't forget to broadcast
+- Added a `storage.use_ssl` option in `config.toml` to enable TLS on the `MySQL` connection (was hardcoded off)
+- Reduced per-player memory overhead on long-running servers with many unique joins
+- Dream Displays security improvements
+- Codebase improvements
+
+### Fixes
+
+- Fixed displays removed by the startup material-validation sweep not telling online players to forget them, leaving
+  ghost displays until reconnect
+- Fixed deleted displays leaking their legacy v1 sync state, which kept being carried by the periodic broadcast
+- Fixed the staggered display list send to a joining player not stopping when the player disconnected mid-send
+
+# 1.8.8 Release
+
+## Highlights
+
+- UI improvements like gradient fill, shimmer effects, and more place for suggestions
+- Enhanced media player stability and performance; now seeks are smoother and faster
+- Enhanced native logging and error handling
+- Fix `Fabric` 1.21.1 display rendering
+- Fixed some minor issues and edge cases
+
+## Client
+
+### Features
+
+- Added gradient fill and shimmer effects for thumbnails and loading states
+
+### Improvements
+
+- Pausing now keeps the decoder warm on every pipeline, so resume is instant instead of restarting the stream
+- Seeking no longer tears the whole session down before reconnecting: the picture holds its last frame while the target
+  position warms up in the background, then jumps — including the loop wrap-around in synced / broadcast modes
+- The first decoded frame is now shown immediately on start and seek instead of waiting for the playback cushion to fill
+- Stream startup got faster: `FFmpeg` no longer probes the container with its default 5 MB / 5 s window
+- Stall recovery now reconnects in the background while the picture holds its last frame instead of blanking
+- Reduced render overhead on 26.x versions
+- Removed unreachable frame-resize handling from the video reader loop
+- Updated the in-process YouTube resolver `NewPipeExtractor`
+- Enhanced `LAV` decoder with cached packets
+- Enhanced natives logging and error handling
+- Enhanced thumbnail's quality
+
+### Fixes
+
+- Fixed `Fabric` 1.21.1 display rendering
+- Fixed two different videos sharing the same thumbnail when their IDs differed only by letter case
+- Fixed a failed thumbnail registration being able to crash the game
+- Fixed a rare race during quality switches that could destroy the live display textures and leave the screen rendering
+  through dead handles
+- Fixed display teardown leaving already-freed textures reachable, which could lead to rendering through dead handles
+- Fixed player initialization callbacks getting lost when registered right as initialization finished
+- Fixed the reappearance audio bridge potentially starting mid-sample, which could produce noise
+- Fixed several retrying displays being able to block every other display's initialization
+- Fixed leaked `yt-dlp` subprocesses when the fast in-process resolver crashed mid-race
+
+## Server
+
+### Fixes
+
+- Fixed displays with long URLs on `MySQL`
+- Fixed display deletion logic and enhanced `Multiverse`-like projects compatibility
+- Fixed legacy sync packets being able to store an arbitrarily large video duration on the server
+
+# 1.8.7 Release
+
+## Highlights
+
+- Hotfix for 1.21.1 servers
+- Fixed video freezing / losing audio after seeking
+- Fixed default volume protocol
+- Better shaders compatibility
+
+## Client
+
+### Improvements
+
+- Enhanced compatibility with specific shaders
+
+### Fixes
+
+- Fixed default volume protocol that was not working
+- Fixed video freezing / losing audio after seeking or pausing when the selected quality isn't actually available
+  ([#121](https://github.com/arnodoelinger/dreamdisplays/issues/121))
+- Fixed video restarting right at the end of a video when the audio track finished a moment before the video did
+- Fixed z-fighting when player is very far away from the display
+
+## Server
+
+### Fixes
+
+- Fixed Java 25 conflict in 1.21.1
+- Fixed default volume protocol that was not working
+- Fixed doubled message about plugin's startup
+
+# 1.8.6 Release
+
+## Highlights
+
+- Hotfix for `Fabric` 1.21.11 & 26.1.2
+
+## Client
+
+### Improvements
+
+- Enhanced versionizing for Modrinth and GitHub releases
+
+### Fixes
+
+- Fix critical crash for `Fabric` 1.21.11 & 26.1.2 ([#118](https://github.com/arnodoelinger/dreamdisplays/issues/118))
+
+## Server
+
+No changes.
+
+# 1.8.5 Release
+
+## Highlights
+
+- 1.21.1 support
+- All displays now default to 50% volume
+- Fix critical crash on `Fabric`
+- Some fixes and codebase improvements
+
+## Client
+
+### Features
+
+- Added support for Minecraft 1.21.1
+
+### Improvements
+
+- All displays now default to 50% volume
+- Previews have replaced snapshots
+- Now versions have pretty style format
+- Discord publisher integration
+- Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
+- Enhanced safety comments in unsafe blocks in Rust natives
+- Changed author's name arsmotorin to arnodoelinger
+- Some dependecies updates
+
+### Fixes
+
+- Fixed Picture-in-Picture playing ahead of the in-world display; it now stays in sync
+- Fixed critical crash when trying to delete an invalid display in single-player on `Fabric`
+
+## Server
+
+### Features
+
+- Added support for Minecraft 1.21.1
+- Added `default_volume` option in `config.toml`, so server owners can now set the default volume for all players
+
+### Improvements
+
+- Previews have replaced snapshots
+- Now versions have pretty style format
+- Replaced `GSON` library with `kotlinx.serialization` for better maintainability and performance
+
+### Fixes
+
+- Fixed critical crash when trying to delete an invalid display on `Fabric` servers
+
+# 1.8.4 Release
 
 ## Client
 
@@ -17,7 +826,7 @@
 
 ### Fixes
 
-- Fixed incompatibilities with high-quality shaders ([#108](https://github.com/arsmotorin/dreamdisplays/issues/108))
+- Fixed incompatibilities with high-quality shaders ([#108](https://github.com/arnodoelinger/dreamdisplays/issues/108))
 - Fixed unnecessary sync corrections while media is paused or parked
 - Fixed a rare internal service lookup issue that could affect features with multiple service implementations
 
@@ -40,7 +849,7 @@
 - Fixed audio-language validation before saving and rebroadcasting it
 - Fixed a rare internal service lookup issue that could affect features with multiple service implementations
 
-# Version 1.8.3
+# 1.8.3 Release
 
 ## Client
 
@@ -86,7 +895,7 @@
 - Fixed a race that let concurrent reports slip past the report cooldown
 - Fixed default permissions; (local), synced and broadcast are for all players, no only for OPs
 
-# Version 1.8.2
+# 1.8.2 Release
 
 ## Client
 
@@ -102,7 +911,7 @@
 
 ### Fixes
 
-- Fixed audio cutting out after about 10 seconds ([#107](https://github.com/arsmotorin/dreamdisplays/pull/107))
+- Fixed audio cutting out after about 10 seconds ([#107](https://github.com/arnodoelinger/dreamdisplays/pull/107))
 - Fixed repeating video playback in local playback mode
 
 ## Server
@@ -112,7 +921,7 @@
 - Players can no longer spam the report system
 - Improved Dream Displays security
 
-# Version 1.8.1
+# 1.8.1 Release
 
 ## Client
 
@@ -142,13 +951,25 @@
 - Single-player displays are now stored per-world instead of the global database
 - Replaced hardcoded max dimensions with placeholders
 
-# Version 1.8.0
+# 1.8.0 Release
+
+## Highlights
+
+- Added support for Minecraft 26.2
+- Brought back Minecraft 1.21.11 support ([#91](https://github.com/arnodoelinger/dreamdisplays/pull/91))
+- Added a native Rust media pipeline with `FFmpeg` and in-process LAV decoding
+- Added stable `Vulkan` support for display rendering (`OpenGL` rendering is still supported)
+- Replaced the old synchronization mode with new local, synced, and broadcast playback modes
+- Added a new packet protocol v2
+- Reduced CPU usage by up to 50–70× on tested hardware scenarios (Java 25 required)
+- Improved video stream resolving speed by up to 10–12× in supported cases
 
 ## Client
 
 ### Features
+
 - Added support for Minecraft 26.2
-- Brought back Minecraft 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
+- Brought back Minecraft 1.21.11 support ([#91](https://github.com/arnodoelinger/dreamdisplays/pull/91))
 - Added a new packet protocol v2
 - Added fallback support for protocol v1, but v1 is now deprecated and will be removed in the future
 - Introduced an unstable client-side API that will be scaled in the future
@@ -223,7 +1044,7 @@
 - Fixed a critical `Quilt` entry point crash
 - Fixed an ancient `NeoForge` and IntelliJ IDEA compatibility issue
 - Fixed `NeoForge` client shutdown on normal server disconnect
-- Fixed FFmpeg extraction on Linux ([#93](https://github.com/arsmotorin/dreamdisplays/issues/93))
+- Fixed FFmpeg extraction on Linux ([#93](https://github.com/arnodoelinger/dreamdisplays/issues/93))
 - Fixed incompatibility between the popout window and `Vivecraft`
 - Fixed GUI scale handling in the display menu
 - Fixed several shader compatibility issues
@@ -254,7 +1075,8 @@
 - Added Java 21 support for Minecraft 1.21.11 servers
 - Added a new packet protocol v2
 - Added fallback support for protocol v1, but v1 is now deprecated and will be removed in the future
-- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`, `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
+- Added `dreamdisplays.local`, `dreamdisplays.synced`, `dreamdisplays.broadcast`, `dreamdisplays.lock`,
+  `dreamdisplays.delete.others`, and `dreamdisplays.create.bypass` permissions
 - Added more anonymous telemetry data to improve development, compatibility, and stability
 
 ### Improvements
@@ -270,92 +1092,12 @@
 
 ### Fixes
 
-- Fixed `MariaDB` compatibility issue ([#88](https://github.com/arsmotorin/dreamdisplays/pull/88))
+- Fixed `MariaDB` compatibility issue ([#88](https://github.com/arnodoelinger/dreamdisplays/pull/88))
 - Fixed sending display enabled packets to clients
 - Fixed several `Fabric` server compatibility issues
 - Fixed several small server-side stability issues
 
-# Version 1.8.0-SNAPSHOT.2
-
-## Client
-
-### Features
-
-- 10-12× faster video downloading
-
-### Improvements
-
-- Enhance the client codebase with managers
-- Faster DRM-protected videos handling
-- Remove Gradle cache configuration
-
-### Fixes
-
-- Fix critical crash on the `Fabric` 1.21.11 version
-- Fix incompatibility between the popout window and `Vivecraft` mod
-- Fix DRM waiting issue
-- Less log spam
-
-## Server
-
-- No changes
-
-# Version 1.8.0-SNAPSHOT.1
-
-## Client
-
-### Features
-
-- Support 26.2-pre4 version
-- Back 1.21.11 support ([#91](https://github.com/arsmotorin/dreamdisplays/pull/91))
-- Use `Stonecutter` for the multiversion system
-- Support `Vulcan` for display rendering (`OpenGL` still supported)
-- Use default config implementation instead of `AbstractConfig`
-- Use `LoggerFactory` for logging
-- A bit fresher mod icon
-
-### Improvements
-
-- Reorganize the project structure
-- Video frame pipeline stability and brightness handling
-- Enhance cookie handling and process management
-- Improve `Gradle` configuration
-- Workflow improvements
-- Improve the publishing system
-- Remove INotSleep's utils
-- Update dependencies
-
-### Fixes
-
-- Critical `Quilt` entry point crash
-- Ancient bug between `NeoForge` and IntelliJ IDEA
-- `NeoForge` client shutdown on normal server disconnect
-- `FFmpeg` extraction on Linux ([#93](https://github.com/arsmotorin/dreamdisplays/issues/93))
-- Picture-in-Picture mode displays size calculation
-- Temporary focus mute no longer overwrites the user's mute setting
-- Unsafe server display cache filenames on some systems
-- Invalid display sizes no longer create broken client textures
-
-## Server
-
-### Features
-
-- Support 26.2-pre4 `Fabric` servers
-- Implement 1.21.11 support for `Fabric` servers
-- Back Java 21 support (if you're running on 1.21.11, you can still use Java 21 with this version instead of being forced to update to Java 25, as it was in previous versions)
-
-### Improvements
-
-- Remove the useless report button in single-player
-- Improve `Gradle` configuration
-- Update dependencies
-
-### Fixes
-
-- `MariaDB` compatibility issue ([#88](https://github.com/arsmotorin/dreamdisplays/pull/88))
-- Allow sending display enabled packets to clients
-
-# Version 1.7.1
+# 1.7.1 Release
 
 ## Client
 
@@ -384,11 +1126,24 @@
 
 - `FabricDisplayData` error when server shutdowns
 
-# Version 1.7.0
+# 1.7.0 Release
+
+## Highlights
+
+- Support 26.1.2 version and Java 25
+- Support `Fabric` servers
+- Support YouTube shorts
+- Windowed and Picture-in-Picture mode
+- Hardware-accelerated `FFmpeg` video decoding
+- Show max 72 recommended videos based on the current video instead of 24
+- Switch from RGBA to RGB24 for improved rendering performance
+- Fix the "You have to look at the display block" error when there is actually display
+  ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
 
 ## Client
 
 ### Features
+
 - Support 26.1.2 version and Java 25
 - Support `Fabric` servers
 - Support YouTube shorts
@@ -397,6 +1152,7 @@
 - Show max 72 recommended videos based on the current video instead of 24
 
 ### Improvements
+
 - Switch from RGBA to RGB24 for improved rendering performance
 - Videos now stop rendering (but still play) when Minecraft is minimized
 - Enhance watchdog logic for low-connection networks and stability
@@ -409,99 +1165,36 @@
 - Update dependencies and replace some of them with better alternatives
 
 ### Fixes
+
 - Fix cropping at display edges
 - Fix mute logic and allow players to mute displays in sync mode
 - Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
-- Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
+- Fix the "You have to look at the display block" error when there is actually display
+  ([#79](https://github.com/arnodoelinger/dreamdisplays/issues/79))
+- Fix a strange version number in the menu ([#81](https://github.com/arnodoelinger/dreamdisplays/issues/81))
 - Fix version semantic versioning parsing for mod updates
 - Fix tiled thumbnail rendering in the menu
 - Fix texture race crash in some rare cases
-- Fix a locked quality bug ([#80](https://github.com/arsmotorin/dreamdisplays/issues/80))
+- Fix a locked quality bug ([#80](https://github.com/arnodoelinger/dreamdisplays/issues/80))
 - Fix seek time overwriting the current playback time
 - Fix hanging `yt-dlp` when cookies are unavailable
 
 ## Server
 
 ### Features
+
 - Support `Fabric` servers
 - Follow client's feature of lock / unlock displays
 - Deprecate `/display` command (will be replaced by direct interaction with displays in future versions)
 
 ### Improvements
+
 - Preserve sync mode when switching videos
 - Broadcast synced display state every 2 seconds
 - Add dynamic material messages
 - Update dependencies and replace some of them with better alternatives
 
-# Version 1.7.0-SNAPSHOT.4
-
-## Mod
-
-- Now you can decide whether to lock or unlock a display from modifying by other players in the menu (works only on servers with the new plugin version)
-- New async texture uploader with a triple-buffered PBO ring
-- Hardware-accelerated `FFmpeg` video decoding
-- Reimplement fix of OpenGL `GL_INVALID_VALUE` error in all modes
-- Skip restoring saved time if sync is active
-- Fix cropping at display edges
-- Fix tiled thumbnail rendering in the menu
-- Fix mute logic and allow players to mute displays in sync mode
-- Fix admins can't delete displays through the menu
-- Fix the "You have to look at the display block" error when there is actually display ([#79](https://github.com/arsmotorin/dreamdisplays/issues/79))
-- Fix a locked quality bug ([#80](https://github.com/arsmotorin/dreamdisplays/issues/80))
-- Fix a strange version number in the menu ([#81](https://github.com/arsmotorin/dreamdisplays/issues/81))
-- Fix texture race crash in some rare cases
-- Fix seek time overwriting the current playback time
-- Fix hanging `yt-dlp` when cookies are unavailable
-- Fix no display territories translations (you need to use axe, not pickaxe)
-
-## Server
-
-- Follow the client's feature of lock / unlock displays
-- Preserve sync mode when switching videos
-- Broadcast synced display state every 2 seconds
-- Update Paper API to the 65-stable build
-
-# Version 1.7.0-SNAPSHOT.3
-
-## Mod
-
-- Use RGB format instead of RGBA for Picture-in-Picture mode
-- Fix OpenGL `GL_INVALID_VALUE` error in windowed mode
-- Fix `EXCEPTION_ACCESS_VIOLATION` crash because of `GL_INVALID_VALUE` errors
-
-## Server
-
-- No changes
-
-# Version 1.7.0-SNAPSHOT.2
-
-## Mod
-
-- Windowed and Picture-in-Picture mode
-- Enhance YouTube's cache for stability
-- Enhance watchdog logic for low connection networks and stability
-- Fix OpenGL `GL_INVALID_VALUE` error
-
-## Server
-
-- No changes
-
-# Version 1.7.0-SNAPSHOT.1
-
-## Mod
-
-- Support 26.1.2 version and Java 25
-- Support Fabric servers
-- Switch from RGBA to RGB24 for improved rendering performance
-- Reduce maximum brightness from 200% to 100%
-- Videos now stop rendering (but still plays) when Minecraft is minimized
-
-## Server
-
-- Some documentation standardization
-
-# Version 1.6.3
+# 1.6.3 Release
 
 ## Mod
 
@@ -520,7 +1213,7 @@
 - Standardize logs, warnings and errors
 - Reformat codebase
 
-# Version 1.6.2
+# 1.6.2 Release
 
 ## Mod
 
@@ -539,8 +1232,9 @@
 - Fix `BufferOverflow` in specific edge cases
 - Fix some edge cases of audio desynchronization after long playback
 - Fix suggestion scroller not showing up when in large menu mode
-- Fix language selector ([#73](https://github.com/arsmotorin/dreamdisplays/issues/73))
-- Fix volume reset after leaving active display distance ([#76](https://github.com/arsmotorin/dreamdisplays/issues/76))
+- Fix language selector ([#73](https://github.com/arnodoelinger/dreamdisplays/issues/73))
+- Fix volume reset after leaving active display distance
+  ([#76](https://github.com/arnodoelinger/dreamdisplays/issues/76))
 - Enhance project structure and code quality in some places
 
 ## Server
@@ -549,12 +1243,14 @@
 - Batch display info packets on player join to prevent client overload on servers with many displays
 - Validate sync packet time values to reject out-of-range data
 
-# Version 1.6.1
+# 1.6.1 Release
 
 ## Mod
 
 - Correct suggestion translations
-- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as errored
+- Fix video playback failing with a 403 Forbidden error when cached YouTube URLs expire – the player now automatically
+  invalidates the stale cache entry and re-fetches fresh URLs from `yt-dlp` instead of permanently marking the screen as
+  errored
 - Reduce format URL cache TTL from 5 hours to 2 hours to avoid serving near-expired YouTube CDN links
 - Improve error handling and timeout management in `yt-dlp` process execution
 
@@ -562,7 +1258,18 @@
 
 - No changes
 
-# Version 1.6.0
+# 1.6.0 Release
+
+## Highlights
+
+- Switch mod channel from Beta to Release
+- Support YouTube livestreams (live, première, and regular streams)
+- Direct searching and playback of YouTube videos without leaving the game
+- Switch to Paper plugin, drop Bukkit and Spigot support
+- Progress slider with seeking support
+- Single unified pipeline for all content (merged video + audio)
+- Rewrite seek and quality-change to use a single reliable pipeline rebuild
+- Improved video quality and format detection
 
 ## Mod
 
@@ -591,7 +1298,14 @@
 - Inform player about a display if they don't have the mod installed when they try to touch it
 - Various optimizations and some small bug fixes
 
-# Version 1.5.0
+# 1.5.0 Release
+
+## Highlights
+
+- Switch YouTube playback to `yt-dlp`
+- Improve video playback stability and reduce some lags
+- Improve seeking, synchronization and buffering behavior
+- Better detection of system GStreamer library path on macOS and Linux
 
 ## Mod
 
@@ -606,7 +1320,7 @@
 
 - No changes
 
-# Version 1.4.4
+# 1.4.4 Release
 
 ## Mod
 
@@ -622,7 +1336,7 @@
 - Add admin target mode for `/display on|off <player>`
 - Improve `/display reload` output with what was reloaded
 
-# Version 1.4.3
+# 1.4.3 Release
 
 ## Mod
 
@@ -634,8 +1348,8 @@
 
 ## Server
 
-- Improved `/display video` URL parsing: now accepts direct video IDs and more YouTube link formats (
-  watch/shorts/embed/live/youtu.be).
+- Improved `/display video` URL parsing: now accepts direct video IDs and more YouTube link formats
+  (watch/shorts/embed/live/youtu.be).
 - Add paginated display listing with improved formatting
 - Improved tab-completion: now it's case-insensitive
 - Language suggestions for `/display video` when typing language parameter
@@ -645,7 +1359,7 @@
 - Player-only `/display` subcommands now return a clear console message instead of failing silently
 - Fixed scheduler timing mismatch between Bukkit and Folia
 
-# Version 1.4.2
+# 1.4.2 Release
 
 ## Mod
 
@@ -661,7 +1375,7 @@
 - Handle failed config gracefully
 - Remove unnecessary warnings and logs
 
-# Version 1.4.1
+# 1.4.1 Release
 
 ## Mod
 
@@ -677,7 +1391,12 @@
 - Fix releasing snapshots when pull requesting
 - Add Kolyakot33 as a contributor
 
-# Version 1.4.0
+# 1.4.0 Release
+
+## Highlights
+
+- Support Quilt
+- Fix display directions not being created properly in some cases
 
 ## Mod
 
@@ -691,7 +1410,7 @@
 - Fix display directions not being created properly in some cases
 - Cleanup codebase
 
-# Version 1.3.2
+# 1.3.2 Release
 
 ## Mod
 
@@ -701,7 +1420,7 @@
 
 - No changes
 
-# Version 1.3.1
+# 1.3.1 Release
 
 ## Mod
 
@@ -714,7 +1433,16 @@
 
 - Detect snapshot versions correctly
 
-# Version 1.3.0
+# 1.3.0 Release
+
+## Highlights
+
+- We've created a [Discord server](https://discord.gg/uwMMZ2KWk6)!
+- Video brightness control
+- Change maximum of render distance to 128 blocks ([#59](https://github.com/arnodoelinger/dreamdisplays/issues/59))
+- Change maximum volume to 200% ([#60](https://github.com/arnodoelinger/dreamdisplays/issues/60))
+- Support CurseForge releases
+- Smoother video playback and some optimizations
 
 ## Mod
 
@@ -722,8 +1450,8 @@
 - Smoother video playback and some optimizations
 - Video brightness control
 - Store paused state of display
-- Change maximum of render distance to 128 blocks ([#59](https://github.com/arsmotorin/dreamdisplays/issues/59))
-- Change maximum volume to 200% ([#60](https://github.com/arsmotorin/dreamdisplays/issues/60))
+- Change maximum of render distance to 128 blocks ([#59](https://github.com/arnodoelinger/dreamdisplays/issues/59))
+- Change maximum volume to 200% ([#60](https://github.com/arnodoelinger/dreamdisplays/issues/60))
 - Fix playing videos after changing quality
 - Support CurseForge releases
 - Documentation in codebase of the mod
@@ -732,9 +1460,17 @@
 
 - Refactors and small improvements
 - Documentation in codebase of the plugin
-- Improve update logic and fix ignoring mod versions ([#63](https://github.com/arsmotorin/dreamdisplays/issues/63))
+- Improve update logic and fix ignoring mod versions ([#63](https://github.com/arnodoelinger/dreamdisplays/issues/63))
 
-# Version 1.2.0
+# 1.2.0 Release
+
+## Highlights
+
+- New, refreshed logo
+- All messages from plugin are in client's language now
+- New languages: Belarusian, Czech, German and Hebrew for plugin messages
+- Add `/display help` and `/display stats` commands
+- Fix an issue when after re-enabling displays they don't load until relog
 
 ## Mod
 
@@ -757,7 +1493,7 @@
 - Fix reporting message not showing correctly
 - Fix wrong command usage message logic
 
-# Version 1.1.3
+# 1.1.3 Release
 
 ## Mod
 
@@ -770,7 +1506,7 @@
 
 - No changes
 
-# Version 1.1.2
+# 1.1.2 Release
 
 ## Mod
 
@@ -784,7 +1520,7 @@
 - Add message when client doesn't have the mod installed
 - Better releases system of mod
 
-# Version 1.1.1
+# 1.1.1 Release
 
 ## Mod
 
@@ -797,7 +1533,18 @@
 
 - Fix display desynchronization with server and client
 
-# Version 1.1.0
+# 1.1.0 Release
+
+## Highlights
+
+- Support 1.21.11 version
+- Support NeoForge
+- Huge reduction of CPU usage, more stable and optimized
+- Store all displays from the servers
+- Support more YouTube links
+- Switched to Mojang mappings
+- Plugin rewritten in Kotlin
+- bStats
 
 ## Mod
 
@@ -826,7 +1573,7 @@
 - Removed hourly update notifications from the console
 - bStats
 
-# Version 1.0.8
+# 1.0.8 Release
 
 ## Mod
 
@@ -841,7 +1588,7 @@
 - More languages for plugin configuration
 - .toml format for configuration files
 
-# Version 1.0.7
+# 1.0.7 Release
 
 ## Mod
 
@@ -853,7 +1600,7 @@
 - Better comments in plugin configuration
 - Discontinue FrogDisplays channel support
 
-# Version 1.0.6
+# 1.0.6 Release
 
 ## Mod
 
@@ -868,7 +1615,7 @@
 
 - Bump version
 
-# Version 1.0.5
+# 1.0.5 Release
 
 ## Mod
 
@@ -878,7 +1625,7 @@
 
 - Bump version
 
-# Version 1.0.4
+# 1.0.4 Release
 
 ## Mod
 
@@ -900,7 +1647,7 @@
 - Added support for old mod clients
 - Added plugin information
 
-# Version 1.0.3
+# 1.0.3 Release
 
 ## Mod
 
@@ -910,7 +1657,7 @@
 
 - First public version
 
-# Version 1.0.2
+# 1.0.2 Release
 
 ## Mod
 
@@ -920,7 +1667,7 @@
 
 - Bump version (not public)
 
-# Version 1.0.1
+# 1.0.1 Release
 
 ## Mod
 
@@ -930,7 +1677,11 @@
 
 - Bump version (not public)
 
-# Version 1.0.0
+# 1.0.0 Release
+
+## Highlights
+
+- First version
 
 ## Mod
 

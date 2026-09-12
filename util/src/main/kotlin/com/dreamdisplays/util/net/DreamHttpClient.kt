@@ -1,5 +1,7 @@
 package com.dreamdisplays.util.net
 
+import kotlinx.io.IOException
+import com.dreamdisplays.api.security.policy.MediaHosts
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -7,7 +9,6 @@ import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import org.slf4j.LoggerFactory
-import java.io.IOException
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URI
@@ -16,7 +17,9 @@ import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardOpenOption
-import java.util.Locale
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.zip.GZIPInputStream
 
@@ -26,10 +29,38 @@ import java.util.zip.GZIPInputStream
  * remains an implementation detail of `util`.
  */
 object DreamHttpClient {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/Http")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     private const val DEFAULT_CONNECT_TIMEOUT_MS = 10_000L
     private const val DEFAULT_READ_TIMEOUT_MS = 30_000L
+    private const val MAX_UNLIMITED_BODY_BYTES = 64 * 1024 * 1024
+
+    private const val DEFAULT_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) " + "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+
+    private const val THIRD_PARTY_HOST_CONCURRENCY = 4
+    private const val THIRD_PARTY_QUEUE_TIMEOUT_MS = 15_000L
+    private const val MAX_TRACKED_HOSTS = 256
+
+    private val hostGates = ConcurrentHashMap<String, Semaphore>()
+
+    /**
+     * Runs [block] under this host's concurrency gate, or straight through for the platforms and
+     * for URLs with no host to key on.
+     */
+    private fun <T> withHostGate(url: String, block: () -> T): T {
+        if (MediaHosts.isFirstParty(url)) return block()
+        val host = MediaHosts.hostOf(url) ?: return block()
+        if (hostGates.size > MAX_TRACKED_HOSTS) hostGates.clear()
+        val gate = hostGates.computeIfAbsent(host) { Semaphore(THIRD_PARTY_HOST_CONCURRENCY, true) }
+        if (!gate.tryAcquire(THIRD_PARTY_QUEUE_TIMEOUT_MS, TimeUnit.MILLISECONDS)) {
+            throw IOException("Too many requests already in flight to $host.")
+        }
+        try {
+            return block()
+        } finally {
+            gate.release()
+        }
+    }
 
     private val baseClient = OkHttpClient.Builder()
         .retryOnConnectionFailure(true)
@@ -46,7 +77,41 @@ object DreamHttpClient {
         val callTimeoutMs: Long = 0L,
         val followRedirects: Boolean = true,
         val proxyUrl: String? = null,
-    )
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as RequestOptions
+
+            if (connectTimeoutMs != other.connectTimeoutMs) return false
+            if (readTimeoutMs != other.readTimeoutMs) return false
+            if (writeTimeoutMs != other.writeTimeoutMs) return false
+            if (callTimeoutMs != other.callTimeoutMs) return false
+            if (followRedirects != other.followRedirects) return false
+            if (method != other.method) return false
+            if (headers != other.headers) return false
+            if (!body.contentEquals(other.body)) return false
+            if (contentType != other.contentType) return false
+            if (proxyUrl != other.proxyUrl) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = connectTimeoutMs.hashCode()
+            result = 31 * result + readTimeoutMs.hashCode()
+            result = 31 * result + writeTimeoutMs.hashCode()
+            result = 31 * result + callTimeoutMs.hashCode()
+            result = 31 * result + followRedirects.hashCode()
+            result = 31 * result + method.hashCode()
+            result = 31 * result + headers.hashCode()
+            result = 31 * result + (body?.contentHashCode() ?: 0)
+            result = 31 * result + contentType.hashCode()
+            result = 31 * result + proxyUrl.hashCode()
+            return result
+        }
+    }
 
     data class HttpResponse(
         val code: Int,
@@ -58,20 +123,45 @@ object DreamHttpClient {
         val isSuccessful: Boolean get() = code in 200..299
 
         fun bodyString(charset: Charset = StandardCharsets.UTF_8): String = body.toString(charset)
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as HttpResponse
+
+            if (code != other.code) return false
+            if (message != other.message) return false
+            if (headers != other.headers) return false
+            if (!body.contentEquals(other.body)) return false
+            if (finalUrl != other.finalUrl) return false
+            if (isSuccessful != other.isSuccessful) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = code
+            result = 31 * result + message.hashCode()
+            result = 31 * result + headers.hashCode()
+            result = 31 * result + body.contentHashCode()
+            result = 31 * result + finalUrl.hashCode()
+            result = 31 * result + isSuccessful.hashCode()
+            return result
+        }
     }
 
     fun headersOf(vararg headers: Pair<String, String>): Map<String, List<String>> =
         headers.groupBy({ it.first }, { it.second })
 
     @Throws(IOException::class)
-    fun execute(url: String, options: RequestOptions = RequestOptions()): HttpResponse {
+    fun execute(url: String, options: RequestOptions = RequestOptions()): HttpResponse = withHostGate(url) {
         val request = request(url, options)
         clientFor(options).newCall(request).execute().use { response ->
-            return HttpResponse(
+            HttpResponse(
                 code = response.code,
                 message = response.message,
                 headers = response.headers.toMultimap(),
-                body = response.readBodyBytes(),
+                body = response.readBodyBytes(url),
                 finalUrl = response.request.url.toString(),
             )
         }
@@ -89,6 +179,26 @@ object DreamHttpClient {
     }
 
     @Throws(IOException::class)
+    fun executeLimited(
+        url: String,
+        maxBytes: Int,
+        options: RequestOptions = RequestOptions(),
+    ): HttpResponse = withHostGate(url) {
+        require(maxBytes > 0) { "maxBytes must be positive." }
+        val request = request(url, options)
+        clientFor(options).newCall(request).execute().use { response ->
+            val body = response.bodyStream().use { it.readAtMost(maxBytes) }
+            HttpResponse(
+                code = response.code,
+                message = response.message,
+                headers = response.headers.toMultimap(),
+                body = body,
+                finalUrl = response.request.url.toString(),
+            )
+        }
+    }
+
+    @Throws(IOException::class)
     fun downloadToFile(
         url: String,
         dest: Path,
@@ -103,7 +213,7 @@ object DreamHttpClient {
                         code = response.code,
                         message = response.message,
                         headers = response.headers.toMultimap(),
-                        body = response.readBodyBytes(),
+                        body = response.readBodyBytes(url),
                         finalUrl = response.request.url.toString(),
                     ),
                     url,
@@ -148,6 +258,9 @@ object DreamHttpClient {
         for ((name, values) in options.headers) {
             for (value in values) builder.addHeader(name, value)
         }
+        if (options.headers.keys.none { it.equals("User-Agent", ignoreCase = true) }) {
+            builder.header("User-Agent", DEFAULT_USER_AGENT)
+        }
         val method = options.method.uppercase(Locale.ROOT)
         builder.method(method, requestBody(method, options))
         return builder.build()
@@ -172,28 +285,42 @@ object DreamHttpClient {
     }
 
     private fun proxyFor(rawProxyUrl: String?): Proxy? {
-        val raw = rawProxyUrl?.trim().orEmpty()
-        if (raw.isEmpty()) return null
-        val uri = try {
-            URI.create(raw)
-        } catch (e: Exception) {
-            logger.warn("Invalid proxy URL: $raw.")
-            return null
-        }
-        val type = when (uri.scheme?.lowercase(Locale.ROOT)) {
-            "socks", "socks4", "socks5" -> Proxy.Type.SOCKS
-            else -> Proxy.Type.HTTP
-        }
-        val host = uri.host ?: run {
-            logger.warn("Invalid proxy URL without host: $raw.")
-            return null
-        }
-        val port = if (uri.port > 0) uri.port else if (type == Proxy.Type.SOCKS) 1080 else 8080
-        return Proxy(type, InetSocketAddress(host, port))
+        val raw = rawProxyUrl?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return runCatching { URI.create(raw) }
+            .onFailure { logger.warn("Invalid proxy URL: $raw.") }
+            .mapCatching { uri ->
+                val host = uri.host ?: throw IllegalArgumentException("Missing host")
+                val type = when (uri.scheme?.lowercase(Locale.ROOT)) {
+                    "socks", "socks4", "socks5" -> Proxy.Type.SOCKS
+                    else -> Proxy.Type.HTTP
+                }
+                val port = if (uri.port > 0) uri.port else if (type == Proxy.Type.SOCKS) 1080 else 8080
+
+                Proxy(type, InetSocketAddress(host, port))
+            }
+            .onFailure { logger.warn("Invalid proxy URL without host: $raw.") }
+            .getOrNull()
     }
 
-    private fun Response.readBodyBytes(): ByteArray {
-        return bodyStream().use { it.readBytes() }
+    private fun Response.readBodyBytes(url: String): ByteArray {
+        val probe = bodyStream().use { it.readAtMost(MAX_UNLIMITED_BODY_BYTES + 1) }
+        if (probe.size > MAX_UNLIMITED_BODY_BYTES) {
+            throw IOException("Response body for $url exceeds the ${MAX_UNLIMITED_BODY_BYTES / (1024 * 1024)} MiB limit.")
+        }
+        return probe
+    }
+
+    private fun java.io.InputStream.readAtMost(maxBytes: Int): ByteArray {
+        val out = java.io.ByteArrayOutputStream(minOf(maxBytes, DEFAULT_BUFFER_SIZE))
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        var remaining = maxBytes
+        while (remaining > 0) {
+            val read = read(buffer, 0, minOf(buffer.size, remaining))
+            if (read < 0) break
+            out.write(buffer, 0, read)
+            remaining -= read
+        }
+        return out.toByteArray()
     }
 
     private fun Response.bodyStream() =

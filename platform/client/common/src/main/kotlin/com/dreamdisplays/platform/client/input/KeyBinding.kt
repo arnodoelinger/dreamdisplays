@@ -10,9 +10,9 @@ data class KeyBinding(
     /** The default key code for this key binding. */
     val defaultKey: Int,
 
-    /** The category of this key binding, used for grouping in the controls menu. */
+    /** The category of this key binding, used for grouping in the control's menu. */
     val category: String,
 
-    /** A human-readable description of this key binding, shown in the controls menu. */
+    /** A human-readable description of this key binding, shown in the control's menu. */
     val description: String,
 )

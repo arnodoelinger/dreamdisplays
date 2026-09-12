@@ -1,14 +1,24 @@
 name: DreamDisplays
 version: '${version}'
-main: com.dreamdisplays.platform.server.Main
+main: com.dreamdisplays.platform.server.PaperServer
 api-version: '${paperMinecraftApi}'
 description: 'Plugin for the Dream Displays mod.'
 authors:
-  - arsmotorin
+  - arnodoelinger
   - INotSleep
   - Kolyakot33
   - Toffikk
 folia-supported: true
+dependencies:
+  server:
+    LuckPerms:
+      load: BEFORE
+      required: false
+      join-classpath: true
+    WorldGuard:
+      load: BEFORE
+      required: false
+      join-classpath: true
 permissions:
   dreamdisplays.create:
     default: true
@@ -16,11 +26,55 @@ permissions:
     default: true
   dreamdisplays.info:
     default: true
+  dreamdisplays.help:
+    default: true
   dreamdisplays.local:
     default: true
   dreamdisplays.synced:
     default: true
   dreamdisplays.broadcast:
     default: true
+  dreamdisplays.watchparty:
+    default: true
+  dreamdisplays.custom:
+    default: true
+  dreamdisplays.lock:
+    default: true
+  dreamdisplays.delete:
+    default: true
+  dreamdisplays.lock.bypass.worldguard:
+    default: op
+  dreamdisplays.delete.others:
+    default: op
+  dreamdisplays.list:
+    default: op
+  dreamdisplays.stats:
+    default: op
+  dreamdisplays.premium:
+    default: op
+  dreamdisplays.reload:
+    default: op
+  dreamdisplays.updates:
+    default: op
   dreamdisplays.toggle.others:
+    default: op
+  dreamdisplays.create.bypass:
+    default: op
+  dreamdisplays.fullscreen.start:
+    default: op
+  dreamdisplays.fullscreen.stop:
+    default: op
+  dreamdisplays.fullscreen.list:
+    default: op
+  dreamdisplays.fullscreen.network:
+    default: op
+  dreamdisplays.remote:
+    default: op
+  dreamdisplays.name:
+    default: true
+  dreamdisplays.name.others:
+    default: op
+  dreamdisplays.schedule:
+    default: true
+  dreamdisplays.schedule.others:
     default: op

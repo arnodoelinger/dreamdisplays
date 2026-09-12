@@ -1,48 +1,46 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.playback.PlaybackServices
-import com.dreamdisplays.api.watchparty.WatchPartyServices
-import com.dreamdisplays.api.display.service.DisplayServices
-import com.dreamdisplays.platform.client.popout.PopoutManager
+//? if >=1.21.11 {
+import net.minecraft.client.input.MouseButtonEvent
+//?}
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.service.keys.DisplayServices
+import com.dreamdisplays.api.media.service.keys.MediaServices
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.media.audio.model.AcousticQuality
+import com.dreamdisplays.api.media.audio.service.keys.AudioAcousticsServices
+import com.dreamdisplays.api.media.search.model.MediaSearchResult
+import com.dreamdisplays.api.playback.model.FullscreenMode
+import com.dreamdisplays.api.playback.model.PlaybackAction
+import com.dreamdisplays.api.playback.model.DisplayAccess
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.api.playback.service.keys.PlaybackServices
+import com.dreamdisplays.api.runtime.registry.service.get
+import com.dreamdisplays.api.watchparty.service.keys.WatchPartyServices
+import com.dreamdisplays.media.source.youtube.cache.VideoMetadataCache
+import com.dreamdisplays.media.source.youtube.cache.VideoTitleCache
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.get
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.ui.kit.UiRect
-import com.dreamdisplays.platform.client.ui.kit.UiTheme
-import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
-import com.dreamdisplays.platform.client.ui.kit.drawPanel
-import com.dreamdisplays.platform.client.ui.menu.ErrorPanel
-import com.dreamdisplays.platform.client.ui.menu.MenuLayout
-import com.dreamdisplays.platform.client.ui.menu.ModTitleLabel
-import com.dreamdisplays.platform.client.ui.menu.PopoutDropdown
-import com.dreamdisplays.platform.client.ui.menu.PreviewSection
-import com.dreamdisplays.platform.client.ui.menu.SettingsSection
-import com.dreamdisplays.platform.client.ui.widgets.IconButton
-import com.dreamdisplays.platform.client.ui.widgets.SeekBar
-import com.dreamdisplays.platform.client.ui.widgets.SuggestionsPanel
-import com.dreamdisplays.platform.client.ui.widgets.SyncModeSlider
-import com.dreamdisplays.platform.client.ui.widgets.ValueSlider
-import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.api.media.MediaServices
-import com.dreamdisplays.api.media.search.MediaSearchResult
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.platform.client.popout.PopoutManager
+import com.dreamdisplays.platform.client.render.ScrubPreview
+import com.dreamdisplays.platform.client.storage.CustomVideoStore
+import com.dreamdisplays.platform.client.ui.kit.UiRect
+import com.dreamdisplays.platform.client.ui.kit.UiScreenBase
+import com.dreamdisplays.platform.client.ui.kit.UiText
+import com.dreamdisplays.platform.client.ui.kit.UiTheme
+import com.dreamdisplays.platform.client.ui.kit.drawPanel
+import com.dreamdisplays.platform.client.ui.menu.*
+import com.dreamdisplays.platform.client.ui.widgets.*
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
-import com.dreamdisplays.media.source.ytdlp.VideoMetadataCache
-import com.dreamdisplays.media.source.ytdlp.VideoTitleCache
 import net.minecraft.ChatFormatting
 import net.minecraft.client.Minecraft
-import net.minecraft.client.input.MouseButtonEvent
 import net.minecraft.network.chat.Component
 import kotlin.math.abs
 import kotlin.math.floor
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * The display configuration screen: video preview with playback controls, the settings rows, and
@@ -57,18 +55,41 @@ class DisplayMenu private constructor(
     private val dropdown = PopoutDropdown(
         onWindow = { popout.openWindow(DisplayId(displayScreen.uuid)) },
         onPip = { popout.openPip(DisplayId(displayScreen.uuid)) },
+        onFullscreen = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.STANDARD); onClose() },
+        onBorderless = { popout.openFullscreen(DisplayId(displayScreen.uuid), FullscreenMode.IMMERSIVE); onClose() },
+    )
+    private val audioTrackDropdown = AudioTrackDropdown(
+        getTracks = { displayScreen.audioTrackList },
+        currentUrl = { displayScreen.currentAudioTrackUrl },
+        // Routed through the playback service (client-local, per-viewer) like every other control.
+        onSelect = {
+            DreamServices.registry.get(PlaybackServices.PLAYBACK)
+                .setAudioTrack(DisplayId(displayScreen.uuid), it.url)
+        },
+    )
+    private val subtitleDropdown = SubtitleDropdown(
+        getTracks = { displayScreen.subtitleTrackList },
+        currentLang = { displayScreen.currentSubtitleLang.takeIf { displayScreen.subtitlesEnabled } },
+        onSelect = {
+            DreamServices.registry.get(PlaybackServices.PLAYBACK)
+                .setSubtitleTrack(DisplayId(displayScreen.uuid), it?.lang)
+        },
     )
 
     private lateinit var volume: ValueSlider
-    private lateinit var renderD: ValueSlider
     private lateinit var quality: ValueSlider
     private lateinit var brightness: ValueSlider
-    private lateinit var sync: SyncModeSlider
+    private lateinit var audio3d: ModeSlider<AcousticQuality>
+    private lateinit var sync: ModeSlider<PlaybackMode>
+    private lateinit var access: ModeSlider<DisplayAccess>
     private lateinit var progress: SeekBar
     private lateinit var suggestions: SuggestionsPanel
     private lateinit var preview: PreviewSection
     private lateinit var settings: SettingsSection
     private lateinit var errorPanel: ErrorPanel
+    private lateinit var popoutButton: IconButton
+    private lateinit var audioTrackButton: IconButton
+    private lateinit var subtitleButton: IconButton
 
     private var lastSuggestedVideoId: String? = null
     private var prevQualityListSize = 0
@@ -86,32 +107,15 @@ class DisplayMenu private constructor(
         val videoReady = { ds.isVideoStarted && !ds.errored }
         val notErrored = { !ds.errored }
 
-        // Migrate legacy block-based renderDistance to the nearest valid chunk multiple (2–12 chunks).
-        val migratedChunks = (ds.renderDistance / 16.0).roundToInt().coerceIn(MIN_CHUNKS, MAX_CHUNKS)
-        val migratedBlocks = migratedChunks * CHUNK_BLOCKS
-        if (ds.renderDistance != migratedBlocks) {
-            ds.renderDistance = migratedBlocks
-            DisplayRegistry.saveScreenData(ds)
-        }
-
         volume = addUi(
             ValueSlider(
                 initial = ds.volume.toDouble(),
                 label = { Component.literal("${floor(it * 200).toInt()}%") },
+                // Volume's fraction maps to 0-200%, so a 5%-of-displayed-value stop is 0.025 of the fraction.
+                step = 0.025,
             ) { playback.setVolume(displayId, it.toFloat()) })
         volume.enabledWhen = videoReady
         volume.visibleWhen = notErrored
-
-        renderD = addUi(
-            ValueSlider(
-                initial = chunksToFraction(ds.renderDistance / CHUNK_BLOCKS),
-                label = { Component.translatable("dreamdisplays.button.render-distance.label", fractionToChunks(it)) },
-            ) {
-                ds.renderDistance = fractionToChunks(it) * CHUNK_BLOCKS
-                DisplayRegistry.saveScreenData(ds)
-            })
-        renderD.enabledWhen = { videoReady() && !ds.isPopoutActive }
-        renderD.visibleWhen = notErrored
 
         quality = addUi(
             ValueSlider(
@@ -124,7 +128,10 @@ class DisplayMenu private constructor(
                         else -> Component.literal("${ds.quality.serialize()}p")
                     }
                 },
-                // Commit on release: a quality change restarts the video, so don't fire on every drag step
+                // One stop per available quality, so the handle can only ever rest exactly on a real option
+                step = qualityStep(ds.qualityList.size),
+                // Commit on release: applying live would restart the decoder on every stop crossed
+                // while dragging, which can drop videoReady() mid-drag and freeze the widget.
                 live = false,
             ) {
                 if (ds.qualityList.isNotEmpty()) playback.setQuality(
@@ -132,19 +139,35 @@ class DisplayMenu private constructor(
                     VideoQuality.parse(qualityFromFraction(it))
                 )
             })
-        quality.enabledWhen = { videoReady() && ds.qualityList.isNotEmpty() && ds.canChangeQualityHere }
+        quality.enabledWhen = { ds.qualityList.isNotEmpty() && ds.canChangeQualityHere }
         quality.visibleWhen = notErrored
 
         brightness = addUi(
             ValueSlider(
                 initial = ds.brightness.toDouble().coerceIn(0.0, 1.0),
                 label = { Component.literal("${floor(it * 100).toInt()}%") },
+                step = 0.05,
             ) { playback.setBrightness(displayId, it.toFloat()) })
-        brightness.enabledWhen = { videoReady() && (!ds.isSync || ds.canEdit) }
+        brightness.enabledWhen = { !ds.isSync || ds.canEdit }
         brightness.visibleWhen = notErrored
 
+        audio3d = addUi(
+            ModeSlider(
+                modes = AUDIO_3D_MODES,
+                initial = ClientStateManager.config.audioAcoustics,
+                current = { ClientStateManager.config.audioAcoustics },
+                enabledFor = { true },
+                label = { Component.translatable(audio3dModeLabel(it)) },
+            ) { quality ->
+                ClientStateManager.config.audioAcoustics = quality
+                ClientStateManager.config.save()
+                DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.setGlobalQuality(quality)
+            })
+        audio3d.visibleWhen = notErrored
+
         sync = addUi(
-            SyncModeSlider(
+            ModeSlider(
+                modes = SYNC_MODES,
                 initial = ds.effectiveMode,
                 current = { ds.effectiveMode },
                 enabledFor = {
@@ -163,62 +186,56 @@ class DisplayMenu private constructor(
                 }
             })
         sync.enabledWhen = {
-            videoReady() && (ds.canSetModeHere || (ds.watchParty != null && ds.canCloseWatchPartyHere))
+            ds.canSetModeHere || (ds.watchParty != null && ds.canCloseWatchPartyHere)
         }
         sync.visibleWhen = notErrored
 
-        val defaultVolume = { DisplayScreen.defaultVolumeFor(ds.mode) }
-        val volumeReset = addUi(IconButton("refresh") {
-            val resetValue = defaultVolume()
-            playback.setVolume(displayId, resetValue)
-            volume.value = resetValue.toDouble()
-        })
-        volumeReset.enabledWhen = { videoReady() && abs(volume.value - defaultVolume().toDouble()) > 0.01 }
-        volumeReset.visibleWhen = notErrored
-
-        val renderDReset = addUi(IconButton("refresh") {
-            val defaultChunks =
-                (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(MIN_CHUNKS, MAX_CHUNKS)
-            ds.renderDistance = defaultChunks * CHUNK_BLOCKS
-            renderD.value = chunksToFraction(defaultChunks)
-            DisplayRegistry.saveScreenData(ds)
-        })
-        renderDReset.enabledWhen = {
-            val defaultBlocks = (ClientStateManager.config.defaultDistance / CHUNK_BLOCKS).coerceIn(
-                MIN_CHUNKS,
-                MAX_CHUNKS
-            ) * CHUNK_BLOCKS
-            videoReady() && !ds.isPopoutActive && ds.renderDistance != defaultBlocks
-        }
-        renderDReset.visibleWhen = notErrored
+        access = addUi(
+            ModeSlider(
+                modes = accessModesFor(ds),
+                initial = ds.access ?: DisplayAccess.DEFAULT,
+                current = { ds.access ?: DisplayAccess.DEFAULT },
+                enabledFor = { ds.canToggleLockHere },
+                label = { Component.translatable(accessLevelLabel(it)) },
+            ) { level ->
+                if (level != ds.access) displays.setAccess(displayId, level)
+            })
+        access.enabledWhen = { ds.canToggleLockHere }
+        access.visibleWhen = { ds.access != null && !ds.errored }
 
         val qualityReset = addUi(IconButton("refresh") {
             playback.setQuality(displayId, VideoQuality.DEFAULT)
             quality.value = qualityFraction(VideoQuality.DEFAULT.serialize())
         })
-        qualityReset.enabledWhen = { videoReady() && ds.canChangeQualityHere && ds.quality != VideoQuality.DEFAULT }
+        qualityReset.enabledWhen = { ds.canChangeQualityHere && ds.quality != VideoQuality.DEFAULT }
         qualityReset.visibleWhen = notErrored
 
         val brightnessReset = addUi(IconButton("refresh") {
             playback.setBrightness(displayId, 1.0f)
             brightness.value = 1.0
         })
-        brightnessReset.enabledWhen = { videoReady() && abs(brightness.value - 0.5) > 0.01 }
+        brightnessReset.enabledWhen = { abs(brightness.value - 1.0) > 0.01 }
         brightnessReset.visibleWhen = notErrored
+
+        val audio3dReset = addUi(IconButton("refresh") {
+            ClientStateManager.config.audioAcoustics = AUDIO_3D_DEFAULT
+            ClientStateManager.config.save()
+            DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.setGlobalQuality(AUDIO_3D_DEFAULT)
+        })
+        audio3dReset.enabledWhen = { ClientStateManager.config.audioAcoustics != AUDIO_3D_DEFAULT }
+        audio3dReset.visibleWhen = notErrored
 
         val syncReset = addUi(IconButton("refresh") {
             if (ds.canSetModeHere) playback.setMode(displayId, PlaybackMode.LOCAL)
         })
-        syncReset.enabledWhen = { videoReady() && ds.canSetModeHere && ds.effectiveMode != PlaybackMode.LOCAL }
+        syncReset.enabledWhen = { ds.canSetModeHere && ds.effectiveMode != PlaybackMode.LOCAL }
         syncReset.visibleWhen = notErrored
 
-        val canSeekNow = { ds.canSeekHere && ds.canSeek() }
-        val backButton = addUi(IconButton("left") { playback.seekRelative(displayId, (-5).seconds) })
-        backButton.enabledWhen = canSeekNow
-        backButton.visibleWhen = notErrored
-        val forwardButton = addUi(IconButton("right") { playback.seekRelative(displayId, 5.seconds) })
-        forwardButton.enabledWhen = canSeekNow
-        forwardButton.visibleWhen = notErrored
+        val accessReset = addUi(IconButton("refresh") {
+            if (ds.canToggleLockHere) displays.setAccess(displayId, ds.defaultAccess)
+        })
+        accessReset.enabledWhen = { ds.canToggleLockHere && ds.access != ds.defaultAccess }
+        accessReset.visibleWhen = { ds.access != null && !ds.errored }
 
         val muteButton = addUi(
             IconButton(
@@ -227,7 +244,7 @@ class DisplayMenu private constructor(
         muteButton.enabledWhen = videoReady
         muteButton.visibleWhen = notErrored
 
-        val popoutButton = addUi(IconButton("popout") {
+        popoutButton = addUi(IconButton("popout") {
             if (ds.isPopoutActive) {
                 popout.close(displayId)
                 dropdown.hide()
@@ -237,6 +254,14 @@ class DisplayMenu private constructor(
         })
         popoutButton.enabledWhen = { videoReady() && (ds.canPopoutHere || ds.isPopoutActive) }
         popoutButton.visibleWhen = notErrored
+
+        audioTrackButton = addUi(IconButton("lang") { audioTrackDropdown.toggle() })
+        audioTrackButton.enabledWhen = { videoReady() && ds.audioTrackList.size > 1 }
+        audioTrackButton.visibleWhen = notErrored
+
+        subtitleButton = addUi(IconButton("cc") { subtitleDropdown.toggle() })
+        subtitleButton.enabledWhen = { videoReady() && ds.subtitleTrackList.isNotEmpty() }
+        subtitleButton.visibleWhen = notErrored
 
         val pauseButton = addUi(
             IconButton(
@@ -249,6 +274,20 @@ class DisplayMenu private constructor(
             SeekBar(
                 current = { ds.currentTimeNanos },
                 duration = { ds.mediaPlayerDurationNanos },
+                previewFrame = { nanos ->
+                    if (ds.isLive) null else {
+                        val key = ds.videoUrl
+                        val rawUrl = ds.scrubPreviewRawUrl
+                        val dur = ds.mediaPlayerDurationNanos
+                        if (key != null && rawUrl != null) {
+                            ScrubPreview.request(key, rawUrl, dur, ds.scrubPreviewSeeksByDecoding)
+                        }
+                        key?.let { ScrubPreview.frameAt(it, nanos) }
+                    }
+                },
+                waitingLabel = { if (!ds.isVideoStarted) Component.translatable("dreamdisplays.ui.waiting").string else null },
+                scheduleLabel = { scheduleCountdownText() },
+                chapters = { DisplayChapters.of(ds) },
             ) { nanos ->
                 if (ds.canSeek() && !ds.isLive && ds.canSeekHere) {
                     playback.seek(displayId, (nanos / 1_000_000L).milliseconds)
@@ -256,16 +295,6 @@ class DisplayMenu private constructor(
             })
         progress.enabledWhen = { videoReady() && ds.canSeek() && !ds.isLive && ds.canSeekHere }
         progress.visibleWhen = notErrored
-
-        val lockButton = addUi(
-            IconButton(
-                icon = { IconButton.modIcon(if (ds.isLocked == true) "lock" else "unlock") },
-            ) {
-                val locked = ds.isLocked ?: return@IconButton
-                displays.setLocked(displayId, !locked)
-            })
-        lockButton.enabledWhen = { ds.canToggleLockHere }
-        lockButton.visibleWhen = { ds.isLocked != null && !ds.errored }
 
         val retryButton = addUi(IconButton("refresh") {
             playback.retry(displayId) // Local re-resolve; the error panel clears itself once it succeeds
@@ -294,28 +323,21 @@ class DisplayMenu private constructor(
                 })
         } else null
 
-        suggestions = addUi(SuggestionsPanel(::onPickSuggested))
+        suggestions = addUi(SuggestionsPanel(::onPickSuggested, ds.suggestionsController))
         suggestions.visibleWhen = { !ds.errored && suggestionsRect != null }
         // Locked / Broadcast / Watch party displays only let the owner / admin change the video, so
         // the panel shows an "unavailable" notice to everyone else instead of pickable suggestions.
         suggestions.available = { ds.canSetVideoHere }
 
         preview =
-            PreviewSection(ds, backButton, forwardButton, muteButton, popoutButton, pauseButton, progress, dropdown)
+            PreviewSection(
+                ds, muteButton, volume, popoutButton, audioTrackButton, subtitleButton, pauseButton, progress,
+                dropdown, audioTrackDropdown, subtitleDropdown,
+            )
         settings = SettingsSection(
-            rows = settingsRows(volumeReset, renderDReset, qualityReset, brightnessReset, syncReset),
-            ownerActions = listOf(reportButton, deleteButton, lockButton),
+            rows = settingsRows(qualityReset, brightnessReset, audio3dReset, syncReset, accessReset),
+            ownerActions = listOf(reportButton, deleteButton),
             buttonTooltips = listOf(
-                lockButton to {
-                    ds.isLocked?.let { locked ->
-                        listOf(
-                            Component.translatable(if (locked) "dreamdisplays.button.unlock.tooltip.1" else "dreamdisplays.button.lock.tooltip.1")
-                                .withStyle { it.withColor(ChatFormatting.WHITE).withBold(true) },
-                            Component.translatable(if (locked) "dreamdisplays.button.unlock.tooltip.2" else "dreamdisplays.button.lock.tooltip.2")
-                                .withStyle { it.withColor(ChatFormatting.GRAY) },
-                        )
-                    }
-                },
                 deleteButton to { buttonTooltip("dreamdisplays.button.delete") },
                 reportButton to { buttonTooltip("dreamdisplays.button.report") },
             ),
@@ -323,30 +345,14 @@ class DisplayMenu private constructor(
         errorPanel = ErrorPanel(retryButton, deleteButton, reportButton) { ds.mediaError }
     }
 
-    /** Builds the five settings rows with their tooltip content. */
+    /** Builds the settings rows with their tooltip content. */
     private fun settingsRows(
-        volumeReset: IconButton, renderDReset: IconButton, qualityReset: IconButton,
-        brightnessReset: IconButton, syncReset: IconButton,
+        qualityReset: IconButton,
+        brightnessReset: IconButton, audio3dReset: IconButton, syncReset: IconButton,
+        accessReset: IconButton,
     ): List<SettingsSection.Row> {
         val ds = displayScreen
         return listOf(
-            SettingsSection.Row("dreamdisplays.button.volume", volume, volumeReset) {
-                listOf(
-                    tooltipTitle("dreamdisplays.button.volume.tooltip.1"),
-                    tooltipBody("dreamdisplays.button.volume.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.volume.tooltip.3"),
-                    tooltipValue("dreamdisplays.button.volume.tooltip.4", (volume.value * 200).toInt()),
-                )
-            },
-            SettingsSection.Row("dreamdisplays.button.render-distance", renderD, renderDReset) {
-                listOf(
-                    tooltipTitle("dreamdisplays.button.render-distance.tooltip.1"),
-                    tooltipBody("dreamdisplays.button.render-distance.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.render-distance.tooltip.3"),
-                    Component.literal(""),
-                    tooltipValue("dreamdisplays.button.render-distance.tooltip.8", fractionToChunks(renderD.value)),
-                )
-            },
             SettingsSection.Row("dreamdisplays.button.quality", quality, qualityReset) {
                 val tip = mutableListOf(
                     tooltipTitle("dreamdisplays.button.quality.tooltip.1"),
@@ -354,7 +360,7 @@ class DisplayMenu private constructor(
                     Component.literal(""),
                     tooltipValue("dreamdisplays.button.quality.tooltip.4", qualityFromFraction(quality.value)),
                 )
-                if ((ds.quality.targetHeight ?: 0) >= 1080) {
+                if ((ds.quality.targetHeight ?: 0) > 1080) {
                     tip.add(
                         Component.translatable("dreamdisplays.button.quality.tooltip.5")
                             .withStyle { it.withColor(ChatFormatting.YELLOW) },
@@ -367,14 +373,32 @@ class DisplayMenu private constructor(
                     tooltipTitle("dreamdisplays.button.brightness.tooltip.1"),
                     tooltipBody("dreamdisplays.button.brightness.tooltip.2"),
                     Component.literal(""),
-                    tooltipValue("dreamdisplays.button.brightness.tooltip.3", floor(brightness.value * 200).toInt()),
+                    tooltipValue("dreamdisplays.button.brightness.tooltip.3", floor(brightness.value * 100).toInt()),
+                )
+            },
+            SettingsSection.Row("dreamdisplays.button.audio3d", audio3d, audio3dReset) {
+                listOf(
+                    tooltipTitle("dreamdisplays.button.audio3d.tooltip.1"),
+                    tooltipBody("dreamdisplays.button.audio3d.tooltip.2"),
+                    Component.literal(""),
+                    tooltipModeBullet("dreamdisplays.mode.audio_off", "dreamdisplays.button.audio3d.tooltip.3"),
+                    tooltipModeBullet("dreamdisplays.mode.audio_enhanced", "dreamdisplays.button.audio3d.tooltip.4"),
+                    tooltipModeBullet("dreamdisplays.mode.audio_advanced", "dreamdisplays.button.audio3d.tooltip.5"),
+                    Component.literal(""),
+                    tooltipValue(
+                        "dreamdisplays.button.audio3d.tooltip.6",
+                        Component.translatable(audio3dModeLabel(audio3d.mode)),
+                    ),
                 )
             },
             SettingsSection.Row("dreamdisplays.button.synchronization", sync, syncReset, extraGapBefore = 6) {
                 listOf(
                     tooltipTitle("dreamdisplays.button.synchronization.tooltip.1"),
                     tooltipBody("dreamdisplays.button.synchronization.tooltip.2"),
-                    tooltipBody("dreamdisplays.button.synchronization.tooltip.3"),
+                    Component.literal(""),
+                    tooltipModeBullet("dreamdisplays.mode.local", "dreamdisplays.button.synchronization.tooltip.3"),
+                    tooltipModeBullet("dreamdisplays.mode.synced", "dreamdisplays.button.synchronization.tooltip.4"),
+                    tooltipModeBullet("dreamdisplays.mode.broadcast", "dreamdisplays.button.synchronization.tooltip.6"),
                     Component.literal(""),
                     tooltipValue(
                         "dreamdisplays.button.synchronization.tooltip.5",
@@ -382,7 +406,50 @@ class DisplayMenu private constructor(
                     ),
                 )
             },
+            SettingsSection.Row("dreamdisplays.button.access", access, accessReset) {
+                buildList {
+                    add(tooltipTitle("dreamdisplays.button.access.tooltip.1"))
+                    add(tooltipBody("dreamdisplays.button.access.tooltip.2"))
+                    add(Component.literal(""))
+                    add(tooltipModeBullet("dreamdisplays.access.everyone", "dreamdisplays.button.access.tooltip.3"))
+                    if (ds.supportsRegionAccess) {
+                        add(tooltipModeBullet("dreamdisplays.access.region", "dreamdisplays.button.access.tooltip.4"))
+                    }
+                    add(tooltipModeBullet("dreamdisplays.access.locked", "dreamdisplays.button.access.tooltip.5"))
+                    if (ds.supportsRegionAccess && !ds.inRegion) {
+                        add(Component.literal(""))
+                        add(
+                            Component.translatable("dreamdisplays.button.access.tooltip.no_region")
+                                .withStyle { it.withColor(ChatFormatting.YELLOW) },
+                        )
+                    }
+                    add(Component.literal(""))
+                    add(
+                        tooltipValue(
+                            "dreamdisplays.button.access.tooltip.6",
+                            Component.translatable(accessLevelLabel(access.mode)),
+                        ),
+                    )
+                }
+            },
         )
+    }
+
+    /**
+     * "Pause in 4:32" / "Play in 4:32" for [displayScreen]'s pending scheduled action (see
+     * [com.dreamdisplays.platform.server.playback.ScheduledPlaybackManager]), or null when none is
+     * pending / it has already elapsed. Re-evaluated every frame against the live wall clock.
+     */
+    private fun scheduleCountdownText(): String? {
+        val at = displayScreen.scheduledStartEpochMillis.takeIf { it > 0 } ?: return null
+        val remainingMs = at - System.currentTimeMillis()
+        if (remainingMs <= 0) return null
+        val key = if (displayScreen.scheduledAction == PlaybackAction.PAUSE.wire) {
+            "dreamdisplays.ui.schedule_pause"
+        } else {
+            "dreamdisplays.ui.schedule_play"
+        }
+        return Component.translatable(key, UiText.formatTime(remainingMs * 1_000_000L)).string
     }
 
     private fun tooltipTitle(key: String): Component =
@@ -393,6 +460,13 @@ class DisplayMenu private constructor(
 
     private fun tooltipValue(key: String, arg: Any): Component =
         Component.translatable(key, arg).withStyle { it.withColor(ChatFormatting.GOLD) }
+
+    /** Bullet line naming a playback mode ([modeKey], e.g. `dreamdisplays.mode.local`) plus its short [descKey]. */
+    private fun tooltipModeBullet(modeKey: String, descKey: String): Component =
+        Component.literal("• ").withStyle { it.withColor(ChatFormatting.GRAY) }
+            .append(Component.translatable(modeKey).withStyle { it.withColor(ChatFormatting.GRAY) })
+            .append(Component.literal(": ").withStyle { it.withColor(ChatFormatting.GRAY) })
+            .append(Component.translatable(descKey).withStyle { it.withColor(ChatFormatting.GRAY) })
 
     /** Two-line white/gray tooltip used by the delete and report buttons. */
     private fun buttonTooltip(prefix: String): List<Component> = listOf(
@@ -405,10 +479,22 @@ class DisplayMenu private constructor(
         val ds = displayScreen
         if (!ds.canSetVideoHere) return
         DreamServices.registry.get(DisplayServices.DISPLAY).setUrl(DisplayId(ds.uuid), info.getWatchUrl(), ds.lang)
-        VideoTitleCache.put(info.id, info.title)
-        VideoMetadataCache.put(info.id, info)
-        lastSuggestedVideoId = info.id
-        suggestions.setRelatedTo(info.id)
+
+        // A pasted link exists nowhere else, so remember it locally the moment it is used
+        if (info.isCustom) {
+            CustomVideoStore.remember(info.getWatchUrl(), info.title)
+            return
+        }
+
+        // Related videos, the title cache, and the metadata cache are all keyed by a YouTube video
+        // id. A Twitch / Vimeo / Kick card has none — its id is a URL or a platform key — so feeding
+        // those here would fire a bogus YouTube "related" lookup. Only real YouTube picks continue.
+        val videoId = DreamServices.registry.getOrNull(MediaServices.SEARCH)?.extractVideoId(info.getWatchUrl())
+            ?: return
+        VideoTitleCache.put(videoId, info.title)
+        VideoMetadataCache.put(videoId, info)
+        lastSuggestedVideoId = videoId
+        suggestions.setRelatedTo(videoId)
     }
 
     override fun drawScreen(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, partialTick: Float) {
@@ -418,6 +504,7 @@ class DisplayMenu private constructor(
         modLabel.draw(g, UiTheme.SCREEN_PADDING, 6)
         resyncQualitySlider()
         resyncModeSlider()
+        audio3d.syncToCurrent()
 
         if (ds.errored) {
             dropdown.hide()
@@ -432,7 +519,7 @@ class DisplayMenu private constructor(
 
         g.drawPanel(font, layout.preview, Component.translatable("dreamdisplays.ui.preview").string)
         g.drawPanel(font, layout.settings, Component.translatable("dreamdisplays.ui.settings").string)
-        preview.render(g, layout.preview)
+        preview.render(g, layout.preview, mouseX, mouseY)
         settings.render(g, layout.settings)
 
         val suggestionsArea = layout.suggestions
@@ -447,6 +534,9 @@ class DisplayMenu private constructor(
         refreshRelatedVideos()
 
         drawChildren(g, mouseX, mouseY, partialTick)
+        //? if <1.21.11 {
+        suggestions.redrawSortDropdownOnTop(g, mouseX, mouseY)
+        //?}
         settings.renderTooltips(g, mouseX, mouseY, toRealX(mouseX), toRealY(mouseY))
     }
 
@@ -456,6 +546,7 @@ class DisplayMenu private constructor(
         val qualityList = ds.qualityList
         if (qualityList.size != prevQualityListSize) {
             prevQualityListSize = qualityList.size
+            quality.step = qualityStep(qualityList.size)
             if (qualityList.isNotEmpty()) {
                 // In Broadcast the handle should sit on the capped quality, not the user's saved value.
                 quality.value = qualityFraction(
@@ -468,6 +559,7 @@ class DisplayMenu private constructor(
     /** Keeps the synchronization mode slider aligned with server echoes and watch-party state. */
     private fun resyncModeSlider() {
         sync.syncToCurrent()
+        access.syncToCurrent()
     }
 
     /** Points the suggestions panel at the currently playing video when it changes. */
@@ -480,16 +572,50 @@ class DisplayMenu private constructor(
         }
     }
 
+    override fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
+        audioTrackDropdown.handleScroll(mouseX.toInt(), mouseY.toInt(), scrollY) ||
+                subtitleDropdown.handleScroll(mouseX.toInt(), mouseY.toInt(), scrollY)
+
+    //? if >=1.21.11 {
     override fun onMouseClicked(event: MouseButtonEvent, doubleClick: Boolean): Boolean {
-        // Coordinates are already in virtual space (UiScreenBase converted them); dropdown and mod
-        // label are laid out in that same space, so hit-testing matches what's drawn at any GUI scale.
         val mx = event.x().toInt()
         val my = event.y().toInt()
-        if (dropdown.visible && event.button() == 0 && dropdown.handleClick(mx, my)) return true
+        val onPopoutButton = popoutButton.isMouseOver(mx.toDouble(), my.toDouble())
+        if (dropdown.visible && event.button() == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
+        val onAudioTrackButton = audioTrackButton.isMouseOver(mx.toDouble(), my.toDouble())
+        if (audioTrackDropdown.visible && event.button() == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(
+                mx,
+                my
+            )
+        ) return true
+        val onSubtitleButton = subtitleButton.isMouseOver(mx.toDouble(), my.toDouble())
+        if (subtitleDropdown.visible && event.button() == 0 && !onSubtitleButton && subtitleDropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 
-    override fun onMouseReleased(event: MouseButtonEvent): Boolean = progress.commitDragIfActive()
+    override fun onMouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean =
+        audioTrackDropdown.handleDrag(event.y().toInt()) || subtitleDropdown.handleDrag(event.y().toInt())
+
+    override fun onMouseReleased(event: MouseButtonEvent): Boolean =
+        audioTrackDropdown.handleRelease() || subtitleDropdown.handleRelease() || progress.commitDragIfActive()
+    //?} else
+    /*override fun onMouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        val mx = mouseX.toInt()
+        val my = mouseY.toInt()
+        val onPopoutButton = popoutButton.isMouseOver(mouseX, mouseY)
+        if (dropdown.visible && button == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
+        val onAudioTrackButton = audioTrackButton.isMouseOver(mouseX, mouseY)
+        if (audioTrackDropdown.visible && button == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(mx, my)) return true
+        val onSubtitleButton = subtitleButton.isMouseOver(mouseX, mouseY)
+        if (subtitleDropdown.visible && button == 0 && !onSubtitleButton && subtitleDropdown.handleClick(mx, my)) return true
+        return modLabel.handleClick(mx, my)
+    }
+
+    override fun onMouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean =
+        audioTrackDropdown.handleDrag(mouseY.toInt()) || subtitleDropdown.handleDrag(mouseY.toInt())
+
+    override fun onMouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean =
+        audioTrackDropdown.handleRelease() || subtitleDropdown.handleRelease() || progress.commitDragIfActive()*/
 
     override fun isPauseScreen(): Boolean = false
 
@@ -512,11 +638,14 @@ class DisplayMenu private constructor(
         return ds.qualityList.filter { it <= cap }.maxOrNull() ?: cap
     }
 
+    /** The slider step for [size] evenly spaced quality stops (1 per available option). */
+    private fun qualityStep(size: Int): Double = 1.0 / max(1, size - 1)
+
     /** Maps a quality string (e.g. "720") to its fractional position within the available quality list. */
     private fun qualityFraction(q: String): Double {
         val list = displayScreen.qualityList
         if (list.isEmpty()) return 0.0
-        val target = q.replace("p", "").toIntOrNull() ?: 720
+        val target = q.replace("p", "").toIntOrNull() ?: 1080
         val closest = list.minByOrNull { abs(target - it) } ?: return 0.0
         return list.indexOf(closest) / max(1, list.size - 1).toDouble()
     }
@@ -532,20 +661,7 @@ class DisplayMenu private constructor(
     companion object {
         /** Minimum logical canvas the normal layout is comfortable in; smaller windows scale down. */
         private const val MIN_CONTENT_W = 640
-        private const val MIN_CONTENT_H = 380
-
-        private const val CHUNK_BLOCKS = 16
-        private const val MIN_CHUNKS = 2
-        private const val MAX_CHUNKS = 12
-        private const val CHUNK_STEPS = MAX_CHUNKS - MIN_CHUNKS  // 10
-
-        /** Converts a chunk count (2–12) to a slider fraction (0.0–1.0). */
-        private fun chunksToFraction(chunks: Int): Double =
-            (chunks.coerceIn(MIN_CHUNKS, MAX_CHUNKS) - MIN_CHUNKS) / CHUNK_STEPS.toDouble()
-
-        /** Converts a slider fraction (0.0–1.0) to a snapped chunk count (2–12). */
-        private fun fractionToChunks(fraction: Double): Int =
-            (fraction * CHUNK_STEPS).roundToInt() + MIN_CHUNKS
+        private const val MIN_CONTENT_H = 410
 
         /** Translation key for the compact mode label shown inside the sync slider. */
         private fun syncModeLabel(mode: PlaybackMode): String = when (mode) {
@@ -553,6 +669,35 @@ class DisplayMenu private constructor(
             PlaybackMode.SYNCED -> "dreamdisplays.mode.synced"
             PlaybackMode.WATCH_PARTY -> "dreamdisplays.mode.watch_party"
             PlaybackMode.BROADCAST -> "dreamdisplays.mode.broadcast"
+        }
+
+        /** The three tiers exposed by the 3D audio slider; BASIC stays an internal-only engine step. */
+        private val AUDIO_3D_MODES = listOf(AcousticQuality.OFF, AcousticQuality.ADVANCED, AcousticQuality.ULTRA)
+
+        /** Factory default the 3D audio row's reset button restores. */
+        private val AUDIO_3D_DEFAULT = AcousticQuality.ADVANCED
+
+        /** Translation key for the compact mode label shown inside the 3D audio slider. */
+        private fun audio3dModeLabel(quality: AcousticQuality): String = when (quality) {
+            AcousticQuality.OFF -> "dreamdisplays.mode.audio_off"
+            AcousticQuality.ULTRA -> "dreamdisplays.mode.audio_advanced"
+            else -> "dreamdisplays.mode.audio_enhanced"
+        }
+
+        /** The three sync-mode notches exposed by the playback-mode slider. */
+        private val SYNC_MODES = listOf(PlaybackMode.LOCAL, PlaybackMode.SYNCED, PlaybackMode.BROADCAST)
+
+        private fun accessModesFor(ds: DisplayScreen): List<DisplayAccess> =
+            if (ds.supportsRegionAccess || ds.access == DisplayAccess.REGION) {
+                listOf(DisplayAccess.EVERYONE, DisplayAccess.REGION, DisplayAccess.LOCKED)
+            } else {
+                listOf(DisplayAccess.EVERYONE, DisplayAccess.LOCKED)
+            }
+
+        private fun accessLevelLabel(access: DisplayAccess): String = when (access) {
+            DisplayAccess.EVERYONE -> "dreamdisplays.access.everyone"
+            DisplayAccess.REGION -> "dreamdisplays.access.region"
+            DisplayAccess.LOCKED -> "dreamdisplays.access.locked"
         }
 
         /** Opens the menu for [displayScreen]. */

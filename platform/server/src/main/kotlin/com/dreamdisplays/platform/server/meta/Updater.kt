@@ -1,112 +1,72 @@
 package com.dreamdisplays.platform.server.meta
 
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.platform.server.Main.Companion.modVersion
-import com.dreamdisplays.platform.server.Main.Companion.pluginLatestVersion
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.utils.GitHubFetcherUtil
-import com.dreamdisplays.util.net.DreamHttpClient
+import com.dreamdisplays.util.asJsonArrayOrNull
+import com.dreamdisplays.util.asJsonObjectOrNull
 import com.dreamdisplays.util.json.DreamJson
+import com.dreamdisplays.util.net.DreamHttpClient
+import com.dreamdisplays.util.optString
 import org.semver4j.Semver
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.decodeFromString
 import org.slf4j.LoggerFactory
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 
 /**
- * Checks for updates of the `Paper` plugin and mod from GitHub releases.
+ * Checks for updates of plugin / mod from GitHub releases.
  */
-@PaperOnly
-object Updater {
-    /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
+object VersionState {
+    /** Latest stable mod version seen on GitHub, or null before the first successful check. */
+    @Volatile
+    var modLatestVersion: Semver? = null
 
-    /**
-     * Fetches GitHub releases and stores the latest mod and plugin versions in `Main`.
-     * Network errors are logged but never propagated, so a transient outage is harmless.
-     */
-    fun checkForUpdates(repoOwner: String, repoName: String) {
-        try {
-            val releases = GitHubFetcherUtil.fetchReleases(repoOwner, repoName)
-
-            if (releases.isEmpty()) {
-                logger.warn("No releases found on GitHub. This may be due to network issues or API problems.")
-                return
-            }
-
-            val stableVersions = releases.mapNotNull { parseVersion(it.tagName) }
-
-            modVersion = stableVersions.maxOrNull()
-
-            pluginLatestVersion = releases
-                .filter {
-                    it.tagName.contains("spigot", ignoreCase = true) ||
-                            it.tagName.contains("plugin", ignoreCase = true)
-                }
-                .mapNotNull { parseVersion(it.tagName)?.toString() }
-                .maxOrNull() ?: modVersion?.toString()
-
-        } catch (_: UnknownHostException) {
-            logger.warn("Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain.")
-        } catch (_: ConnectException) {
-            logger.warn("Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed.")
-        } catch (_: SocketTimeoutException) {
-            logger.warn("GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection.")
-        } catch (e: Exception) {
-            logger.warn("Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
-        }
-    }
-
-    /** Extracts a stable semver from a GitHub release tag; returns null for snapshots and unparseable tags. */
-    private fun parseVersion(tag: String): Semver? =
-        Semver.coerce(tag)?.takeIf { it.isStable() }
+    /** Latest plugin (`Paper`) version string seen on GitHub, or null before the first check. */
+    @Volatile
+    var pluginLatestVersion: String? = null
 }
 
 /**
- * `Fabric`-specific implementation of [Updater].
+ * Checks for updates of the mod / plugin from GitHub releases. Shared across `Paper`, `Fabric`, and
+ * `NeoForge`.
  */
-@FabricOnly
-object FabricUpdater {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/Updater")
+object Updater {
+    /** Logger. */
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
-     * Fetches GitHub releases and stores the latest mod and plugin versions in `Main`.
+     * Fetches GitHub releases and stores the latest mod and plugin versions in [VersionState].
      * Network errors are logged but never propagated, so a transient outage is harmless.
      */
     fun checkForUpdates(repoOwner: String, repoName: String) {
-        try {
-            val releases = fetchReleases(repoOwner, repoName)
-            if (releases.isEmpty()) {
-                logger.warn("No releases found on GitHub.")
-                return
-            }
-
-            val stableVersions = releases.mapNotNull { parseVersion(it.tagName) }
-
-            Server.modLatestVersion = stableVersions.maxOrNull()
-
-            Server.pluginLatestVersion = releases
-                .filter {
-                    it.tagName.contains("spigot", ignoreCase = true) ||
-                            it.tagName.contains("plugin", ignoreCase = true)
+        runCatching { fetchReleases(repoOwner, repoName) }
+            .onSuccess { releases ->
+                if (releases.isEmpty()) {
+                    logger.warn("No releases found on GitHub. This may be due to network issues or API problems.")
+                    return
                 }
-                .mapNotNull { parseVersion(it.tagName)?.toString() }
-                .maxOrNull() ?: Server.modLatestVersion?.toString()
 
-        } catch (_: UnknownHostException) {
-            logger.warn("Cannot reach GitHub (DNS resolution failed).")
-        } catch (_: ConnectException) {
-            logger.warn("Cannot connect to GitHub.")
-        } catch (_: SocketTimeoutException) {
-            logger.warn("GitHub connection timed out.")
-        } catch (e: Exception) {
-            logger.warn("Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}")
-        }
+                val stableVersions = releases.mapNotNull { parseVersion(it.tagName) }
+                val latestMod = stableVersions.maxOrNull()
+                VersionState.modLatestVersion = latestMod
+
+                VersionState.pluginLatestVersion = releases
+                    .filter {
+                        it.tagName.contains("spigot", ignoreCase = true) || it.tagName.contains(
+                            "plugin",
+                            ignoreCase = true
+                        )
+                    }
+                    .mapNotNull { parseVersion(it.tagName)?.toString() }
+                    .maxOrNull() ?: latestMod?.toString()
+            }
+            .onFailure { e ->
+                val message = when (e) {
+                    is UnknownHostException -> "Cannot reach GitHub (DNS resolution failed). It seems that your hosting environment cannot resolve GitHub's domain."
+                    is ConnectException -> "Cannot connect to GitHub. It seems that your hosting environment is blocking connections or 443 port is closed."
+                    is SocketTimeoutException -> "GitHub connection timed out. The GitHub API may be experiencing issues or your hosting environment has a very slow connection."
+                    else -> "Unable to load versions from GitHub: ${e.javaClass.simpleName}: ${e.message}"
+                }
+                logger.warn(message)
+            }
     }
 
     /** Fetches releases from GitHub API, returning an empty list on non-200 responses. Rethrows connection errors. */
@@ -126,17 +86,29 @@ object FabricUpdater {
         )
         if (response.code != 200) return emptyList()
 
-        return DreamJson.compact.decodeFromString<List<Release>>(response.bodyString())
-            .filter { it.tagName.isNotBlank() }
+        return parseReleases(response.bodyString())
     }
+
+    /** Parses only the GitHub release fields used by the updater; no generated serializer required. */
+    private fun parseReleases(body: String): List<Release> =
+        DreamJson.compact.parseToJsonElement(body)
+            .asJsonArrayOrNull()
+            ?.mapNotNull { element ->
+                val obj = element.asJsonObjectOrNull() ?: return@mapNotNull null
+                Release(
+                    tagName = obj.optString("tag_name").orEmpty(),
+                    name = obj.optString("name").orEmpty(),
+                )
+            }
+            ?.filter { it.tagName.isNotBlank() }
+            ?: emptyList()
 
     /** Extracts a stable semver from a GitHub release tag; returns null for snapshots and unparseable tags. */
     private fun parseVersion(tag: String): Semver? =
         Semver.coerce(tag)?.takeIf { it.isStable() }
 
-    @Serializable
     data class Release(
-        @SerialName("tag_name") val tagName: String = "",
+        val tagName: String = "",
         val name: String = "",
     )
 }

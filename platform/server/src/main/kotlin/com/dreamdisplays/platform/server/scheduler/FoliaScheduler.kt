@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.scheduler
 
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 
 import org.bukkit.plugin.Plugin
 import org.jspecify.annotations.NullMarked

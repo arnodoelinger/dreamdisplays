@@ -1,25 +1,27 @@
 package com.dreamdisplays.platform.client.capabilities
 
-import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
-import com.dreamdisplays.platform.client.managers.WarmParkPolicy
-import com.dreamdisplays.api.media.stream.SupportedCodec
-import com.dreamdisplays.api.render.RenderBackend
-import com.dreamdisplays.api.render.ShaderBackend
-import com.dreamdisplays.api.render.TextureUploadPath
+import com.dreamdisplays.api.media.stream.model.SupportedCodec
+import com.dreamdisplays.api.render.backend.model.RenderBackend
+import com.dreamdisplays.api.render.backend.model.ShaderBackend
+import com.dreamdisplays.api.render.texture.model.TextureUploadPath
+import com.dreamdisplays.core.protocol.common.packets.ClientHello
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.process.HwAccelBackend
-import com.dreamdisplays.core.protocol.ClientHello
+import com.dreamdisplays.platform.client.managers.WarmParkPolicy
+import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.RenderBackendCompat
 import com.dreamdisplays.platform.client.render.ShaderPackCompat
+import com.dreamdisplays.platform.client.ui.VideoPopoutWindow
+import java.time.Instant
+import java.time.ZoneId
 
 /**
  * Probes the running client for [ClientHello] capabilities. Popout support comes from the `GLFW`
  * shared-context check in [VideoPopoutWindow], hardware decode from the per-OS
- * [HwAccelBackend] default, and codec support from what the FFmpeg pipeline decodes.
+ * [HwAccelBackend] default, and codec support from what the `FFmpeg` pipeline decodes.
  */
 object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
-
-    /** Matches [com.dreamdisplays.platform.client.render.AsyncTextureUploader]; a GL query needs a current context, which detect-time can't guarantee. */
+    /** Matches [AsyncTextureUploader]; a GL query needs a current context, which detect-time can't guarantee. */
     override val maxTextureSize: Int = 8192
 
     /** True when `GLFW` can create the shared-context popout window on this platform. */
@@ -56,12 +58,18 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
             lavInProcessEnabled = lavAvailable && safeBool { NativeMedia.lavInProcessEnabled },
             lavSurfaceInteropAvailable = lavAvailable && safeBool { NativeMedia.lavSurfaceInteropAvailable },
             lavZeroCopyEnabled = lavAvailable && safeBool { NativeMedia.lavZeroCopyEnabled },
+            nativeUnavailableReason = if (nativeAvailable) "" else safeString("unknown") { NativeMedia.unavailableReason.ifBlank { "unknown" } },
+            lavUnavailableReason = if (lavAvailable) "" else safeString("unknown") { NativeMedia.lavUnavailableReason.ifBlank { "unknown" } },
             systemRamMb = memory.systemRamMb,
             maxJvmMemoryMb = memory.maxJvmMemoryMb,
             dedicatedVramMb = memory.dedicatedVramMb,
             warmDisplayLimit = WarmParkPolicy.maxFullWarmDisplays,
+            timeZoneOffsetMinutes = safeInt { ZoneId.systemDefault().rules.getOffset(Instant.now()).totalSeconds / 60 },
         )
     }
+
+    /** Runs [block] and returns `0` on any exception. */
+    private fun safeInt(block: () -> Int): Int = runCatching(block).getOrDefault(0)
 
     /** Runs [block] and returns `false` on any exception. */
     private fun safeBool(block: () -> Boolean): Boolean = runCatching(block).getOrDefault(false)

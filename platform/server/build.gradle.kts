@@ -1,24 +1,101 @@
-import java.util.*
+import support.shadow.excludeDreamDisplaysSqliteNativeExtras
+import support.stonecutter.StonecutterVersions
+import support.stonecutter.VersionsJson
 
 plugins {
     id("dreamdisplays.kotlin-conventions")
     id("dreamdisplays.serialization-conventions")
     id("dreamdisplays.shadow-conventions")
-    id("io.papermc.paperweight.userdev") version libs.versions.paperweight
+    alias(libs.plugins.paperweight)
+    alias(libs.plugins.platformweaver)
 }
 
-val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-val stonecutterVersions = Properties().apply {
-    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-}
-
-fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+val scVersions = gradle.extensions.getByType<StonecutterVersions>()
+val activeStonecutterVersion = scVersions.active
+fun scVersion(name: String): String = scVersions.get(name)
 
 val isLegacyObfuscatedMinecraft = scVersion("minecraft.version").startsWith("1.")
 
+fun fancyModLoaderVersion(neoForgeVersion: String): String = when (neoForgeVersion) {
+    "21.1.233" -> "4.0.42"
+    "21.11.42" -> "10.0.36"
+    else -> "11.0.13"
+}
+
 if (isLegacyObfuscatedMinecraft) {
     evaluationDependsOn(":platform:client:fabric")
+}
+
+// The Paper jar is one cross-version artifact (dispatches 1.21.1 through 26.x at runtime via
+// ServerVersion), so it must always be compiled against this pinned Minecraft version: the oldest
+// one on the Java 21 toolchain, matching the paper_build_version calc in .github/workflows/_build.yml.
+// Building it on a newer, Java 25-only version (e.g. 26.2) would bake Java 25 bytecode into the one
+// jar every supported server loads, breaking every Java 21 server (Paper 1.21.1 / 1.21.11).
+val paperPinVersion = "1.21.11"
+run {
+    val pinnedJavaVersion = VersionsJson.load(rootProject.file("versions.json")).propertiesFor(paperPinVersion)["java.version"]
+    check(pinnedJavaVersion == "21") {
+        "versions.json's '$paperPinVersion' entry has java.version=$pinnedJavaVersion, expected 21. " +
+                "The paperPinVersion in platform/server/build.gradle.kts must point at a Java 21 version."
+    }
+}
+
+tasks.named("compileKotlin") {
+    // Captured as plain values here, not referenced live inside doFirst below: referencing a value
+    // declared in this script from within a task action captures the whole script object, which
+    // the configuration cache can't serialize.
+    val active = activeStonecutterVersion
+    val pin = paperPinVersion
+    doFirst {
+        require(active == pin) {
+            "The Paper jar must be compiled with the active Stonecutter version pinned to $pin " +
+                    "(active is $active). Run the root ':platform:server:buildPaper' task instead " +
+                    "of building this module's tasks directly, or switch with " +
+                    "./gradlew \"Set active project to $pin\" first."
+        }
+    }
+}
+
+if (activeStonecutterVersion == paperPinVersion) {
+    tasks.build {
+        dependsOn(tasks.shadowJar)
+    }
+} else {
+    val buildPaper = tasks.register("buildPaper") {
+        group = "build"
+        description = "Builds the cross-version Paper jar, pinning the active Stonecutter version to " +
+                "$paperPinVersion (currently $activeStonecutterVersion) for a nested Gradle invocation."
+        val versionsJsonFile = rootProject.file("versions.json")
+        val gradlewPath = rootProject.file("gradlew").absolutePath
+        val rootDir = rootProject.projectDir
+        val pinVersion = paperPinVersion
+        val currentVersion = activeStonecutterVersion
+        doLast {
+            val originalText = versionsJsonFile.readText()
+            val pinnedText = originalText.replaceFirst(
+                "\"active\": \"$currentVersion\"",
+                "\"active\": \"$pinVersion\"",
+            )
+            check(pinnedText != originalText) {
+                "Could not find \"active\": \"$currentVersion\" in versions.json to pin it to $pinVersion."
+            }
+            versionsJsonFile.writeText(pinnedText)
+            try {
+                val exitCode = ProcessBuilder(gradlewPath, ":platform:server:shadowJar")
+                    .directory(rootDir)
+                    .redirectOutput(ProcessBuilder.Redirect.INHERIT)
+                    .redirectError(ProcessBuilder.Redirect.INHERIT)
+                    .start()
+                    .waitFor()
+                check(exitCode == 0) { "Nested Gradle build for the pinned Paper jar failed with exit code $exitCode." }
+            } finally {
+                versionsJsonFile.writeText(originalText)
+            }
+        }
+    }
+    tasks.named("build") {
+        setDependsOn(listOf(buildPaper))
+    }
 }
 
 repositories {
@@ -26,29 +103,38 @@ repositories {
         maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods"))
     }
     mavenCentral()
-    maven("https://repo.lostyy.ru/releases")
     maven("https://repo.papermc.io/repository/maven-public/")
     maven("https://oss.sonatype.org/content/groups/public/")
     maven("https://jitpack.io")
+    maven("https://maven.neoforged.net/releases")
+    maven("https://maven.enginehub.org/repo/")
+}
+
+platformweaver {
+    target = "paper"
+    chameleonsDir = null
 }
 
 dependencies {
-    compileOnly(libs.ofratAnnotations)
-    "kotlinCompilerPluginClasspath"(libs.ofratPlugin)
-}
-
-tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
-    compilerOptions.freeCompilerArgs.addAll(
-        "-P", "plugin:io.github.arsmotorin.ofrat:platform=paper"
-    )
+    compileOnly(libs.platformweaverAnnotations)
 }
 
 dependencies {
     paperweight.devBundle("io.papermc.paper", scVersion("paper.api.version"))
     compileOnly(libs.jspecify)
+    compileOnly(libs.luckpermsApi)
+    compileOnly(libs.worldguardApi) {
+        exclude(group = "com.google.guava", module = "guava")
+        exclude(group = "com.google.code.gson", module = "gson")
+        exclude(group = "it.unimi.dsi", module = "fastutil")
+    }
     compileOnly(project(":core"))
     compileOnly(project(":platform:client:common"))
     compileOnly("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
+    compileOnly("net.neoforged:neoforge:${scVersion("neoforge.version")}:universal")
+    compileOnly("net.neoforged:bus:8.0.5")
+    compileOnly("net.fabricmc:sponge-mixin:0.17.3+mixin.0.8.7")
+    compileOnly("net.neoforged.fancymodloader:loader:${fancyModLoaderVersion(scVersion("neoforge.version"))}")
     if (isLegacyObfuscatedMinecraft) {
         compileOnly(project(path = ":platform:client:fabric", configuration = "mappedFabricApiElements"))
     } else {
@@ -57,10 +143,10 @@ dependencies {
 
     implementation(project(":core"))
     implementation(project(":util"))
-    implementation(libs.gson)
     implementation(libs.kotlinxSerializationProtobuf)
     implementation(libs.kotlinxSerializationJson)
     implementation(libs.kotlinxCoroutinesCore)
+    implementation(libs.kotlinxIoCore)
     implementation(libs.semver4j)
     implementation(libs.tomlj)
     implementation(libs.exposedCore)
@@ -73,20 +159,17 @@ dependencies {
     implementation(libs.caffeine)
 }
 
-tasks.withType<JavaCompile>().configureEach {
-    options.release.set(scVersion("java.version").toInt())
+sourceSets.main {
+    resources.srcDir(project(":platform:resources").file("src/main/resources"))
+    resources.exclude("assets/dreamdisplays/lang/client/**")
 }
 
 tasks.processResources {
+    from(project(":platform:resources").file("src/main/resources/assets/dreamdisplays/lang/server/config.toml"))
     val projectVersion = version.toString()
-    val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-    val stonecutterVersions = Properties().apply {
-        rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream()
-            .use { input -> load(input) }
-    }
     val props = mapOf(
         "version" to projectVersion,
-        "paperMinecraftApi" to stonecutterVersions.getProperty("paper.minecraft.api"),
+        "paperMinecraftApi" to scVersion("paper.minecraft.api"),
     )
     inputs.properties(props)
     filteringCharset = Charsets.UTF_8.name()
@@ -97,10 +180,6 @@ tasks.processResources {
 
 tasks.jar {
     enabled = false
-}
-
-tasks.build {
-    dependsOn(tasks.shadowJar)
 }
 
 tasks.shadowJar {
@@ -125,22 +204,12 @@ tasks.shadowJar {
         "okio",
         "org.jetbrains.exposed",
         "kotlinx.serialization",
+        "kotlinx.io",
         "com.zaxxer.hikari",
     ).forEach { pack ->
         relocate(pack, "$prefix.$pack")
     }
-    exclude("org/sqlite/native/Linux-Android/**")
-    exclude("org/sqlite/native/Linux-Musl/x86/**")
-    // exclude("org/sqlite/native/FreeBSD/**")
-    exclude("org/sqlite/native/Linux/ppc64/**")
-    exclude("org/sqlite/native/Linux/riscv64/**")
-    exclude("org/sqlite/native/Linux/arm/**")
-    exclude("org/sqlite/native/Linux/armv6/**")
-    exclude("org/sqlite/native/Linux/armv7/**")
-    exclude("org/sqlite/native/Linux/x86/**")
-    exclude("org/sqlite/native/Windows/x86/**")
-    exclude("org/sqlite/native/Windows/armv7/**")
-    exclude("org/sqlite/native/Windows/aarch64/**")
+    excludeDreamDisplaysSqliteNativeExtras()
 }
 
 tasks.withType<AbstractArchiveTask>().configureEach {

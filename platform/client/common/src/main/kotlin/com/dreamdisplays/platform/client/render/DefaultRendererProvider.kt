@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.render.DisplayRenderer
-import com.dreamdisplays.api.render.RendererProvider
+import com.dreamdisplays.api.render.service.DisplayRenderer
+import com.dreamdisplays.api.render.backend.service.RendererProvider
 
 /** Supplies the GPU-backed [DisplayRenderer] used to render registered surfaces. */
 object DefaultRendererProvider : RendererProvider {

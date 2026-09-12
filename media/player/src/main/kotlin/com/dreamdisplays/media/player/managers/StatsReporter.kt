@@ -1,14 +1,8 @@
 package com.dreamdisplays.media.player.managers
 
-import kotlinx.coroutines.CoroutineName
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Diagnostic service that periodically logs decoded FPS, GPU-upload FPS, dropped frames,
@@ -24,7 +18,7 @@ internal class StatsReporter(
     private val isLive: () -> Boolean,
 ) {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/StatsReporter")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** Raw counter values sampled at one reporting interval. */
     data class Snapshot(val samplesIn: Long, val framesToGpu: Long, val framesDropped: Long)
@@ -40,10 +34,10 @@ internal class StatsReporter(
     fun start() {
         if (job?.isActive == true) return
         job = scope.launch {
-            delay(intervalMs)
+            delay(intervalMs.milliseconds)
             while (isActive) {
                 report()
-                delay(intervalMs)
+                delay(intervalMs.milliseconds)
             }
         }
     }

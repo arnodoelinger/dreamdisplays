@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.player.platform
 
-import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.api.media.model.DreamMediaException
+import com.dreamdisplays.api.media.model.VideoQuality
 import com.dreamdisplays.api.media.player.PlaybackHost
-import java.util.UUID
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.platform.client.displays.DisplayScreen
+import java.util.*
 
 /**
  * Adapts a Minecraft [DisplayScreen] to the platform-agnostic [PlaybackHost] the media player drives.
@@ -29,6 +29,9 @@ class DisplayPlaybackHost(private val screen: DisplayScreen) : PlaybackHost {
 
     /** The mode the player experiences (`WATCH_PARTY` while a session is live). */
     override val effectiveMode: PlaybackMode get() = screen.effectiveMode
+
+    /** False only for a non-looping fullscreen presentation; true for everything else. */
+    override val shouldLoopOnEnd: Boolean get() = !(screen.isFullscreenActive && !screen.isFullscreenLoop)
 
     /** Aspect ratio of the decoded content, surfaced for popout sizing. */
     override var videoContentAspect: Double

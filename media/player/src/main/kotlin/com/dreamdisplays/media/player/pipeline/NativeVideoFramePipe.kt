@@ -1,25 +1,21 @@
 package com.dreamdisplays.media.player.pipeline
 
+import com.dreamdisplays.api.media.model.FramePixelFormat
+import com.dreamdisplays.api.media.player.FrameUploaderFactory
+import com.dreamdisplays.api.media.player.GpuTextureRef
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.media.player.process.HwAccelBackend
+import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.player.util.daemon
-import com.dreamdisplays.api.media.FramePixelFormat
-import com.dreamdisplays.media.runtime.OsInfo
-import com.dreamdisplays.api.media.player.FrameUploaderFactory
-import com.dreamdisplays.api.media.player.GpuTextureRef
+import com.dreamdisplays.util.OsInfo
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Native (Rust) variant of [VideoFramePipe]: the FFmpeg process and its pipe live inside
- * `dreamdisplays_native`, which reads NV12/RGB24 frames in large blocks and writes
- * brightness-adjusted RGB24 or RGBA32 directly into the spare direct buffer in one fused pass.
- *
- * The JVM side keeps only what it is good at: A/V pacing against the audio clock,
- * the ready-buffer swap, and the GPU upload — all shared with the JVM pipe via [FrameSurface].
+ * Native (Rust) variant of [VideoFramePipe]: in-process LAV decoder via Rust FFI.
  */
 internal class NativeVideoFramePipe(
     private val debugLabel: String,
@@ -27,22 +23,27 @@ internal class NativeVideoFramePipe(
     /** True when frames stay as raw I420 planes and the YUV -> RGB conversion happens on the GPU. */
     private val planarOutput: Boolean,
 ) : FramePipe {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/NativeVideoFramePipe")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     companion object {
-        /** Default frame rate when the source doesn't report one or reports an invalid one. */
-        private const val DEFAULT_FPS = 30.0
-
-        /** How long to wait for FFmpeg's exit code after EOF, mirroring the JVM pipe. */
         private const val EXIT_WAIT_MILLIS = 500
-
+        internal const val PARK_POLL_MS = 2L
         private const val LAV_HW_AUTO = 1
         private const val LAV_PTS_ORIGIN_TOLERANCE_NS = 10_000_000_000L
         private const val LAV_PREROLL_MARGIN_NS = 50_000_000L
 
-        // Rolling reappearance cache, enabled by default: ~30 s of recent stream so a returning
-        // display can replay locally (network-free) while the live source re-resolves. Capped by bytes.
-        private const val DEFAULT_CACHE_WINDOW_MS = 30_000L
+        /**
+         * A raw LAV PTS step larger than this (either direction) between consecutive frames is a
+         * mid-stream discontinuity — a Twitch ad-break splice resets the PTS base — not normal frame
+         * progression, so the pipe re-anchors the origin bias on it instead of dropping every frame.
+         */
+        private const val LAV_PTS_DISCONTINUITY_NS = 1_000_000_000L
+
+        // Rolling packet cache, enabled by default: ~60 s of recent stream. Serves in-window seeks
+        // network-free (instant backward scrubbing) and lets a returning display replay locally
+        // while the live source re-resolves. Capped by bytes, so the window costs no extra memory
+        // on high-bitrate sources.
+        private const val DEFAULT_CACHE_WINDOW_MS = 60_000L
         private const val DEFAULT_CACHE_MAX_BYTES = 96L * 1024L * 1024L
 
         /** Rolling encoded-packet cache window for live LAV sessions; 0 disables it. */
@@ -59,9 +60,18 @@ internal class NativeVideoFramePipe(
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     override val lastFrameReceivedNanos = AtomicLong(0)
 
-    /** Set by the popout window to receive raw frames. Called on the reader thread. */
     @Volatile
-    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    private var rawPopoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+
+    private val lastFrame = LastFrameCache()
+
+    /** Popout frame sink; replays cached last frame when set. */
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?
+        get() = rawPopoutFrameSink
+        set(value) {
+            rawPopoutFrameSink = value
+            if (value != null) lastFrame.replay(value)
+        }
 
     @Volatile
     var expectedW = 0; private set
@@ -87,9 +97,32 @@ internal class NativeVideoFramePipe(
     private var lavHandle = 0L
 
     /** When set and true, the reader idles (no decode) while keeping the native session open — used to keep
-     *  the in-process LAV decoder warm while a display is parked out of render distance. Null = not parkable. */
+     *  the decoder warm while a display is warm-paused or parked out of render distance. On the process
+     *  path the full pipe back-pressures FFmpeg into a standstill. Null = not parkable. */
     @Volatile
     private var parked: AtomicBoolean? = null
+
+    private class LavSeekCommand(val offsetNanos: Long, val onFirstFrame: () -> Unit) {
+        val createdNanos: Long = System.nanoTime()
+
+        @Volatile
+        var applied = false
+
+        @Volatile
+        var failed = false
+    }
+
+    /**
+     * Raw (unbiased) LAV PTS of the first frame of the current session / in-place seek, in nanos, or [Long.MIN_VALUE]
+     * before any frame has arrived.
+     */
+    @Volatile
+    var firstRawPtsNanos: Long = Long.MIN_VALUE; private set
+
+    private val lavSeekMonitor = Any()
+
+    @Volatile
+    private var pendingLavSeek: LavSeekCommand? = null
 
     override fun textureFilled(): Boolean = surface.textureFilled()
 
@@ -116,29 +149,18 @@ internal class NativeVideoFramePipe(
 
     override fun cleanup() = surface.cleanup()
 
-    /**
-     * Opens a native FFmpeg session for [args] and starts the reader thread.
-     * Returns the running thread, or null when the native session could not be spawned
-     * (e.g., the FFmpeg binary is missing).
-     *
-     * @param args            full FFmpeg argv including the binary path (see `MediaProcess.videoArgs`)
-     * @param nv12            true when [args] makes FFmpeg emit NV12 instead of RGB24
-     * @param seekOffsetNanos initial playback position (must match the FFmpeg `-ss` offset)
-     * @param sourceFps       frame rate reported by yt-dlp for the chosen stream
-     * @param getAudioClock   returns current audio position in nanos, or -1 if unavailable
-     * @param onFirstFrame    called once when the first frame arrives (starts the wall clock)
-     * @param getBrightness   returns current brightness multiplier (read per frame)
-     * @param onEos           called when the stream ends with stderr output and EOS flag
-     */
+    /** Opens a native `FFmpeg` session and starts the reader thread. */
     fun start(
         args: List<String>, w: Int, h: Int, nv12: Boolean, seekOffsetNanos: Long, sourceFps: Double,
         stopFlag: AtomicBoolean, terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit,
         getBrightness: () -> Double, onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        parkFlag: AtomicBoolean? = null, presentPreview: Boolean = true, tolerateLateness: Boolean = true,
     ): Thread? {
         release()
         clear()
         expectedW = w
         expectedH = h
+        parked = parkFlag
         lastFrameReceivedNanos.set(System.nanoTime())
 
         val hnd = NativeMedia.videoOpen(args, w, h, nv12)
@@ -147,9 +169,11 @@ internal class NativeVideoFramePipe(
             return null
         }
         handle = hnd
-        val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        // Must be the same rate FFmpeg was pinned to (`-r`), or synthesized timestamps drift.
+        val frameNs = (1_000_000_000.0 / MediaProcess.outputFps(sourceFps)).toLong()
         val prebuffer = FramePrebuffer.createIfEnabled(
-            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel, presentPreview,
+            tolerateLateness, parkFlag,
         ).also { activePrebuffer = it }
         return daemon(
             {
@@ -165,7 +189,8 @@ internal class NativeVideoFramePipe(
                     onFirstFrame,
                     getBrightness,
                     onEos,
-                    prebuffer
+                    prebuffer,
+                    presentPreview,
                 )
             },
             "MediaPlayer-video",
@@ -191,6 +216,8 @@ internal class NativeVideoFramePipe(
         getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit,
         parkFlag: AtomicBoolean? = null,
+        presentPreview: Boolean = true,
+        tolerateLateness: Boolean = true,
     ): Thread? {
         if (!planarOutput) return null
         release()
@@ -207,9 +234,11 @@ internal class NativeVideoFramePipe(
         }
         lavHandle = hnd
         enableLavCache(hnd)
-        val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        // Must be the same rate FFmpeg was pinned to (`-r`), or synthesized timestamps drift.
+        val frameNs = (1_000_000_000.0 / MediaProcess.outputFps(sourceFps)).toLong()
         val prebuffer = FramePrebuffer.createIfEnabled(
-            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel, presentPreview,
+            tolerateLateness, parkFlag,
         ).also { activePrebuffer = it }
         return daemon(
             {
@@ -225,7 +254,8 @@ internal class NativeVideoFramePipe(
                     onFirstFrame,
                     getBrightness,
                     onEos,
-                    prebuffer
+                    prebuffer,
+                    presentPreview,
                 )
             },
             "MediaPlayer-video",
@@ -254,7 +284,7 @@ internal class NativeVideoFramePipe(
             return null
         }
         lavHandle = hnd
-        val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        val frameNs = (1_000_000_000.0 / MediaProcess.outputFps(sourceFps)).toLong()
         val prebuffer = FramePrebuffer.createIfEnabled(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
         ).also { activePrebuffer = it }
@@ -272,7 +302,8 @@ internal class NativeVideoFramePipe(
                     onFirstFrame,
                     getBrightness,
                     onEos,
-                    prebuffer
+                    prebuffer,
+                    presentPreview = true,
                 )
             },
             "MediaPlayer-video-replay",
@@ -287,6 +318,28 @@ internal class NativeVideoFramePipe(
         return NativeMedia.lavRingSnapshot(lh, positionNanos)
     }
 
+    /** Seeks the live in-process LAV session without closing the decoder or network context. */
+    fun seekInProcess(offsetNanos: Long, onFirstFrame: () -> Unit): Boolean {
+        val lh = lavHandle
+        if (lh == 0L) return false
+        val cmd = LavSeekCommand(offsetNanos, onFirstFrame)
+        synchronized(lavSeekMonitor) {
+            pendingLavSeek?.let {
+                it.failed = true
+                if (MediaPlayer.DEBUG) {
+                    logger.debug(
+                        "$debugLabel Coalescing in-place seek: ${"%.1f".format(it.offsetNanos / 1e6)}ms " +
+                                "superseded by ${"%.1f".format(offsetNanos / 1e6)}ms."
+                    )
+                }
+            }
+            pendingLavSeek = cmd
+            NativeMedia.lavKill(lh)
+        }
+        activePrebuffer?.requestFlush()
+        return true
+    }
+
     /**
      * Main loop of the reader thread: blocks in the native library until a converted frame lands
      * in the spare buffer, then paces and publishes it exactly like the JVM pipe.
@@ -295,9 +348,8 @@ internal class NativeVideoFramePipe(
         handle: Long, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
+        presentPreview: Boolean = true,
     ) {
-        // Planar mode carries I420 (w*h Y + two quarter-size chroma planes); brightness is
-        // applied in the fragment shader instead of a CPU LUT pass.
         val frameSize = if (planarOutput) {
             val c = ((w + 1) / 2) * ((h + 1) / 2)
             w * h + 2 * c
@@ -309,20 +361,75 @@ internal class NativeVideoFramePipe(
 
         var firstFrame = false
         var videoPts = seekOffsetNanos
+        var currentSeekOffsetNanos = seekOffsetNanos
+        var currentOnFirstFrame = onFirstFrame
         var lavPtsBiasNanos: Long? = null
+        var prevRawLavPtsNanos: Long? = null
         var rc = NativeMedia.READ_OK
+        var passFirstFrameAfterSeek = true
 
         val lav = handle == 0L && lavHandle != 0L
         val prerollMarginNs = maxOf(frameNs * 2L, LAV_PREROLL_MARGIN_NS)
         val metrics = NativeReadMetrics(debugLabel, if (lav) "lav" else "process", w, h, frameSize)
+        prebuffer?.onPresent = { buf -> feedPopout(buf, w, h, frameSize, metrics) }
+
+        fun armFirstFrameClock() {
+            if (!firstFrame) {
+                firstFrame = true
+                currentOnFirstFrame()
+                if (MediaPlayer.DEBUG) logger.debug("$debugLabel First frame $w x $h (native).")
+            }
+        }
+
+        fun applyLavSeek(seek: LavSeekCommand): Boolean {
+            val queuedMs = (System.nanoTime() - seek.createdNanos) / 1_000_000
+            if (queuedMs >= 1_000) {
+                logger.warn(
+                    "$debugLabel In-place seek to ${"%.1f".format(seek.offsetNanos / 1e6)}ms reached the " +
+                            "reader only after $queuedMs ms — reader was blocked outside the native read."
+                )
+            } else if (MediaPlayer.DEBUG) {
+                logger.debug("$debugLabel In-place seek applied $queuedMs ms after request.")
+            }
+            prebuffer?.resetForSeek(seek.onFirstFrame)
+            val ok = NativeMedia.lavSeek(lavHandle, seek.offsetNanos / 1_000L)
+            synchronized(lavSeekMonitor) {
+                if (ok) seek.applied = true else seek.failed = true
+            }
+            if (!ok) {
+                logger.warn(
+                    "$debugLabel In-place LAV seek to ${"%.1f".format(seek.offsetNanos / 1e6)}ms failed: " +
+                            "${NativeMedia.lavError(lavHandle)}."
+                )
+                return false
+            }
+            currentSeekOffsetNanos = seek.offsetNanos
+            currentOnFirstFrame = seek.onFirstFrame
+            videoPts = seek.offsetNanos
+            lavPtsBiasNanos = null
+            prevRawLavPtsNanos = null
+            firstRawPtsNanos = Long.MIN_VALUE
+            firstFrame = false
+            passFirstFrameAfterSeek = true
+            lastFrameReceivedNanos.set(System.nanoTime())
+            return true
+        }
+
         while (!terminated.get() && !stopFlag.get()) {
+            if (lav) {
+                val seek = pollLavSeek()
+                if (seek != null) {
+                    applyLavSeek(seek)
+                    continue
+                }
+            }
             // Parked (display out of render distance): idle without decoding, keeping the native session
             // open so resuming reads the next frame instantly. Refresh the stall timestamp on wake.
             val pk = parked
             if (pk != null && pk.get()) {
                 while (pk.get() && !terminated.get() && !stopFlag.get()) {
                     try {
-                        Thread.sleep(20)
+                        Thread.sleep(PARK_POLL_MS)
                     } catch (_: InterruptedException) {
                         Thread.currentThread().interrupt(); break
                     }
@@ -349,6 +456,31 @@ internal class NativeVideoFramePipe(
             }
             val readElapsedNs = System.nanoTime() - readStartNs
             if (MediaPlayer.DEBUG) metrics.recordRead(readElapsedNs, rc)
+            if (lav && rc == NativeMedia.READ_PREVIEW) {
+                // Post-seek keyframe delivered ahead of the (network-bound) pre-roll: present it
+                // straight to the surface so the picture updates instantly, but never let it
+                // start the clock, compute the PTS bias, or enter the prebuffer — its PTS is
+                // before the seek target and the exact frame follows once the pre-roll completes.
+                lastFrameReceivedNanos.set(System.nanoTime())
+                if (presentPreview && MediaPlayer.captureSamples
+                    && pendingLavSeek == null && parked?.get() != true
+                ) {
+                    spare.limit(frameSize).position(0)
+                    spare = surface.publish(spare, frameSize)
+                }
+                continue
+            }
+            if (lav && rc != NativeMedia.READ_OK) {
+                val seek = pollLavSeek()
+                if (seek != null && applyLavSeek(seek)) {
+                    spare.clear()
+                    continue
+                }
+                if (rc == NativeMedia.READ_INTERRUPTED) {
+                    spare.clear()
+                    continue
+                }
+            }
             if (rc != NativeMedia.READ_OK) break
             if (parked?.get() == true) {
                 lastFrameReceivedNanos.set(System.nanoTime())
@@ -360,9 +492,10 @@ internal class NativeVideoFramePipe(
             lastFrameReceivedNanos.set(System.nanoTime())
 
             val hasLavPts = lav && rawLavPtsNanos != NativeMedia.LAV_NO_PTS_NANOS
+            if (hasLavPts && firstRawPtsNanos == Long.MIN_VALUE) firstRawPtsNanos = rawLavPtsNanos
             val framePts = if (hasLavPts) {
-                val bias = lavPtsBiasNanos ?: run {
-                    val delta = seekOffsetNanos - rawLavPtsNanos
+                var bias = lavPtsBiasNanos ?: run {
+                    val delta = currentSeekOffsetNanos - rawLavPtsNanos
                     val computed = if (delta > LAV_PTS_ORIGIN_TOLERANCE_NS || delta < -LAV_PTS_ORIGIN_TOLERANCE_NS) {
                         delta
                     } else {
@@ -373,26 +506,57 @@ internal class NativeVideoFramePipe(
                         logger.debug(
                             "$debugLabel LAV PTS origin shifted by ${"%.1f".format(computed / 1_000_000.0)}ms " +
                                     "(firstPts=${"%.1f".format(rawLavPtsNanos / 1_000_000.0)}ms, " +
-                                    "seek=${"%.1f".format(seekOffsetNanos / 1_000_000.0)}ms).",
+                                    "seek=${"%.1f".format(currentSeekOffsetNanos / 1_000_000.0)}ms).",
                         )
                     }
                     computed
                 }
+                val prev = prevRawLavPtsNanos
+                if (prev != null) {
+                    val rawStep = rawLavPtsNanos - prev
+                    if (rawStep > LAV_PTS_DISCONTINUITY_NS || rawStep < -LAV_PTS_DISCONTINUITY_NS) {
+                        bias = videoPts - rawLavPtsNanos
+                        lavPtsBiasNanos = bias
+                        if (MediaPlayer.DEBUG) {
+                            logger.debug(
+                                "$debugLabel LAV PTS discontinuity (rawStep=${"%.1f".format(rawStep / 1_000_000.0)} ms); " +
+                                        "re-anchored video to ${"%.1f".format(videoPts / 1_000_000.0)} ms.",
+                            )
+                        }
+                    }
+                }
+                prevRawLavPtsNanos = rawLavPtsNanos
                 rawLavPtsNanos + bias
             } else {
                 videoPts
             }
-            if (hasLavPts && framePts + frameNs < seekOffsetNanos - prerollMarginNs) {
+            if (hasLavPts && !passFirstFrameAfterSeek
+                && framePts + frameNs < currentSeekOffsetNanos - prerollMarginNs
+            ) {
                 if (MediaPlayer.DEBUG) {
                     MediaPlayer.framesDropped.incrementAndGet()
-                    metrics.recordPrerollDrop(seekOffsetNanos - framePts)
+                    metrics.recordPrerollDrop(currentSeekOffsetNanos - framePts)
                     metrics.maybeLog()
                 }
                 videoPts = framePts + frameNs
                 continue
             }
 
-            feedPopout(spare, w, h, frameSize, metrics)
+            if (passFirstFrameAfterSeek && (prebuffer == null || !MediaPlayer.captureSamples)) {
+                // As soon as the first acceptable post-seek frame exists, start the playback clock and
+                // release the audio start gate before pacing. Otherwise, video waits for an audio clock
+                // that itself is waiting for this callback, producing the visible ~3 s seek delay.
+                // With a prebuffer that arming belongs to it instead — it fires the callback as its own
+                // first frame goes out to pace, so the clock starts when playout does and the cushion it
+                // filled is not spent as lateness before the first frame is even shown. Its prefill
+                // deadline keeps the seek bounded, so the delay this guards against cannot come back.
+                armFirstFrameClock()
+            }
+            passFirstFrameAfterSeek = false
+
+            if (prebuffer == null || !MediaPlayer.captureSamples) {
+                feedPopout(spare, w, h, frameSize, metrics)
+            }
 
             if (!MediaPlayer.captureSamples) {
                 if (MediaPlayer.DEBUG) metrics.recordNotPublished()
@@ -402,7 +566,6 @@ internal class NativeVideoFramePipe(
             }
 
             if (prebuffer != null) {
-                // Producer path: the jitter buffer's consumer thread paces and presents (and fires onFirstFrame).
                 spare = prebuffer.submit(spare, framePts, frameSize)
                 if (MediaPlayer.DEBUG) {
                     MediaPlayer.samplesIn.incrementAndGet(); metrics.recordPublished(); metrics.maybeLog()
@@ -413,7 +576,9 @@ internal class NativeVideoFramePipe(
 
             val audioClock = getAudioClock()
             val avDiffNs = if (audioClock >= 0) framePts - audioClock else 0L
-            if (FramePacing.pace(framePts, getAudioClock)) {
+            if (FramePacing.pace(framePts, getAudioClock, {
+                    pendingLavSeek != null || stopFlag.get() || terminated.get()
+                })) {
                 if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
                 if (MediaPlayer.DEBUG) metrics.recordPacedDrop(avDiffNs)
                 videoPts = framePts + frameNs
@@ -425,19 +590,11 @@ internal class NativeVideoFramePipe(
             spare = surface.publish(spare, frameSize)
             if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
             if (MediaPlayer.DEBUG) metrics.recordPublished()
-            if (!firstFrame) {
-                firstFrame = true
-                onFirstFrame()
-                if (MediaPlayer.DEBUG) logger.debug("$debugLabel First frame ${w} x ${h} (native).")
-            }
 
             videoPts = framePts + frameNs
             if (MediaPlayer.DEBUG) metrics.maybeLog()
         }
 
-        // On normal EOF (notably cached replay) let the consumer drain queued frames; abort only for
-        // teardown / errors. Otherwise replay decodes its whole snapshot, hits EOF, and discards the
-        // buffered bridge before live video is ready.
         if (!terminated.get() && !stopFlag.get() && rc == NativeMedia.READ_EOF) {
             prebuffer?.finish()
         } else {
@@ -458,6 +615,14 @@ internal class NativeVideoFramePipe(
         }
     }
 
+    private fun pollLavSeek(): LavSeekCommand? {
+        synchronized(lavSeekMonitor) {
+            val cmd = pendingLavSeek ?: return null
+            pendingLavSeek = null
+            return cmd
+        }
+    }
+
     /** Feeds the current [spare] frame to the popout sink, converting planar I420 -> RGBA when needed. */
     private fun feedPopout(spare: ByteBuffer, w: Int, h: Int, frameSize: Int, metrics: NativeReadMetrics) {
         val sink = popoutFrameSink ?: return
@@ -470,10 +635,12 @@ internal class NativeVideoFramePipe(
             rgba.clear()
             if (NativeMedia.i420ToRgba(spare, frameSize, rgba, w, h) == 0) {
                 rgba.limit(rgbaSize).position(0)
+                lastFrame.store(rgba, w, h, rgbaSize, FramePixelFormat.RGBA32)
                 sink(rgba, w, h, FramePixelFormat.RGBA32)
             }
             spare.rewind()
         } else {
+            lastFrame.store(spare, w, h, frameSize, outputFormat)
             sink(spare, w, h, outputFormat); spare.rewind()
         }
         if (MediaPlayer.DEBUG) metrics.recordPopout(System.nanoTime() - popoutStartNs)
@@ -508,6 +675,10 @@ internal class NativeVideoFramePipe(
      */
     fun release() {
         parked = null
+        synchronized(lavSeekMonitor) {
+            pendingLavSeek?.failed = true
+            pendingLavSeek = null
+        }
         val h = handle
         handle = 0L
         if (h != 0L) NativeMedia.videoClose(h)
@@ -543,7 +714,7 @@ internal class NativeVideoFramePipe(
         private val h: Int,
         private val frameBytes: Int,
     ) {
-        private val logger = LoggerFactory.getLogger("DreamDisplays/NativeVideoFramePipe")
+        private val logger = LoggerFactory.getLogger(javaClass)
         private var lastLogNs = System.nanoTime()
         private var readCount = 0L
         private var readTotalNs = 0L

@@ -1,35 +1,40 @@
-//! C ABI surface for the Dream Displays native media pipeline, consumed from Kotlin via
-//! the Java FFM API (Project Panama).
-//!
-//! Design rules:
-//! - Every entry point is panic-safe (`catch_unwind`); panics become error codes, never UB.
-//! - Handles are opaque `i64` values; 0 is "no handle".
-//! - The reader contract mirrors the JVM `VideoFramePipe` loop: `dd_video_read_frame`
-//!   blocks until a full frame is read from the FFmpeg pipe, converts it to tightly
-//!   packed RGB24 with brightness applied, and writes it into the caller's buffer.
-//! - `dd_video_kill` unblocks a stuck reader; `dd_video_close` frees the session and
-//!   must only be called after the reader thread has been joined.
+//! C ABI surface for the `Dream Displays` native media pipeline, consumed from `Kotlin` via
+//! the `Java FFM API` (`Project Panama`).
 
 pub mod convert;
 pub mod session;
 
-use session::{PixFmt, Sessions, ERR_BAD_ARGS, ERR_BAD_HANDLE, ERR_IO};
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use session::{ERR_BAD_ARGS, ERR_BAD_HANDLE, ERR_IO, PixFmt, Sessions};
+use std::any::Any;
+use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::OnceLock;
 
-/// Bumped on any breaking change of this ABI. The JVM bridge refuses to use a library
-/// whose version does not match what it was compiled against.
+/// Bumped on any breaking change of this ABI.
 pub const ABI_VERSION: u32 = 1;
 
 static SESSIONS: OnceLock<Sessions> = OnceLock::new();
 
 fn sessions() -> &'static Sessions {
+    dreamdisplays_logging::init();
     SESSIONS.get_or_init(Sessions::new)
+}
+
+/// Fallback for a caught panic in an ABI entry point: logs the panic message (panics must never
+/// cross the C boundary silently) and substitutes `code` as the return value.
+fn on_panic<T: Copy>(entry: &'static str, code: T) -> impl FnOnce(Box<dyn Any + Send>) -> T {
+    move |payload| {
+        log::error!(
+            "{entry} panicked: {}.",
+            dreamdisplays_logging::panic_message(&*payload)
+        );
+        code
+    }
 }
 
 /// Returns [`ABI_VERSION`]; the JVM bridge calls this first as a sanity check.
 #[unsafe(no_mangle)]
 pub extern "C" fn dd_abi_version() -> u32 {
+    dreamdisplays_logging::init();
     ABI_VERSION
 }
 
@@ -50,9 +55,15 @@ pub unsafe extern "C" fn dd_video_open(
     if argv_blob.is_null() || blob_len == 0 {
         return 0;
     }
-    let blob = std::slice::from_raw_parts(argv_blob, blob_len as usize);
+    let blob = unsafe {
+        // Safety: the caller guarantees argv_blob points to blob_len readable bytes; null
+        // and zero-length inputs are rejected above.
+        std::slice::from_raw_parts(argv_blob, blob_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
-        let Some(pix) = PixFmt::from_u32(pix_fmt) else { return 0; };
+        let Some(pix) = PixFmt::from_u32(pix_fmt) else {
+            return 0;
+        };
         let args: Vec<String> = blob
             .split(|&b| b == 0)
             .filter(|part| !part.is_empty())
@@ -60,7 +71,7 @@ pub unsafe extern "C" fn dd_video_open(
             .collect();
         sessions().open(&args, w, h, pix)
     }))
-        .unwrap_or(0)
+    .unwrap_or_else(on_panic("dd_video_open", 0))
 }
 
 /// Blocking read of the next frame into `dst` as RGB24 with brightness applied
@@ -80,11 +91,14 @@ pub unsafe extern "C" fn dd_video_read_frame(
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         sessions().read_frame(handle, dst, brightness_milli)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_video_read_frame", ERR_IO))
 }
 
 /// Blocking read of the next frame into `dst` as RGBA32 with brightness applied
@@ -104,11 +118,14 @@ pub unsafe extern "C" fn dd_video_read_frame_rgba(
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         sessions().read_frame_rgba(handle, dst, brightness_milli)
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_video_read_frame_rgba", ERR_IO))
 }
 
 /// Blocking read of the next frame as raw I420 planes (Y, then U, then V) with no color
@@ -124,8 +141,12 @@ pub unsafe extern "C" fn dd_video_read_frame_i420(handle: i64, dst: *mut u8, dst
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
-    catch_unwind(AssertUnwindSafe(|| sessions().read_frame_i420(handle, dst))).unwrap_or(ERR_IO)
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().read_frame_i420(handle, dst)))
+        .unwrap_or_else(on_panic("dd_video_read_frame_i420", ERR_IO))
 }
 
 /// Converts one I420 frame (as produced by [`dd_video_read_frame_i420`]) into RGBA32 with
@@ -150,13 +171,21 @@ pub unsafe extern "C" fn dd_i420_to_rgba(
     if (src_len as usize) < convert::nv12_frame_size(w, h) || (dst_len as usize) < w * h * 4 {
         return ERR_BAD_ARGS;
     }
-    let src = std::slice::from_raw_parts(src, src_len as usize);
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
+    let src = unsafe {
+        // Safety: the caller guarantees src points to src_len readable bytes; size was
+        // validated against the requested frame dimensions above.
+        std::slice::from_raw_parts(src, src_len as usize)
+    };
+    let dst = unsafe {
+        // Safety: The caller guarantees dst points to dst_len writable bytes; size was
+        // validated against the requested frame dimensions above.
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
     catch_unwind(AssertUnwindSafe(|| {
         convert::i420_to_rgba32_identity(src, w, h, dst);
         0
     }))
-        .unwrap_or(ERR_IO)
+    .unwrap_or_else(on_panic("dd_i420_to_rgba", ERR_IO))
 }
 
 /// Copies the captured FFmpeg stderr (UTF-8, capped) into `dst`; returns bytes written
@@ -168,8 +197,12 @@ pub unsafe extern "C" fn dd_video_stderr(handle: i64, dst: *mut u8, dst_len: u64
     if dst.is_null() {
         return ERR_BAD_ARGS;
     }
-    let dst = std::slice::from_raw_parts_mut(dst, dst_len as usize);
-    catch_unwind(AssertUnwindSafe(|| sessions().stderr(handle, dst))).unwrap_or(ERR_IO)
+    let dst = unsafe {
+        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
+        std::slice::from_raw_parts_mut(dst, dst_len as usize)
+    };
+    catch_unwind(AssertUnwindSafe(|| sessions().stderr(handle, dst)))
+        .unwrap_or_else(on_panic("dd_video_stderr", ERR_IO))
 }
 
 /// Waits up to `wait_millis` for the `FFmpeg` process to exit; returns its exit code or -1
@@ -179,7 +212,7 @@ pub extern "C" fn dd_video_exit_code(handle: i64, wait_millis: u32) -> i32 {
     catch_unwind(AssertUnwindSafe(|| {
         sessions().exit_code(handle, wait_millis)
     }))
-        .unwrap_or(ERR_BAD_HANDLE)
+    .unwrap_or_else(on_panic("dd_video_exit_code", ERR_BAD_HANDLE))
 }
 
 /// Kills the `FFmpeg` process, unblocking any reader stuck in [`dd_video_read_frame`].

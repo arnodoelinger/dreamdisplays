@@ -1,33 +1,30 @@
 package com.dreamdisplays.media.player.pipeline
 
-/** Tracks playback position as seek offset and elapsed wall time. It's thread-safe for reads. */
+/**
+ * Playback position as a seek origin plus the wall time elapsed since the first frame. Thread-safe for reads;
+ * writes assume a single control thread.
+ */
 internal class PlaybackClock {
     companion object {
         private const val NOT_STARTED = Long.MIN_VALUE
     }
 
     @Volatile
-    var seekOffsetNanos = 0L
+    private var originNanosValue = 0L
 
     @Volatile
     private var startWallNanos = NOT_STARTED
 
+    /** The seek origin — the position [currentTime] reports while the clock is not running. */
+    val originNanos: Long get() = originNanosValue
+
     val isRunning: Boolean get() = startWallNanos != NOT_STARTED
 
-    /** Returns the current playback position in nanos, based on the seek offset and elapsed wall time. */
+    /** Returns the current playback position in nanos, based on the seek origin and elapsed wall time. */
     fun currentTime(): Long {
         val start = startWallNanos
-        return if (start == NOT_STARTED) seekOffsetNanos
-        else seekOffsetNanos + (System.nanoTime() - start)
-    }
-
-    /**
-     * Converts an audio line frame position into absolute playback nanos.
-     * Returns -1 when [framePos] is negative (no audio line open yet).
-     */
-    fun audioClockNanos(framePos: Long, sampleRate: Int): Long {
-        if (framePos < 0) return -1L
-        return seekOffsetNanos + (framePos * 1_000_000_000L / sampleRate)
+        return if (start == NOT_STARTED) originNanosValue
+        else originNanosValue + (System.nanoTime() - start)
     }
 
     /** Called once by the video thread when the first frame arrives. */
@@ -46,7 +43,7 @@ internal class PlaybackClock {
 
     /** Resets the clock to a new seek position (pauses the wall clock). */
     fun reset(offsetNanos: Long) {
-        seekOffsetNanos = offsetNanos
+        originNanosValue = offsetNanos
         startWallNanos = NOT_STARTED
     }
 
@@ -56,7 +53,15 @@ internal class PlaybackClock {
      * Unlike [reset] the clock stays running, so pacing never momentarily reads "not started".
      */
     fun rebaseTo(offsetNanos: Long) {
-        seekOffsetNanos = offsetNanos
+        originNanosValue = offsetNanos
         startWallNanos = System.nanoTime()
+    }
+
+    /**
+     * Moves the reported position to [offsetNanos] whatever the current state: a running clock is rebased
+     * (so [currentTime] stays continuous), a stopped one is simply reset.
+     */
+    fun moveTo(offsetNanos: Long) {
+        if (isRunning) rebaseTo(offsetNanos) else reset(offsetNanos)
     }
 }

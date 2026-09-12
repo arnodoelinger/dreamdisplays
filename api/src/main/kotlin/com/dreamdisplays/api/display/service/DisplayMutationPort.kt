@@ -1,15 +1,16 @@
 package com.dreamdisplays.api.display.service
 
-import com.dreamdisplays.api.DreamDisplaysUnstableApi
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.display.model.DisplaySettings
+import com.dreamdisplays.api.playback.model.DisplayAccess
+import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.model.settings.DisplaySettings
 
 /**
  * Display mutation port.
  *
- * @since 1.8.4
+ * @since 1.8.x
  */
-@DreamDisplaysUnstableApi
+@Unstable
 interface DisplayMutationPort {
     /** Updates the display settings for [id]. */
     fun updateSettings(id: DisplayId, settings: DisplaySettings)
@@ -17,8 +18,8 @@ interface DisplayMutationPort {
     /** Sets the URL for [id]. */
     fun setUrl(id: DisplayId, url: String?, lang: String? = null)
 
-    /** Locks or unlocks [id]. */
-    fun setLocked(id: DisplayId, locked: Boolean)
+    /** Sets who may use [id]. */
+    fun setAccess(id: DisplayId, access: DisplayAccess)
 
     /** Deletes [id]. */
     fun delete(id: DisplayId)

@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.overlay
 
-import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayId
 
 /**
  * Manages overlays for displays. This is the main interface for interacting with overlays, allowing you to open, close,

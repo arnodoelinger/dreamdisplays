@@ -8,22 +8,32 @@ modId = "dreamdisplays"
 version = "${version}"
 displayName = "Dream Displays"
 logoFile = "assets/dreamdisplays/icon.png"
-authors = "arsmotorin, INotSleep, Kolyakot33, Toffikk"
+authors = "arnodoelinger, INotSleep, Kolyakot33, Toffikk"
 description = "Create in-game screens to stream videos on any Minecraft server."
 
 [[mixins]]
 config = "dreamdisplays.mixins.json"
+
+[[mixins]]
+config = "dreamdisplays.server.mixins.json"
 
 [[dependencies.dreamdisplays]]
 modId = "neoforge"
 type = "required"
 versionRange = "${neoforgeLoaderRange}"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"
 
 [[dependencies.dreamdisplays]]
 modId = "minecraft"
 type = "required"
 versionRange = "${minecraftRange}"
 ordering = "NONE"
-side = "CLIENT"
+side = "BOTH"
+
+[[dependencies.dreamdisplays]]
+modId = "luckperms"
+type = "optional"
+versionRange = "[5,)"
+ordering = "AFTER"
+side = "BOTH"
