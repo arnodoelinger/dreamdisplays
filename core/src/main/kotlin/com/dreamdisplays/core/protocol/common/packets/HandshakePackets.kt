@@ -4,6 +4,7 @@ package com.dreamdisplays.core.protocol.common.packets
 
 import com.dreamdisplays.api.protocol.ProtocolVersion
 import com.dreamdisplays.core.protocol.common.UuidSerializer
+import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.protobuf.ProtoNumber
@@ -50,6 +51,7 @@ data class ServerHello(
     @ProtoNumber(4) val isReportingEnabled: Boolean = false,
     @ProtoNumber(6) val maxDisplays: Int = -1,
     @ProtoNumber(7) val allowedFeatures: List<String> = emptyList(),
+    @EncodeDefault
     @ProtoNumber(8) val defaultVolume: Float = -1f,
 ) : DreamPacket
 

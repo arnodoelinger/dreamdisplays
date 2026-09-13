@@ -46,7 +46,13 @@ class RoundTripTest {
             isReportingEnabled = true,
             maxDisplays = 25,
             allowedFeatures = listOf("popout", "pip"),
+            defaultVolume = 0.25f,
         )
+    )
+
+    @Test
+    fun serverHelloZeroDefaultVolume() = roundTrip(
+        ServerHello(defaultVolume = 0f),
     )
 
     @Test

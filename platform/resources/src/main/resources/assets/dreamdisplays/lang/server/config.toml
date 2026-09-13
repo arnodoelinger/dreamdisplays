@@ -37,7 +37,7 @@ mod_detection_enabled = true
 # Update notifications
 updates = true
 
-# Default volume for new players in percent (0 to 100, default 50)
+# Default volume for newly seen displays, in the same units as the client slider (0 to 200, default 50)
 default_volume = 50
 
 # Max displays one player may own at once. 0 or less means no limit.

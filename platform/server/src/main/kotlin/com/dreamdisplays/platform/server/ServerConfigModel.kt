@@ -55,8 +55,8 @@ data class SettingsSection(
     /** Max displays one player may own at once; `0` or less means no limit. Bypassed by [PermissionsSection.createBypass]. */
     val maxDisplaysPerPlayer get() = display.max_displays_per_player
 
-    /** Volume in [0, 1] ready for the wire; config stores 0-100 percent. */
-    val defaultVolume get() = display.default_volume / 100f
+    /** Volume in [0, 1] ready for the wire. */
+    val defaultVolume get() = display.default_volume / 200f
 
     // Custom media (player-pasted links)
     val customMediaPolicy: com.dreamdisplays.api.security.policy.CustomMediaPolicy.Settings
@@ -257,7 +257,7 @@ fun parseServerConfig(t: TomlTable?): ParsedServerConfig = ParsedServerConfig(
             min_height = t?.getLong("display.min_height")?.toInt() ?: 1,
             max_width = t?.getLong("display.max_width")?.toInt() ?: 32,
             max_height = t?.getLong("display.max_height")?.toInt() ?: 24,
-            default_volume = t?.getLong("display.default_volume")?.toInt()?.coerceIn(0, 100) ?: 50,
+            default_volume = t.intOr("display.default_volume", 50).coerceIn(0, 200),
             max_displays_per_player = t?.getLong("display.max_displays_per_player")?.toInt() ?: 100,
         ),
         customMedia = SettingsSection.CustomMediaConfig(
@@ -320,6 +320,13 @@ fun parseServerConfig(t: TomlTable?): ParsedServerConfig = ParsedServerConfig(
         clock_sync_interval = t?.getLong("proxy.clock_sync_interval")?.toInt() ?: 5,
     ),
 )
+
+private fun TomlTable?.intOr(key: String, default: Int): Int {
+    val table = this ?: return default
+    table.getLong(key)?.toInt()?.let { return it }
+    table.getDouble(key)?.toInt()?.let { return it }
+    return default
+}
 
 /**
  * Reads [key] as a TOML array of strings, dropping blanks and non-string entries. Returns an empty
