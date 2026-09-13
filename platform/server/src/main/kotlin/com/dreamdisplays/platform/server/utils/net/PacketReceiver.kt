@@ -1,17 +1,19 @@
 package com.dreamdisplays.platform.server.utils.net
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.api.playback.model.DisplayAccess
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
-import io.github.arsmotorin.ofrat.PaperOnly
+import com.dreamdisplays.platform.server.managers.StateManager
+import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.io.Buffer
+import kotlinx.io.Source
+import kotlinx.io.readString
 import org.bukkit.entity.Player
 import org.bukkit.plugin.messaging.PluginMessageListener
 import org.jspecify.annotations.NullMarked
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayInputStream
-import java.io.DataInputStream
 import java.util.*
 
 /**
@@ -22,8 +24,8 @@ import java.util.*
 @Deprecated("Protocol v1 receiver; remove when v1 client support is dropped.")
 @PaperOnly
 @NullMarked
-class PacketReceiver(private val plugin: Main) : PluginMessageListener {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/PacketReceiver")
+class PacketReceiver(private val plugin: PaperServer) : PluginMessageListener {
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val maxVersionBytes = 128
     private val maxStringBytes = 4096
 
@@ -44,16 +46,15 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
     /** Decodes a sync packet from [player] and forwards it to [StateManager.processSyncPacket]. */
     private fun handleSyncPacket(player: Player, message: ByteArray) {
         runCatching {
-            DataInputStream(ByteArrayInputStream(message)).use { input ->
-                val syncData = SyncData(
-                    input.readUUID(),
-                    input.readBoolean(),
-                    input.readBoolean(),
-                    input.readVarLong(),
-                    input.readVarLong()
-                )
-                StateManager.processSyncPacket(syncData, player)
-            }
+            val input = bufferOf(message)
+            val syncData = SyncData(
+                input.readUUID(),
+                input.readBoolean(),
+                input.readBoolean(),
+                input.readVarLong(),
+                input.readVarLong()
+            )
+            StateManager.processSyncPacket(syncData, player)
         }.onFailure { e ->
             logger.warn("Failed to decode sync packet", e)
         }
@@ -90,9 +91,9 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
             if (V2PlayerTracker.isV2(player.uniqueId)) return
 
             DisplayActions.recordVersionAndCheckUpdates(player, version)
-            PacketUtil.sendPremium(player, player.hasPermission(Main.config.permissions.premium))
-            PacketUtil.sendIsAdmin(player, player.hasPermission(Main.config.permissions.delete))
-            PacketUtil.sendReportEnabled(player, Main.config.settings.webhookUrl.isNotEmpty())
+            PacketUtil.sendPremium(player, player.hasPermission(PaperServer.config.permissions.premium))
+            PacketUtil.sendIsAdmin(player, player.hasPermission(PaperServer.config.permissions.deleteOthers))
+            PacketUtil.sendReportEnabled(player, PaperServer.config.settings.webhookUrl.isNotEmpty())
             DisplayActions.sendAllDisplays(player)
         }.onFailure { e ->
             logger.warn("Failed to process version packet", e)
@@ -102,10 +103,8 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
     /** Persists a client toggle for whether [player] wants to render displays. */
     private fun handleDisplayEnabled(player: Player, message: ByteArray) {
         runCatching {
-            DataInputStream(ByteArrayInputStream(message)).use { input ->
-                val enabled = input.readBoolean()
-                PlayerManager.setDisplaysEnabled(player, enabled)
-            }
+            val enabled = bufferOf(message).readBoolean()
+            PlayerManager.setDisplaysEnabled(player, enabled)
         }.onFailure { e ->
             logger.warn("Failed to decode display enabled packet", e)
         }
@@ -114,25 +113,23 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
     /** Applies a client-supplied URL / language to a display via [DisplayActions.setVideo]. */
     private fun handleSetVideo(player: Player, message: ByteArray) {
         runCatching {
-            DataInputStream(ByteArrayInputStream(message)).use { input ->
-                val displayId = input.readUUID()
-                val url = input.readString()
-                val lang = input.readString()
-                DisplayActions.setVideo(player, displayId, url, lang)
-            }
+            val input = bufferOf(message)
+            val displayId = input.readUUID()
+            val url = input.readString()
+            val lang = input.readString()
+            DisplayActions.setVideo(player, displayId, url, lang)
         }.onFailure { e ->
             logger.warn("Failed to decode set_video packet", e)
         }
     }
 
-    /** Updates the locked flag of a display via [DisplayActions.setLocked]. */
+    /** Applies the frozen-v1 locked boolean, which only ever meant everyone / owner-only. */
     private fun handleSetLocked(player: Player, message: ByteArray) {
         runCatching {
-            DataInputStream(ByteArrayInputStream(message)).use { input ->
-                val displayId = input.readUUID()
-                val locked = input.readBoolean()
-                DisplayActions.setLocked(player, displayId, locked)
-            }
+            val input = bufferOf(message)
+            val displayId = input.readUUID()
+            val locked = input.readBoolean()
+            DisplayActions.setAccess(player, displayId, DisplayAccess.fromLegacyLocked(locked))
         }.onFailure { e ->
             logger.warn("Failed to decode set_locked packet", e)
         }
@@ -141,9 +138,7 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
     /** Reads a single UUID payload, logging and returning null on decode failure. */
     private fun readUUIDPacket(message: ByteArray): UUID? {
         return runCatching {
-            DataInputStream(ByteArrayInputStream(message)).use { input ->
-                input.readUUID()
-            }
+            bufferOf(message).readUUID()
         }.onFailure { e ->
             logger.error("Failed to decode UUID packet", e)
         }.getOrNull()
@@ -151,40 +146,41 @@ class PacketReceiver(private val plugin: Main) : PluginMessageListener {
 
     /** Reads a length-prefixed version string with strict bounds checks to reject malformed payloads. */
     private fun readVersionString(message: ByteArray): String {
-        return DataInputStream(ByteArrayInputStream(message)).use { input ->
-            val length = input.readVarInt()
-            require(length in 1..maxVersionBytes) {
-                "Invalid version packet length: $length."
-            }
-            require(length <= input.available()) {
-                "Invalid version packet size: declared = $length, but available = ${input.available()}."
-            }
-            val data = ByteArray(length)
-            input.readFully(data)
-            String(data, 0, length)
+        val input = bufferOf(message)
+        val length = input.readVarInt()
+        require(length in 1..maxVersionBytes) {
+            "Invalid version packet length: $length."
         }
+        require(length <= input.size) {
+            "Invalid version packet size: declared = $length, but available = ${input.size}."
+        }
+        return input.readString(length.toLong())
     }
 
+    /** Wraps a raw plugin-message payload in an in-memory [Buffer] for decoding. */
+    private fun bufferOf(message: ByteArray): Buffer = Buffer().apply { write(message) }
+
+    /** Reads a single byte as a boolean, 0 = `false`, anything else = `true`. */
+    private fun Source.readBoolean(): Boolean = readByte() != 0.toByte()
+
     /** Reads a 128-bit UUID using the shared encoding in [PacketUtil]. */
-    private fun DataInputStream.readUUID() = PacketUtil.run { readUUID() }
+    private fun Source.readUUID() = PacketUtil.run { readUUID() }
 
     /** Reads a Minecraft-style VarInt using the shared encoding in [PacketUtil]. */
-    private fun DataInputStream.readVarInt() = PacketUtil.run { readVarInt() }
+    private fun Source.readVarInt() = PacketUtil.run { readVarInt() }
 
     /** Reads a Minecraft-style VarLong using the shared encoding in [PacketUtil]. */
-    private fun DataInputStream.readVarLong() = PacketUtil.run { readVarLong() }
+    private fun Source.readVarLong() = PacketUtil.run { readVarLong() }
 
     /** Reads a UTF-8 string prefixed by its byte length as a VarInt, with the same bounds checks as [readVersionString]. */
-    private fun DataInputStream.readString(): String {
+    private fun Buffer.readString(): String {
         val length = readVarInt()
         require(length in 0..maxStringBytes) {
             "Invalid string packet length: $length."
         }
-        require(length <= available()) {
-            "Invalid string packet size. Declared = $length, but available = ${available()}."
+        require(length <= size) {
+            "Invalid string packet size. Declared = $length, but available = $size."
         }
-        val data = ByteArray(length)
-        readFully(data)
-        return String(data, Charsets.UTF_8)
+        return readString(length.toLong())
     }
 }

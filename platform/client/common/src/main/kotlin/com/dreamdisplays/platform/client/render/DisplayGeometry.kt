@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.display.model.DisplayFacing
+import com.dreamdisplays.api.display.model.property.DisplayFacing
 import com.mojang.blaze3d.vertex.PoseStack
 import net.minecraft.core.BlockPos
 import org.joml.Quaternionf
@@ -53,17 +53,47 @@ internal object DisplayGeometry {
             sqrt(pos.distSqr(BlockPos(clampedX, clampedY, clampedZ)))
         }
 
-    /** Distance the quad floats in front of the supporting blocks, to avoid z-fighting. */
+    /**
+     * World-space center and orientation basis for a screen anchored at ([x], [y], [z]) with the given
+     * [width] / [height] / [facing]. Approximate (block-center precision, no surface offset): good
+     * enough for placing acoustic emitters, not for rendering.
+     */
+    fun worldPose(x: Int, y: Int, z: Int, width: Int, height: Int, facing: DisplayFacing): ScreenPose =
+        withBounds(x, y, z, width, height, facing) { maxX, maxY, maxZ ->
+            val cx = (x + maxX + 1) / 2.0
+            val cy = (y + maxY + 1) / 2.0
+            val cz = (z + maxZ + 1) / 2.0
+            val (nx, ny, nz) = when (facing) {
+                DisplayFacing.NORTH -> Triple(0.0, 0.0, -1.0)
+                DisplayFacing.SOUTH -> Triple(0.0, 0.0, 1.0)
+                DisplayFacing.EAST -> Triple(1.0, 0.0, 0.0)
+                DisplayFacing.WEST -> Triple(-1.0, 0.0, 0.0)
+                DisplayFacing.UP -> Triple(0.0, 1.0, 0.0)
+                DisplayFacing.DOWN -> Triple(0.0, -1.0, 0.0)
+            }
+            val (ux, uy, uz) = when (facing) {
+                DisplayFacing.NORTH -> Triple(-1.0, 0.0, 0.0)
+                DisplayFacing.SOUTH -> Triple(1.0, 0.0, 0.0)
+                DisplayFacing.EAST -> Triple(0.0, 0.0, -1.0)
+                DisplayFacing.WEST -> Triple(0.0, 0.0, 1.0)
+                DisplayFacing.UP, DisplayFacing.DOWN -> Triple(1.0, 0.0, 0.0)
+            }
+            val (vx, vy, vz) = when (facing) {
+                DisplayFacing.UP, DisplayFacing.DOWN -> Triple(0.0, 0.0, 1.0)
+                else -> Triple(0.0, 1.0, 0.0)
+            }
+            ScreenPose(cx, cy, cz, nx, ny, nz, ux, uy, uz, vx, vy, vz)
+        }
+
+    /**
+     * Distance the quad floats in front of the supporting blocks, in local block space. This is a secondary safety margin
+     * on top of the depth-bias trick.
+     */
     private const val SURFACE_OFFSET = 0.008f
 
     /**
-     * Larger surface offset used while a shader pack is active. Shader packs (notably OptiFine /
-     * SEUS Renewed) drive the depth buffer with far coarser precision than vanilla, so the tiny
-     * [SURFACE_OFFSET] no longer separates the video plane from the backing block: past a few blocks
-     * the block wins the depth test and the screen reverts to the bare block. A wider gap keeps the
-     * quad in front across the whole render distance.
-     *
-     * @see <a href="https://github.com/arsmotorin/dreamdisplays/issues/108">Issue #108</a>
+     * Larger surface offset used while a shader pack is active. Shader packs (notably `OptiFine` / `SEUS Renewed`) draw with
+     * a different depth pass that needs more clearance to avoid z-fighting.
      */
     private const val SHADER_SURFACE_OFFSET = 0.016f
 
@@ -134,10 +164,8 @@ internal object DisplayGeometry {
     }
 
     /**
-     * Nudges [stack] [amount] blocks toward the viewer along [facing]'s outward normal. Call this
-     * before [applyScreenTransform] to lift an overlay layer off the video plane: the transform's
-     * final `scale(w, h, 0)` flattens local z to zero, so coplanar quads can only be depth-separated
-     * by offsetting them in world space here, ahead of that scale.
+     * Nudges [stack] [amount] blocks toward the viewer along [facing]'s outward normal. Call this before [applyScale],
+     * so the lift isn't itself scaled.
      */
     fun liftTowardViewer(stack: PoseStack, facing: DisplayFacing, amount: Float) = moveForward(stack, facing, amount)
 
@@ -164,3 +192,11 @@ internal object DisplayGeometry {
         }
     }
 }
+
+/** World-space center + orthonormal (normal, uAxis, vAxis) basis for a screen, see [DisplayGeometry.worldPose]. */
+internal data class ScreenPose(
+    val centerX: Double, val centerY: Double, val centerZ: Double,
+    val normalX: Double, val normalY: Double, val normalZ: Double,
+    val uAxisX: Double, val uAxisY: Double, val uAxisZ: Double,
+    val vAxisX: Double, val vAxisY: Double, val vAxisZ: Double,
+)

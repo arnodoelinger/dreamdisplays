@@ -1,8 +1,8 @@
 package com.dreamdisplays.platform.client.core.modules
 
-import com.dreamdisplays.api.runtime.DreamDisplaysModule
-import com.dreamdisplays.api.runtime.ModuleContext
-import com.dreamdisplays.api.runtime.register
+import com.dreamdisplays.api.runtime.module.DreamDisplaysModule
+import com.dreamdisplays.api.runtime.module.ModuleContext
+import com.dreamdisplays.api.runtime.registry.service.register
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.capabilities.ClientCapabilityDetector
 import com.dreamdisplays.platform.client.capabilities.DefaultCapabilityNegotiationService

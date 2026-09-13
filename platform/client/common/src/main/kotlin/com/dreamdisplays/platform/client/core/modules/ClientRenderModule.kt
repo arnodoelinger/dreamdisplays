@@ -1,15 +1,10 @@
 package com.dreamdisplays.platform.client.core.modules
 
-import com.dreamdisplays.api.render.RenderServices
-import com.dreamdisplays.api.runtime.DreamDisplaysModule
-import com.dreamdisplays.api.runtime.ModuleContext
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.api.runtime.register
-import com.dreamdisplays.platform.client.render.ClientRenderService
-import com.dreamdisplays.platform.client.render.DefaultRendererProvider
-import com.dreamdisplays.platform.client.render.DefaultTextureUploaderProvider
-import com.dreamdisplays.platform.client.render.RenderHook
-import com.dreamdisplays.platform.client.render.ScreenRenderer
+import com.dreamdisplays.api.render.service.keys.RenderServices
+import com.dreamdisplays.api.runtime.module.DreamDisplaysModule
+import com.dreamdisplays.api.runtime.module.ModuleContext
+import com.dreamdisplays.api.runtime.registry.service.register
+import com.dreamdisplays.platform.client.render.*
 
 /** Installs client render services, API surface renderer, and texture uploader factory. */
 object ClientRenderModule : DreamDisplaysModule {
@@ -23,7 +18,8 @@ object ClientRenderModule : DreamDisplaysModule {
         services.register(RenderServices.DISPLAY_RENDERER, DefaultRendererProvider.create())
         services.register(RenderServices.TEXTURE_UPLOADER_FACTORY, DefaultTextureUploaderProvider.create())
         services.register<RenderHook>(RenderHook { renderContext ->
-            services.getOrNull(RenderServices.DISPLAY_RENDERER)?.takeIf { it.registeredCount > 0 }?.renderAll(renderContext)
+            services.getOrNull(RenderServices.DISPLAY_RENDERER)?.takeIf { it.registeredCount > 0 }
+                ?.renderAll(renderContext)
         })
     }
 }

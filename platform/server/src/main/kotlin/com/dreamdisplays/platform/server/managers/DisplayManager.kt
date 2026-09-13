@@ -1,43 +1,42 @@
 package com.dreamdisplays.platform.server.managers
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import com.github.benmanes.caffeine.cache.Expiry
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.Main.Companion.config
-import com.dreamdisplays.platform.server.Main.Companion.getInstance
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
-import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
-import com.dreamdisplays.platform.server.datatypes.SyncData
+import com.dreamdisplays.core.protocol.common.packets.DreamPacket
+import com.dreamdisplays.platform.server.PaperServer.Companion.config
+import com.dreamdisplays.platform.server.PaperServer.Companion.getInstance
+import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.baseMaterial
+import com.dreamdisplays.platform.server.baseMaterialId
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
 import com.dreamdisplays.platform.server.meta.Scheduler.runSync
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
-import kotlinx.coroutines.launch
+import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
+import com.dreamdisplays.platform.server.playback.PipPinManager
+import com.dreamdisplays.platform.server.playback.ScheduledPlaybackManager
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.PlatformUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.RegionUtil.calculateRegion
+import com.dreamdisplays.platform.server.utils.WorldGuardRegions
 import com.dreamdisplays.platform.server.utils.ReporterUtil
-import com.dreamdisplays.platform.server.utils.ReporterUtil.sendReport
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
-import com.dreamdisplays.platform.server.utils.net.PacketUtil.sendDelete
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import io.github.arnodoelinger.platformweaver.PaperOnly
+import kotlinx.coroutines.launch
 import net.minecraft.core.BlockPos
 import net.minecraft.core.registries.BuiltInRegistries
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
+import org.bukkit.Bukkit
 import org.bukkit.Bukkit.getOfflinePlayer
 import org.bukkit.Location
 import org.bukkit.entity.Player
@@ -45,7 +44,6 @@ import org.bukkit.util.BoundingBox
 import org.jspecify.annotations.NullMarked
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.TimeUnit
 import java.util.function.Consumer
 
 /**
@@ -54,41 +52,14 @@ import java.util.function.Consumer
  */
 @NullMarked
 object DisplayManager {
-    private const val REPORT_RATE_LIMIT_MAX_SIZE = 20_000L
-
-    private data class ReportCooldown(val durationNanos: Long)
-
-    private val reportCooldownExpiry = object : Expiry<UUID, ReportCooldown> {
-        override fun expireAfterCreate(key: UUID, value: ReportCooldown, currentTime: Long): Long =
-            value.durationNanos
-
-        override fun expireAfterUpdate(
-            key: UUID,
-            value: ReportCooldown,
-            currentTime: Long,
-            currentDuration: Long
-        ): Long = value.durationNanos
-
-        override fun expireAfterRead(
-            key: UUID,
-            value: ReportCooldown,
-            currentTime: Long,
-            currentDuration: Long
-        ): Long = currentDuration
-    }
-
+    /** In-memory registry of all displays, keyed by UUID. */
     private val displays: MutableMap<UUID, DisplayData> = ConcurrentHashMap()
-    private val reportTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
-        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
-        .expireAfter(reportCooldownExpiry)
-        .build()
-    private val reporterTime: Cache<UUID, ReportCooldown> = Caffeine.newBuilder()
-        .maximumSize(REPORT_RATE_LIMIT_MAX_SIZE)
-        .expireAfter(reportCooldownExpiry)
-        .build()
-    private val reportRateLimitLock = Any()
-    private val nearbyPlayersByDisplay: MutableMap<UUID, MutableSet<UUID>> = ConcurrentHashMap()
-    private val nearbyDisplaysByPlayer: MutableMap<UUID, Set<UUID>> = ConcurrentHashMap()
+
+    /** Throttles reports to prevent spam. */
+    private val reportThrottle = ReportThrottle()
+
+    /** Proximity index for tracking nearby players in `Folia`. */
+    private val proximityIndex = DisplayProximityIndex()
 
     /** Returns the display registered under [id], or null if none exists. */
     @JvmStatic
@@ -97,19 +68,35 @@ object DisplayManager {
     /** Returns a snapshot list of all currently registered displays. */
     fun getDisplays(): List<DisplayData> = displays.values.toList()
 
+    /** Number of displays currently owned by [ownerId], across every registered display. */
+    fun countOwnedBy(ownerId: UUID): Int = displays.values.count { it.ownerId == ownerId }
+
+    /** Resolves [idOrPrefix] against every registered display: an exact id match first, then an exact case-insensitive name match. */
+    fun resolveByIdOrPrefix(idOrPrefix: String): DisplayData? {
+        runCatching { UUID.fromString(idOrPrefix) }.getOrNull()?.let { exact ->
+            getDisplayData(exact)?.let { return it }
+        }
+        displays.values.firstOrNull { it.name.equals(idOrPrefix, ignoreCase = true) }?.let { return it }
+        if (idOrPrefix.length < 4) return null
+        val matches = displays.values.filter { it.id.toString().startsWith(idOrPrefix, ignoreCase = true) }
+        return matches.singleOrNull()
+    }
+
+    /** True when another display (not [excludeId]) already carries [name], case-insensitively. */
+    fun isNameTaken(name: String, excludeId: UUID): Boolean =
+        displays.values.any { it.id != excludeId && it.name.equals(name, ignoreCase = true) }
+
     /** Bulk-registers displays loaded from storage without sending any updates. */
     fun register(list: List<DisplayData>) {
         list.forEach { displays[it.id] = it }
     }
 
     /** Removes the display referenced by [id], if it exists. */
+    @PaperOnly
     @JvmStatic
     fun delete(id: UUID) {
-        val data = displays[id] ?: return
-        when (data) {
-            is PaperDisplayData -> delete(data)
-            is FabricDisplayData -> delete(data)
-        }
+        val data = displays[id] as? PaperDisplayData ?: return
+        delete(data)
     }
 
     /** Returns true when [x,y,z] is within [maxRender] blocks of the axis-aligned box defined by the given bounds. */
@@ -126,34 +113,19 @@ object DisplayManager {
     }
 
     /**
-     * Checks whether a report from [reporterId] about display [id] should be rate-limited. Drops
-     * the request when either the per-display or the per-reporter cooldown is still active; the
-     * per-reporter limit stops an attacker from amplifying the webhook by spreading reports across
-     * many displays. Records both cooldown markers only when the report may proceed.
-     */
-    private fun isReportThrottled(id: UUID, reporterId: UUID, cooldownMs: Long): Boolean {
-        val durationNanos = TimeUnit.MILLISECONDS.toNanos(cooldownMs).coerceAtLeast(0L)
-        if (durationNanos == 0L) return false
-
-        synchronized(reportRateLimitLock) {
-            if (reportTime.getIfPresent(id) != null || reporterTime.getIfPresent(reporterId) != null) {
-                return true
-            }
-            val marker = ReportCooldown(durationNanos)
-            reportTime.put(id, marker)
-            reporterTime.put(reporterId, marker)
-            return false
-        }
-    }
-
-    /**
-     * Removes every display in [toRemove] from the in-memory registry, invokes [delete] for each,
-     * and returns the list of removed UUIDs.
+     * Removes every display in [toRemove] from the in-memory registry (and its playback/timeline/
+     * watch-party state, same as [delete]), invokes [delete] for each, and returns the removed UUIDs.
      */
     private fun removeDisplays(toRemove: List<DisplayData>, delete: (DisplayData) -> Unit): List<UUID> {
         return toRemove.map { display ->
             displays.remove(display.id)
-            forgetNearbyDisplay(display.id)
+            proximityIndex.forgetDisplay(display.id)
+            TimelineManager.remove(display.id)
+            WatchPartyManager.remove(display.id)
+            FullscreenBroadcastManager.onDisplayRemoved(display.id)
+            PipPinManager.onDisplayRemoved(display.id)
+            ScheduledPlaybackManager.onDisplayRemoved(display.id)
+            StateManager.remove(display.id)
             delete(display)
             display.id
         }
@@ -173,7 +145,7 @@ object DisplayManager {
         val pos1 = data.pos1 ?: return false
         val pos2 = data.pos2 ?: return false
         val selWorld = pos1.world
-        val region = calculateRegion(pos1, pos2)
+        val region = RegionUtil.calculateRegion(pos1, pos2)
         val box = BoundingBox(
             region.minX.toDouble(), region.minY.toDouble(), region.minZ.toDouble(),
             (region.maxX + 1).toDouble(), (region.maxY + 1).toDouble(), (region.maxZ + 1).toDouble(),
@@ -196,70 +168,52 @@ object DisplayManager {
     fun getReceivers(display: PaperDisplayData): List<Player> =
         display.pos1.world?.players?.filter { it.isInRange(display) } ?: emptyList()
 
-    /** Returns true if this location lies within `maxRenderDistance` of the [display]'s box. */
+    /** True if [player] is currently within render range of [display] — the same predicate that decides who receives its frames. */
+    @PaperOnly
+    fun isPlayerInRange(player: Player, display: PaperDisplayData): Boolean = player.isInRange(display)
+
+    /** Returns true if this location lies within the world's view distance of the [display]'s box. */
     @PaperOnly
     private fun Location.isInRange(display: PaperDisplayData): Boolean =
         isInRangeImpl(
             blockX, blockY, blockZ,
             display.box.minX.toInt(), display.box.minY.toInt(), display.box.minZ.toInt(),
             display.box.maxX.toInt(), display.box.maxY.toInt(), display.box.maxZ.toInt(),
-            config.settings.maxRenderDistance,
+            ((world?.viewDistance ?: Bukkit.getViewDistance()) * 16).toDouble(),
         )
 
-    /** Returns true if [player] is in [display]'s world and within render range. Must run on the player's thread on Folia. */
+    /** Returns true if [player] is in [display]'s world and within render range. Must run on the player's thread on `Folia`. */
     @PaperOnly
     private fun Player.isInRange(display: PaperDisplayData): Boolean {
-        if (display.pos1.world != world) return false
-        return location.isInRange(display)
+        return display.pos1.world == world && location.isInRange(display)
     }
 
-    /** Removes a display from the cached Folia proximity index. */
+    /** Removes [playerId] from the cached `Folia` proximity index. */
     @PaperOnly
-    private fun forgetNearbyDisplay(displayId: UUID) {
-        nearbyPlayersByDisplay.remove(displayId)
-        nearbyDisplaysByPlayer.replaceAll { _, ids -> ids - displayId }
-    }
+    fun forgetNearbyPlayer(playerId: UUID) = proximityIndex.forgetPlayer(playerId)
 
-    /** Removes [playerId] from the cached Folia proximity index. */
-    @PaperOnly
-    fun forgetNearbyPlayer(playerId: UUID) {
-        nearbyDisplaysByPlayer.remove(playerId)?.forEach { displayId ->
-            nearbyPlayersByDisplay[displayId]?.remove(playerId)
-        }
-    }
-
-    /** Cached nearby player ids for Folia global coordinators that cannot read entity locations directly. */
+    /** Cached nearby player ids for `Folia` global coordinators that cannot read entity locations directly. */
     @PaperOnly
     fun getTrackedNearbyPlayerIds(display: PaperDisplayData): List<UUID> =
-        nearbyPlayersByDisplay[display.id]?.toList() ?: emptyList()
-
-    /** Updates the cached proximity index after [player]'s entity task computed their nearby displays. */
-    @PaperOnly
-    private fun updateNearbyIndex(player: Player, nearbyDisplayIds: Set<UUID>) {
-        val playerId = player.uniqueId
-        val previous = nearbyDisplaysByPlayer.put(playerId, nearbyDisplayIds) ?: emptySet()
-
-        (previous - nearbyDisplayIds).forEach { displayId ->
-            nearbyPlayersByDisplay[displayId]?.remove(playerId)
-        }
-        (nearbyDisplayIds - previous).forEach { displayId ->
-            nearbyPlayersByDisplay.computeIfAbsent(displayId) { ConcurrentHashMap.newKeySet() }.add(playerId)
-        }
-    }
+        proximityIndex.trackedNearbyPlayerIds(display.id)
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
     @PaperOnly
-    fun sendUpdate(display: PaperDisplayData, players: List<Player>) {
-        @Suppress("UNCHECKED_CAST")
+    fun sendUpdate(display: PaperDisplayData, players: List<Player>, forced: Boolean = false) {
         PacketUtil.sendDisplayInfo(
-            players as MutableList<Player?>,
+            players,
             display.id, display.ownerId, display.box.min, display.width, display.height,
             display.url, display.lang, display.facing, display.isSync, display.isLocked,
-            display.mode, display.qualityCap, display.rotation,
+            display.access, display.mode, display.qualityCap, display.rotation,
+            virtual = display.virtual, forced = forced,
+            scheduledStartEpochMillis = display.scheduledStart?.toEpochMilliseconds() ?: 0,
+            scheduledAction = display.scheduledAction?.wire ?: -1,
+            inRegion = WorldGuardRegions.isProtectedTerritory(display.pos1),
+            isRegionMember = { WorldGuardRegions.isRegionMember(it, display.pos1) },
         )
     }
 
-    /** Broadcasts [display]'s current info through the appropriate Paper/Folia player scheduler path. */
+    /** Broadcasts [display]'s current info through the appropriate `Paper` / `Folia` player scheduler path. */
     @PaperOnly
     fun broadcastUpdate(display: PaperDisplayData) {
         if (PlatformUtil.isFolia) {
@@ -271,16 +225,15 @@ object DisplayManager {
         }
     }
 
-    /** Broadcasts a display delete packet through the appropriate Paper/Folia player scheduler path. */
+    /** Broadcasts a display delete packet through the appropriate `Paper` / `Folia` player scheduler path. */
     @PaperOnly
     fun broadcastDelete(display: PaperDisplayData) {
         if (PlatformUtil.isFolia) {
             Scheduler.forEachTrackedPlayer { player ->
-                if (player.isInRange(display)) sendDelete(listOf(player), display.id)
+                if (player.isInRange(display)) PacketUtil.sendDelete(listOf(player), display.id)
             }
         } else {
-            @Suppress("UNCHECKED_CAST")
-            sendDelete(getReceivers(display) as MutableList<Player?>, display.id)
+            PacketUtil.sendDelete(getReceivers(display), display.id)
         }
     }
 
@@ -290,7 +243,7 @@ object DisplayManager {
         Scheduler.forEachTrackedPlayer { player ->
             val visible = displays.values.filterIsInstance<PaperDisplayData>()
                 .filter { player.isInRange(it) }
-            updateNearbyIndex(player, visible.mapTo(mutableSetOf()) { it.id })
+            proximityIndex.update(player.uniqueId, visible.mapTo(mutableSetOf()) { it.id })
             visible.forEach { display -> sendUpdate(display, listOf(player)) }
         }
     }
@@ -344,8 +297,11 @@ object DisplayManager {
         broadcastDelete(displayData)
         TimelineManager.remove(displayData.id)
         WatchPartyManager.remove(displayData.id)
+        FullscreenBroadcastManager.onDisplayRemoved(displayData.id)
+        PipPinManager.onDisplayRemoved(displayData.id)
+        StateManager.remove(displayData.id)
         displays.remove(displayData.id)
-        forgetNearbyDisplay(displayData.id)
+        proximityIndex.forgetDisplay(displayData.id)
     }
 
     /**
@@ -356,19 +312,23 @@ object DisplayManager {
     @JvmStatic
     fun report(id: UUID, player: Player) {
         val displayData = displays[id] as? PaperDisplayData ?: return
-        if (isReportThrottled(id, player.uniqueId, config.settings.reportCooldown.toLong())) {
+
+        if (reportThrottle.isThrottled(id, player.uniqueId, config.settings.reportCooldown)) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
+
         runAsync {
-            try {
-                if (config.settings.webhookUrl.isEmpty()) return@runAsync
-                sendReport(
+            if (config.settings.webhookUrl.isEmpty()) return@runAsync
+
+            runCatching {
+                ReporterUtil.sendReport(
                     displayData.pos1, displayData.url, displayData.id, player,
                     config.settings.webhookUrl, getOfflinePlayer(displayData.ownerId).name,
                 )
+            }.onSuccess {
                 runSync { MessageUtil.sendMessage(player, "reportSent") }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 getInstance().logger.warning("Exception while sending report: ${e.message}")
                 runSync { MessageUtil.sendMessage(player, "reportFailed") }
             }
@@ -381,19 +341,19 @@ object DisplayManager {
         displays.values.filterIsInstance<PaperDisplayData>().forEach(saveDisplay)
     }
 
-    /**
-     * Scans every display's bounding box for the configured base material; displays with none
-     * are removed from disk and memory. Returns the UUIDs of removed displays.
-     */
+    /** Scans every display's bounding box for the configured base material; displays with none are removed from disk and registry. */
     @PaperOnly
     fun validateDisplaysAndCleanup(): List<UUID> {
         val baseMaterial = config.settings.baseMaterial
         val invalidDisplays = mutableListOf<PaperDisplayData>()
 
         displays.values.filterIsInstance<PaperDisplayData>().forEach { display ->
+            // An unloaded world (e.g., a Multiverse world that loads later) is not an invalid display:
+            // skip it this pass instead of wiping it from the database.
             val world = display.pos1.world
             if (world == null) {
-                invalidDisplays.add(display); return@forEach
+                getInstance().logger.warning("Skipping validation for display ${display.id}: world is not loaded.")
+                return@forEach
             }
 
             var hasBaseMaterial = false
@@ -417,88 +377,92 @@ object DisplayManager {
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        return removeDisplays(invalidDisplays) { display ->
+        val removed = removeDisplays(invalidDisplays) { display ->
             runAsync { getInstance().storage.deleteDisplay(display as PaperDisplayData) }
         }
+        if (removed.isNotEmpty()) {
+            PacketUtil.sendClearCache(Bukkit.getOnlinePlayers().toList(), removed)
+        }
+        return removed
     }
 
     /** Returns the first display whose bounding box contains [blockPos] in [worldKey]. */
-    @FabricOnly
-    fun isContains(worldKey: String, blockPos: BlockPos): FabricDisplayData? {
-        return displays.values.filterIsInstance<FabricDisplayData>().firstOrNull { d ->
+    fun isContains(worldKey: String, blockPos: BlockPos): VanillaDisplayData? {
+        return displays.values.filterIsInstance<VanillaDisplayData>().firstOrNull { d ->
             d.worldKey == worldKey &&
                     d.box.contains(blockPos.x + 0.5, blockPos.y + 0.5, blockPos.z + 0.5)
         }
     }
 
     /** Returns true if the selection [sel] intersects any existing display. */
-    @FabricOnly
-    fun isOverlaps(sel: FabricSelectionData): Boolean {
+    fun isOverlaps(sel: VanillaSelectionData): Boolean {
         val selBox = sel.selectionBox() ?: return false
         val wk = sel.worldKey ?: return false
-        return displays.values.filterIsInstance<FabricDisplayData>().any { d ->
+        return displays.values.filterIsInstance<VanillaDisplayData>().any { d ->
             d.worldKey == wk && d.box.intersects(selBox)
         }
     }
 
     /** Registers a new display. Caller is responsible for broadcasting. */
-    @FabricOnly
-    fun register(data: FabricDisplayData) {
+    fun register(data: VanillaDisplayData) {
         displays[data.id] = data
     }
 
     /** Returns the players currently in range of [display] in its world. */
-    @FabricOnly
-    fun getReceivers(display: FabricDisplayData, server: MinecraftServer): List<ServerPlayer> {
+    fun getReceivers(display: VanillaDisplayData, server: MinecraftServer): List<ServerPlayer> {
         return server.playerList.players.filter { p ->
-            p.level().dimension().identifier().toString() == display.worldKey &&
+            RegionUtil.getPlayerLevelKey(p) == display.worldKey &&
                     p.blockPosition().isInRange(display)
         }
     }
 
-    /** Returns true if this block position lies within `maxRenderDistance` of the [display]'s box. */
-    @FabricOnly
-    private fun BlockPos.isInRange(display: FabricDisplayData): Boolean =
+    /** True if [player] is currently within render range of [display] — the same predicate that decides who receives its frames. */
+    fun isPlayerInRange(player: ServerPlayer, display: VanillaDisplayData): Boolean =
+        RegionUtil.getPlayerLevelKey(player) == display.worldKey && player.blockPosition().isInRange(display)
+
+    /** Returns true if this block position lies within the server's view distance of the [display]'s box. */
+    private fun BlockPos.isInRange(display: VanillaDisplayData): Boolean =
         isInRangeImpl(
             x, y, z,
             display.minX, display.minY, display.minZ,
             display.maxX, display.maxY, display.maxZ,
-            Server.config.settings.maxRenderDistance,
+            (VanillaServerState.server?.playerList?.viewDistance ?: 10) * 16.0,
         )
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
-    @FabricOnly
-    fun sendUpdate(display: FabricDisplayData, players: List<ServerPlayer>) {
-        FabricPacketUtil.sendDisplayInfo(players, display)
+    fun sendUpdate(display: VanillaDisplayData, players: List<ServerPlayer>) {
+        VanillaPacketUtil.sendDisplayInfo(players, display)
     }
 
     /** Sends a refresh packet for every display to in-range players. */
-    @FabricOnly
     fun updateAllDisplays(server: MinecraftServer) {
-        displays.values.filterIsInstance<FabricDisplayData>().forEach { display ->
+        displays.values.filterIsInstance<VanillaDisplayData>().forEach { display ->
             val receivers = getReceivers(display, server)
             if (receivers.isNotEmpty()) sendUpdate(display, receivers)
         }
     }
 
     /** Removes [data] from storage and the registry. The JDBC delete runs off-thread on [ServerCoroutines.io]. */
-    @FabricOnly
-    fun delete(data: FabricDisplayData) {
+    fun delete(data: VanillaDisplayData) {
+        val receivers = VanillaServerState.server?.let { getReceivers(data, it) }.orEmpty()
         displays.remove(data.id)
         TimelineManager.remove(data.id)
         WatchPartyManager.remove(data.id)
-        ServerCoroutines.io.launch { Server.storage?.deleteDisplay(data) }
+        FullscreenBroadcastManager.onDisplayRemoved(data.id)
+        PipPinManager.onDisplayRemoved(data.id)
+        StateManager.remove(data.id)
+        ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(data) }
+        if (receivers.isNotEmpty()) VanillaPacketUtil.sendDelete(receivers, data.id)
     }
 
     /**
      * Posts a report about display [id] to the configured webhook, respecting per-display cooldown
      * and informing [player] about the outcome.
      */
-    @FabricOnly
     fun report(id: UUID, player: ServerPlayer, server: MinecraftServer) {
-        val displayData = displays[id] as? FabricDisplayData ?: return
-        val cfg = Server.config
-        if (isReportThrottled(id, player.uuid, cfg.settings.reportCooldown)) {
+        val displayData = displays[id] as? VanillaDisplayData ?: return
+        val cfg = VanillaServerState.config
+        if (reportThrottle.isThrottled(id, player.uuid, cfg.settings.reportCooldown)) {
             MessageUtil.sendMessage(player, "reportTooQuickly")
             return
         }
@@ -526,24 +490,22 @@ object DisplayManager {
     }
 
     /** Invokes [saveDisplay] for every currently registered display (used by storage flush). */
-    @FabricOnly
-    fun save(saveDisplay: (FabricDisplayData) -> Unit) {
-        displays.values.filterIsInstance<FabricDisplayData>().forEach(saveDisplay)
+    fun save(saveDisplay: (VanillaDisplayData) -> Unit) {
+        displays.values.filterIsInstance<VanillaDisplayData>().forEach(saveDisplay)
     }
 
-    /**
-     * Scans every display's bounding box for the configured base material; displays with none
-     * are removed from disk and memory. Returns the UUIDs of removed displays.
-     */
-    @FabricOnly
+    /** Scans every display's bounding box for the configured base material; displays with none are removed from disk and registry. */
     fun validateDisplaysAndCleanup(server: MinecraftServer): List<UUID> {
-        val cfg = Server.config
-        val baseMaterialKey = cfg.settings.baseMaterial
-        val invalidDisplays = mutableListOf<FabricDisplayData>()
+        val cfg = VanillaServerState.config
+        val baseMaterialKey = cfg.settings.baseMaterialId
+        val invalidDisplays = mutableListOf<VanillaDisplayData>()
 
-        displays.values.filterIsInstance<FabricDisplayData>().forEach { display ->
+        displays.values.filterIsInstance<VanillaDisplayData>().forEach { display ->
+            // An unloaded dimension is not an invalid display: skip it this pass instead of wiping
+            // it from the database.
             val level = RegionUtil.getLevelByKey(server, display.worldKey) ?: run {
-                invalidDisplays.add(display); return@forEach
+                VanillaServerState.logger.warn("Skipping validation for display ${display.id}: dimension '${display.worldKey}' is not loaded.")
+                return@forEach
             }
             var hasBaseMaterial = false
             outerLoop@ for (x in display.minX..display.maxX) {
@@ -561,8 +523,12 @@ object DisplayManager {
             if (!hasBaseMaterial) invalidDisplays.add(display)
         }
 
-        return removeDisplays(invalidDisplays) { display ->
-            ServerCoroutines.io.launch { Server.storage?.deleteDisplay(display as FabricDisplayData) }
+        val removed = removeDisplays(invalidDisplays) { display ->
+            ServerCoroutines.io.launch { VanillaServerState.storage?.deleteDisplay(display as VanillaDisplayData) }
         }
+        if (removed.isNotEmpty()) {
+            VanillaPacketUtil.sendClearCache(server.playerList.players, removed)
+        }
+        return removed
     }
 }

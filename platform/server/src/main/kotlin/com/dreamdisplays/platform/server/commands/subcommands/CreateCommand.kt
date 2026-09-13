@@ -1,18 +1,19 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
+import com.dreamdisplays.api.playback.model.DisplayAccess
+import com.dreamdisplays.platform.server.*
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
+import com.dreamdisplays.platform.server.utils.WorldGuardRegions
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.mojang.brigadier.context.CommandContext
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.core.BlockPos
@@ -35,7 +36,7 @@ import kotlin.math.abs
 @PaperOnly
 class CreateCommand : SubCommand {
     override val name = "create"
-    override val permission = Main.config.permissions.create
+    override val permission = PaperServer.config.permissions.create
     override val playerOnly = true
 
     /** Command execution logic. */
@@ -45,7 +46,7 @@ class CreateCommand : SubCommand {
         val sel = SelectionManager.selectionPoints[player.uniqueId] as? PaperSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial
+                PaperServer.config.settings.selectionMaterial, PaperServer.config.settings.baseMaterial
             )
 
         validate(
@@ -55,8 +56,8 @@ class CreateCommand : SubCommand {
                     MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
-                        Main.config.settings.selectionMaterial,
-                        Main.config.settings.baseMaterial
+                        PaperServer.config.settings.selectionMaterial,
+                        PaperServer.config.settings.baseMaterial
                     )
                 else
                     MessageUtil.sendMessage(player, key, *args)
@@ -65,7 +66,7 @@ class CreateCommand : SubCommand {
                 MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
-                    Main.config.settings.baseMaterial
+                    PaperServer.config.settings.baseMaterial
                 )
             }
         ) ?: return
@@ -75,7 +76,22 @@ class CreateCommand : SubCommand {
             return
         }
 
+        val maxDisplays = PaperServer.config.settings.maxDisplaysPerPlayer
+        if (maxDisplays > 0 && !player.hasPermission(PaperServer.config.permissions.createBypass) &&
+            DisplayManager.countOwnedBy(player.uniqueId) >= maxDisplays
+        ) {
+            MessageUtil.sendMessage(player, "displayLimitReached", maxDisplays)
+            return
+        }
+
         val displayData = sel.generateDisplayData()
+        val pos1 = sel.pos1
+        val pos2 = sel.pos2
+        if (pos1 != null && pos2 != null &&
+            (WorldGuardRegions.isProtectedTerritory(pos1) || WorldGuardRegions.isProtectedTerritory(pos2))
+        ) {
+            displayData.access = DisplayAccess.REGION
+        }
         SelectionManager.selectionPoints.remove(player.uniqueId)
 
         DisplayManager.register(displayData)
@@ -103,41 +119,31 @@ class CreateCommand : SubCommand {
             return null
         }
 
-        val minX = minOf(pos1.blockX, pos2.blockX)
-        val maxX = maxOf(pos1.blockX, pos2.blockX)
-        val minY = minOf(pos1.blockY, pos2.blockY)
-        val maxY = maxOf(pos1.blockY, pos2.blockY)
-        val minZ = minOf(pos1.blockZ, pos2.blockZ)
-        val maxZ = maxOf(pos1.blockZ, pos2.blockZ)
-        val deltaX = maxX - minX + 1
-        val deltaZ = maxZ - minZ + 1
-        val deltaY = maxY - minY + 1
+        val region = RegionUtil.calculateRegion(pos1, pos2)
         val face = sel.getFace()
         val isVertical = face == BlockFace.UP || face == BlockFace.DOWN
-        val width = if (isVertical) deltaX else maxOf(deltaX, deltaZ)
-        val height = if (isVertical) deltaZ else deltaY
 
         return validateRegion(
-            minY = minY,
-            maxY = maxY,
-            deltaX = deltaX,
-            deltaZ = deltaZ,
-            deltaY = deltaY,
+            minY = region.minY,
+            maxY = region.maxY,
+            deltaX = region.deltaX,
+            deltaZ = region.deltaZ,
+            deltaY = region.deltaY,
             faceModX = if (!isVertical) abs(face.modX) else 0,
             faceModZ = if (!isVertical) abs(face.modZ) else 0,
             faceModY = if (isVertical) abs(face.modY) else 0,
-            width = width,
-            height = height,
-            minHeight = Main.config.settings.minHeight,
-            minWidth = Main.config.settings.minWidth,
-            maxHeight = Main.config.settings.maxHeight,
-            maxWidth = Main.config.settings.maxWidth,
+            width = region.screenWidth(isVertical),
+            height = region.screenHeight(isVertical),
+            minHeight = PaperServer.config.settings.minHeight,
+            minWidth = PaperServer.config.settings.minWidth,
+            maxHeight = PaperServer.config.settings.maxHeight,
+            maxWidth = PaperServer.config.settings.maxWidth,
             hasExpectedBaseMaterial = {
                 val world = pos1.world ?: return@validateRegion false
-                for (x in minX..maxX) {
-                    for (y in minY..maxY) {
-                        for (z in minZ..maxZ) {
-                            if (world.getBlockAt(x, y, z).type != Main.config.settings.baseMaterial) {
+                for (x in region.minX..region.maxX) {
+                    for (y in region.minY..region.maxY) {
+                        for (z in region.minZ..region.maxZ) {
+                            if (world.getBlockAt(x, y, z).type != PaperServer.config.settings.baseMaterial) {
                                 return@validateRegion false
                             }
                         }
@@ -151,19 +157,21 @@ class CreateCommand : SubCommand {
     }
 }
 
-/** `Fabric`-specific version of the [CreateCommand]. */
+/** Shared `Fabric` / `NeoForge` version of the [CreateCommand]. */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricCreateCommand {
+@ModLoaderOnly
+object VanillaCreateCommand {
     /** Command execution logic. */
     fun execute(ctx: CommandContext<CommandSourceStack>): Int {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("This command can only be used by a player.")).let { 0 }
 
-        val sel = SelectionManager.selectionPoints[player.uuid] as? FabricSelectionData
+        val sel = SelectionManager.selectionPoints[player.uuid] as? VanillaSelectionData
             ?: return MessageUtil.sendMessageWithMaterials(
-                player, "noDisplayTerritories",
-                Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial
+                player,
+                "noDisplayTerritories",
+                VanillaServerState.config.settings.selectionMaterialId,
+                VanillaServerState.config.settings.baseMaterialId
             ).let { 0 }
 
         validate(
@@ -173,8 +181,8 @@ object FabricCreateCommand {
                     MessageUtil.sendMessageWithMaterials(
                         player,
                         key,
-                        Server.config.settings.selectionMaterial,
-                        Server.config.settings.baseMaterial
+                        VanillaServerState.config.settings.selectionMaterialId,
+                        VanillaServerState.config.settings.baseMaterialId
                     )
                 else
                     MessageUtil.sendMessage(player, key, *args)
@@ -183,7 +191,7 @@ object FabricCreateCommand {
                 MessageUtil.sendMessageWithMaterials(
                     player,
                     "wrongStructure",
-                    Server.config.settings.baseMaterial
+                    VanillaServerState.config.settings.baseMaterialId
                 )
             }
         ) ?: return 0
@@ -193,14 +201,27 @@ object FabricCreateCommand {
             return 0
         }
 
+        val maxDisplays = VanillaServerState.config.settings.maxDisplaysPerPlayer
+        if (maxDisplays > 0 &&
+            !VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.createBypass,
+                VanillaPermissions.Fallback.OP
+            ) &&
+            DisplayManager.countOwnedBy(player.uuid) >= maxDisplays
+        ) {
+            MessageUtil.sendMessage(player, "displayLimitReached", maxDisplays)
+            return 0
+        }
+
         val displayData = sel.generateDisplayData(player.uuid)
         SelectionManager.selectionPoints.remove(player.uuid)
 
         DisplayManager.register(displayData)
-        ServerCoroutines.io.launch { Server.storage?.saveDisplay(displayData) }
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, ctx.source.server)
-        FabricPacketUtil.sendDisplayInfo(receivers, displayData)
+        VanillaPacketUtil.sendDisplayInfo(receivers, displayData)
 
         MessageUtil.sendMessage(player, "successfulCreation")
         return 1
@@ -211,11 +232,11 @@ object FabricCreateCommand {
      * registers the resulting display.
      */
     private fun validate(
-        sel: FabricSelectionData,
+        sel: VanillaSelectionData,
         server: MinecraftServer,
         sendError: (String, Array<out Any>) -> Unit,
         onWrongStructure: (() -> Unit)? = null,
-    ): FabricSelectionData? {
+    ): VanillaSelectionData? {
         if (!sel.isReady || sel.pos1 == null || sel.pos2 == null) {
             sendError("noDisplayTerritories", emptyArray())
             return null
@@ -237,35 +258,29 @@ object FabricCreateCommand {
 
         val facing = sel.facing
         val isVertical = facing == Direction.UP || facing == Direction.DOWN
-        val faceModX = if (!isVertical && (facing == Direction.EAST || facing == Direction.WEST)) 1 else 0
-        val faceModZ = if (!isVertical && (facing == Direction.NORTH || facing == Direction.SOUTH)) 1 else 0
-        val faceModY = if (isVertical) 1 else 0
-        val deltaY = region.maxY - region.minY + 1
-        val screenWidth = if (isVertical) region.deltaX else region.width
-        val screenHeight = if (isVertical) region.deltaZ else region.height
 
         return validateRegion(
             minY = region.minY,
             maxY = region.maxY,
             deltaX = region.deltaX,
             deltaZ = region.deltaZ,
-            deltaY = deltaY,
-            faceModX = faceModX,
-            faceModZ = faceModZ,
-            faceModY = faceModY,
-            width = screenWidth,
-            height = screenHeight,
-            minHeight = Server.config.settings.minHeight,
-            minWidth = Server.config.settings.minWidth,
-            maxHeight = Server.config.settings.maxHeight,
-            maxWidth = Server.config.settings.maxWidth,
+            deltaY = region.deltaY,
+            faceModX = if (!isVertical) abs(facing.stepX) else 0,
+            faceModZ = if (!isVertical) abs(facing.stepZ) else 0,
+            faceModY = if (isVertical) abs(facing.stepY) else 0,
+            width = region.screenWidth(isVertical),
+            height = region.screenHeight(isVertical),
+            minHeight = VanillaServerState.config.settings.minHeight,
+            minWidth = VanillaServerState.config.settings.minWidth,
+            maxHeight = VanillaServerState.config.settings.maxHeight,
+            maxWidth = VanillaServerState.config.settings.maxWidth,
             hasExpectedBaseMaterial = {
                 for (x in region.minX..region.maxX) {
                     for (y in region.minY..region.maxY) {
                         for (z in region.minZ..region.maxZ) {
                             val blockState = level.getBlockState(BlockPos(x, y, z))
                             val blockKey = BuiltInRegistries.BLOCK.getKey(blockState.block).toString()
-                            if (blockKey != Server.config.settings.baseMaterial) {
+                            if (blockKey != VanillaServerState.config.settings.baseMaterialId) {
                                 return@validateRegion false
                             }
                         }

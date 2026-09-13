@@ -1,10 +1,14 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.api.media.search.YouTubeUrls
-import com.dreamdisplays.api.playback.PlaybackPermissions
-import com.dreamdisplays.api.security.LanguageTag
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.ModLoaderOnly
+import com.dreamdisplays.api.media.source.model.MediaSource
+import com.dreamdisplays.api.playback.policy.PlaybackPermissions
+import com.dreamdisplays.api.security.model.LanguageTag
+import com.dreamdisplays.api.security.policy.MediaUrlPolicy
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.StateManager
 import com.dreamdisplays.platform.server.meta.Scheduler.runAsync
@@ -12,19 +16,16 @@ import com.dreamdisplays.platform.server.meta.ServerCoroutines
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.TimelineManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.RegionUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
+import com.dreamdisplays.platform.server.utils.net.CustomMediaGate
+import com.dreamdisplays.platform.server.utils.net.VanillaDisplayActions
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
 import com.mojang.brigadier.context.CommandContext
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import kotlinx.coroutines.launch
 import net.minecraft.commands.CommandSourceStack
-import net.minecraft.core.BlockPos
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
-import net.minecraft.world.level.ClipContext
-import net.minecraft.world.phys.HitResult
 import org.bukkit.command.CommandSender
 import org.bukkit.entity.Player
 import java.util.*
@@ -37,7 +38,7 @@ import java.util.*
 @PaperOnly
 class VideoCommand : SubCommand {
     override val name = "video"
-    override val permission = Main.config.permissions.video
+    override val permission = PaperServer.config.permissions.video
     override val playerOnly = true
 
     /**
@@ -50,41 +51,43 @@ class VideoCommand : SubCommand {
             MessageUtil.sendMessage(player, "invalidURL")
             return
         }
+        val token = args[0] ?: "this"
 
-        val videoId = YouTubeUrls.extractVideoIdTyped(args[1] ?: "")
-        if (videoId == null) {
+        // Any URL the mod can resolve is accepted, not just YouTube: the same custom links the
+        // menu takes work here too, subject to the same server policy applied further down.
+        val requestedUrl = canonicalUrl(args[1] ?: "")
+        if (requestedUrl == null) {
             MessageUtil.sendMessage(player, "invalidURL")
             return
         }
 
-        val block = player.getTargetBlock(null, 32)
-
-        if (block.type != Main.config.settings.baseMaterial) {
-            MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock")
-            return
-        }
-
-        val data = DisplayManager.isContains(block.location)
-        if (data == null) {
-            MessageUtil.sendMessage(player, "noDisplay")
-            return
-        }
+        val data = resolvePaperDisplayTarget(sender, player, token) as? PaperDisplayData ?: return
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(Main.config.permissions.delete))
+                PlaybackContexts.of(data, player.uniqueId, player.hasPermission(PaperServer.config.permissions.deleteOthers))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return
         }
 
+        CustomMediaGate.refusalKey(
+            requestedUrl,
+            PaperServer.config.settings.customMediaPolicy,
+            player.hasPermission(PaperServer.config.permissions.custom),
+            player.uniqueId,
+        )?.let {
+            MessageUtil.sendMessage(player, it)
+            return
+        }
+
         val wasSync = data.isSync
         data.apply {
-            url = YouTubeUrls.watchUrl(videoId)
+            url = requestedUrl
             lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
         }
 
-        runAsync { Main.getInstance().storage.saveDisplay(data) }
+        runAsync { PaperServer.getInstance().storage.saveDisplay(data) }
         DisplayManager.broadcastUpdate(data)
         if (wasSync) StateManager.resetAndBroadcast(data)
         TimelineManager.onVideoChanged(data)
@@ -106,7 +109,7 @@ class VideoCommand : SubCommand {
                 .asSequence()
                 .map { it.language.lowercase(Locale.ROOT) }
 
-            val fromPlugin = Main.config.languages.keys
+            val fromPlugin = PaperServer.config.languages.keys
                 .asSequence()
                 .map { it.trim().lowercase(Locale.ROOT).replace('-', '_').substringBefore('_') }
 
@@ -123,13 +126,25 @@ class VideoCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display video` command.
+ * Canonical URL for [raw] as typed on the command line, or null when it is not something the mod could ever play or is
+ * blocked by [MediaUrlPolicy]. Routed through the same [MediaSource.from] parser the menu uses.
+ */
+private fun canonicalUrl(raw: String): String? {
+    val input = raw.trim()
+    if (input.isEmpty()) return null
+    val resolvable = MediaSource.from(input).toResolvableUrl() ?: return null
+    if (!resolvable.contains("://")) return null
+    return resolvable.takeIf { MediaUrlPolicy.isAllowed(it) }
+}
+
+/**
+ * Shared `Fabric` / `NeoForge` implementation of the `/display video` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricVideoCommand {
+@ModLoaderOnly
+object VanillaVideoCommand {
     /** Assigns a YouTube URL (and optional language) to the targeted display, after validating ownership. */
-    fun execute(ctx: CommandContext<CommandSourceStack>, urlAndLang: String): Int {
+    fun execute(ctx: CommandContext<CommandSourceStack>, token: String, urlAndLang: String): Int {
         val player = ctx.source.entity as? ServerPlayer
             ?: return ctx.source.sendFailure(Component.literal("Players only.")).let { 0 }
 
@@ -142,44 +157,44 @@ object FabricVideoCommand {
             return 0
         }
 
-        val videoId = YouTubeUrls.extractVideoIdTyped(urlRaw)
+        val requestedUrl = canonicalUrl(urlRaw)
             ?: return MessageUtil.sendMessage(player, "invalidURL").let { 0 }
 
-        val targetPos = getTargetBlockPos(player)
-            ?: return MessageUtil.sendMessage(player, "displayVideoWrongTargetBlock").let { 0 }
-
-        val worldKey = RegionUtil.getLevelKey(player.level())
-        val data = DisplayManager.isContains(worldKey, targetPos)
-            ?: return MessageUtil.sendMessage(player, "noDisplay").let { 0 }
+        val data = resolveVanillaDisplayTarget(player, token) as? VanillaDisplayData ?: return 0
 
         if (!PlaybackPermissions.canSetVideo(
-                PlaybackContexts.of(data, player.uuid, ServerPacketHandler.isOpLevel2(player))
+                PlaybackContexts.of(data, player.uuid, VanillaDisplayActions.isAdmin(player))
             )
         ) {
             MessageUtil.sendMessage(player, "displayVideoNotOwner")
             return 0
         }
 
+        CustomMediaGate.refusalKey(
+            requestedUrl,
+            VanillaServerState.config.settings.customMediaPolicy,
+            VanillaPermissions.has(
+                player,
+                VanillaServerState.config.permissions.custom,
+                VanillaPermissions.Fallback.EVERYONE,
+            ),
+            player.uuid,
+        )?.let { refusal ->
+            MessageUtil.sendMessage(player, refusal)
+            return 0
+        }
+
         val wasSync = data.isSync
-        data.url = YouTubeUrls.watchUrl(videoId)
+        data.url = requestedUrl
         data.lang = LanguageTag.canonicalAudioCode(langRaw).value
-        ServerCoroutines.io.launch { Server.storage?.saveDisplay(data) }
+        ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)
-        FabricPacketUtil.sendDisplayInfo(receivers, data)
+        VanillaPacketUtil.sendDisplayInfo(receivers, data)
         if (wasSync) StateManager.resetAndBroadcast(data.id, receivers)
         TimelineManager.onVideoChanged(data)
 
         MessageUtil.sendMessage(player, "settedURL")
         return 1
-    }
-
-    /** Gets the block position the player is currently looking at (within 32 blocks). */
-    private fun getTargetBlockPos(player: ServerPlayer): BlockPos? {
-        val level = player.level()
-        val start = player.eyePosition
-        val end = start.add(player.lookAngle.scale(32.0))
-        val hit = level.clip(ClipContext(start, end, ClipContext.Block.OUTLINE, ClipContext.Fluid.NONE, player))
-        return if (hit.type == HitResult.Type.BLOCK) hit.blockPos else null
     }
 }

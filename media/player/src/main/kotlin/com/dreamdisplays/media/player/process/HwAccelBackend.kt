@@ -1,5 +1,7 @@
 package com.dreamdisplays.media.player.process
 
+import com.dreamdisplays.util.OsInfo
+
 /**
  * Hardware-accelerated video decoder backends supported by `FFmpeg`.
  *
@@ -28,24 +30,16 @@ enum class HwAccelBackend(val ffmpegName: String?, val hwOutputFormat: String?, 
          * compatible option per-platform rather than the absolute fastest: a stream that fails to
          * decode is worse than a stream that decodes a bit slower.
          */
-        fun detectDefault(): HwAccelBackend {
-            val os = System.getProperty("os.name").orEmpty().lowercase()
-            return when {
-                os.contains("mac") || os.contains("darwin") -> VIDEOTOOLBOX
-                os.contains("win") -> D3D11VA
-                os.contains("nux") || os.contains("nix") -> VAAPI
-                else -> NONE
-            }
+        fun detectDefault(): HwAccelBackend = when {
+            OsInfo.isMac -> VIDEOTOOLBOX
+            OsInfo.isWindows -> D3D11VA
+            OsInfo.isLinux -> VAAPI
+            else -> NONE
         }
 
         /**
-         * Returns true if [stderr] looks like an `FFmpeg` startup failure caused specifically by the
-         * hardware decoder (codec not supported on this hardware, driver missing, device init
-         * failed, etc.). We use this to detect when a hwaccel pick was wrong for the current stream
-         * and silently retry with software decoding.
-         *
-         * False positives just mean a one-off slower restart, false negatives mean
-         * the stream stays broken until the user toggles the config flag.
+         * Returns true if [stderr] looks like an `FFmpeg` startup failure caused specifically by the hardware decoder
+         * (as opposed to some unrelated error), so we can fall back to software.
          */
         fun looksLikeHwAccelFailure(stderr: String): Boolean {
             if (stderr.isEmpty()) return false

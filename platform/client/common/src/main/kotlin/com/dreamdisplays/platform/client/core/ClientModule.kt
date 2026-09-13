@@ -1,7 +1,7 @@
 package com.dreamdisplays.platform.client.core
 
-import com.dreamdisplays.api.runtime.DreamDisplaysModule
-import com.dreamdisplays.api.runtime.ModuleContext
+import com.dreamdisplays.api.runtime.module.DreamDisplaysModule
+import com.dreamdisplays.api.runtime.module.ModuleContext
 
 /**
  * Client module: a self-contained unit of functionality, which can be installed into the client context.

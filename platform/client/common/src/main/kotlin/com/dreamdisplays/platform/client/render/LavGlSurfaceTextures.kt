@@ -9,6 +9,7 @@ import org.lwjgl.opengl.GL11
  * The native side retains the decoder's hardware frame. This class owns the OpenGL texture
  * objects and asks `dreamdisplays_lav` to import each retained surface plane into them.
  */
+@Suppress("UNUSED")
 internal class LavGlSurfaceTextures : AutoCloseable {
     /** GL texture ids for each imported plane (0 until allocated). */
     private val textureIds = IntArray(MAX_PLANES)

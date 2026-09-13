@@ -1,13 +1,18 @@
 package com.dreamdisplays.platform.client.net
 
+import com.dreamdisplays.core.protocol.common.PacketRegistry
 import com.dreamdisplays.platform.client.Initializer
 import net.minecraft.network.RegistryFriendlyByteBuf
 import net.minecraft.network.codec.StreamCodec
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
+//? if >=1.21.11 {
 import net.minecraft.resources.Identifier
 
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
+
 /**
- * The single Minecraft payload wrapper for protocol v2: opaque [PacketRegistry][com.dreamdisplays.core.protocol.PacketRegistry]
+ * The single Minecraft payload wrapper for protocol v2: opaque [PacketRegistry]
  * envelope bytes on the `dreamdisplays:v2` channel. All structure lives in the platform-free
  * `:protocol` module.
  */

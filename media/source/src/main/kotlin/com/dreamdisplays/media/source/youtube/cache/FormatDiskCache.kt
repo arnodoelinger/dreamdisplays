@@ -1,0 +1,154 @@
+package com.dreamdisplays.media.source.youtube.cache
+
+import com.dreamdisplays.media.source.youtube.model.YtStream
+import com.dreamdisplays.media.source.youtube.model.YtStreams
+import com.dreamdisplays.util.DreamCoroutines
+import com.dreamdisplays.util.json.DreamJson
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
+import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Path
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.security.NoSuchAlgorithmException
+import java.util.*
+
+/**
+ * Persistent on-disk cache for resolved YouTube format URLs.
+ */
+object FormatDiskCache {
+    /** Logger. */
+    private val logger = LoggerFactory.getLogger(javaClass)
+
+    /** Directory under the config root where the cache is stored. */
+    private val CACHE_DIR: Path = Path.of("config", "dreamdisplays", "yt-cache")
+
+    /** Shared 5h format-cache TTL: the on-disk default and [YtDlp]'s in-memory format TTL. */
+    const val DEFAULT_TTL_MS = 5L * 60L * 60L * 1_000L
+
+    /**
+     * Short TTL for live entries: live playlist URLs carry expiring tokens (Twitch usher, YouTube
+     * live manifests), so a stale entry hands the player a dead URL instead of a stream.
+     */
+    const val LIVE_TTL_MS = 5L * 60L * 1_000L
+
+    /** TTL for partial (non-ladder) results. */
+    const val PARTIAL_TTL_MS = 15L * 60L * 1_000L
+
+    /** Schema version. */
+    private const val SCHEMA_VERSION = 4
+
+    /**
+     * Serializes write / delete coroutines so same-file ops keep their submission order (the single-writer
+     * guarantee the old dedicated writer thread gave).
+     */
+    private val writeMutex = Mutex()
+
+    /** Reads the cached streams for [videoUrl] from disk; returns null if absent, expired, or schema-mismatched. */
+    fun load(videoUrl: String, maxAgeMs: Long): List<YtStream>? {
+        val f = fileFor(videoUrl)
+        if (!f.isFile) return null
+        // A transient read failure is treated as a miss and left on disk to retry; only a corrupt or
+        // schema-mismatched payload is deleted.
+        val json = runCatching {
+            Files.readString(f.toPath(), StandardCharsets.UTF_8)
+        }.onFailure { e ->
+            logger.debug("Cache read failed for {}: {}.", f.name, e.message)
+        }.getOrNull() ?: return null
+        return runCatching {
+            val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
+            if (entry.v != SCHEMA_VERSION) {
+                f.delete()
+                return null
+            }
+            val effectiveMaxAge = when {
+                entry.streams.any { it.isLive } -> minOf(maxAgeMs, LIVE_TTL_MS)
+                !YtStreams.offersQualityLadder(entry.streams) -> minOf(maxAgeMs, PARTIAL_TTL_MS)
+                else -> maxAgeMs
+            }
+            if (System.currentTimeMillis() - entry.ts > effectiveMaxAge) {
+                f.delete()
+                return null
+            }
+            entry.streams.takeIf { it.isNotEmpty() }
+        }.onFailure { e ->
+            logger.debug("Cache parse failed for {}, dropping entry: {}.", f.name, e.message)
+            runCatching { f.delete() }
+        }.getOrNull()
+    }
+
+    /** Serialises [streams] to disk for [videoUrl] asynchronously, ordered behind any in-flight write. */
+    fun saveAsync(videoUrl: String, streams: List<YtStream>) {
+        if (streams.isEmpty()) return
+        DreamCoroutines.clientIo.launch { writeMutex.withLock { writeNow(videoUrl, streams) } }
+    }
+
+    /** Atomically writes the stream JSON to disk using a temp file and rename. */
+    private fun writeNow(videoUrl: String, streams: List<YtStream>) {
+        runCatching {
+            Files.createDirectories(CACHE_DIR)
+            val target = fileFor(videoUrl)
+            val tmp = File(target.parentFile, target.name + ".tmp")
+            val root = CacheEntry(SCHEMA_VERSION, System.currentTimeMillis(), videoUrl, streams)
+            Files.writeString(tmp.toPath(), DreamJson.compact.encodeToString(root), StandardCharsets.UTF_8)
+            Files.move(
+                tmp.toPath(), target.toPath(),
+                StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE
+            )
+        }.onFailure { e ->
+            logger.warn("Write failed: ${e.message}")
+        }
+    }
+
+    /** Deletes the cache entry for [videoUrl] asynchronously, ordered behind any in-flight write. */
+    fun deleteEntry(videoUrl: String) {
+        DreamCoroutines.clientIo.launch {
+            writeMutex.withLock { runCatching { Files.deleteIfExists(fileFor(videoUrl).toPath()) } }
+        }
+    }
+
+    /** Scans the cache directory and deletes all `.json` entries older than [maxAgeMs] milliseconds. */
+    fun sweepExpired(maxAgeMs: Long = DEFAULT_TTL_MS) {
+        runCatching {
+            if (!Files.isDirectory(CACHE_DIR)) return
+            val now = System.currentTimeMillis()
+            Files.list(CACHE_DIR).use { stream ->
+                stream.filter { it.toString().endsWith(".json") }.forEach { p ->
+                    runCatching {
+                        val json = Files.readString(p, StandardCharsets.UTF_8)
+                        val entry = DreamJson.compact.decodeFromString<CacheEntry>(json)
+                        if (entry.v != SCHEMA_VERSION || now - entry.ts > maxAgeMs) Files.deleteIfExists(p)
+                    }.onFailure {
+                        runCatching { Files.deleteIfExists(p) }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Returns the cache file path for [videoUrl] by hashing the URL to a stable filename. */
+    private fun fileFor(videoUrl: String): File = File(CACHE_DIR.toFile(), hash(videoUrl) + ".json")
+
+    /** Returns an SHA-1 hex digest of [s], falling back to `hashCode` if SHA-1 is unavailable. */
+    private fun hash(s: String): String = runCatching {
+        val md = MessageDigest.getInstance("SHA-1")
+        HexFormat.of().formatHex(md.digest(s.toByteArray(StandardCharsets.UTF_8)))
+    }.getOrElse { e ->
+        if (e !is NoSuchAlgorithmException) throw e
+        Integer.toHexString(s.hashCode())
+    }
+
+    /** Cache entry schema for serialization. */
+    @Serializable
+    private data class CacheEntry(
+        val v: Int,
+        val ts: Long,
+        val url: String,
+        val streams: List<YtStream> = emptyList(),
+    )
+}

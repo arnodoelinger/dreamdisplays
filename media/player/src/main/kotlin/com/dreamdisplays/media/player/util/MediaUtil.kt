@@ -1,6 +1,6 @@
 package com.dreamdisplays.media.player.util
 
-import java.io.IOException
+import kotlinx.io.IOException
 import java.io.InputStream
 
 /** Stateless helpers used by the media pipeline. */
@@ -28,6 +28,7 @@ object MediaUtil {
         "Network is unreachable",
         "Operation timed out",
         "Server returned",
+        "Not all references are available",
     )
 
     /** Returns true if [line] is not a known benign `FFmpeg` error that can be safely ignored. */

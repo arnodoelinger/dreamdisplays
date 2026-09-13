@@ -1,4 +1,4 @@
-import java.util.*
+import support.stonecutter.StonecutterVersions
 
 plugins {
     id("net.neoforged.moddev")
@@ -16,6 +16,7 @@ dependencies {
     api(project(":media:runtime"))
     api(project(":media:player"))
     api(project(":media:source"))
+    api(project(":media:audio"))
     api(project(":util"))
     api(libs.jspecify)
     api(libs.commonsCompress)
@@ -27,13 +28,8 @@ dependencies {
     compileOnly(libs.kotlinStdlib)
 }
 
-val activeStonecutterVersion = rootProject.file("versions/active.txt").readText().trim()
-val stonecutterVersions = Properties().apply {
-    rootProject.file("versions/$activeStonecutterVersion/gradle.properties").inputStream().use { input -> load(input) }
-}
-
-fun scVersion(name: String): String = stonecutterVersions.getProperty(name)
-    ?: error("Missing Stonecutter version property '$name' for $activeStonecutterVersion.")
+val scVersions = gradle.extensions.getByType<StonecutterVersions>()
+fun scVersion(name: String): String = scVersions.get(name)
 
 neoForge {
     enable {

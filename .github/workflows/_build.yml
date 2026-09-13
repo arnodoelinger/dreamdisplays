@@ -12,10 +12,12 @@ on:
     outputs:
       version:
         value: ${{ jobs.metadata.outputs.version }}
+      pretty_version:
+        value: ${{ jobs.metadata.outputs.pretty_version }}
       is_dev:
         value: ${{ jobs.metadata.outputs.is_dev }}
-      is_snapshot:
-        value: ${{ jobs.metadata.outputs.is_snapshot }}
+      is_preview:
+        value: ${{ jobs.metadata.outputs.is_preview }}
       is_release:
         value: ${{ jobs.metadata.outputs.is_release }}
       is_marketplace_publishable:
@@ -35,13 +37,15 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.get_version.outputs.version }}
+      pretty_version: ${{ steps.get_version.outputs.pretty_version }}
       is_dev: ${{ steps.get_version.outputs.is_dev }}
-      is_snapshot: ${{ steps.get_version.outputs.is_snapshot }}
+      is_preview: ${{ steps.get_version.outputs.is_preview }}
       is_release: ${{ steps.get_version.outputs.is_release }}
       is_marketplace_publishable: ${{ steps.get_version.outputs.is_marketplace_publishable }}
       stonecutter_versions: ${{ steps.stonecutter_versions.outputs.versions_json }}
       build_stonecutter_versions: ${{ steps.stonecutter_versions.outputs.build_versions_json }}
       primary_stonecutter_version: ${{ steps.stonecutter_versions.outputs.primary_version }}
+      paper_build_version: ${{ steps.stonecutter_versions.outputs.paper_build_version }}
       marketplace_publish_tasks: ${{ steps.stonecutter_versions.outputs.marketplace_tasks_json }}
       native_matrix: ${{ steps.stonecutter_versions.outputs.native_matrix_json }}
       required_native_platforms: ${{ steps.stonecutter_versions.outputs.required_native_platforms }}
@@ -60,18 +64,33 @@ jobs:
           python3 - <<'EOF'
           import json, os
 
-          versions = sorted(
-              p for p in os.listdir("versions")
-              if os.path.isfile(os.path.join("versions", p, "gradle.properties"))
-          )
+          with open("versions.json") as f:
+              versions_data = json.load(f)
+
+          versions = sorted(versions_data["versions"].keys())
 
           if not versions:
               raise SystemExit("No Stonecutter versions found")
 
+          def version_key(v):
+              return tuple(int(x) if x.isdigit() else 0 for x in v.split("."))
+
+          PAPER_MIN = (1, 21, 11)
+          paper_build_candidates = sorted(
+              v for v in versions
+              if versions_data["versions"][v].get("java.version") == "21"
+              and version_key(v) >= PAPER_MIN
+          )
+          if not paper_build_candidates:
+              raise SystemExit("No Java 21 Minecraft version >= 1.21.11 available to build the Paper jar")
+          paper_build_version = paper_build_candidates[0]
+
           tasks = (
               [{"kind": "fabric", "mc": version} for version in versions] +
               [{"kind": "neoforge", "mc": version} for version in versions] +
-              [{"kind": "paper", "mc": versions[-1]}]
+              [{"kind": "paper", "mc": paper_build_version}] +
+              [{"kind": "velocity", "mc": paper_build_version}] +
+              [{"kind": "bungeecord", "mc": paper_build_version}]
           )
 
           native_matrix = [
@@ -127,6 +146,7 @@ jobs:
               f.write(f"versions_json={json.dumps(versions)}\n")
               f.write(f"build_versions_json={json.dumps(build_versions)}\n")
               f.write(f"primary_version={versions[0]}\n")
+              f.write(f"paper_build_version={paper_build_version}\n")
               f.write(f"marketplace_tasks_json={json.dumps(tasks)}\n")
               f.write(f"native_matrix_json={json.dumps(selected_native_matrix)}\n")
               f.write(f"required_native_platforms={' '.join(required_native_platforms)}\n")
@@ -138,26 +158,34 @@ jobs:
           VERSION=$(grep '^version' gradle.properties | cut -d'=' -f2 | tr -d ' ')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-          if [[ "$VERSION" == *"-DEV" ]]; then
+          # Version channels and their "pretty" display names:
+          #   1.8.4-dev        -> Developer  (build artifacts only, never published)
+          #   1.9.0-preview.5  -> Preview 5  (public alpha pre-release)
+          #   1.8.4            -> Release    (stable, public release)
+          if [[ "$VERSION" =~ ^([0-9]+(\.[0-9]+)*)-dev$ ]]; then
             echo "is_dev=true" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=false" >> $GITHUB_OUTPUT
-          elif [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*-SNAPSHOT\.[0-9]+$ ]]; then
+            echo "pretty_version=${BASH_REMATCH[1]} Developer" >> $GITHUB_OUTPUT
+          elif [[ "$VERSION" =~ ^([0-9]+(\.[0-9]+)*)-preview\.([0-9]+)$ ]]; then
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=true" >> $GITHUB_OUTPUT
+            echo "is_preview=true" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=true" >> $GITHUB_OUTPUT
+            echo "pretty_version=${BASH_REMATCH[1]} Preview ${BASH_REMATCH[3]}" >> $GITHUB_OUTPUT
           elif [[ "$VERSION" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=true" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=true" >> $GITHUB_OUTPUT
+            echo "pretty_version=$VERSION Release" >> $GITHUB_OUTPUT
           else
             echo "is_dev=false" >> $GITHUB_OUTPUT
-            echo "is_snapshot=false" >> $GITHUB_OUTPUT
+            echo "is_preview=false" >> $GITHUB_OUTPUT
             echo "is_release=false" >> $GITHUB_OUTPUT
             echo "is_marketplace_publishable=false" >> $GITHUB_OUTPUT
+            echo "pretty_version=$VERSION" >> $GITHUB_OUTPUT
           fi
 
   build-natives:
@@ -188,6 +216,17 @@ jobs:
           rustc --version
           cargo --version
 
+      - name: Setup Zig
+        if: runner.os == 'Linux'
+        uses: mlugg/setup-zig@v2.2.1
+        with:
+          version: 0.16.0
+
+      - name: Install cargo-zigbuild
+        if: runner.os == 'Linux'
+        shell: bash
+        run: cargo install cargo-zigbuild --locked
+
       - name: Install FFmpeg dependencies on macOS
         if: runner.os == 'macOS'
         run: |
@@ -196,6 +235,7 @@ jobs:
           ffmpeg_ver="$(brew list --versions ffmpeg | awk '{print $2}')"
           echo "FFMPEG_CACHE_SUFFIX=ffmpeg-${ffmpeg_ver}" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix ffmpeg)/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "MACOSX_DEPLOYMENT_TARGET=11.0" >> "$GITHUB_ENV"
 
       - name: Cache Cargo
         uses: Swatinem/rust-cache@v2.9.1
@@ -210,7 +250,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          sudo apt-get update
+          sudo sed -i 's|azure\.archive\.ubuntu\.com|archive.ubuntu.com|g' /etc/apt/apt-mirrors.txt 2>/dev/null || true
+          sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=10 -o Acquire::https::Timeout=10 update
           sudo apt-get install -y clang libclang-dev patchelf pkg-config xz-utils curl
           case "${{ matrix.native.target }}" in
             x86_64-*) ffmpeg_arch=linux64 ;;
@@ -241,7 +282,7 @@ jobs:
           path = sys.argv[1]
           arch = os.environ["FFMPEG_ARCH"]
           ext = os.environ["FFMPEG_EXT"]
-          pattern = re.compile(rf"^ffmpeg-n8\..*-{re.escape(arch)}-lgpl-shared-8\.1\.{re.escape(ext)}$")
+          pattern = re.compile(rf"^ffmpeg-n9\..*-{re.escape(arch)}-lgpl-shared-9\.0\.{re.escape(ext)}$")
           with open(path, encoding="utf-8") as f:
               release = json.load(f)
           url = next(
@@ -270,7 +311,7 @@ jobs:
           # Use a prebuilt LGPL shared FFmpeg instead of compiling it from
           # source via vcpkg (which took 10+ min per run). ffmpeg-sys-next picks
           # it up through FFMPEG_DIR and runs bindgen against its headers, so any
-          # 8.x build works. BtbN publishes matching win64 / winarm64 archives.
+          # 9.x build works. BtbN publishes matching win64 / winarm64 archives.
           case "${{ matrix.native.target }}" in
             x86_64-*) ffmpeg_arch=win64 ;;
             aarch64-*) ffmpeg_arch=winarm64 ;;
@@ -300,7 +341,7 @@ jobs:
           path = sys.argv[1]
           arch = os.environ["FFMPEG_ARCH"]
           ext = os.environ["FFMPEG_EXT"]
-          pattern = re.compile(rf"^ffmpeg-n8\..*-{re.escape(arch)}-lgpl-shared-8\.1\.{re.escape(ext)}$")
+          pattern = re.compile(rf"^ffmpeg-n9\..*-{re.escape(arch)}-lgpl-shared-9\.0\.{re.escape(ext)}$")
           with open(path, encoding="utf-8") as f:
               release = json.load(f)
           url = next(
@@ -324,13 +365,24 @@ jobs:
       - name: Build native libraries
         shell: bash
         run: |
-          cargo build \
-            --manifest-path native/Cargo.toml \
-            --release \
-            --package dreamdisplays-native \
-            --package dreamdisplays-lav \
-            --locked \
-            --target "${{ matrix.native.target }}"
+          set -euo pipefail
+          if [[ "${{ runner.os }}" == "Linux" ]]; then
+            cargo zigbuild \
+              --manifest-path native/Cargo.toml \
+              --release \
+              --package dreamdisplays-native \
+              --package dreamdisplays-lav \
+              --locked \
+              --target "${{ matrix.native.target }}.2.28"
+          else
+            cargo build \
+              --manifest-path native/Cargo.toml \
+              --release \
+              --package dreamdisplays-native \
+              --package dreamdisplays-lav \
+              --locked \
+              --target "${{ matrix.native.target }}"
+          fi
 
       - name: Test native libraries
         shell: bash
@@ -362,6 +414,9 @@ jobs:
           fi
 
           release_dir="native/target/$target/release"
+          if [[ ! -f "$release_dir/$native_library" && -d "native/target/${target}.2.28/release" ]]; then
+            release_dir="native/target/${target}.2.28/release"
+          fi
           out="native-artifact/dreamdisplays-natives/$platform"
           mkdir -p "$out"
 
@@ -492,7 +547,17 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Select Stonecutter version
-        run: echo "${{ matrix.mc }}" > versions/active.txt
+        run: |
+          python3 - <<'EOF'
+          import json
+
+          with open("versions.json") as f:
+              data = json.load(f)
+          data["active"] = "${{ matrix.mc }}"
+          with open("versions.json", "w") as f:
+              json.dump(data, f, indent=2)
+              f.write("\n")
+          EOF
 
       - name: Download native archives
         uses: actions/download-artifact@v8.0.1
@@ -534,18 +599,41 @@ jobs:
         env:
           REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
 
-      - name: Build with Gradle
+      - name: Build loaders with Gradle
         run: |
           ./gradlew \
             :platform:client:fabric:publishJar \
             :platform:client:neoforge:shadowJar \
-            :platform:server:shadowJar \
             --no-daemon \
-            --parallel \
-            --build-cache
+            --parallel
         env:
           DREAMDISPLAYS_REQUIRE_NATIVES: "true"
           DREAMDISPLAYS_REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
+
+      # The Paper jar is one cross-version artifact built only in the paper_build_version job
+      # (>=1.21.11); it dispatches 1.21.1 and 26.x at runtime, so it is not built per version.
+      - name: Build Paper with Gradle
+        if: matrix.mc == needs.metadata.outputs.paper_build_version
+        run: |
+          ./gradlew \
+            :platform:server:shadowJar \
+            --no-daemon \
+            --parallel
+        env:
+          DREAMDISPLAYS_REQUIRE_NATIVES: "true"
+          DREAMDISPLAYS_REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
+          GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
+
+      - name: Build proxy plugins with Gradle
+        if: matrix.mc == needs.metadata.outputs.paper_build_version
+        run: |
+          ./gradlew \
+            :platform:proxy:velocity:shadowJar \
+            :platform:proxy:bungeecord:shadowJar \
+            --no-daemon \
+            --parallel
+        env:
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
 
       - name: Verify jar native bundle

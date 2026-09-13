@@ -1,13 +1,12 @@
 package com.dreamdisplays.platform.server.managers
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Server
-import com.dreamdisplays.platform.server.datatypes.FabricSelectionData
-import com.dreamdisplays.platform.server.datatypes.PaperSelectionData
-import com.dreamdisplays.platform.server.datatypes.SelectionData
+import com.dreamdisplays.platform.server.*
+import com.dreamdisplays.platform.server.datatypes.selection.PaperSelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.SelectionData
+import com.dreamdisplays.platform.server.datatypes.selection.VanillaSelectionData
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.dreamdisplays.platform.server.utils.RegionUtil
-import io.github.arsmotorin.ofrat.*
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.core.BlockPos
 import net.minecraft.core.Direction
 import net.minecraft.server.level.ServerPlayer
@@ -22,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
  * second corner positions and exposes helpers to validate and reset the current selection.
  */
 object SelectionManager {
+    /** Map of player UUIDs to their current selection data. */
     val selectionPoints: MutableMap<UUID, SelectionData> = ConcurrentHashMap()
 
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
@@ -38,10 +38,9 @@ object SelectionManager {
     }
 
     /** Records the first selection corner for [player] and resets stale state if the world changed. */
-    @FabricOnly
     fun setFirstPoint(player: ServerPlayer, pos: BlockPos, worldKey: String, face: Direction) {
-        val sel = (selectionPoints[player.uuid] as? FabricSelectionData)
-            ?: FabricSelectionData().also { selectionPoints[player.uuid] = it }
+        val sel = (selectionPoints[player.uuid] as? VanillaSelectionData)
+            ?: VanillaSelectionData().also { selectionPoints[player.uuid] = it }
         if (sel.worldKey != worldKey) sel.reset()
         sel.pos1 = pos
         sel.worldKey = worldKey
@@ -59,7 +58,7 @@ object SelectionManager {
             sel.reset()
             MessageUtil.sendMessageWithMaterials(
                 player, "noDisplayTerritories",
-                Main.config.settings.selectionMaterial, Main.config.settings.baseMaterial
+                PaperServer.config.settings.selectionMaterial, PaperServer.config.settings.baseMaterial
             )
             return
         }
@@ -69,14 +68,15 @@ object SelectionManager {
     }
 
     /** Records the second selection corner, validating the worlds match the first point. */
-    @FabricOnly
     fun setSecondPoint(player: ServerPlayer, pos: BlockPos, worldKey: String) {
-        val sel = selectionPoints[player.uuid] as? FabricSelectionData ?: return
+        val sel = selectionPoints[player.uuid] as? VanillaSelectionData ?: return
         if (sel.pos1 == null || sel.worldKey != worldKey) {
             sel.reset()
             MessageUtil.sendMessageWithMaterials(
-                player, "noDisplayTerritories",
-                Server.config.settings.selectionMaterial, Server.config.settings.baseMaterial
+                player,
+                "noDisplayTerritories",
+                VanillaServerState.config.settings.selectionMaterialId,
+                VanillaServerState.config.settings.baseMaterialId
             )
             return
         }
@@ -91,9 +91,8 @@ object SelectionManager {
         selectionPoints.values.filterIsInstance<PaperSelectionData>().any { it.isReady && it.contains(loc) }
 
     /** Returns true if [pos] lies within any player's finalized selection in [worldKey]. */
-    @FabricOnly
     fun isLocationSelected(pos: BlockPos, worldKey: String): Boolean =
-        selectionPoints.values.filterIsInstance<FabricSelectionData>().any { sel ->
+        selectionPoints.values.filterIsInstance<VanillaSelectionData>().any { sel ->
             sel.isReady && sel.worldKey == worldKey && sel.contains(pos)
         }
 
@@ -105,7 +104,6 @@ object SelectionManager {
     fun resetSelection(player: Player) = resetSelection(player.uniqueId)
 
     /** Clears [player]'s current selection. */
-    @FabricOnly
     fun resetSelection(player: ServerPlayer) = resetSelection(player.uuid)
 
     /** Returns true if [loc] is inside the bounding box defined by this selection. */

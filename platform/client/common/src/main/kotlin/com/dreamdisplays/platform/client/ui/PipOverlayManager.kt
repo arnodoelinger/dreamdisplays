@@ -1,12 +1,12 @@
 package com.dreamdisplays.platform.client.ui
 
-import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.overlay.Overlay
 import com.dreamdisplays.platform.client.overlay.OverlayEvent
 import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.overlay.OverlayRenderContext
-import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.client.displays.DisplayScreen
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
@@ -22,10 +22,10 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 object PipOverlayManager : OverlayManager {
     private val overlays = mutableListOf<PipOverlay>()
 
-    /** Adds the overlay, snapping to a free anchor if the requested one is taken. Returns false if all 8 anchors are occupied. */
+    /** Adds the overlay, snapping to a free anchor if the requested one is taken. Returns false if all 8 anchors are already occupied. */
     fun add(overlay: PipOverlay): Boolean {
-        if (overlays.size >= PipAnchor.entries.size) return false
-        val taken = overlays.map { it.anchor }.toSet()
+        if (overlays.count { !it.closing } >= PipAnchor.entries.size) return false
+        val taken = overlays.filter { !it.closing }.map { it.anchor }.toSet()
         if (overlay.anchor in taken) {
             val free = PipAnchor.entries.firstOrNull { it !in taken } ?: return false
             overlay.anchor = free

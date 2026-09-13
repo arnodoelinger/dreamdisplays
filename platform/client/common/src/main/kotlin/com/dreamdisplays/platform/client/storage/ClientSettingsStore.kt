@@ -1,13 +1,14 @@
 package com.dreamdisplays.platform.client.storage
 
-import com.dreamdisplays.api.storage.ClientDisplaySettings
-import com.dreamdisplays.api.storage.ClientSettingsStorage
-import com.dreamdisplays.api.media.VideoQuality
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.display.model.settings.ClientDisplaySettings
+import com.dreamdisplays.api.display.model.settings.ClientSettingsStorage
 import com.dreamdisplays.util.json.JsonFileStore
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import org.slf4j.LoggerFactory
-import java.util.UUID
+import java.util.*
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * In-memory cache and JSON persistence for per-display, client-local [ClientDisplaySettings].
@@ -17,7 +18,7 @@ import java.util.UUID
  */
 object ClientSettingsStore : ClientSettingsStorage {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/ClientSettingsStore")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** File name for the JSON settings file. */
     private const val FILE_NAME = "client-display-settings.json"
@@ -27,7 +28,7 @@ object ClientSettingsStore : ClientSettingsStorage {
     private val settingsSerializer = MapSerializer(String.serializer(), ClientDisplaySettings.serializer())
 
     /** In-memory cache of settings, keyed by display UUID. */
-    private val settings = HashMap<UUID, ClientDisplaySettings>()
+    private val settings = ConcurrentHashMap<UUID, ClientDisplaySettings>()
 
     /** Loads all client display settings from disk into the in-memory map, replacing any current state. */
     override fun load() {
@@ -52,7 +53,7 @@ object ClientSettingsStore : ClientSettingsStorage {
         displayUuid: UUID,
         defaultVolume: Float,
     ): ClientDisplaySettings =
-        settings.getOrPut(displayUuid) {
+        settings.computeIfAbsent(displayUuid) {
             ClientDisplaySettings(volume = defaultVolume.coerceIn(0f, 1f))
         }
 
@@ -79,6 +80,42 @@ object ClientSettingsStore : ClientSettingsStorage {
         val s = getSettings(displayUuid)
         s.urlOverride = url
         s.langOverride = lang
+        save()
+    }
+
+    /** Sets the viewer-picked audio track language for [displayUuid] and saves. */
+    override fun setAudioTrackLang(displayUuid: UUID, lang: String?) {
+        val s = getSettings(displayUuid)
+        s.audioTrackLang = lang
+        save()
+    }
+
+    /** Sets the viewer's subtitle track language for [displayUuid] (null disables subtitles) and saves. */
+    override fun setSubtitleTrackLang(displayUuid: UUID, lang: String?) {
+        val s = getSettings(displayUuid)
+        s.subtitleTrackLang = lang
+        s.subtitlesEnabled = lang != null
+        save()
+    }
+
+    /** Sets the last known playback position for [displayUuid] and saves. */
+    override fun setSavedTimeNanos(displayUuid: UUID, nanos: Long) {
+        val s = getSettings(displayUuid)
+        s.savedTimeNanos = nanos
+        save()
+    }
+
+    /** Sets whether [displayUuid] is pinned to a Picture-in-Picture overlay and saves. */
+    override fun setPipOpen(displayUuid: UUID, open: Boolean) {
+        val s = getSettings(displayUuid)
+        s.pipOpen = open
+        save()
+    }
+
+    /** Sets whether the 3D acoustics engine applies to [displayUuid] and saves. */
+    override fun setAcousticsEnabled(displayUuid: UUID, enabled: Boolean) {
+        val s = getSettings(displayUuid)
+        s.acousticsEnabled = enabled
         save()
     }
 

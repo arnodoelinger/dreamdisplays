@@ -1,24 +1,22 @@
 package com.dreamdisplays.platform.server.managers
 
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.FabricDisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
-import com.dreamdisplays.platform.server.datatypes.StateData
-import com.dreamdisplays.platform.server.datatypes.SyncData
-import com.dreamdisplays.api.playback.PlaybackMode
-import com.dreamdisplays.api.playback.PlaybackPermissions
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.api.playback.policy.PlaybackPermissions
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
+import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.datatypes.state.StateData
+import com.dreamdisplays.platform.server.datatypes.sync.SyncData
 import com.dreamdisplays.platform.server.managers.DisplayManager.getDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager.getReceivers
 import com.dreamdisplays.platform.server.playback.PlaybackContexts
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
 import com.dreamdisplays.platform.server.utils.PlatformUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.server.MinecraftServer
 import net.minecraft.server.level.ServerPlayer
 import org.bukkit.entity.Player
@@ -33,10 +31,26 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @NullMarked
 object StateManager {
+    /** Play state for each display, keyed by display UUID. */
     private val playStates: MutableMap<UUID, StateData> = ConcurrentHashMap()
+
+    /** Last broadcast timestamp for each display, keyed by display UUID. Used for rate-limiting rebroadcasts. */
     private val lastSyncBroadcast: MutableMap<UUID, Long> = ConcurrentHashMap()
+
+    /** Minimum interval between rebroadcasts of sync packets for a display, in milliseconds. */
     private const val SYNC_MIN_INTERVAL_MS = 250L
+
+    /** Forgets a removed display's v1 sync state, so [tickBroadcast] stops carrying its dead entry. */
+    fun remove(displayId: UUID) {
+        playStates.remove(displayId)
+        lastSyncBroadcast.remove(displayId)
+    }
+
+    /** Interval for periodic sync broadcasts to keep clients in lockstep, in milliseconds. */
     private const val PERIODIC_BROADCAST_INTERVAL_MS = 2000L
+
+    /** Sanity ceiling (24h in ns) for client-reported position and duration. */
+    private const val MAX_TIME_NS = 24L * 60 * 60 * 1_000_000_000L
 
     /**
      * Validates a sync [packet] sent by [senderId], updates the per-display state, and applies
@@ -69,7 +83,7 @@ object StateManager {
         }
 
         if (packet.currentTime < 0 || packet.limitTime < 0
-            || packet.currentTime > 24L * 60 * 60 * 1_000_000_000L
+            || packet.currentTime > MAX_TIME_NS || packet.limitTime > MAX_TIME_NS
         ) return false
 
         val state = playStates.computeIfAbsent(displayId) { id -> StateData(id) }
@@ -90,34 +104,35 @@ object StateManager {
     @PaperOnly
     @JvmStatic
     fun processSyncPacket(packet: SyncData, player: Player) {
-        if (!applySyncPacket(packet, player.uniqueId, player.hasPermission(Main.config.permissions.delete))) return
+        if (!applySyncPacket(
+                packet,
+                player.uniqueId,
+                player.hasPermission(PaperServer.config.permissions.deleteOthers)
+            )
+        ) return
         val data = getDisplayData(packet.id) ?: return
         if (PlatformUtil.isFolia) {
             DisplayManager.sendLegacySyncToTrackedNearbyPlayers(
                 data as PaperDisplayData,
-                packet.copy(id = packet.id),
+                packet,
                 excludedPlayerId = player.uniqueId,
             )
             return
         }
         val receivers = getReceivers(data as PaperDisplayData)
-        PacketUtil.sendSync(
-            receivers.filter { it.uniqueId != player.uniqueId }.toMutableList(),
-            packet.copy(id = packet.id)
-        )
+        PacketUtil.sendSync(receivers.filter { it.uniqueId != player.uniqueId }, packet)
     }
 
     /**
      * Handles a sync packet from [player]: validates it, updates the per-display state,
      * and rebroadcasts to other receivers (rate-limited to avoid packet floods).
      */
-    @FabricOnly
     fun processSyncPacket(packet: SyncData, player: ServerPlayer, server: MinecraftServer, isAdmin: Boolean) {
         if (!applySyncPacket(packet, player.uuid, isAdmin)) return
         val data = getDisplayData(packet.id) ?: return
-        val receivers = getReceivers(data as FabricDisplayData, server)
+        val receivers = getReceivers(data as VanillaDisplayData, server)
             .filter { it.uuid != player.uuid }
-        FabricPacketUtil.sendSync(receivers, packet.copy(id = packet.id))
+        VanillaPacketUtil.sendSync(receivers, packet)
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
@@ -129,18 +144,17 @@ object StateManager {
         val state = playStates[displayId] ?: return
 
         val packet = state.createPacket()
-        PacketUtil.sendSync(mutableListOf(player), packet)
+        PacketUtil.sendSync(listOf(player), packet)
     }
 
     /** Sends the current sync packet for display [id] to a single [player], if state exists. */
-    @FabricOnly
     fun sendSyncPacket(id: UUID?, player: ServerPlayer) {
         val displayId = id ?: return
         if (V2PlayerTracker.isV2(player.uuid)) return
         val state = playStates[displayId] ?: return
-        val display = getDisplayData(displayId) as? FabricDisplayData
+        val display = getDisplayData(displayId) as? VanillaDisplayData
         val packet = state.createPacket(display)
-        FabricPacketUtil.sendSync(listOf(player), packet)
+        VanillaPacketUtil.sendSync(listOf(player), packet)
     }
 
     /**
@@ -161,7 +175,7 @@ object StateManager {
     @JvmStatic
     fun resetAndBroadcast(displayId: UUID, receivers: List<Player>) {
         val state = resetState(displayId) ?: return
-        PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
+        PacketUtil.sendSync(receivers, state.createPacket())
     }
 
     /** Resets and broadcasts over the correct `Paper` / `Folia` player scheduling path. */
@@ -179,11 +193,11 @@ object StateManager {
     }
 
     /** Resets the server-side clock for [displayId] to 0 (called when owner switches video). */
-    @FabricOnly
+    @JvmName("resetAndBroadcastVanilla")
     fun resetAndBroadcast(displayId: UUID, receivers: List<ServerPlayer>) {
         val state = resetState(displayId) ?: return
-        val display = getDisplayData(displayId) as? FabricDisplayData
-        FabricPacketUtil.sendSync(receivers, state.createPacket(display))
+        val display = getDisplayData(displayId) as? VanillaDisplayData
+        VanillaPacketUtil.sendSync(receivers, state.createPacket(display))
     }
 
     /**
@@ -213,7 +227,7 @@ object StateManager {
     fun tickBroadcast() = forEachBroadcastDue { state, display ->
         val receivers = getReceivers(display as PaperDisplayData)
             .filterNot { V2PlayerTracker.isV2(it.uniqueId) }
-        if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers.toMutableList(), state.createPacket())
+        if (receivers.isNotEmpty()) PacketUtil.sendSync(receivers, state.createPacket())
     }
 
     /**
@@ -229,11 +243,10 @@ object StateManager {
      * Periodically broadcasts the current sync packet for every active sync display to keep
      * clients in lockstep. Without this, clients drift after the initial sync.
      */
-    @FabricOnly
     fun tickBroadcast(server: MinecraftServer) = forEachBroadcastDue { state, display ->
-        val fabricDisplay = display as FabricDisplayData
-        val receivers = getReceivers(fabricDisplay, server)
+        val vanillaDisplay = display as VanillaDisplayData
+        val receivers = getReceivers(vanillaDisplay, server)
             .filterNot { V2PlayerTracker.isV2(it.uuid) }
-        if (receivers.isNotEmpty()) FabricPacketUtil.sendSync(receivers, state.createPacket(fabricDisplay))
+        if (receivers.isNotEmpty()) VanillaPacketUtil.sendSync(receivers, state.createPacket(vanillaDisplay))
     }
 }

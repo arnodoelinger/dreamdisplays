@@ -36,3 +36,6 @@ replay_*.log
 
 # Rust
 native/target/
+
+# Stonecutter
+versions/

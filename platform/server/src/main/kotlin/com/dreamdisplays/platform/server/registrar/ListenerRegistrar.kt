@@ -1,11 +1,10 @@
 package com.dreamdisplays.platform.server.registrar
 
-import io.github.arsmotorin.ofrat.PaperOnly
-
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.listeners.PlayerListener
 import com.dreamdisplays.platform.server.listeners.ProtectionListener
 import com.dreamdisplays.platform.server.listeners.SelectionListener
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bukkit.Bukkit
 
 /**
@@ -14,7 +13,7 @@ import org.bukkit.Bukkit
 @PaperOnly
 object ListenerRegistrar {
     /** Registers selection, protection, and player listeners with `Bukkit`. */
-    fun registerListeners(plugin: Main) {
+    fun registerListeners(plugin: PaperServer) {
         val pm = Bukkit.getPluginManager()
         pm.registerEvents(SelectionListener(plugin), plugin)
         pm.registerEvents(ProtectionListener(), plugin)

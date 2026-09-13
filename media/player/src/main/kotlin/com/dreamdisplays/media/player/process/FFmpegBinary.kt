@@ -1,8 +1,8 @@
 package com.dreamdisplays.media.player.process
 
-import com.dreamdisplays.media.runtime.OsInfo
-import com.dreamdisplays.media.runtime.Processes
 import com.dreamdisplays.media.player.util.daemon
+import com.dreamdisplays.media.runtime.system.Processes
+import com.dreamdisplays.util.OsInfo
 import com.dreamdisplays.util.net.DreamHttpClient
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
@@ -13,7 +13,7 @@ import java.util.zip.ZipInputStream
 
 /** `FFmpeg` binary downloader. **/
 object FFmpegBinary {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/FFmpeg")
+    private val logger = LoggerFactory.getLogger(javaClass)
     private const val CACHE_ROOT = "./dreamdisplays/ffmpeg"
     private const val BTBN_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
 
@@ -30,14 +30,17 @@ object FFmpegBinary {
         }
     }
 
-    /** Resolves the `FFmpeg` binary in the background to minimize latency on first use. */
+    /**
+     * Resolves the `FFmpeg` binary in the background to minimize latency on first use, and probes
+     * its optional filters while it is there — otherwise that probe spawns its own `ffmpeg -filters`
+     * synchronously inside the first playback launch, right where latency is most visible.
+     */
     fun prewarmAsync() {
         daemon({
-            try {
-                getPath()
-            } catch (e: Exception) {
-                logger.warn("Prewarm failed", e)
-            }
+            runCatching {
+                val path = getPath()
+                if (path != null) FFmpegCapabilities.hasFilter(path, "scale_vt")
+            }.onFailure { e -> logger.warn("Prewarm failed", e) }
         }, "FFmpeg-prewarm").start()
     }
 
@@ -59,7 +62,7 @@ object FFmpegBinary {
             return binary.absolutePath
         }
 
-        return try {
+        return runCatching {
             if (!cacheDir.exists() && !cacheDir.mkdirs()) {
                 throw IOException("Cannot create cache dir: $cacheDir.")
             }
@@ -71,7 +74,7 @@ object FFmpegBinary {
             Processes.removeMacQuarantine(binary.toPath())
             logger.info("Ready to work.")
             binary.absolutePath
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.error("Download failed, falling back to system ffmpeg", e)
             findSystemFfmpeg()
         }

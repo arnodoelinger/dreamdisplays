@@ -1,9 +1,10 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.media.FramePixelFormat
+//? if >=1.21.11 {
+//?}
+import com.dreamdisplays.api.media.model.FramePixelFormat
 import com.dreamdisplays.api.media.player.FrameUploader
 import com.dreamdisplays.api.media.player.GpuTextureRef
-import com.mojang.blaze3d.textures.GpuTexture
 import net.minecraft.client.Minecraft
 import java.nio.ByteBuffer
 
@@ -23,10 +24,15 @@ class GpuFrameUploader : FrameUploader {
     private var rgbaUploadBuffer: ByteBuffer? = null
 
     /** False while the window is minimized (no GL context to upload into). */
-    override fun canUpload(): Boolean = !Minecraft.getInstance().window.isMinimized
+    override fun canUpload(): Boolean =
+        //? if >=1.21.11 {
+        !Minecraft.getInstance().window.isMinimized
+    //?} else
+    /*true*/
 
     /** Uploads an interleaved [src] frame into [target] in the given [format]. */
     override fun uploadInterleaved(target: GpuTextureRef, src: ByteBuffer, format: FramePixelFormat): Boolean {
+        //? if >=1.21.11 {
         val texture = (target as GpuTextureHandle).texture
         TextureUploadUtil.upload(
             texture = texture,
@@ -38,31 +44,31 @@ class GpuFrameUploader : FrameUploader {
             rgbaScratch = rgbaUploadBuffer,
             setRgbaScratch = { rgbaUploadBuffer = it },
         )
+        //?} else
+        /*val texture = target as GpuTextureHandle
+        glUploader().upload(texture.textureId, src, texture.width, texture.height, format.toUploadFormat())*/
         return true
     }
 
-    /** Uploads the Y / U / V planes packed in [src] into their respective textures. */
+    /** Uploads the Y / U / V planes packed in [src] into their respective textures in one PBO pass. */
     override fun uploadPlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, src: ByteBuffer): Boolean {
-        var offset = 0
-        for ((i, ref) in arrayOf(y, u, v).withIndex()) {
-            val texture: GpuTexture = (ref as GpuTextureHandle).texture
-            val planeBytes = texture.getWidth(0) * texture.getHeight(0)
-            val view = src.duplicate()
-            view.position(offset).limit(offset + planeBytes)
-            TextureUploadUtil.upload(
-                texture = texture,
-                src = view,
-                w = texture.getWidth(0),
-                h = texture.getHeight(0),
-                format = UploadPixelFormat.R8,
-                glUploader = { planeUploader(i) },
-                rgbaScratch = null,
-                setRgbaScratch = {},
-            )
-            offset += planeBytes
-        }
+        //? if >=1.21.11 {
+        TextureUploadUtil.uploadPlanar(
+            y = (y as GpuTextureHandle).texture,
+            u = (u as GpuTextureHandle).texture,
+            v = (v as GpuTextureHandle).texture,
+            src = src,
+            glUploader = { planeUploader(0) },
+        )
         return true
+        //?} else
+        /*return false*/
     }
+
+    /** Lazily creates the interleaved GL uploader. */
+    @Suppress("UNUSED")
+    private fun glUploader(): AsyncTextureUploader =
+        uploader ?: AsyncTextureUploader(stateCache = true).also { uploader = it }
 
     /** Lazily creates the per-plane GL uploader for plane [i] (0 = Y, 1 = U, 2 = V). */
     private fun planeUploader(i: Int): AsyncTextureUploader =

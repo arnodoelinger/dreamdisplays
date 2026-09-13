@@ -1,9 +1,9 @@
 package com.dreamdisplays.platform.client.input
 
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.ui.DisplayMenu
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.ui.DisplayMenu
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
 
@@ -33,7 +33,7 @@ class DisplayMenuInputHandler : InputHandler {
     }
 
     companion object {
-        /** Id of the menu-open binding in the [KeyBindingRegistry]. */
+        /** ID of the menu-open binding in the [KeyBindingRegistry]. */
         const val OPEN_MENU_BINDING_ID = "dreamdisplays.open_menu"
 
         /** Default menu-open binding: right mouse button (with sneak held). */

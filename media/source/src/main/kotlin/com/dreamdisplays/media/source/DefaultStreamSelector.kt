@@ -1,10 +1,10 @@
 package com.dreamdisplays.media.source
 
-import com.dreamdisplays.api.media.stream.MediaStream
-import com.dreamdisplays.api.media.stream.MediaStreamType
-import com.dreamdisplays.api.media.stream.StreamPreferences
-import com.dreamdisplays.api.media.stream.StreamSelector
-import com.dreamdisplays.api.media.stream.StreamSet
+import com.dreamdisplays.api.media.stream.model.MediaStream
+import com.dreamdisplays.api.media.stream.model.MediaStreamType
+import com.dreamdisplays.api.media.stream.model.StreamPreferences
+import com.dreamdisplays.api.media.stream.model.StreamSet
+import com.dreamdisplays.api.media.stream.service.StreamSelector
 import com.dreamdisplays.media.player.stream.MediaStreamSelector
 import org.slf4j.LoggerFactory
 
@@ -14,7 +14,7 @@ import org.slf4j.LoggerFactory
  */
 class DefaultStreamSelector : StreamSelector {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/DefaultStreamSelector")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** Whether to log debug messages. */
     private val debug: Boolean
@@ -30,7 +30,7 @@ class DefaultStreamSelector : StreamSelector {
         val videoStreams = streams.filter { it.type.hasVideo }
         val audioStreams = streams.filter { it.type == MediaStreamType.AUDIO }
 
-        val targetHeight = preferences.maxHeight ?: 720
+        val targetHeight = preferences.maxHeight ?: 1080
         val lang = preferences.preferredAudioLanguage ?: ""
 
         val video = MediaStreamSelector.pickVideo(videoStreams, targetHeight, preferences.preferFps60)
@@ -38,9 +38,17 @@ class DefaultStreamSelector : StreamSelector {
         val adaptiveAudio = MediaStreamSelector.pickAudio(audioStreams, lang, video)
             ?: audioStreams.firstOrNull()
 
-        val progressiveAudio = streams.filter { it.type == MediaStreamType.VIDEO_AUDIO }
-            .maxByOrNull { it.bitrate ?: 0 }
-        val audio = if (preferProgressiveAudio && progressiveAudio != null) progressiveAudio else adaptiveAudio
+        val progressiveAudio = video?.takeIf { it.type == MediaStreamType.VIDEO_AUDIO }
+            ?: streams.filter { it.type == MediaStreamType.VIDEO_AUDIO }.maxByOrNull { it.bitrate ?: 0 }
+
+        val muxedHls = video?.type == MediaStreamType.VIDEO_AUDIO &&
+                (video.url.contains(".m3u8") || video.url.contains(".ttvnw.net/"))
+
+        val audio = when {
+            muxedHls && adaptiveAudio != null && !adaptiveAudio.type.hasVideo -> adaptiveAudio
+            preferProgressiveAudio && progressiveAudio != null -> progressiveAudio
+            else -> adaptiveAudio
+        }
 
         if (debug) {
             logger.debug(

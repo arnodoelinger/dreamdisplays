@@ -1,31 +1,23 @@
 package com.dreamdisplays.util
 
-import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.util.json.DreamJson
+import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.coroutines.launch
 import org.semver4j.Semver
 import org.slf4j.LoggerFactory
 
 /** Checks mod updates against the latest stable GitHub release. **/
 object UpdateCheck {
-    /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/UpdateCheck")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-    /** GitHub releases API. */
-    private const val API = "https://api.github.com/repos/arsmotorin/dreamdisplays/releases/latest"
+    private const val API = "https://api.github.com/repos/arnodoelinger/dreamdisplays/releases/latest"
 
-    /** Check state. */
     @Volatile
     private var checked = false
 
-    /** Latest release version of the mod, or null if the check failed or the version is unknown. */
     @Volatile
     private var latestVersion: String? = null
 
-    /**
-     * Returns true if the UI update arrow should be shown.
-     * Suppressed on DEV / SNAPSHOT builds and when the current version is already newer than the latest stable.
-     */
     fun shouldShowArrow(): Boolean {
         if (isPreRelease(GeneralUtil.getModVersion())) return false
         if (!checked) startCheck()
@@ -33,11 +25,9 @@ object UpdateCheck {
         return compareVersions(latest, GeneralUtil.getModVersion()) > 0
     }
 
-    /** If [version] is a DEV or SNAPSHOT build, returns true. */
     fun isPreRelease(version: String): Boolean =
-        version.contains("-DEV", ignoreCase = true) || version.contains("-SNAPSHOT", ignoreCase = true)
+        version.contains("-dev", ignoreCase = true) || version.contains("-preview", ignoreCase = true)
 
-    /** Start the background update check exactly once; subsequent calls are no-ops. */
     @Synchronized
     private fun startCheck() {
         if (checked) return
@@ -45,15 +35,14 @@ object UpdateCheck {
         DreamCoroutines.clientIo.launch { doCheck() }
     }
 
-    /** Check the latest release version against the current version. */
     private fun doCheck() {
-        try {
+        runCatching {
             val body = DreamHttpClient.readText(
                 API,
                 DreamHttpClient.RequestOptions(
                     headers = DreamHttpClient.headersOf(
                         "User-Agent" to
-                                "DreamDisplays/${GeneralUtil.getModVersion()} (+github.com/arsmotorin/dreamdisplays)",
+                                "DreamDisplays/${GeneralUtil.getModVersion()} (+github.com/arnodoelinger/dreamdisplays)",
                         "Accept" to "application/vnd.github+json",
                     ),
                     connectTimeoutMs = 5_000,
@@ -75,12 +64,11 @@ object UpdateCheck {
                 else -> null
             } ?: return
             latestVersion = rawTag.trimStart('v', 'V')
-        } catch (e: Exception) {
+        }.onFailure { e ->
             logger.warn("Update check failed: ${e.message}")
         }
     }
 
-    /** Compares two version strings using semver rules. Returns positive if [a] is newer than [b]. */
     internal fun compareVersions(a: String, b: String): Int {
         val av = Semver.coerce(a) ?: return a.compareTo(b)
         val bv = Semver.coerce(b) ?: return a.compareTo(b)

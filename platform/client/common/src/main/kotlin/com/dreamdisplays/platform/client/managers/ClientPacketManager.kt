@@ -1,21 +1,14 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.platform.client.Mod
+import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.service.DisplaySystem
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
+import com.dreamdisplays.core.protocol.common.packets.*
+import com.dreamdisplays.core.services.DisplayStorage
+import com.dreamdisplays.platform.client.Mod
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.api.display.model.DisplayId
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.core.protocol.ClearCache
-import com.dreamdisplays.core.protocol.DisplayDelete
-import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.core.protocol.DisplaySync
-import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.core.protocol.ServerHello
-import com.dreamdisplays.core.protocol.SetDisplaysEnabled
-import com.dreamdisplays.core.protocol.WatchPartyState
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import org.slf4j.LoggerFactory
 
@@ -25,7 +18,7 @@ import org.slf4j.LoggerFactory
  */
 object ClientPacketManager {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/ClientPacketManager")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** The platform [Mod] used to send raw payloads; set via [bind]. */
     private lateinit var mod: Mod
@@ -44,7 +37,7 @@ object ClientPacketManager {
         mod.sendPacket(packet)
     }
 
-    /** Applies an incoming packet to the client state; non-clientbound packets are ignored. */
+    /** Applies an incoming packet to the client state; non-client-bound packets are ignored. */
     fun handle(packet: DreamPacket) {
         when (packet) {
             is ServerHello -> applyServerHello(packet)
@@ -60,9 +53,11 @@ object ClientPacketManager {
                 DisplayRegistry.recordScreen(it)
             }
 
+            is FullscreenState -> FullscreenController.handle(packet)
+            is RemotePlaybackToggle -> DisplayRegistry.screens[packet.id]?.setPaused(packet.paused)
             is DisplayDelete -> handleDelete(packet)
             is ClearCache -> handleClearCache(packet)
-            else -> logger.debug("Ignoring non-clientbound packet {}.", packet::class.simpleName)
+            else -> logger.debug("Ignoring non-client-bound packet {}.", packet::class.simpleName)
         }
     }
 
@@ -91,10 +86,11 @@ object ClientPacketManager {
         logger.info("Display deleted and removed from saved data: ${packet.id}.")
     }
 
-    /** Drops the listed displays from the registry, display system, and saved data. */
+    /** Drops the listed displays from the registry (active or unloaded), display system, and saved data. */
     private fun handleClearCache(packet: ClearCache) {
         packet.ids.forEach { uuid ->
-            DisplayRegistry.screens.remove(uuid)?.unregister()
+            DisplayRegistry.screens[uuid]?.let { DisplayRegistry.unregisterScreen(it) }
+            DisplayRegistry.unloadedScreens.remove(uuid)
             DreamServices.registry.getOrNull<DisplaySystem>()?.removeDisplay(DisplayId(uuid))
             DisplayStorage.removeDisplay(uuid)
         }
@@ -103,5 +99,6 @@ object ClientPacketManager {
     /** Resets per-server negotiation state on disconnect. */
     fun reset() {
         serverSnapshot = ServerHello()
+        FullscreenController.reset()
     }
 }

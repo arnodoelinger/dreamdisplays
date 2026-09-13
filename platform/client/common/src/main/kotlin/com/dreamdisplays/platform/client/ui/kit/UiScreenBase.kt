@@ -6,7 +6,9 @@ import net.minecraft.client.gui.GuiGraphicsExtractor
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.client.gui.screens.Screen
+//? if >=1.21.11 {
 import net.minecraft.client.input.MouseButtonEvent
+//?}
 import net.minecraft.network.chat.Component
 
 /**
@@ -79,15 +81,22 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
         height = (realH / s).toInt()
 
         val matrices = g.pose()
+        //? if >=1.21.11 {
         matrices.pushMatrix()
         matrices.scale(s.toFloat(), s.toFloat())
         drawScreen(g, (mouseX / s).toInt(), (mouseY / s).toInt(), delta)
         matrices.popMatrix()
+        //?} else
+        /*matrices.pushPose()
+        matrices.scale(s.toFloat(), s.toFloat(), 1f)
+        drawScreen(g, (mouseX / s).toInt(), (mouseY / s).toInt(), delta)
+        matrices.popPose()*/
 
         width = realW
         height = realH
     }
 
+    //? if >=1.21.11 {
     /** Converts a real-space mouse event into virtual space; returns it unchanged when not scaling. */
     private fun toVirtual(event: MouseButtonEvent): MouseButtonEvent =
         if (uiScale >= 1.0) event
@@ -109,11 +118,50 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
         return onMouseReleased(e) || super.mouseReleased(e)
     }
 
-    final override fun mouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean =
-        super.mouseDragged(toVirtual(event), dragX / uiScale, dragY / uiScale)
+    /** Screen-specific drag handling, in virtual coordinates. Return true to consume. */
+    protected open fun onMouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean = false
 
-    final override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
-        super.mouseScrolled(mouseX / uiScale, mouseY / uiScale, scrollX, scrollY)
+    final override fun mouseDragged(event: MouseButtonEvent, dragX: Double, dragY: Double): Boolean {
+        val e = toVirtual(event)
+        val dx = dragX / uiScale
+        val dy = dragY / uiScale
+        return onMouseDragged(e, dx, dy) || super.mouseDragged(e, dx, dy)
+    }
+    //?} else
+    /*protected open fun onMouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean = false
+
+    protected open fun onMouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean = false
+
+    final override fun mouseClicked(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseClicked(mx, my, button) || super.mouseClicked(mx, my, button)
+    }
+
+    final override fun mouseReleased(mouseX: Double, mouseY: Double, button: Int): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseReleased(mx, my, button) || super.mouseReleased(mx, my, button)
+    }
+
+    protected open fun onMouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean = false
+
+    final override fun mouseDragged(mouseX: Double, mouseY: Double, button: Int, dragX: Double, dragY: Double): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseDragged(mx, my, button, dragX / uiScale, dragY / uiScale) ||
+            super.mouseDragged(mx, my, button, dragX / uiScale, dragY / uiScale)
+    }*/
+
+    /** Screen-specific scroll handling, in virtual coordinates. Return true to consume. */
+    protected open fun onMouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean =
+        false
+
+    final override fun mouseScrolled(mouseX: Double, mouseY: Double, scrollX: Double, scrollY: Double): Boolean {
+        val mx = mouseX / uiScale
+        val my = mouseY / uiScale
+        return onMouseScrolled(mx, my, scrollX, scrollY) || super.mouseScrolled(mx, my, scrollX, scrollY)
+    }
 
     final override fun mouseMoved(mouseX: Double, mouseY: Double) =
         super.mouseMoved(mouseX / uiScale, mouseY / uiScale)
@@ -137,5 +185,11 @@ abstract class UiScreenBase(title: Component) : Screen(title) {
 
     // Renders all registered child widgets (the vanilla `super` pass).
     protected fun drawChildren(g: GuiGraphicsCompat, mouseX: Int, mouseY: Int, delta: Float) =
-        super.render(g, mouseX, mouseY, delta)*/
+        super.render(g, mouseX, mouseY, delta)
+
+    //? if <1.21.11 {
+    // 1.21.1 strange background remover
+    override fun renderBackground(g: GuiGraphics, mouseX: Int, mouseY: Int, delta: Float) {}
+    //?}
+    */
 }

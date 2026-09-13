@@ -1,14 +1,15 @@
 package com.dreamdisplays.media.player.pipeline
 
-import com.dreamdisplays.media.player.MediaPlayer
-import com.dreamdisplays.media.player.util.MediaUtil
-import com.dreamdisplays.media.player.util.daemon
-import com.dreamdisplays.api.media.FramePixelFormat
+import com.dreamdisplays.api.media.model.FramePixelFormat
 import com.dreamdisplays.api.media.player.FrameUploaderFactory
 import com.dreamdisplays.api.media.player.GpuTextureRef
+import com.dreamdisplays.media.player.MediaPlayer
+import com.dreamdisplays.media.player.process.MediaProcess
+import com.dreamdisplays.media.player.util.MediaUtil
+import com.dreamdisplays.media.player.util.daemon
+import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
 import java.io.BufferedReader
-import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
 import java.nio.ByteBuffer
@@ -17,29 +18,37 @@ import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Producer-consumer frame buffer and `FFmpeg` video reader loop (pure-JVM pipeline).
- *
- * The reader thread parses PPM frames from the `FFmpeg` pipe, fills a "spare" buffer, then
- * atomically swaps it into the shared [FrameSurface]; the render thread reads from the
- * surface without blocking the reader.
+ * Producer-consumer frame buffer and `FFmpeg` video reader loop (pure-JVM pipeline). The reader thread parses raw
+ * frames from the process's stdout into [FrameSurface].
  */
 internal class VideoFramePipe(
     private val debugLabel: String,
     uploaderFactory: FrameUploaderFactory,
 ) : FramePipe {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/VideoFramePipe")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
-    companion object {
-        /** Default frame rate when the source doesn't report one or reports an invalid one. */
-        private const val DEFAULT_FPS = 30.0
+    private companion object {
+        const val PARK_POLL_MS = 2L
     }
 
     /** Updated by the reader thread on every frame; used by the watchdog to detect stalls. */
     override val lastFrameReceivedNanos = AtomicLong(0)
 
-    /** Set by the popout window to receive raw RGB frames. Called on the reader thread. */
     @Volatile
-    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+    private var rawPopoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)? = null
+
+    private val lastFrame = LastFrameCache()
+
+    /**
+     * Set by the popout window to receive raw RGB frames. Called on the reader thread. Replays the last cached frame
+     * immediately so the popout isn't blank until the next frame arrives.
+     */
+    override var popoutFrameSink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?
+        get() = rawPopoutFrameSink
+        set(value) {
+            rawPopoutFrameSink = value
+            if (value != null) lastFrame.replay(value)
+        }
 
     @Volatile
     var expectedW = 0; private set
@@ -53,21 +62,21 @@ internal class VideoFramePipe(
     private var activePrebuffer: FramePrebuffer? = null
 
     /**
+     * When set and true, the reader idles between frames while keeping the process and pipe open — the
+     * full pipe back-pressures `FFmpeg` into a warm standstill, so a subsequent un-park resumes immediately
+     * without a new process launch or connection.
+     */
+    @Volatile
+    private var parked: AtomicBoolean? = null
+
+    /**
      * Returns true once a frame is available for upload or has already been uploaded to the GPU texture.
      */
     override fun textureFilled(): Boolean = surface.textureFilled()
 
     /**
-     * Uploads the ready frame to [texture] if one is available.
-     * [actualW] / [actualH] must match the dimensions this pipe was started with.
-     *
-     * Warning: this is one of the most expensive operations in the pipeline. It's critical to call this as soon as
-     * possible after [textureFilled] returns true, to minimize the chance of the reader thread overwriting the ready
-     * buffer before upload.
-     *
-     * You should also never call this method more than once per frame, or call it when [textureFilled] is false.
-     * It does not block or wait for a frame to be ready, and it does not guarantee that the same frame will still be
-     * ready by the time it executes.
+     * Uploads the ready frame to [texture] if one is available. [actualW] / [actualH] must match the dimensions the
+     * texture was allocated with.
      */
     override fun updateFrame(texture: GpuTextureRef, actualW: Int, actualH: Int): Boolean =
         surface.updateFrame(texture, actualW, actualH, expectedW, expectedH)
@@ -87,29 +96,27 @@ internal class VideoFramePipe(
      */
     override fun cleanup() = surface.cleanup()
 
-    /**
-     * Starts the video reader thread and returns it (already running).
-     *
-     * @param seekOffsetNanos initial playback position (must match the `FFmpeg` `-ss` offset)
-     * @param sourceFps       frame rate reported by yt-dlp for the chosen stream
-     * @param getAudioClock   returns current audio position in nanos, or -1 if unavailable
-     * @param onFirstFrame    called once when the first frame arrives (starts the wall clock)
-     * @param getBrightness   returns current brightness multiplier (read per frame)
-     * @param onEos           called when the stream ends with stderr output and EOS flag
-     */
+    /** Starts the video reader thread and returns it (already running). */
     fun start(
         proc: Process, w: Int, h: Int, seekOffsetNanos: Long, sourceFps: Double, stopFlag: AtomicBoolean,
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
-        onEos: (stderr: String, normalEos: Boolean) -> Unit,
+        onEos: (stderr: String, normalEos: Boolean) -> Unit, parkFlag: AtomicBoolean? = null,
+        presentPreview: Boolean = true, tolerateLateness: Boolean = true,
     ): Thread {
         clear()
         expectedW = w
         expectedH = h
+        parked = parkFlag
         lastFrameReceivedNanos.set(System.nanoTime())
-        val frameNs = (1_000_000_000.0 / (sourceFps.takeIf { it > 1.0 } ?: DEFAULT_FPS)).toLong()
+        // Must be the same rate FFmpeg was pinned to -r, or synthesized timestamps drift
+        val frameNs = (1_000_000_000.0 / MediaProcess.outputFps(sourceFps)).toLong()
         val prebuffer = FramePrebuffer.createIfEnabled(
-            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel,
+            surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel, presentPreview,
+            tolerateLateness, parkFlag,
         ).also { activePrebuffer = it }
+        // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
+        // in-world display; feeding at decode time would run the popout ahead by the buffer depth.
+        prebuffer?.onPresent = { buf -> feedSink(buf, w, h) }
         return daemon(
             {
                 read(
@@ -139,7 +146,8 @@ internal class VideoFramePipe(
         terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
         onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
     ) {
-        var frameSize = w * h * 3
+        // Dimensions are fixed per session (mismatched frames are skipped in the loop), so the size never changes.
+        val frameSize = w * h * 3
         var spare = surface.allocateFrameBuffer(frameSize)
         surface.recycleFrameBuffer(surface.allocateFrameBuffer(frameSize))
 
@@ -163,10 +171,24 @@ internal class VideoFramePipe(
 
         var normalEos = false
 
-        try {
+        runCatching {
             proc.inputStream.use { input ->
-                var rowBuf = ByteArray(w * 3)
+                val rowBuf = ByteArray(w * 3)
                 while (!terminated.get() && !stopFlag.get()) {
+                    // Parked (warm pause / out of render distance): idle without reading; the full pipe
+                    // back-pressures FFmpeg into a standstill, keeping the decode and connection warm.
+                    val pk = parked
+                    if (pk != null && pk.get()) {
+                        while (pk.get() && !terminated.get() && !stopFlag.get()) {
+                            try {
+                                Thread.sleep(PARK_POLL_MS)
+                            } catch (_: InterruptedException) {
+                                Thread.currentThread().interrupt(); break
+                            }
+                        }
+                        lastFrameReceivedNanos.set(System.nanoTime())
+                        continue
+                    }
                     if (!skipToP6(input)) {
                         normalEos = true; break
                     }
@@ -181,42 +203,36 @@ internal class VideoFramePipe(
                         }
                         continue
                     }
-                    val requiredFrameSize = w * h * 3
-                    if (rowBuf.size < w * 3) rowBuf = ByteArray(w * 3)
-                    if (frameSize != requiredFrameSize
-                        || spare.capacity() < requiredFrameSize
-                    ) {
-                        frameSize = requiredFrameSize
-                        surface.resetPool()
-                        spare = surface.allocateFrameBuffer(frameSize)
-                        surface.recycleFrameBuffer(surface.allocateFrameBuffer(frameSize))
-                    }
-
-                    if (spare.capacity() < requiredFrameSize) {
-                        spare = surface.takeOrAllocate(requiredFrameSize)
-                    }
                     spare.clear()
-                    if (spare.remaining() < requiredFrameSize) {
-                        logger.warn("$debugLabel Reallocated undersized frame buffer: remaining=${spare.remaining()} required=$requiredFrameSize.")
-                        spare = surface.allocateFrameBuffer(requiredFrameSize)
+                    if (spare.remaining() < frameSize) {
+                        logger.warn("$debugLabel Reallocated undersized frame buffer: remaining=${spare.remaining()} required=$frameSize.")
+                        spare = surface.allocateFrameBuffer(frameSize)
                         spare.clear()
                     }
-                    if (!readFully(input, spare, rowBuf, requiredFrameSize)) {
+                    if (!readFully(input, spare, rowBuf, frameSize)) {
                         normalEos = true; break
                     }
-                    applyBrightness(spare, requiredFrameSize, getBrightness())
+                    applyBrightness(spare, frameSize, getBrightness())
                     spare.flip()
 
                     lastFrameReceivedNanos.set(System.nanoTime())
 
+                    val pk2 = parked
+                    if (pk2 != null && pk2.get()) {
+                        continue
+                    }
+
                     if (prebuffer != null) {
                         // Producer path: hand the decoded frame to the jitter buffer; the consumer thread
-                        // paces and presents it (and fires onFirstFrame after the prefill).
-                        popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
+                        // paces and presents it (and feeds the popout via prebuffer.onPresent, and fires
+                        // onFirstFrame after the prefill).
                         if (!MediaPlayer.captureSamples) {
+                            // Benchmark-only path: frames are never submitted / presented, so feed the
+                            // popout here (otherwise it would never receive a frame).
+                            feedSink(spare, w, h)
                             videoPts += frameNs; continue
                         }
-                        spare = prebuffer.submit(spare, videoPts, requiredFrameSize)
+                        spare = prebuffer.submit(spare, videoPts, frameSize)
                         if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
                         videoPts += frameNs
                         continue
@@ -228,24 +244,25 @@ internal class VideoFramePipe(
                         continue
                     }
 
-                    popoutFrameSink?.let { sink -> sink(spare, w, h, FramePixelFormat.RGB24); spare.rewind() }
+                    feedSink(spare, w, h)
 
                     if (!MediaPlayer.captureSamples) {
                         videoPts += frameNs; continue
                     }
 
-                    spare = surface.publish(spare, requiredFrameSize)
+                    spare = surface.publish(spare, frameSize)
                     if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
                     if (!firstFrame) {
                         firstFrame = true
                         onFirstFrame()
-                        if (MediaPlayer.DEBUG) logger.debug("$debugLabel First frame ${w} x ${h}.")
+                        if (MediaPlayer.DEBUG) logger.debug("$debugLabel First frame $w x $h.")
                     }
 
                     videoPts += frameNs
                 }
             }
-        } catch (e: IOException) {
+        }.onFailure { e ->
+            if (e !is IOException) throw e
             if (MediaPlayer.DEBUG && !terminated.get() && !stopFlag.get()) {
                 logger.warn("$debugLabel Read: ${e.message}")
             }
@@ -262,23 +279,29 @@ internal class VideoFramePipe(
 
         var exitCode = -1
         if (normalEos) {
-            try {
+            runCatching {
                 val done = proc.waitFor(500, TimeUnit.MILLISECONDS)
                 exitCode = if (done) proc.exitValue() else -1
                 if (!done) proc.destroyForcibly()
-            } catch (_: InterruptedException) {
+            }.onFailure { e ->
+                if (e !is InterruptedException) throw e
                 Thread.currentThread().interrupt()
             }
         }
 
         if (!terminated.get() && !stopFlag.get()) {
-            try {
-                stderrThread.join(500)
-            } catch (_: InterruptedException) {
-            }
+            runCatching { stderrThread.join(500) }
             val stderr = synchronized(stderrBuf) { stderrBuf.toString() }
             onEos(stderr, exitCode == 0)
         }
+    }
+
+    /** Feeds [buf] (position 0, [w] x [h] RGB24) to the popout sink, if any, caching a copy for [lastFrame]. */
+    private fun feedSink(buf: ByteBuffer, w: Int, h: Int) {
+        val sink = popoutFrameSink ?: return
+        lastFrame.store(buf, w, h, w * h * 3, FramePixelFormat.RGB24)
+        sink(buf, w, h, FramePixelFormat.RGB24)
+        buf.rewind()
     }
 
     /** Scans [input] forward until the PPM magic `P6` is consumed (followed by whitespace). Returns false on EOF. */

@@ -1,24 +1,26 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.dreamdisplays.api.display.service.DisplayCommandExecutor
+import com.dreamdisplays.api.playback.model.DisplayAccess
 import com.dreamdisplays.api.display.model.Display
-import com.dreamdisplays.api.display.model.DisplayId
-import com.dreamdisplays.api.display.model.DisplaySettings
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.display.model.settings.DisplaySettings
+import com.dreamdisplays.api.display.service.DisplayExecutor
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.core.protocol.common.packets.DisplayDelete
+import com.dreamdisplays.core.protocol.common.packets.ReportDisplay
+import com.dreamdisplays.core.protocol.common.packets.SetLocked
+import com.dreamdisplays.core.services.DisplayStorage
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.core.protocol.DisplayDelete
-import com.dreamdisplays.core.protocol.ReportDisplay
-import com.dreamdisplays.core.protocol.SetLocked
-import com.dreamdisplays.core.storage.DisplayStorage
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import kotlin.time.Duration
 
 /**
- * Client-side [DisplayCommandExecutor]: resolves each command to the live [DisplayScreen] in the
+ * Client-side [DisplayExecutor]: resolves each command to the live [DisplayScreen] in the
  * [DisplayRegistry] and applies it, returning the updated [Display] snapshot (or `null` when the
  * display is not present locally).
  */
-class MinecraftDisplayCommands : DisplayCommandExecutor {
+class MinecraftDisplayCommands : DisplayExecutor {
     /** Applies a full [settings] snapshot to the display, optionally swapping in a URL override. */
     override fun updateSettings(id: DisplayId, settings: DisplaySettings): Display? {
         val screen = DisplayRegistry.screens[id.uuid] ?: return null
@@ -27,7 +29,6 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
         screen.brightness = settings.brightness
         screen.mute(settings.muted)
         screen.setPaused(settings.paused)
-        screen.renderDistance = settings.renderDistance
 
         val override = settings.urlOverride
         if (!override.isNullOrBlank()) {
@@ -45,11 +46,15 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
         return screen.toDisplay()
     }
 
-    /** Locks or unlocks the display and informs the server. */
-    override fun setLocked(id: DisplayId, locked: Boolean): Display? {
+    /** Sets who may use the display and informs the server. */
+    @Deprecated("Scheduled for removal in 2.0.0")
+    override fun setAccess(id: DisplayId, access: DisplayAccess): Display? {
         val screen = DisplayRegistry.screens[id.uuid] ?: return null
-        screen.isLocked = locked
-        Initializer.sendPacket(SetLocked(id.uuid, locked))
+        screen.access = access
+        screen.isLocked = access != DisplayAccess.EVERYONE
+        // TODO: remove this in 2.0.0
+        // locked is filled in as well so a pre-1.10 server still gets the closest thing it understands
+        Initializer.sendPacket(SetLocked(id.uuid, access != DisplayAccess.EVERYONE, access.wire))
         return screen.toDisplay()
     }
 
@@ -114,7 +119,31 @@ class MinecraftDisplayCommands : DisplayCommandExecutor {
     /** Sets the requested video [quality]. */
     override fun setQuality(displayId: DisplayId, quality: VideoQuality): Display? {
         val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
-        screen.quality = quality
+        screen.setQualityByViewer(quality)
+        return screen.toDisplay()
+    }
+
+    /**
+     * Sets the active audio track by its resolved stream [trackUrl]; remembers the track's language so
+     * [DisplayScreen] can re-apply the same pick once the same display resolves audio tracks again
+     * (e.g. after rejoining).
+     */
+    override fun setAudioTrack(displayId: DisplayId, trackUrl: String): Display? {
+        val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
+        screen.audioTrack = trackUrl
+        val lang = screen.audioTrackList.firstOrNull { it.url == trackUrl }?.audioIdentity
+        ClientSettingsStore.setAudioTrackLang(displayId.uuid, lang)
+        return screen.toDisplay()
+    }
+
+    /**
+     * Sets the subtitle track by [lang] (null turns subtitles off) and persists the pick so
+     * [DisplayScreen] can re-apply it once the same display resolves subtitle tracks again.
+     */
+    override fun setSubtitleTrack(displayId: DisplayId, lang: String?): Display? {
+        val screen = DisplayRegistry.screens[displayId.uuid] ?: return null
+        screen.subtitleTrack = lang
+        ClientSettingsStore.setSubtitleTrackLang(displayId.uuid, lang)
         return screen.toDisplay()
     }
 

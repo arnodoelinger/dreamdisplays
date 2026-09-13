@@ -1,31 +1,22 @@
 package com.dreamdisplays.platform.client.render
 
+//? if >=1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
+//? if >=1.21.11 {
+import net.minecraft.resources.Identifier
+//?} else
+/*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.platform.client.Initializer
+import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
-import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.client.renderer.texture.DynamicTexture
-import net.minecraft.resources.Identifier
-import java.util.UUID
+import java.util.*
 
-/**
- * Owns the per-display GPU resources and their allocation / release lifecycle. Depending on the
- * pipeline mode this is either a single RGBA [DynamicTexture] (frames converted on the CPU) or
- * three RED8 [VideoPlaneTexture] planes (raw I420 planes converted in the fragment shader, see
- * [DisplayYuvRenderTypes]), plus the [RenderType] that samples them.
- *
- * Pulled out of [com.dreamdisplays.platform.client.displays.DisplayScreen] so the screen no longer mixes Minecraft texture
- * management with playback and sync state. [width]/[height] are the texture's pixel dimensions, derived from the
- * screen's block aspect ratio and target quality.
- *
- * A second "pending" allocation can be staged alongside the live one ([allocatePending]) so a
- * resolution change (quality switch) can be decoded into fresh textures while the old ones keep
- * being rendered; [promotePending] then swaps it in atomically once the first new frame has landed,
- * so the picture never blanks during the switch.
- *
- * @param uuid the owning display's id, used to build a unique texture identifier.
- */
+/** Owns the per-display GPU resources and their allocation / release lifecycle. Depending on the pipeline mode this is either one RGBA texture or three YUV planes. */
 class DisplayTextureResource(private val uuid: UUID) {
     /** One complete set of GPU resources (either RGBA or the three YUV planes) plus its render types. */
     private class Allocation(
@@ -46,8 +37,13 @@ class DisplayTextureResource(private val uuid: UUID) {
         /** All texture-manager ids backing this allocation (for release). */
         val allIds: List<Identifier> get() = listOfNotNull(textureId) + planeIds
 
-        /** Closes the GPU textures and unregisters them from the texture manager. */
+        /** Set once [release] has run, so a deferred cancel racing a promote can never double-free. */
+        private var released = false
+
+        /** Closes the GPU textures and unregisters them from the texture manager. Render thread only; idempotent. */
         fun release() {
+            if (released) return
+            released = true
             val manager = Minecraft.getInstance().textureManager
             texture?.close()
             listOfNotNull(yPlane, uPlane, vPlane).forEach { it.close() }
@@ -67,6 +63,7 @@ class DisplayTextureResource(private val uuid: UUID) {
     }
 
     /** Allocated GPU resources, or null if none are allocated. */
+    @Volatile
     private var current: Allocation? = null
 
     /**
@@ -111,6 +108,7 @@ class DisplayTextureResource(private val uuid: UUID) {
      * in YUV mode a plain unlit type over a white texture (the YUV shader would
      * misinterpret a flat color quad as chroma).
      */
+    @Suppress("UNUSED")
     val fallbackRenderType: RenderType? get() = current?.fallbackRenderType
 
     /** True while a pending (new-resolution) allocation is staged, waiting for its first frame. */
@@ -133,9 +131,22 @@ class DisplayTextureResource(private val uuid: UUID) {
      * render thread.
      */
     fun prepareDimensions(blockWidth: Int, blockHeight: Int, qualityHeight: Int) {
-        width = ((blockWidth / blockHeight.toDouble()) * qualityHeight).toInt()
-        height = qualityHeight
+        val (w, h) = textureDimensions(blockWidth, blockHeight, qualityHeight)
+        width = w
+        height = h
     }
+
+    /**
+     * Texture size for a [blockWidth] x [blockHeight] screen at [qualityHeight] pixels tall, with
+     * both axes forced even.
+     */
+    private fun textureDimensions(blockWidth: Int, blockHeight: Int, qualityHeight: Int): Pair<Int, Int> {
+        val width = ((blockWidth / blockHeight.toDouble()) * qualityHeight).toInt()
+        return width.toEvenDimension() to qualityHeight.toEvenDimension()
+    }
+
+    /** Rounds down to an even size, never below 2. */
+    private fun Int.toEvenDimension(): Int = (this and 1.inv()).coerceAtLeast(2)
 
     /**
      * Releases any existing textures (current and pending) and allocates fresh GPU textures and a
@@ -149,16 +160,11 @@ class DisplayTextureResource(private val uuid: UUID) {
         current = build(width, height)
     }
 
-    /**
-     * Stages a fresh allocation at the dimensions for [blockWidth] x [blockHeight] @ [qualityHeight]
-     * without touching the live textures, so the current frame keeps rendering. Once the first
-     * new-resolution frame has been uploaded into it, call [promotePending] to swap it in. Replaces
-     * any previously staged pending allocation. Must be called on the render thread.
-     */
+    /** Stages a fresh allocation at the dimensions for [blockWidth] x [blockHeight] @ [qualityHeight] without touching the currently active allocation. */
     fun allocatePending(blockWidth: Int, blockHeight: Int, qualityHeight: Int) {
         discardPending()
-        val w = ((blockWidth / blockHeight.toDouble()) * qualityHeight).toInt()
-        pending = build(w, qualityHeight)
+        val (w, h) = textureDimensions(blockWidth, blockHeight, qualityHeight)
+        pending = build(w, h)
     }
 
     /**
@@ -189,24 +195,32 @@ class DisplayTextureResource(private val uuid: UUID) {
     fun discardPendingAsync() {
         val p = pending ?: return
         pending = null
-        Minecraft.getInstance().execute { p.release() }
+        // The render thread may promote p to current concurrently; release it only if it never went live.
+        Minecraft.getInstance().execute { if (p !== current) p.release() }
     }
 
     /** Builds one allocation of [w] x [h] pixels in whichever pipeline mode is currently active. */
     private fun build(w: Int, h: Int): Allocation =
+        //? if >=1.21.11 {
         if (DisplayYuvRenderTypes.active) buildYuv(w, h) else buildRgba(w, h)
+    //?} else
+    /*buildRgba(w, h)*/
 
     /** Builds the legacy single RGBA texture fed by CPU-converted frames. */
     private fun buildRgba(w: Int, h: Int): Allocation {
+        //? if >=1.21.11 {
         val newTexture = DynamicTexture(
             { UUID.randomUUID().toString() },
             NativeImage(NativeImage.Format.RGBA, w, h, false),
         )
+        //?} else
+        /*val newTexture = DynamicTexture(NativeImage(NativeImage.Format.RGBA, w, h, false))*/
         val newId = Identifier.fromNamespaceAndPath(
             Initializer.MOD_ID,
             "screen-main-texture-$uuid-${UUID.randomUUID()}",
         )
         Minecraft.getInstance().textureManager.register(newId, newTexture)
+        TextureUploadUtil.applyBilinearFilter(newTexture)
         val rt = createRenderType(newId)
         return Allocation(
             width = w, height = h, texture = newTexture, textureId = newId,
@@ -215,6 +229,7 @@ class DisplayTextureResource(private val uuid: UUID) {
         )
     }
 
+    //? if >=1.21.11 {
     /** Builds the three I420 plane textures consumed by the YUV fragment shader. */
     private fun buildYuv(w: Int, h: Int): Allocation {
         val cw = (w + 1) / 2
@@ -243,6 +258,7 @@ class DisplayTextureResource(private val uuid: UUID) {
             fallbackRenderType = DisplayYuvRenderTypes.createFallback(),
         )
     }
+    //?}
 
     /** Closes the current and pending textures and unregisters them, leaving the resource empty. */
     fun release() {
@@ -251,18 +267,20 @@ class DisplayTextureResource(private val uuid: UUID) {
         current = null
     }
 
-    /** Releases the GPU textures asynchronously on the render thread; safe to call during teardown. */
+    /**
+     * Releases the GPU textures asynchronously on the render thread; safe to call during teardown.
+     * Clears [current] / [pending] immediately so [hasTexture] and the getters stop handing out
+     * textures that are about to be freed.
+     */
     fun releaseAsync() {
-        val ids = (current?.allIds.orEmpty()) + (pending?.allIds.orEmpty())
-        if (ids.isEmpty()) return
-        val mc = Minecraft.getInstance()
-        mc.execute {
-            for (id in ids) {
-                try {
-                    mc.textureManager.release(id)
-                } catch (_: Exception) {
-                }
-            }
+        val c = current
+        val p = pending
+        current = null
+        pending = null
+        if (c == null && p == null) return
+        Minecraft.getInstance().execute {
+            c?.release()
+            p?.release()
         }
     }
 

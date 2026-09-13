@@ -1,17 +1,12 @@
+//? if >=1.21.11 {
 package com.dreamdisplays.platform.client.render
 
 import com.mojang.blaze3d.pipeline.BlendFunction
 import com.mojang.blaze3d.pipeline.RenderPipeline
 
 /**
- * Applies the display pipelines' translucent blend and default depth state across Minecraft
- * versions. 26.x exposes the explicit `withColorTargetState(ColorTargetState)` /
- * `withDepthStencilState(DepthStencilState)` pair; 1.21.x only has the flat `withBlend` (whose depth
- * defaults already match what we want). Both branches go through reflection so the single binary
- * compiles and runs on every Stonecutter target without a compile-time dependency on the 26.x-only
- * `ColorTargetState` / `DepthStencilState` classes.
- *
- * Resolved once per pipeline at lazy creation time, never on the per-frame path.
+ * Applies the display pipelines' translucent blend and default depth state across Minecraft versions.
+ * 26.x exposes typed builder methods; older versions fall back to reflection.
  */
 internal fun RenderPipeline.Builder.withDisplayColorAndDepth(): RenderPipeline.Builder {
     val builderClass = javaClass
@@ -27,3 +22,4 @@ internal fun RenderPipeline.Builder.withDisplayColorAndDepth(): RenderPipeline.B
     }
     return this
 }
+//?}

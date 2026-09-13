@@ -1,58 +1,34 @@
 package com.dreamdisplays.media.player.nativebridge
 
-import com.dreamdisplays.media.runtime.OsInfo
+import com.dreamdisplays.util.OsInfo
 import com.dreamdisplays.util.net.DreamHttpClient
+import kotlinx.io.IOException
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream
 import org.apache.commons.compress.compressors.xz.XZCompressorInputStream
 import org.slf4j.LoggerFactory
-import java.io.BufferedInputStream
-import java.io.BufferedOutputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
+import java.io.*
 import java.net.URI
 import java.util.zip.ZipInputStream
 
-/**
- * Provides the `FFmpeg` shared libraries the in-process libav backend
- * ([NativeMedia.initLav]) links against. When the extracted native cache does not
- * already contain them, a prebuilt shared build is downloaded on demand and
- * unpacked next to `dreamdisplays_lav`, where [NativeMedia.preloadLavDependencies]
- * picks it up.
- *
- * The download must match the `FFmpeg` major branch the library was linked against
- * (matching SONAMEs / DLL names). BtbN's autobuild asset names include a moving
- * git revision, so URLs are resolved from the latest GitHub release at runtime.
- * macOS has no prebuilt shared build available, so it keeps relying on a system
- * (Homebrew) `FFmpeg`.
- */
+/** Downloads and unpacks `FFmpeg` shared libraries from BtbN for the in-process libav backend. */
 object LavFfmpeg {
-    private val logger = LoggerFactory.getLogger("DreamDisplays/LavFFmpeg")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** BtbN latest release API; keep the branch suffix in sync with `.github/workflows/_build.yml`. */
     private const val LATEST_RELEASE_API = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
-    private const val FFMPEG_BRANCH_SUFFIX = "8.1"
+    private const val FFMPEG_BRANCH_SUFFIX = "9.0"
 
     private data class Source(
-        /** BtbN asset name matcher for the latest release. */
         val assetNameRegex: Regex,
-        /** True for `.tar.xz` (Linux), false for `.zip` (Windows). */
         val isTarXz: Boolean,
-        /** In-archive directory holding the shared libraries (`bin` on Windows, `lib` on Linux). */
         val libDir: String,
     )
 
-    /**
-     * Ensures [dir] contains the FFmpeg shared libraries, downloading and
-     * unpacking them once if needed. Returns true when they are present
-     * afterwards. Best-effort: any failure (no network, unsupported platform)
-     * just returns false and leaves the in-process backend unavailable.
-     */
+    /** Ensures [dir] contains `FFmpeg` libraries, downloading and unpacking them on first run. */
     fun ensure(dir: File): Boolean {
         if (hasFfmpeg(dir)) return true
         val source = source() ?: return false
-        return try {
+        return runCatching {
             if (!dir.exists() && !dir.mkdirs()) throw IOException("Cannot create $dir.")
             val archive = File(dir, "_ffmpeg" + if (source.isTarXz) ".tar.xz" else ".zip")
             try {
@@ -68,7 +44,7 @@ object LavFfmpeg {
                 if (archive.exists() && !archive.delete()) archive.deleteOnExit()
             }
             hasFfmpeg(dir)
-        } catch (e: Exception) {
+        }.getOrElse { e ->
             logger.warn("Could not provision FFmpeg libraries (${e.javaClass.simpleName}: ${e.message}).")
             false
         }
@@ -98,7 +74,7 @@ object LavFfmpeg {
 
     private fun assetRegex(arch: String, extension: String): Regex =
         Regex(
-            """^ffmpeg-n8\..*-${Regex.escape(arch)}-lgpl-shared-${Regex.escape(FFMPEG_BRANCH_SUFFIX)}\.${
+            """^ffmpeg-n9\..*-${Regex.escape(arch)}-lgpl-shared-${Regex.escape(FFMPEG_BRANCH_SUFFIX)}\.${
                 Regex.escape(
                     extension
                 )
@@ -107,7 +83,7 @@ object LavFfmpeg {
 
     @Throws(IOException::class)
     private fun resolveLatestAssetUrl(source: Source): String {
-        val json = readUrl(LATEST_RELEASE_API)
+        val json = readLatestReleaseJson()
         val urls = Regex(""""browser_download_url"\s*:\s*"([^"]+)"""")
             .findAll(json)
             .map { it.groupValues[1].replace("\\/", "/") }
@@ -160,12 +136,12 @@ object LavFfmpeg {
     private fun wantedEntry(entryName: String, libDir: String): Boolean {
         val parts = entryName.split('/')
         val leaf = parts.last()
-        if (parts.size >= 2 && parts[parts.size - 2] == libDir && isSharedLibrary(leaf.lowercase())) return true
-        return leaf.equals("LICENSE.txt", ignoreCase = true) && parts.size <= 2
+        return parts.size >= 2 && parts[parts.size - 2] == libDir && isSharedLibrary(leaf.lowercase()) ||
+                leaf.equals("LICENSE.txt", ignoreCase = true) && parts.size <= 2
     }
 
     @Throws(IOException::class)
-    private fun writeEntry(input: java.io.InputStream, dest: File) {
+    private fun writeEntry(input: InputStream, dest: File) {
         BufferedOutputStream(FileOutputStream(dest)).use { out -> input.transferTo(out) }
     }
 
@@ -200,11 +176,11 @@ object LavFfmpeg {
         }
     }
 
-    /** Reads [url], following up to 10 redirect hops. */
+    /** Reads the BtbN latest-release API response, following up to 10 redirect hops. */
     @Throws(IOException::class)
-    private fun readUrl(url: String): String {
+    private fun readLatestReleaseJson(): String {
         return DreamHttpClient.readText(
-            url,
+            LATEST_RELEASE_API,
             DreamHttpClient.RequestOptions(
                 headers = DreamHttpClient.headersOf(
                     "User-Agent" to "DreamDisplays-lav-ffmpeg",

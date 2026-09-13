@@ -1,6 +1,6 @@
 //! Pixel conversion kernels: brightness LUT and NV12 -> RGB24 (BT.709 limited range).
 //!
-//! The NV12 hot path walks 2x2 luma blocks because each UV pair is shared by four
+//! The NV12 hot path walks 2 x 2 luma blocks because each UV pair is shared by four
 //! pixels. That keeps chroma loads, index math, and bounds checks out of the per-pixel
 //! path as much as possible while preserving exact BT.709 limited-range output.
 
@@ -57,7 +57,9 @@ pub fn nv12_frame_size(w: usize, h: usize) -> usize {
 ///
 /// `raw.len()` must be >= [`nv12_frame_size`], `dst.len()` must be >= `w * h * 3`.
 pub fn nv12_to_rgb24(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8; 256]) {
-    if should_parallel(w, h) && let Some(pool) = convert_pool() {
+    if should_parallel(w, h)
+        && let Some(pool) = convert_pool()
+    {
         pool.install(|| nv12_to_rgb24_lut_parallel(raw, w, h, dst, lut));
         return;
     }
@@ -66,7 +68,9 @@ pub fn nv12_to_rgb24(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8; 
 
 /// Converts NV12 to RGB24 without brightness adjustment.
 pub fn nv12_to_rgb24_identity(raw: &[u8], w: usize, h: usize, dst: &mut [u8]) {
-    if should_parallel(w, h) && let Some(pool) = convert_pool() {
+    if should_parallel(w, h)
+        && let Some(pool) = convert_pool()
+    {
         pool.install(|| nv12_to_rgb24_identity_parallel(raw, w, h, dst));
         return;
     }
@@ -75,7 +79,9 @@ pub fn nv12_to_rgb24_identity(raw: &[u8], w: usize, h: usize, dst: &mut [u8]) {
 
 /// Converts one NV12 frame into tightly packed RGBA32 with alpha fixed at 255.
 pub fn nv12_to_rgba32(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8; 256]) {
-    if should_parallel(w, h) && let Some(pool) = convert_pool() {
+    if should_parallel(w, h)
+        && let Some(pool) = convert_pool()
+    {
         pool.install(|| nv12_to_rgba32_lut_parallel(raw, w, h, dst, lut));
         return;
     }
@@ -84,7 +90,9 @@ pub fn nv12_to_rgba32(raw: &[u8], w: usize, h: usize, dst: &mut [u8], lut: &[u8;
 
 /// Converts NV12 to RGBA32 without brightness adjustment.
 pub fn nv12_to_rgba32_identity(raw: &[u8], w: usize, h: usize, dst: &mut [u8]) {
-    if should_parallel(w, h) && let Some(pool) = convert_pool() {
+    if should_parallel(w, h)
+        && let Some(pool) = convert_pool()
+    {
         pool.install(|| nv12_to_rgba32_identity_parallel(raw, w, h, dst));
         return;
     }
@@ -418,7 +426,7 @@ fn convert_pool() -> Option<&'static ThreadPool> {
             .build()
             .ok()
     })
-        .as_ref()
+    .as_ref()
 }
 
 #[inline(always)]
@@ -727,7 +735,7 @@ mod tests {
 
     #[test]
     fn nv12_odd_dimensions() {
-        // 3x3: chroma plane is 2x2 blocks of UV pairs (stride 4). Must not panic and
+        // 3 x 3: chroma plane is 2x2 blocks of UV pairs (stride 4). Must not panic and
         // must produce a fully written 3*3*3 output.
         let lut = build_lut(IDENTITY_MILLI);
         let raw = nv12_frame(3, 3, 126, 128, 128);

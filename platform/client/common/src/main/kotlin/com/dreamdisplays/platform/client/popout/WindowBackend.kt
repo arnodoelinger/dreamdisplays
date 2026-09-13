@@ -1,5 +1,7 @@
 package com.dreamdisplays.platform.client.popout
 
+import com.dreamdisplays.util.OsInfo
+
 /**
  * Windowing toolkit used to host a detached popout window. Chosen per-OS because macOS cannot run
  * an `AWT` window alongside the `GLFW` game window, while Windows / Linux prefer `AWT` for native chrome.
@@ -13,9 +15,6 @@ enum class WindowBackend {
 
     companion object {
         /** Picks [GLFW] on macOS and [AWT] everywhere else. */
-        fun detectDefault(): WindowBackend {
-            val os = System.getProperty("os.name", "").lowercase()
-            return if ("mac" in os) GLFW else AWT
-        }
+        fun detectDefault(): WindowBackend = if (OsInfo.isMac) GLFW else AWT
     }
 }

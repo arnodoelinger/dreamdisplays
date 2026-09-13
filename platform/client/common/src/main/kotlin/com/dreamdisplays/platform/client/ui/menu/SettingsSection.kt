@@ -12,10 +12,8 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * The settings panel of the display menu: labeled rows (volume, render distance, quality,
- * brightness, sync), each with its control widget and reset button, plus the owner action buttons
- * (lock/delete/report) anchored to the panel's bottom-right corner. Tooltips are declared per row
- * and rendered after the widgets so they overlay everything.
+ * The settings panel of the display menu: labeled rows (volume, render distance, quality, brightness, sync), each with a
+ * control and a reset button.
  */
 class SettingsSection(
     private val rows: List<Row>,
@@ -45,9 +43,14 @@ class SettingsSection(
         val innerW = panel.w - UiTheme.PANEL_PADDING_X * 2
         var rowY = panel.y + UiTheme.PANEL_PADDING_Y + font.lineHeight + 6
 
+        // Reserve a shared label column as wide as the widest label so every control gets the same
+        // width and left edge, instead of each being squeezed by its own label length (which made
+        // the sliders visibly different widths from row to row).
+        val labelColW = rows.maxOf { font.width(Component.translatable(it.labelKey)) }
+
         for (row in rows) {
             rowY += row.extraGapBefore
-            renderRow(g, row, innerX, rowY, innerW)
+            renderRow(g, row, innerX, rowY, innerW, labelColW)
             rowY += UiTheme.ROW_H + UiTheme.ROW_GAP
         }
 
@@ -55,7 +58,7 @@ class SettingsSection(
     }
 
     /** Draws one row's background and label, and places its control and reset button. */
-    private fun renderRow(g: GuiGraphicsCompat, row: Row, x: Int, y: Int, w: Int) {
+    private fun renderRow(g: GuiGraphicsCompat, row: Row, x: Int, y: Int, w: Int, labelColW: Int) {
         val font = Minecraft.getInstance().font
         g.fill(x, y, x + w, y + UiTheme.ROW_H, UiTheme.ROW_BG)
         val label = Component.translatable(row.labelKey)
@@ -63,11 +66,14 @@ class SettingsSection(
         g.drawText(font, label, x + 6, textY, UiTheme.TEXT_PRIMARY, false)
         row.labelHover = UiRect(x + 6, textY, font.width(label), font.lineHeight)
 
-        var rightEdge = x + w - 4
+        // Right-align the reset button to the panel's inner edge (x + w), matching the owner action
+        // buttons below; the old `- 4` inset left it 4px shy of them, looking misaligned.
+        var rightEdge = x + w
         row.reset.place(UiRect(rightEdge - UiTheme.RESET_W, y, UiTheme.RESET_W, UiTheme.ROW_H))
         rightEdge -= UiTheme.RESET_W + 4
 
-        val controlW = min(UiTheme.CONTROL_W, max(60, rightEdge - (x + 6 + font.width(label) + 8)))
+        // Size every control from the shared label column, so all rows get an identical control width.
+        val controlW = min(UiTheme.CONTROL_W, max(60, rightEdge - (x + 6 + labelColW + 8)))
         row.control.place(UiRect(rightEdge - controlW, y, controlW, UiTheme.ROW_H))
     }
 
@@ -92,7 +98,7 @@ class SettingsSection(
         val font = Minecraft.getInstance().font
         for (row in rows) {
             if (row.labelHover?.contains(mouseX, mouseY) == true) {
-                g.setComponentTooltipForNextFrame(font, row.tooltip(), anchorX, anchorY)
+                renderTooltip(g, row.tooltip(), anchorX, anchorY)
             }
         }
         for ((button, tooltip) in buttonTooltips) {
@@ -100,8 +106,16 @@ class SettingsSection(
             if (mouseX >= button.x && mouseX < button.x + button.width &&
                 mouseY >= button.y && mouseY < button.y + button.height
             ) {
-                tooltip()?.let { g.setComponentTooltipForNextFrame(font, it, anchorX, anchorY) }
+                tooltip()?.let { renderTooltip(g, it, anchorX, anchorY) }
             }
         }
+    }
+
+    private fun renderTooltip(g: GuiGraphicsCompat, lines: List<Component>, x: Int, y: Int) {
+        val font = Minecraft.getInstance().font
+        //? if >=1.21.11 {
+        g.setComponentTooltipForNextFrame(font, lines, x, y)
+        //?} else
+        /*g.renderComponentTooltip(font, lines, x, y)*/
     }
 }

@@ -1,6 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import java.util.Locale
+import java.util.*
 
 /** Filter keywords accepted by `/display list`. */
 internal enum class ListFilter(val token: String) {

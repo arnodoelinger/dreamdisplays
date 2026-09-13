@@ -1,3 +1,4 @@
+//? if >=1.21.11 {
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
@@ -10,14 +11,9 @@ import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.resources.Identifier
 
 /**
- * Reflective GPU-YUV backend for the 26.2+ Blaze3D API. It rebuilds the same pipeline through
+ * Reflective GPU-YUV backend for the 26.2+ `Blaze3D` API. It rebuilds the same pipeline through
  * reflection over the new `BindGroupLayout` / `GpuFormat` API, so one binary serves every loader
  * and version.
- *
- * Reflection only runs once per session (pipeline and texture-method handles are resolved on
- * first use); the per-frame hot path is untouched. The layout chain mirrors vanilla's fogged
- * snippet (GLOBALS, MATRICES_PROJECTION, FOG, samplers), widened to the three video planes, so
- * the `display_fog` vertex shader can feed vanilla distance fog without any lightmap or normals.
  */
 internal object Yuv262Reflect {
     /** True when the 26.2+ API classes are present at runtime. */
@@ -36,8 +32,7 @@ internal object Yuv262Reflect {
 
     /** The `GpuFormat.R8_UNORM` enum constant, resolved reflectively. */
     private val gpuFormatR8: Any by lazy {
-        @Suppress("UNCHECKED_CAST")
-        java.lang.Enum.valueOf(gpuFormatClass as Class<out Enum<*>>, "R8_UNORM")
+        RenderPipelineCompat.reflectiveEnumValue(gpuFormatClass, "R8_UNORM")
     }
 
     /** Looks up a vanilla [net.minecraft.client.renderer.BindGroupLayouts] constant. */
@@ -74,14 +69,14 @@ internal object Yuv262Reflect {
 
         val topologyClass = Class.forName("com.mojang.blaze3d.PrimitiveTopology")
 
-        @Suppress("UNCHECKED_CAST")
-        val quads = java.lang.Enum.valueOf(topologyClass as Class<out Enum<*>>, "QUADS")
+        val quads = RenderPipelineCompat.reflectiveEnumValue(topologyClass, "QUADS")
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)
 
         builder.withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
         builder.withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
         builder.withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
         RenderPipelineCompat.configureDepth(builder)
+        RenderPipelineCompat.configureBlend(builder)
         builder.withCull(false)
         return builder.build()
     }
@@ -110,3 +105,4 @@ internal object Yuv262Reflect {
             }
         }
 }
+//?}

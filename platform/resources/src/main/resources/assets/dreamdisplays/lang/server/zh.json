@@ -1,0 +1,208 @@
+{
+  "noDisplayTerritories": "&7D |&f 你还没有选择任何显示屏区域！请使用 {0} 在 {1} 上选择两个点",
+  "createDisplayCommand": "&7D |&f 现在输入 /display create 来创建显示屏",
+  "secondPointNotSelected": "&7D |&f 你还没有选择第二个点！",
+  "displayOverlap": "&7D |&f 该区域已经存在一个显示屏！",
+  "displayLimitReached": "&7D |&f 你已达到每位玩家最多 %d 个显示屏的上限！",
+  "structureTooLarge": "&7D |&f 你不能创建大于 %d × %d 方块的显示屏",
+  "structureTooSmall": "&7D |&f 你不能创建小于 %d × %d 方块的显示屏",
+  "firstPointSelected": "&7D |&f 第一个点已选定！现在请选择第二个点",
+  "secondPointSelected": "&7D |&f 第二个点已选定！",
+  "structureWrongDepth": "&7D |&f 选择区域必须至少 1 格深",
+  "wrongStructure": "&7D |&f 只有 {0} 方块可用于显示屏",
+  "displayTooHigh": "&7D |&f 显示屏高度过高（最高 %d）",
+  "displayTooLow": "&7D |&f 显示屏高度过低（最低 %d）",
+  "selectionClear": "&7D |&f 选区已清除！",
+  "displayWrongCommand": "&7D |&f 你输入的内容有误！",
+  "displayCommandMissingPermission": "&7D |&f 你没有使用此命令的权限！",
+  "commandPlayersOnly": "&7D |&f 此命令只能由游戏中的玩家使用",
+  "successfulCreation": "&7D |&f 显示屏已创建！按住 Shift 并右键注视它以打开菜单",
+  "noDisplay": "&7D |&f 未找到显示屏！",
+  "settedURL": "&7D |&f 视频已加载！",
+  "invalidURL": "&7D |&f 你的链接无效！请使用有效的视频链接（YouTube、Twitch 等）",
+  "settedName": "&7D |&f 显示屏名称已设置！",
+  "currentName": "&7D |&f 此显示屏的名称：%s",
+  "noNameSet": "&7D |&f 此显示屏未设置名称",
+  "invalidName": "&7D |&f 名称无效！最多可使用 32 个字母、数字、- 或 _，不可包含空格",
+  "nameTaken": "&7D |&f 该名称已被其他显示屏使用！",
+  "scheduleSet": "&7D |&f 现在是 {0}。显示屏 {1} 将于 {3} {2}（{4}）",
+  "scheduleCurrentSet": "&7D |&f 此显示屏计划于 {1} {0}",
+  "scheduleNoneSet": "&7D |&f 此显示屏没有计划操作",
+  "scheduleCancelled": "&7D |&f 已取消计划操作",
+  "scheduleInvalidTime": "&7D |&f 时间格式无效！请使用 HH:mm 或 HH:mm:ss（24小时制），例如 23:51 或 23:51:30",
+  "scheduleNeedsTime": "&7D |&f 现在是 {0}。请输入时间（HH:mm）来计划此操作",
+  "scheduleActionPlay": "开始播放",
+  "scheduleActionPause": "暂停",
+  "scheduleCountdownSeconds": "{0}秒后",
+  "scheduleCountdownMinutes": "{0}分{1}秒后",
+  "scheduleCountdownHours": "{0}小时{1}分钟后",
+  "displayVideoWrongTargetBlock": "&7D |&f 你必须注视一个显示屏方块才能使用此命令！",
+  "displayVideoNotOwner": "&7D |&f 你不是此显示屏的所有者！",
+  "reportTooQuickly": "&7D |&f 你发送举报太过频繁！请稍后再试",
+  "reportSent": "&7D |&f 举报已发送！",
+  "reportFailed": "&7D |&f 举报发送失败，请稍后再试",
+  "displayDeleted": "&7D |&f 显示屏已删除！",
+  "displayReported": "&7D |&f 显示屏已被举报！",
+  "reportNotConfigured": "&7D |&f 此服务器禁用了举报系统！",
+  "newVersion": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "Dream Displays 新版本 %s 已发布！请 ",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "更新你的模组",
+        "color": "#023EB6",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays/versions"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "点击下载新版本"
+        }
+      },
+      {
+        "text": "",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "newPluginVersion": "&7D |&f Dream Displays 插件新版本 (%s) 可用！请更新服务器插件！",
+  "configReloaded": "&7D | &fDream Displays 已重载！",
+  "configReloadFailed": "&7D |&f Dream Displays 重载失败，请查看控制台了解错误",
+  "configReloadSummary": "&7D |&f 已重载：配置文件、语言消息、命令权限",
+  "noDisplaysFound": "&7D |&f 未找到显示屏",
+  "displayListHeader": "&7D |&f 显示屏列表：",
+  "displayListEntry": "&7D |&f {0}。所有者：{1}，位置：[{2}, {3}, {4}]，链接：{5}",
+  "displayListPageLine": "&7D |&7 页码=&f{0}/{1} &8| &7总计=&f{2}",
+  "displayListDetails": " &8| &7世界=&f{0} &8| &7尺寸=&f{1}x{2} &8| &7同步=&f{3} &8| &7ID=&f{4}",
+  "displayListUnknownOwner": "未知",
+  "displayListUnknownWorld": "未知",
+  "displayListUnavailableUrl": "不可用",
+  "displayListTpButton": " [传送]",
+  "displayListUrlButton": " [链接]",
+  "displayBlockBreak": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "这是一个显示屏方块。",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "下载 Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "点击下载 Dream Displays"
+        }
+      },
+      {
+        "text": " 模组即可与之交互！",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "modRequired": {
+    "text": "",
+    "extra": [
+      {
+        "text": "D | ",
+        "color": "#9D9D97"
+      },
+      {
+        "text": "此服务器使用了游戏内显示屏。",
+        "color": "#FFFFFF"
+      },
+      {
+        "text": "下载 Dream Displays",
+        "color": "#5555FF",
+        "underlined": true,
+        "clickEvent": {
+          "action": "open_url",
+          "value": "https://modrinth.com/plugin/dreamdisplays"
+        },
+        "hoverEvent": {
+          "action": "show_text",
+          "value": "点击下载 Dream Displays"
+        }
+      },
+      {
+        "text": " 模组即可看到！",
+        "color": "#FFFFFF"
+      }
+    ]
+  },
+  "display.enabled": "&7D |&f 显示屏已启用，请稍候...",
+  "display.disabled": "&7D |&f 显示屏已禁用",
+  "display.already-disabled": "&7D |&f 显示屏已经处于禁用状态",
+  "display.already-enabled": "&7D |&f 显示屏已经处于启用状态",
+  "displayTargetNotFound": "&7D |&f 玩家 '%s' 不在线或未找到！",
+  "display.enabled.target": "&7D |&f 已为 %s 启用显示屏",
+  "display.disabled.target": "&7D |&f 已为 %s 禁用显示屏",
+  "display.already-enabled.target": "&7D |&f %s 的显示屏已经启用",
+  "display.already-disabled.target": "&7D |&f %s 的显示屏已经禁用",
+  "displayStatsHeader": "&7D |&f 模组使用统计：",
+  "displayStatsEntry": "&7D |&f 版本 %s：%d 名玩家",
+  "displayStatsTotal": "&7D |&f 使用模组的玩家总数：%d",
+  "displayHelpHeader": "可用命令：",
+  "displayHelpCreate": "– /display create：创建一个新的显示屏",
+  "displayHelpVideo": "– /display video <链接>：为你的显示屏设置视频",
+  "displayHelpName": "– /display name this|<id> <名称>：为显示屏设置一个无空格别名，可用作其 ID",
+  "displayHelpInfo": "– /display info：显示你注视的显示屏详情",
+  "displayHelpDelete": "– /display delete：删除你注视的显示屏",
+  "displayHelpList": "– /display list：列出所有显示屏",
+  "displayHelpStats": "– /display stats：显示模组使用统计",
+  "displayHelpReload": "– /display reload：重载配置文件",
+  "displayHelpOn": "– /display on [玩家]：为自己或指定玩家启用显示屏",
+  "displayHelpOff": "– /display off [玩家]：为自己或指定玩家禁用显示屏",
+  "displayHelpFullscreen": "– /display fullscreen start <id|链接> [参数]：强制向玩家推送全屏广播",
+  "displayHelpHelp": "– /display help：显示此帮助",
+  "displayInfoHeader": "&7D |&f 显示屏信息：",
+  "displayInfoOwnerLine": "&7D |&7 所有者=&f{0} &8| &7UUID=&f{1}",
+  "displayInfoUuidLine": "&7D |&7 显示屏ID=&f{0}",
+  "displayInfoPositionLine": "&7D |&7 世界=&f{0} &8| &7点1=&f[{1}, {2}, {3}] &8| &7点2=&f[{4}, {5}, {6}]",
+  "displayInfoStateLine": "&7D |&7 尺寸=&f{0}x{1} &8| &7朝向=&f{2} &8| &7同步=&f{3}",
+  "displayInfoMediaLine": "&7D |&7 语言=&f{0} &8| &7时长=&f{1} &8| &7链接=&f{2}",
+  "displayInfoScheduleLine": "&7D |&7 计划={0} 于 &f{1}",
+  "displayInfoUnknownOwner": "未知",
+  "displayInfoUnknownWorld": "未知",
+  "displayInfoUnknownDuration": "未知",
+  "displayInfoAutoLang": "自动",
+  "displayInfoUnavailableUrl": "不可用",
+  "fullscreenStarted": "&7D |&f 全屏广播 &b{0}&f 已开始（已覆盖 {1} 名玩家）",
+  "fullscreenStopped": "&7D |&f 已停止 {0} 个全屏广播",
+  "fullscreenStopFailed": "&7D |&f 未找到匹配的全屏广播",
+  "fullscreenNoTargets": "&7D |&f 请至少指定 target <玩家> 或 radius <范围> 其中之一",
+  "fullscreenAlreadyRunning": "&7D |&f 该显示屏已存在全屏广播，或会话 ID 已被占用",
+  "fullscreenForcedDisallowed": "&7D |&f 配置中已禁用强制全屏广播",
+  "fullscreenNoDisplay": "&7D |&f 未找到显示屏，且没有加载的世界可用于承载 URL 广播",
+  "fullscreenNetworkNoProxy": "&7D |&f 此后端未连接到 Dream Displays 代理，请检查 config.toml 中的 [proxy] 设置",
+  "fullscreenNetworkNotYetSupported": "&7D |&f 尚未支持网络范围的全屏（server <名称>/<global>）",
+  "fullscreenNetworkUrlOnly": "&7D |&f 网络范围的全屏仅支持视频 URL，不支持现有的显示屏 ID",
+  "fullscreenNetworkRadiusUnsupported": "&7D |&f radius 参数不支持与 server 一起使用 — 它仅适用于本服务器，请直接在本地启动",
+  "fullscreenNetworkQueued": "&7D |&f 网络全屏广播已加入队列，稍后将在所有匹配的服务器上启动",
+  "fullscreenNetworkStopQueued": "&7D |&f 已发送该会话的网络范围停止请求",
+  "fullscreenListEmpty": "&7D |&f 当前没有正在运行的全屏广播",
+  "fullscreenListEntry": "&7D |&7 {0} &8| &7显示屏=&f{1} &8| &7虚拟=&f{2} &8| &7覆盖=&f{3}",
+  "fullscreenListNetworkEntry": "&7D |&7 {0} &8| &7范围=&f{1} &8| &7网络覆盖=&f{2}",
+  "customMediaDisabled": "&7D |&f 此服务器已禁用自定义视频链接",
+  "customMediaHostBlocked": "&7D |&f 此服务器不允许来自该站点的视频",
+  "customMediaNoPermission": "&7D |&f 你没有权限播放自己的视频链接",
+  "customMediaTooFast": "&7D |&f 你切换视频链接过于频繁，请稍候"
+}

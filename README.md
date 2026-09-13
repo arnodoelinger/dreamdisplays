@@ -1,75 +1,93 @@
-If you enjoy Dream Displays, consider [buying me a coffee](https://ko-fi.com/arsmotorin). Every contribution helps keep the project alive!
-
-[![Support me on Ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/arsmotorin)
-
-- - -
-
-[![Latest release](https://img.shields.io/github/release/arsmotorin/dreamdisplays.svg)](https://github.com/arsmotorin/dreamdisplays/releases/latest)
-[![License](https://img.shields.io/github/license/arsmotorin/dreamdisplays)](https://github.com/arsmotorin/dreamdisplays/blob/master/LICENSE)
-[![Discord](http://img.shields.io/discord/1456716690879676501?label=Discord&style=flat&logo=discord)](https://discord.gg/uwMMZ2KWk6)
+![Dream Displays](https://i.imgur.com/oJPS9DB.png)
 
 <div align="center">
-  <img src="https://i.imgur.com/EquheHU.png" alt="Dream Displays"> 
-  <div>
-    <a href="https://modrinth.com/plugin/dreamdisplays">Download from Modrinth</a>
-    <span> | </span>
-    <a href="https://www.curseforge.com/minecraft/mc-mods/dreamdisplays">CurseForge</a>
-    <span> | </span>
-    <a href="https://github.com/arsmotorin/dreamdisplays">GitHub</a>
-    <span> | </span>
-    <a href="https://discord.com/invite/uwMMZ2KWk6">Discord</a>
-  </div>
+<a href="https://modrinth.com/plugin/dreamdisplays"><img src="https://i.imgur.com/C7yPsgr.png" height="48" alt="Modrinth"></a>
+<a href="https://www.curseforge.com/minecraft/mc-mods/dreamdisplays"><img src="https://i.imgur.com/p3OZHhH.png" height="48" alt="CurseForge"></a>
+<a href="https://github.com/arnodoelinger/dreamdisplays"><img src="https://i.imgur.com/fd254hJ.png" height="48" alt="GitHub"></a>
+<a href="https://discord.com/invite/uwMMZ2KWk6"><img src="https://i.imgur.com/g0O0JSQ.png" height="48" alt="Discord"></a>
+<a href="https://ko-fi.com/arnodoelinger"><img src="https://i.imgur.com/L3Zx1Wu.png" height="48" alt="Ko-Fi"></a>
 </div>
 
-## Available for Fabric, NeoForge, Quilt, and popular server forks
+# Bring real video playback to Minecraft
 
-Dream Displays also supports Fabric servers! No Paper or hybrid server software required.
+Watch videos, livestreams, and more directly on in-game displays — together with your friends.
 
-Create interactive in-game displays that stream YouTube videos in real time, with smooth playback, configurable
-resolution, and even with synchronization mode for all players on the server.
+Create a display, paste a link and that's it!
 
-For this mod to work, players install the client mod, while server admins can install either:
+![Player watching on displays](https://i.imgur.com/JoARVeu.png)
 
-- Server plugin on Paper / Folia / Purpur or other fork
-- Fabric server mod on Fabric servers
+# Watch anything
 
-![img](https://i.imgur.com/lOKNx6g.png)
+![Display menu](https://i.imgur.com/wGnDzrT.png)
 
-## Features
+|                                                                                                                                                                                                                                                                           | Source                        | What works                                                               |
+|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-------------------------------|--------------------------------------------------------------------------|
+| <img src="https://cdn.simpleicons.org/youtube" width="32" height="32" alt="YouTube">                                                                                                                                                                                      | **YouTube**                   | Videos and livestreams, ad-free, up to 4K, with multiple audio languages |
+| <img src="https://cdn.simpleicons.org/twitch" width="32" height="32" alt="Twitch">                                                                                                                                                                                        | **Twitch**                    | Live channels, VODs, and clips                                           |
+| <img src="https://cdn.simpleicons.org/kick" width="32" height="32" alt="Kick">                                                                                                                                                                                            | **Kick**                      | Live channels and VODs                                                   |
+| <img src="https://cdn.simpleicons.org/vimeo" width="32" height="32" alt="Vimeo">                                                                                                                                                                                          | **Vimeo**                     | Public videos and live events                                            |
+| <img src="https://cdn.simpleicons.org/bilibili" width="32" height="32" alt="Bilibili">                                                                                                                                                                                    | **Bilibili**                  | Videos, live channels, bungumi                                                 |
+| <img src="https://cdn.simpleicons.org/ffmpeg" width="32" height="32" alt="Video file">                                                                                                                                                                                    | **Any video link**            | Direct video files and live streams                                      |
+| <img src="https://cdn.simpleicons.org/googledrive" width="32" height="32" alt="Google Drive"><br><img src="https://cdn.simpleicons.org/dropbox" width="32" height="32" alt="Dropbox"><br><img src="https://cdn.simpleicons.org/imgur" width="32" height="32" alt="Imgur"> | **Share links**               | Google Drive, Dropbox, and Imgur direct links                            |
+| <img src="https://cdn.simpleicons.org/googlechrome" width="32" height="32" alt="Web">                                                                                                                                                                                     | **Pretty much anywhere else** | Not on the list? Try it anyway                                           |
 
-### Client
+# Built for multiplayer
 
-- **Ad-free YouTube video playback, so you can enjoy uninterrupted viewing**
-- **Seamless multiplayer synchronization: local, synced, and broadcast**
-- **Livestreams and premières support**
-- **Direct YouTube search and suggestions**
-- **Vertical display orientation support**
-- **Picture-in-Picture mode**
-- Adjustable resolutions from 144p up to 4K
-- Volume control from 0% to 200%
-- Brightness control from 0% to 100%
-- Multiple video languages support
-- Customizable display sizes in blocks
-- Integrated controls for play, pause, and seek
-- Hardware accelerations
-- And much more!
+Watch together with your friends with seamless multiplayer synchronization. Choose between local, synchronized, and
+broadcast playback depending on how you want your displays to behave.
 
-### Server
+Dream Displays keeps playback synchronized across the server while keeping network usage extremely low.
 
-- **Screens and settings remain after the server restarts or when unloaded**
-- **Simple and precise server-side configuration**
-- **Ultra-low network impact and zero lags**
-- **Fabric server support (1:1 as Paper)**
-- Display commands — manage your in-game screens: create, delete, etc.
-- Fine-grained permissions for admin-only control
+![Cinema](https://i.imgur.com/PKxe0oG.png)
 
-## How to use this mod?
+# Made for you
 
-Set up a display using black concrete, select it with a diamond axe, and type `/display create`. After the display is
-created, type `/display video <link to YouTube video> [language]`
+Dream Displays is built to make watching videos in Minecraft feel as natural as possible.
 
-Done! To customize the display, look at it and press `Shift + RMB`
+<table>
+<tr>
+<td valign="top" width="50%" align="center">
 
-[Read more in our wiki](https://github.com/arsmotorin/dreamdisplays/wiki).
+## Your experience
 
-![img](https://i.imgur.com/yyIKdp8.png)
+<div align="left">
+
+- **Seamless multiplayer playback** — with several modes
+- **Powerful media player** — search, Picture-in-Picture & more
+- **Ad-free YouTube** — no ads with multiple audio languages
+- **Immersive audio** — 3D sound, volume up to 200% & more
+- **Customizable displays** — size, brightness & orientation
+- **Hardware-accelerated playback** — smooth and efficient video decoding
+
+</div>
+
+</td>
+<td valign="top" width="50%" align="center">
+
+## Your server
+
+<div align="left">
+
+- **Broad server support** — Paper, Folia, Fabric, NeoForge
+- **Fullscreen mode** — great for events and presentations
+- **Simple config** — precise control over displays and playback
+- **Permissions** — fine-grained control with LuckPerms support
+- **Ultra-low network impact** — minimal impact for your traffic
+- **Persistent displays** — settings survive server restarts and unloading
+
+</div>
+
+</td>
+</tr>
+</table>
+
+# Get started
+Now it's your turn! Build your first display, invite your friends, and make displays a part of your world.
+
+- [Install Dream Displays](https://github.com/arnodoelinger/dreamdisplays/wiki/%C2%A71.-Installation)
+- [Create your first display](https://github.com/arnodoelinger/dreamdisplays/wiki/%C2%A72.-Using-displays)
+- [Browse the full wiki](https://github.com/arnodoelinger/dreamdisplays/wiki)
+
+---
+
+<sub><img src="https://i.imgur.com/BDbw8NI.png" height="20" alt="Thanks to WHYSUMI for renders"></sub> ∙ Thanks to [@whysumi_official](https://t.me/whysumi_official) for renders.

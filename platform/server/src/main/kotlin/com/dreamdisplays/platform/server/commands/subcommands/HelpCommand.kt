@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.ModLoaderOnly
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.utils.MessageUtil
 import com.mojang.brigadier.context.CommandContext
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
@@ -19,7 +19,7 @@ import org.bukkit.entity.Player
 @PaperOnly
 class HelpCommand : SubCommand {
     override val name = "help"
-    override val permission = Main.config.permissions.help
+    override val permission = PaperServer.config.permissions.help
     override val playerOnly = true
 
     /** Prints the help message listing every `/display` subcommand. */
@@ -28,20 +28,22 @@ class HelpCommand : SubCommand {
 
         MessageUtil.sendColoredMessage(
             sender,
-            $$"&7D |&f $${Main.config.getMessageForPlayer(player, "displayHelpHeader")}"
+            $$"&7D |&f $${PaperServer.config.getMessageForPlayer(player, "displayHelpHeader")}"
         )
 
         fun line(key: String) {
             MessageUtil.sendColoredMessage(
-                sender, $$"&f $${Main.config.getMessageForPlayer(player, key)}"
+                sender, $$"&f $${PaperServer.config.getMessageForPlayer(player, key)}"
             )
         }
 
         line("displayHelpCreate")
         line("displayHelpVideo")
+        line("displayHelpName")
         line("displayHelpInfo")
         line("displayHelpDelete")
         line("displayHelpList")
+        line("displayHelpFullscreen")
         line("displayHelpStats")
         line("displayHelpReload")
         line("displayHelpOn")
@@ -51,14 +53,14 @@ class HelpCommand : SubCommand {
 }
 
 /**
- * `Fabric`-specific implementation of the `/display help` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display help` command.
  */
-@FabricOnly
-object FabricHelpCommand {
+@ModLoaderOnly
+object VanillaHelpCommand {
     /** Prints the help message listing every `/display` subcommand. */
-    fun execute(ctx: CommandContext<CommandSourceStack>): Int {
+    fun execute(ctx: CommandContext<CommandSourceStack>) {
         val player = ctx.source.entity as? ServerPlayer
-        val config = Server.config
+        val config = VanillaServerState.config
 
         /** Prints the localized message for [key] to the player, or to the command source if not a player. */
         fun line(key: String) {
@@ -69,11 +71,12 @@ object FabricHelpCommand {
         val header = config.getMessageForPlayer(player, "displayHelpHeader")
         MessageUtil.sendColoredMessage(player ?: run {
             ctx.source.sendSystemMessage(Component.literal("D | Help"))
-            return 1
+            return
         }, header)
 
         line("displayHelpCreate")
         line("displayHelpVideo")
+        line("displayHelpName")
         line("displayHelpInfo")
         line("displayHelpDelete")
         line("displayHelpList")
@@ -81,7 +84,7 @@ object FabricHelpCommand {
         line("displayHelpReload")
         line("displayHelpOn")
         line("displayHelpOff")
+        line("displayHelpFullscreen")
         line("displayHelpHelp")
-        return 1
     }
 }

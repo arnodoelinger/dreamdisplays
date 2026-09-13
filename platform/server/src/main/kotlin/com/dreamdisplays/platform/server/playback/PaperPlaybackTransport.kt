@@ -1,17 +1,18 @@
 package com.dreamdisplays.platform.server.playback
 
-import com.dreamdisplays.core.protocol.DreamPacket
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.datatypes.DisplayData
-import com.dreamdisplays.platform.server.datatypes.PaperDisplayData
+import com.dreamdisplays.core.protocol.common.packets.DreamPacket
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.datatypes.display.DisplayData
+import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.utils.PlatformUtil
+import com.dreamdisplays.platform.server.utils.WorldGuardRegions
 import com.dreamdisplays.platform.server.utils.net.PaperV2Networking
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.jspecify.annotations.NullMarked
-import java.util.UUID
+import java.util.*
 
 /** `Paper` implementation of [PlaybackTransport]: v2 envelopes via [PaperV2Networking]. */
 @PaperOnly
@@ -39,7 +40,7 @@ object PaperPlaybackTransport : PlaybackTransport {
             }
             return
         }
-        val player = Main.getInstance().server.getPlayer(playerId) ?: return
+        val player = PaperServer.getInstance().server.getPlayer(playerId) ?: return
         if (V2PlayerTracker.isV2(playerId)) PaperV2Networking.send(listOf(player), packet)
     }
 
@@ -53,12 +54,58 @@ object PaperPlaybackTransport : PlaybackTransport {
     /** Display name for [playerId], or null if unknown / offline. */
     override fun playerName(playerId: UUID): String? {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerName(playerId)
-        return Main.getInstance().server.getPlayer(playerId)?.name
+        return PaperServer.getInstance().server.getPlayer(playerId)?.name
     }
 
     /** True if [playerId] is recognized as an admin (op / delete permission). */
     override fun isAdmin(playerId: UUID): Boolean {
         if (PlatformUtil.isFolia) return Scheduler.trackedPlayerIsAdmin(playerId)
-        return Main.getInstance().server.getPlayer(playerId)?.hasPermission(Main.config.permissions.delete) == true
+        return PaperServer.getInstance().server.getPlayer(playerId)
+            ?.hasPermission(PaperServer.config.permissions.deleteOthers) == true
+    }
+
+    /** True if [playerId] is a member (or owner) of the `WorldGuard` region [display] stands in. */
+    override fun isTerritoryMember(display: DisplayData, playerId: UUID): Boolean {
+        val paper = display as? PaperDisplayData ?: return false
+        val player = PaperServer.getInstance().server.getPlayer(playerId) ?: return false
+        return WorldGuardRegions.isRegionMember(player, paper.pos1)
+    }
+
+    /** UUIDs of every online player. */
+    override fun onlinePlayerIds(): List<UUID> = PaperServer.getInstance().server.onlinePlayers.map { it.uniqueId }
+
+    /** Squared distance from [playerId] to (`x`, `y`, `z`) in [world], or null when offline or in a different world. */
+    override fun playerDistanceSq(playerId: UUID, world: String, x: Double, y: Double, z: Double): Double? {
+        val loc = PaperServer.getInstance().server.getPlayer(playerId)?.location ?: return null
+        if (loc.world?.name != world) return null
+        val dx = loc.x - x
+        val dy = loc.y - y
+        val dz = loc.z - z
+        return dx * dx + dy * dy + dz * dz
+    }
+
+    /** Sends [display]'s `DisplayInfo` to one [playerId], regardless of render distance. */
+    override fun sendDisplayInfo(playerId: UUID, display: DisplayData, forced: Boolean) {
+        val paper = display as? PaperDisplayData ?: return
+        val player = PaperServer.getInstance().server.getPlayer(playerId) ?: return
+        DisplayManager.sendUpdate(paper, listOf(player), forced)
+    }
+
+    /** Runs [task] on the main / global region thread. */
+    override fun runOnMainThread(task: () -> Unit) {
+        Scheduler.runSync(task)
+    }
+
+    /** Persists [display] via the `Paper` storage backend. */
+    override fun saveDisplay(display: DisplayData) {
+        val paper = display as? PaperDisplayData ?: return
+        Scheduler.runAsync { PaperServer.getInstance().storage.saveDisplay(paper) }
+    }
+
+    /** Builds a synthetic 1x1 [PaperDisplayData] at the origin of the first loaded world. */
+    override fun createVirtualDisplay(id: UUID, ownerId: UUID): DisplayData? {
+        val world = PaperServer.getInstance().server.worlds.firstOrNull() ?: return null
+        val loc = org.bukkit.Location(world, 0.0, 0.0, 0.0)
+        return PaperDisplayData(id, ownerId, loc, loc, 1, 1, virtual = true)
     }
 }

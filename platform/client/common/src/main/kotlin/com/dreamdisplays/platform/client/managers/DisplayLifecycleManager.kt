@@ -1,24 +1,26 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.api.display.model.DisplayFacing
-import com.dreamdisplays.api.display.model.ContentRotation
+import com.dreamdisplays.api.display.model.property.DisplayRotation
+import com.dreamdisplays.api.display.model.property.DisplayFacing
+import com.dreamdisplays.api.media.service.keys.MediaServices
+import com.dreamdisplays.api.media.model.VideoQuality
+import com.dreamdisplays.api.media.source.model.MediaSource
+import com.dreamdisplays.api.playback.model.PlaybackMode
+import com.dreamdisplays.api.storage.model.FullDisplayData
+import com.dreamdisplays.core.protocol.common.packets.DisplayInfo
+import com.dreamdisplays.core.services.DisplayStorage
+import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.core.storage.DisplayStorage
-import com.dreamdisplays.api.storage.FullDisplayData
-import com.dreamdisplays.api.media.VideoQuality
-import com.dreamdisplays.core.protocol.DisplayInfo
-import com.dreamdisplays.api.playback.PlaybackMode
+import com.dreamdisplays.platform.client.managers.DisplayLifecycleManager.MAX_DISPLAY_BLOCKS
+import com.dreamdisplays.platform.client.storage.ClientSettingsStore
 import com.dreamdisplays.util.FacingUtil
-import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.api.media.MediaServices
-import com.dreamdisplays.api.media.source.MediaSource
 import net.minecraft.client.Minecraft
+import net.minecraft.client.multiplayer.ClientLevel
 import net.minecraft.core.BlockPos
 import org.joml.Vector3i
 import org.slf4j.LoggerFactory
-import java.util.UUID
+import java.util.*
 import kotlin.math.sqrt
 
 /**
@@ -26,7 +28,7 @@ import kotlin.math.sqrt
  */
 object DisplayLifecycleManager {
     /** Logger. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/DisplayLifecycleManager")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** Maximum allowed display dimension, in blocks. */
     private const val MAX_DISPLAY_BLOCKS = 256
@@ -40,37 +42,67 @@ object DisplayLifecycleManager {
         }
 
         DisplayRegistry.screens[packet.id]?.let {
+            DisplayRegistry.markReconfirmed(packet.id)
             it.updateData(packet)
             DisplayRegistry.recordScreen(it)
             return
         }
 
         val facing = FacingUtil.fromPacket(packet.facing.toByte())
-
-        Minecraft.getInstance().player?.let { player ->
-            val renderDistance =
-                DisplayStorage.getDisplayData(packet.id)?.renderDistance ?: ClientStateManager.config.defaultDistance
-            val dist = distanceToScreen(
-                packet.x, packet.y, packet.z,
-                packet.width, packet.height, facing.toDisplayFacing(),
-                player.blockPosition()
-            )
-            if (dist > renderDistance) return
-        }
-
-        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(packet.url))
-        DisplayRegistry.unloadedScreens.remove(packet.id)
-
         val mode = if (packet.mode == PlaybackMode.LOCAL.wire && packet.isSync) {
             PlaybackMode.SYNCED
         } else {
             PlaybackMode.fromWire(packet.mode)
         }
+        val renderDistance = DisplayScreen.clientRenderDistanceBlocks()
+
+        if (!packet.forced && !packet.virtual) {
+            Minecraft.getInstance().player?.let { player ->
+                val dist = distanceToScreen(
+                    packet.x, packet.y, packet.z,
+                    packet.width, packet.height, facing.toDisplayFacing(),
+                    player.blockPosition()
+                )
+                if (dist > renderDistance) {
+                    cacheUnloadedDisplay(packet, facing, mode, currentDimensionKey())
+                    return
+                }
+            }
+        }
+
+        DreamServices.registry.getOrNull(MediaServices.RESOLVER_REGISTRY)?.prefetch(MediaSource.from(packet.url))
+        DisplayRegistry.unloadedScreens.remove(packet.id)
 
         createScreen(
             packet.id, packet.ownerId, Vector3i(packet.x, packet.y, packet.z), facing,
             packet.width, packet.height, packet.url, packet.lang,
-            mode, packet.qualityCap, ContentRotation.fromQuarterTurns(packet.rotation),
+            mode, packet.qualityCap, DisplayRotation.fromQuarterTurns(packet.rotation),
+            currentDimensionKey(),
+        )
+        DisplayRegistry.screens[packet.id]?.virtual = packet.virtual
+    }
+
+    /**
+     * Stashes an out-of-range [packet] as an unloaded-screen snapshot (viewer's saved volume / quality /
+     * etc. merged in, matching a normal [DisplayScreen.toFullDisplayData] capture), so it restores from
+     * the local cache instead of needing another server broadcast once the player is back in range.
+     */
+    private fun cacheUnloadedDisplay(
+        packet: DisplayInfo, facing: FacingUtil, mode: PlaybackMode, dimensionKey: String,
+    ) {
+        val settings = ClientSettingsStore.getSettings(packet.id, DisplayScreen.defaultVolume())
+        DisplayRegistry.unloadedScreens[packet.id] = FullDisplayData(
+            uuid = packet.id,
+            x = packet.x, y = packet.y, z = packet.z,
+            facing = facing.toDisplayFacing(),
+            width = packet.width, height = packet.height,
+            videoUrl = packet.url, lang = packet.lang,
+            volume = settings.volume, quality = settings.quality, brightness = settings.brightness,
+            muted = settings.muted, mode = mode, ownerUuid = packet.ownerId,
+            currentTimeNanos = settings.savedTimeNanos,
+            rotation = DisplayRotation.fromQuarterTurns(packet.rotation).quarterTurns,
+            qualityCap = packet.qualityCap,
+            dimensionKey = dimensionKey,
         )
     }
 
@@ -78,31 +110,46 @@ object DisplayLifecycleManager {
     fun createScreen(
         uuid: UUID, ownerUuid: UUID, pos: Vector3i, facingUtil: FacingUtil,
         width: Int, height: Int, code: String, lang: String,
-        mode: PlaybackMode, qualityCap: Int, rotation: ContentRotation = ContentRotation.NONE,
+        mode: PlaybackMode, qualityCap: Int, rotation: DisplayRotation = DisplayRotation.NONE,
+        dimensionKey: String = currentDimensionKey(),
     ) {
         val displayScreen = DisplayScreen(
             uuid, ownerUuid, pos.x(), pos.y(), pos.z(), facingUtil.toDisplayFacing(),
-            width, height, mode, qualityCap, rotation
+            width, height, mode, qualityCap, rotation, dimensionKey,
         )
-
-        val savedData = DisplayStorage.getDisplayData(uuid)
-        displayScreen.renderDistance = savedData?.renderDistance ?: ClientStateManager.config.defaultDistance
 
         displayScreen.createTexture()
         DisplayRegistry.registerScreen(displayScreen)
         if (code != "") displayScreen.loadVideo(code, lang)
+
+        if (ClientSettingsStore.getSettings(uuid, DisplayScreen.defaultVolume()).pipOpen) {
+            displayScreen.activatePipMode()
+        }
     }
 
-    /** Restores any softly-unloaded screens that are back within render distance of [playerPos]. */
     fun restoreVisibleUnloadedScreens(playerPos: BlockPos) {
+        val dimensionKey = currentDimensionKey()
+        val renderDistance = DisplayScreen.clientRenderDistanceBlocks()
         DisplayRegistry.unloadedScreens.values
-            .filter { it.videoUrl.isNotEmpty() && distanceToData(it, playerPos) <= it.renderDistance }
+            .filter { sameDimension(it.dimensionKey, dimensionKey) && distanceToData(it, playerPos) <= renderDistance }
             .toList()
             .forEach { data ->
                 DisplayRegistry.unloadedScreens.remove(data.uuid)
                 restoreScreen(data)
             }
     }
+
+    private fun sameDimension(cached: String, current: String): Boolean =
+        cached.isEmpty() || cached == current
+
+    internal fun currentDimensionKey(): String =
+        Minecraft.getInstance().level?.let { dimensionKeyOf(it) } ?: ""
+
+    private fun dimensionKeyOf(level: ClientLevel): String =
+        //? if >=1.21.11 {
+        level.dimension().identifier().toString()
+    //?} else
+    /*level.dimension().location().toString()*/
 
     /** Rebuilds a [DisplayScreen] from persisted [data] and re-registers it. */
     private fun restoreScreen(data: FullDisplayData) {
@@ -115,9 +162,9 @@ object DisplayLifecycleManager {
         val displayScreen = DisplayScreen(
             data.uuid, data.ownerUuid, data.x, data.y, data.z, data.facing,
             data.width, data.height, data.mode ?: PlaybackMode.LOCAL,
-            qualityCap = data.qualityCap, rotation = ContentRotation.fromQuarterTurns(data.rotation),
+            qualityCap = data.qualityCap, rotation = DisplayRotation.fromQuarterTurns(data.rotation),
+            dimensionKey = data.dimensionKey.ifEmpty { currentDimensionKey() },
         )
-        displayScreen.renderDistance = data.renderDistance
         displayScreen.savedTimeNanos = data.currentTimeNanos
         displayScreen.volume = data.volume
         displayScreen.quality = VideoQuality.parse(data.quality)

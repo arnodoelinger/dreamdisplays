@@ -1,11 +1,11 @@
 package com.dreamdisplays.platform.client.displays
 
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
 import com.dreamdisplays.media.player.MediaPlayer
 import com.dreamdisplays.media.player.preparation.PreparedMedia
 import com.dreamdisplays.platform.client.managers.WarmParkPolicy
-import java.util.UUID
+import com.github.benmanes.caffeine.cache.Cache
+import com.github.benmanes.caffeine.cache.Caffeine
+import java.util.*
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
@@ -21,6 +21,7 @@ internal object DisplayReplayCache {
     private const val POSITION_TOLERANCE_NS = 1_000_000_000L
 
     /** One retained replay snapshot: the encoded video bytes, optional audio PCM, and resolved streams. */
+    @Suppress("ArrayInDataClass")
     private data class Entry(
         val url: String,
         val positionNanos: Long,

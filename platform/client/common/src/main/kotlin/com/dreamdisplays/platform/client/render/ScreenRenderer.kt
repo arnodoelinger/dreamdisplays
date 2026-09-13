@@ -1,17 +1,29 @@
 package com.dreamdisplays.platform.client.render
 
-import com.dreamdisplays.api.display.model.ContentRotation
-import com.dreamdisplays.api.display.model.DisplayFacing
-import com.dreamdisplays.api.display.model.DisplayId
+//? if >=26 {
+//?} else
+/*import com.mojang.blaze3d.systems.RenderSystem*/
+//? if >=26.2 {
+//?} else
+/*import com.mojang.blaze3d.vertex.Tesselator*/
+//? if >=1.21.11 {
+import net.minecraft.client.renderer.rendertype.RenderType
+//?} else
+/*import net.minecraft.client.renderer.RenderType*/
+import com.dreamdisplays.api.display.model.property.DisplayRotation
+import com.dreamdisplays.api.display.model.property.DisplayFacing
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.render.backend.service.RenderContext
+import com.dreamdisplays.api.render.texture.model.TextureHandle
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
-import com.dreamdisplays.api.render.RenderContext
-import com.dreamdisplays.api.render.TextureHandle
-import com.mojang.blaze3d.vertex.*
+import com.dreamdisplays.platform.client.render.ScreenRenderer.drawLayer
+import com.mojang.blaze3d.vertex.PoseStack
+import com.mojang.blaze3d.vertex.VertexConsumer
+import com.mojang.blaze3d.vertex.VertexFormat
 import net.minecraft.client.Camera
-import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sin
 
@@ -20,9 +32,12 @@ object ScreenRenderer : ClientRenderService {
     private typealias QuadAppender = (PoseStack.Pose, VertexConsumer) -> Unit
     private typealias QuadRenderer = (RenderType, QuadAppender) -> Unit
 
-    /** Iterates all registered screens and renders each one relative to [camera]. */
-    fun render(stack: PoseStack, camera: Camera) {
-        render(stack, camera) { type, appendVertices ->
+    /**
+     * Iterates all registered screens and renders each one relative to [camera]. Pass `replay = true`
+     * for [UnshadedDisplayPass]'s second draw of a frame already on screen.
+     */
+    fun render(stack: PoseStack, camera: Camera, replay: Boolean = false) {
+        render(stack, camera, replay) { type, appendVertices ->
             drawImmediate(stack, type, appendVertices)
         }
     }
@@ -54,8 +69,12 @@ object ScreenRenderer : ClientRenderService {
     override val registeredCount: Int; get() = DisplayRegistry.getScreens().count { it.hasTexture }
 
     /** Iterates all registered screens and lets the caller submit quads through the active renderer. */
-    fun render(stack: PoseStack, camera: Camera, drawQuad: QuadRenderer) {
-        val cameraPos = camera.position()
+    fun render(stack: PoseStack, camera: Camera, replay: Boolean = false, drawQuad: QuadRenderer) {
+        val cameraPos =
+            //? if >=1.21.11 {
+            camera.position()
+        //?} else
+        /*camera.getPosition()*/
         for (displayScreen in DisplayRegistry.getScreens()) {
             if (displayScreen.isDormant || !displayScreen.hasTexture) continue
 
@@ -66,7 +85,7 @@ object ScreenRenderer : ClientRenderService {
             val relativePos = screenCenter.subtract(cameraPos)
             stack.translate(relativePos.x, relativePos.y, relativePos.z)
 
-            renderScreenTexture(displayScreen, stack, drawQuad)
+            renderScreenTexture(displayScreen, stack, replay, drawQuad)
 
             stack.popPose()
         }
@@ -74,25 +93,29 @@ object ScreenRenderer : ClientRenderService {
         // The registered RenderHook extends the world pass after the mod's own screens.
         // ClientRenderModule installs the default hook for API-registered surfaces.
         // The world render hooks do not surface a partial tick, hence the 0f tickDelta.
-        DreamServices.registry.getOrNull<RenderHook>()
+        // Only on the level-pass draw: the replay would run every surface a second time.
+        if (!replay) DreamServices.registry.getOrNull<RenderHook>()
             ?.onRender(MinecraftRenderContext(stack, camera, 0f))
     }
 
+    /** Distance the [UnshadedDisplayPass] replay is lifted off the level-pass quad it repeats, in blocks. */
+    private const val REPLAY_LIFT = 0.01f
+
     /** Translates and rotates the pose for [displayScreen]'s facing direction, then renders the video or fallback color. */
-    private fun renderScreenTexture(displayScreen: DisplayScreen, stack: PoseStack, drawQuad: QuadRenderer) {
-        // Upload the latest decoded frame to the GPU texture (if a new one is ready).
-        // Done here on the render thread instead of via mc.execute() per frame.
-        displayScreen.fitTexture()
+    private fun renderScreenTexture(
+        displayScreen: DisplayScreen, stack: PoseStack, replay: Boolean, drawQuad: QuadRenderer,
+    ) {
+        if (!replay) displayScreen.fitTexture()
 
         val facing = displayScreen.facing
         val w = displayScreen.width
         val h = displayScreen.height
+        val lift = if (replay) REPLAY_LIFT else 0f
 
         if (displayScreen.isVideoStarted && displayScreen.hasTexture && displayScreen.renderType != null) {
-            stack.pushPose()
-            DisplayGeometry.applyScreenTransform(stack, facing, w, h)
-            renderGpuTexture(drawQuad, displayScreen)
-            stack.popPose()
+            drawLayer(stack, facing, w, h, lift) {
+                renderGpuTexture(drawQuad, displayScreen)
+            }
         } else {
             renderPlaceholder(
                 stack,
@@ -101,19 +124,54 @@ object ScreenRenderer : ClientRenderService {
                 facing,
                 w,
                 h,
-                displayScreen.errored
+                displayScreen.errored,
+                lift,
             )
         }
+
+        renderSubtitleOverlay(displayScreen, stack, facing, w, h, lift, drawQuad)
+    }
+
+    private const val SUBTITLE_MAX_HEIGHT_FRAC = 0.16f
+    private const val SUBTITLE_MAX_WIDTH_FRAC = 0.86f
+    private const val SUBTITLE_BOTTOM_MARGIN_FRAC = 0.05f
+
+    private fun renderSubtitleOverlay(
+        displayScreen: DisplayScreen, stack: PoseStack, facing: DisplayFacing, w: Int, h: Int, lift: Float, drawQuad: QuadRenderer,
+    ) {
+        val overlay = displayScreen.subtitleOverlayTexture()
+        overlay.update(if (displayScreen.subtitlesEnabled) displayScreen.currentSubtitleText else null)
+        val type = overlay.renderType() ?: return
+
+        var unitH = SUBTITLE_MAX_HEIGHT_FRAC
+        var unitW = unitH * (h.toFloat() / w.toFloat()) * overlay.aspectRatio
+        if (unitW > SUBTITLE_MAX_WIDTH_FRAC) {
+            unitW = SUBTITLE_MAX_WIDTH_FRAC
+            unitH = unitW * (w.toFloat() / h.toFloat()) / overlay.aspectRatio
+        }
+        val x0 = 0.5f - unitW / 2f
+        val x1 = 0.5f + unitW / 2f
+        val y0 = SUBTITLE_BOTTOM_MARGIN_FRAC
+        val y1 = y0 + unitH
+
+        drawLayer(stack, facing, w, h, lift + OVERLAY_LIFT) {
+            drawQuad(type) { pose, vb -> appendTexturedRect(pose, vb, x0, y0, x1, y1) }
+        }
+    }
+
+    private fun appendTexturedRect(
+        pose: PoseStack.Pose, builder: VertexConsumer, x0: Float, y0: Float, x1: Float, y1: Float,
+    ) {
+        addVertex(pose, builder, x0, y0, 0f, 255, 255, 255, 0f, 1f)
+        addVertex(pose, builder, x1, y0, 0f, 255, 255, 255, 1f, 1f)
+        addVertex(pose, builder, x1, y1, 0f, 255, 255, 255, 1f, 0f)
+        addVertex(pose, builder, x0, y1, 0f, 255, 255, 255, 0f, 0f)
     }
 
     /** Draws a unit quad using the screen's GPU texture, ramping up the first-appear fade. */
     private fun renderGpuTexture(drawQuad: QuadRenderer, displayScreen: DisplayScreen) {
         val appear = displayScreen.appearProgress()
-        val base = if (displayScreen.isYuvTexture) {
-            displayScreen.brightness.coerceIn(0f, 2f) * 127.5f
-        } else {
-            255f
-        }
+        val base = if (displayScreen.isYuvTexture) displayScreen.brightness.coerceIn(0f, 1f) * 255f else 255f
         val c = (base * appear).toInt().coerceIn(0, 255)
         drawQuad(displayScreen.renderType!!) { pose, builder ->
             appendQuad(pose, builder, c, c, c, displayScreen.rotation)
@@ -124,17 +182,15 @@ object ScreenRenderer : ClientRenderService {
     private const val OVERLAY_LIFT = 0.01f
 
     /**
-     * Loading / error placeholder. Loading is a faintly breathing dark backdrop with an indeterminate
-     * progress bar near the bottom — a track plus an accent segment that sweeps left to right; error is
-     * a dark red backdrop with a static red bar. Each element sits on its own depth layer so they read
-     * cleanly instead of z-fighting or blinking in place.
+     * Loading / error placeholder. Loading is a faintly breathing dark backdrop with an indeterminate progress bar;
+     * error swaps in a static red tint.
      */
     private fun renderPlaceholder(
         stack: PoseStack, drawQuad: QuadRenderer, type: RenderType,
-        facing: DisplayFacing, w: Int, h: Int, error: Boolean,
+        facing: DisplayFacing, w: Int, h: Int, error: Boolean, lift: Float,
     ) {
         // Backdrop on the screen plane
-        drawLayer(stack, facing, w, h, 0f) {
+        drawLayer(stack, facing, w, h, lift) {
             val (r, g, b) = if (error) {
                 Triple(28, 6, 6)
             } else {
@@ -151,7 +207,7 @@ object ScreenRenderer : ClientRenderService {
         val x1 = 0.94f
 
         // Bar track, lifted off the backdrop.
-        drawLayer(stack, facing, w, h, OVERLAY_LIFT) {
+        drawLayer(stack, facing, w, h, lift + OVERLAY_LIFT) {
             val (r, g, b) = if (error) Triple(120, 30, 30) else Triple(22, 24, 34)
             drawQuad(type) { pose, vb -> appendRect(pose, vb, x0, y0, x1, y1, r, g, b) }
         }
@@ -166,7 +222,7 @@ object ScreenRenderer : ClientRenderService {
         val segStart = x0 - segW + travel * phase
         val sx0 = segStart.coerceIn(x0, x1)
         val sx1 = (segStart + segW).coerceIn(x0, x1)
-        if (sx1 > sx0) drawLayer(stack, facing, w, h, OVERLAY_LIFT * 2f) {
+        if (sx1 > sx0) drawLayer(stack, facing, w, h, lift + OVERLAY_LIFT * 2f) {
             drawQuad(type) { pose, vb -> appendRect(pose, vb, sx0, y0, sx1, y1, 40, 110, 255) }
         }
     }
@@ -210,7 +266,7 @@ object ScreenRenderer : ClientRenderService {
         r: Int,
         g: Int,
         b: Int,
-        rotation: ContentRotation,
+        rotation: DisplayRotation,
     ) {
         val rot = rotation.quarterTurns
         val uv = Array(4) { baseUv[(it + rot) % 4] }
@@ -244,35 +300,52 @@ object ScreenRenderer : ClientRenderService {
     /** Compatibility layer for the new immediate mode API. */
     private object ImmediateRenderCompat {
         fun draw(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-            //? if >=26 {
+            //? if >=26.2 {
             draw262(stack, type, appendVertices)
             //?} else
             /*run {
-                val builder = Tesselator.getInstance().begin(type.mode(), type.format())
-                appendVertices(stack.last(), builder)
-                type.draw(builder.buildOrThrow())
+                //? if <1.21.11 {
+                RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+                //?}
+                try {
+                    val builder = Tesselator.getInstance().begin(type.mode(), type.format())
+                    appendVertices(stack.last(), builder)
+                    type.draw(builder.buildOrThrow())
+                } finally {
+                    //? if <1.21.11 {
+                    RenderSystem.setShaderColor(1f, 1f, 1f, 1f)
+                    //?}
+                }
             }*/
         }
 
-        //? if >=26 {
+        //? if >=26.2 {
+        /** Staged-buffer class and constructor for the 26.2+ draw path, resolved once. */
+        private val stagedClass: Class<*> by lazy { Class.forName("net.minecraft.client.renderer.StagedVertexBuffer") }
+        private val stagedCtor by lazy {
+            stagedClass.getConstructor(java.util.function.Supplier::class.java, Int::class.javaPrimitiveType)
+        }
+
+        /** Per-class method cache so the staged draw resolves each method once, not per quad per frame. */
+        private val methodCache = java.util.concurrent.ConcurrentHashMap<String, java.lang.reflect.Method>()
+
+        /** Looks up a public method on [owner] through the cache. */
+        private fun method(owner: Class<*>, name: String, vararg params: Class<*>): java.lang.reflect.Method =
+            methodCache.computeIfAbsent("${owner.name}#$name") { owner.getMethod(name, *params) }
+
         private fun draw262(stack: PoseStack, type: RenderType, appendVertices: QuadAppender) {
-            val stagedClass = Class.forName("net.minecraft.client.renderer.StagedVertexBuffer")
-            val staged = stagedClass
-                .getConstructor(java.util.function.Supplier::class.java, Int::class.javaPrimitiveType)
-                .newInstance(java.util.function.Supplier { "dream-displays-immediate" }, 1536)
+            val staged = stagedCtor.newInstance(java.util.function.Supplier { "dream-displays-immediate" }, 1536)
             try {
-                val primitiveTopology = type.javaClass.getMethod("primitiveTopology").invoke(type)
-                val draw = stagedClass
-                    .getMethod("appendDraw", VertexFormat::class.java, primitiveTopology.javaClass)
+                val primitiveTopology = method(type.javaClass, "primitiveTopology").invoke(type)
+                val draw = method(stagedClass, "appendDraw", VertexFormat::class.java, primitiveTopology.javaClass)
                     .invoke(staged, type.format(), primitiveTopology)
-                val builder = stagedClass
-                    .getMethod("getVertexBuilder", draw.javaClass)
+                val builder = method(stagedClass, "getVertexBuilder", draw.javaClass)
                     .invoke(staged, draw) as VertexConsumer
                 appendVertices(stack.last(), builder)
-                stagedClass.getMethod("upload").invoke(staged)
-                val executeInfo = stagedClass.getMethod("getExecuteInfo", draw.javaClass).invoke(staged, draw) ?: return
-                val prepared = type.javaClass.getMethod("prepare").invoke(type)
-                prepared.javaClass.getMethod("drawFromBuffer", executeInfo.javaClass).invoke(prepared, executeInfo)
+                method(stagedClass, "upload").invoke(staged)
+                val executeInfo = method(stagedClass, "getExecuteInfo", draw.javaClass).invoke(staged, draw) ?: return
+                val prepared = method(type.javaClass, "prepare").invoke(type)
+                method(prepared.javaClass, "drawFromBuffer", executeInfo.javaClass).invoke(prepared, executeInfo)
             } finally {
                 (staged as AutoCloseable).close()
             }

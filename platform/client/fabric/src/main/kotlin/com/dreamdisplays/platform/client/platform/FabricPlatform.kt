@@ -1,15 +1,16 @@
 package com.dreamdisplays.platform.client.platform
 
+import com.dreamdisplays.api.platform.capability.PlatformLogger
+import com.dreamdisplays.api.platform.capability.PlatformPaths
+import com.dreamdisplays.api.platform.capability.PlatformScheduler
+import com.dreamdisplays.api.platform.identity.Platform
+import com.dreamdisplays.api.platform.identity.PlatformId
+import com.dreamdisplays.api.platform.identity.PlatformSide
 import com.dreamdisplays.platform.client.Initializer
-import com.dreamdisplays.api.platform.Platform
-import com.dreamdisplays.api.platform.PlatformId
-import com.dreamdisplays.api.platform.PlatformLogger
-import com.dreamdisplays.api.platform.PlatformPaths
-import com.dreamdisplays.api.platform.PlatformScheduler
-import com.dreamdisplays.api.platform.PlatformSide
 import com.dreamdisplays.util.GeneralUtil
 import net.fabricmc.loader.api.FabricLoader
 import java.nio.file.Path
+import kotlin.jvm.optionals.getOrNull
 
 /** Fabric client [Platform]. Versions and paths come from [FabricLoader] metadata. */
 object FabricPlatform : Platform {
@@ -18,18 +19,14 @@ object FabricPlatform : Platform {
     override val id: String get() = platformId.wire
     override val side: PlatformSide = PlatformSide.CLIENT
 
-    @Suppress("TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     override val minecraftVersion: String by lazy {
-        FabricLoader.getInstance().getModContainer("minecraft")
-            .map { it.metadata.version.friendlyString }
-            .orElse("unknown")
+        FabricLoader.getInstance().getModContainer("minecraft").getOrNull()
+            ?.metadata?.version?.friendlyString ?: "unknown"
     }
 
-    @Suppress("TYPE_MISMATCH_BASED_ON_JAVA_ANNOTATIONS")
     override val modVersion: String by lazy {
-        FabricLoader.getInstance().getModContainer(Initializer.MOD_ID)
-            .map { it.metadata.version.friendlyString }
-            .orElse(GeneralUtil.getModVersion())
+        FabricLoader.getInstance().getModContainer(Initializer.MOD_ID).getOrNull()
+            ?.metadata?.version?.friendlyString ?: GeneralUtil.getModVersion()
     }
 
     override val scheduler: PlatformScheduler = MinecraftClientScheduler

@@ -1,17 +1,17 @@
 package com.dreamdisplays.platform.client.input
 
-import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayId
 
 /**
- * Represents the result of a raycast against the displays.
+ * Represents the result of a ray-cast against the displays.
  */
 sealed interface RaycastResult {
-    /** Represents a raycast that did not hit any display. */
+    /** Represents a ray-cast that did not hit any display. */
     data object Miss : RaycastResult
 
-    /** Represents a raycast that hit a display. */
+    /** Represents a ray-cast that hit a display. */
     data class Hit(
-        /** Id of the display that was hit. */
+        /** ID of the display that was hit. */
         val displayId: DisplayId,
 
         /** World X coordinate of the hit point. */

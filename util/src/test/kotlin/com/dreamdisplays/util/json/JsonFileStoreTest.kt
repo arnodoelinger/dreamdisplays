@@ -10,7 +10,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class JsonFileStoreTest {
-    private val logger = LoggerFactory.getLogger(JsonFileStoreTest::class.java)
+    private val logger = LoggerFactory.getLogger(javaClass)
     private val mapSerializer = MapSerializer(String.serializer(), Int.serializer())
 
     @Test

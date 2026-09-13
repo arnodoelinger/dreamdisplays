@@ -2,20 +2,14 @@ package com.dreamdisplays.media.player
 
 import kotlin.math.abs
 
-/**
- * Combines the user-set volume with distance-based attenuation and pushes the effective value to
- * the audio pipeline via [applyVolume]. Extracted from `MediaPlayer` so volume policy lives in one
- * place.
- *
- * @param initialVolume starting user volume (0.0-2.0)
- * @param applyVolume sink receiving the effective volume (user volume * attenuation)
- */
+/** Combines the user-set volume with distance-based attenuation and pushes the effective value to the audio pipeline. */
 internal class VolumeController(
     initialVolume: Double,
     private val applyVolume: (Double) -> Unit,
 ) {
     @Volatile
     private var userVolume = initialVolume
+
     @Volatile
     private var lastAttenuation = 1.0
 

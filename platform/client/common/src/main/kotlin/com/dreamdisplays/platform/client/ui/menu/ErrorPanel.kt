@@ -1,24 +1,23 @@
 package com.dreamdisplays.platform.client.ui.menu
 
+import com.dreamdisplays.api.media.model.DreamMediaException
+import com.dreamdisplays.api.media.model.MediaFailureKind
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
 import com.dreamdisplays.platform.client.ui.kit.UiRect
 import com.dreamdisplays.platform.client.ui.kit.UiTheme
 import com.dreamdisplays.platform.client.ui.kit.drawPanel
+import com.dreamdisplays.platform.client.ui.menu.ErrorPanel.Companion.MAX_DETAIL_LINES
 import com.dreamdisplays.platform.client.ui.widgets.IconButton
-import com.dreamdisplays.api.media.DreamMediaException
-import com.dreamdisplays.api.media.MediaFailureKind
 import net.minecraft.ChatFormatting
-import net.minecraft.client.gui.Font
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.Font
 import net.minecraft.network.chat.Component
 import kotlin.math.min
 
 /**
- * The centered "video failed to load" panel shown instead of the normal menu content. It now states
- * what actually went wrong — a per-kind headline plus the underlying failure message — and offers
- * Retry / Report / Delete. Retry re-resolves the same URL in place, so a transient failure no longer
- * forces the player to delete a display they want to keep.
+ * The centered "video failed to load" panel shown instead of the normal menu content; states what actually failed and
+ * offers retry / delete / report actions.
  */
 class ErrorPanel(
     private val retryButton: IconButton,
@@ -87,7 +86,7 @@ class ErrorPanel(
         }
         if (line.isNotEmpty()) lines.add(line)
         if (lines.size <= MAX_DETAIL_LINES) return lines
-        return lines.take(MAX_DETAIL_LINES).toMutableList().also { it[it.lastIndex] = it.last() + " …" }
+        return lines.take(MAX_DETAIL_LINES).toMutableList().also { it[it.lastIndex] = it.last() + " ..." }
     }
 
     companion object {

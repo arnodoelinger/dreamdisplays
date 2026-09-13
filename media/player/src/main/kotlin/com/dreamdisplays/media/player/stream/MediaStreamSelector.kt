@@ -1,35 +1,32 @@
 package com.dreamdisplays.media.player.stream
 
-import com.dreamdisplays.api.media.stream.MediaStream
-import com.dreamdisplays.api.media.stream.MediaStreamType
-import com.dreamdisplays.api.media.stream.SupportedCodec
+import com.dreamdisplays.api.media.stream.model.MediaStream
+import com.dreamdisplays.api.media.stream.model.MediaStreamType
+import com.dreamdisplays.api.media.stream.model.SupportedCodec
+import com.dreamdisplays.util.OsInfo
 import kotlin.math.abs
 
 /** Pure helpers for parsing quality values and picking video / audio tracks from a [MediaStream] list. */
 object MediaStreamSelector {
     /** Realtime-safe selection is enabled by default, but can be disabled via system property. */
-    private val realtimeSafeSelection: Boolean = System.getProperty("dreamdisplays.stream.realtimeSafe", "true").toBoolean()
+    private val realtimeSafeSelection: Boolean =
+        System.getProperty("dreamdisplays.stream.realtimeSafe", "true").toBoolean()
 
     /** Default 60 fps preference. Can be overridden by system property. */
     private val defaultPreferFps60: Boolean = System.getProperty("dreamdisplays.stream.prefer60", "false").toBoolean()
 
     /** Default 60 fps penalty. Can be overridden by system property. */
-    private val defaultFps60Penalty: Int = System.getProperty("dreamdisplays.stream.fps60Penalty", "420").toIntOrNull()?.coerceAtLeast(0) ?: 420
-
-    /** Operating system name. Used to determine platform-specific behavior. */
-    private val osName: String = System.getProperty("os.name").orEmpty().lowercase()
-
-    /** Operating system architecture. Used to determine platform-specific behavior. */
-    private val osArch: String = System.getProperty("os.arch").orEmpty().lowercase()
+    private val defaultFps60Penalty: Int =
+        System.getProperty("dreamdisplays.stream.fps60Penalty", "420").toIntOrNull()?.coerceAtLeast(0) ?: 420
 
     /** Is the current platform macOS? */
-    private val isMac: Boolean = osName.contains("mac") || osName.contains("darwin")
+    private val isMac: Boolean = OsInfo.isMac
 
     /** Is the current platform Windows? */
-    private val isWindows: Boolean = osName.contains("win")
+    private val isWindows: Boolean = OsInfo.isWindows
 
     /** Is the current platform Apple Silicon? */
-    private val isAppleSilicon: Boolean = isMac && (osArch.contains("aarch64") || osArch.contains("arm64"))
+    private val isAppleSilicon: Boolean = OsInfo.isMac && OsInfo.isArm64
 
     /** Returns the pixel height of [stream], or [Int.MAX_VALUE] if unknown. */
     fun parseQuality(stream: MediaStream): Int = stream.height ?: Int.MAX_VALUE
@@ -53,20 +50,37 @@ object MediaStreamSelector {
      * @return the updated set, or null when no switch is possible (no candidate, or the best
      *   candidate is already the current video).
      */
-    internal fun switchQuality(streams: ActiveStreams, target: Int, lang: String): ActiveStreams? {
+    internal fun switchQuality(streams: ActiveStreams, target: Int): ActiveStreams? {
         val best = pickVideo(streams.availableVideo, target)
             ?.takeIf { it.url != streams.currentVideo.url } ?: return null
         // Keep the current audio so the progressive pick isn't reverted on a quality switch
         return streams.copy(currentVideo = best, currentAudio = streams.currentAudio)
     }
 
-    /** Pick the best video stream closest to [target] quality (height in pixels). */
+    /**
+     * Switches the active audio track to the one whose URL equals [targetUrl], leaving the video
+     * selection untouched.
+     *
+     * @return the updated set, or null when there's no matching track, or it's already current.
+     */
+    internal fun switchAudioTrack(streams: ActiveStreams, targetUrl: String): ActiveStreams? {
+        val best = streams.availableAudio.firstOrNull { it.url == targetUrl }
+            ?.takeIf { it.url != streams.currentAudio.url } ?: return null
+        return streams.copy(currentAudio = best)
+    }
+
+    /**
+     * Pick the best video stream at or below [target] quality (height in pixels), falling back to
+     * the closest stream above it only when nothing at-or-below is available — a quality setting is
+     * a ceiling, not just a target to get near, so this never silently serves more than asked for.
+     */
     fun pickVideo(streams: List<MediaStream>?, target: Int, preferFps60: Boolean = defaultPreferFps60): MediaStream? {
         if (streams.isNullOrEmpty()) return null
         return streams.asSequence()
             .filter { it.height != null }
             .minWithOrNull(
-                compareBy<MediaStream> { realtimeScore(it, target, preferFps60) }
+                compareBy<MediaStream> { parseQuality(it) > target }
+                    .thenBy { realtimeScore(it, target, preferFps60) }
                     .thenBy { abs(parseQuality(it) - target) }
                     .thenBy { platformCodecPenalty(it) }
                     .thenBy { fpsPenalty(it, preferFps60) }
@@ -179,28 +193,33 @@ object MediaStreamSelector {
         val requested = lang.trim()
 
         if (requested.isNotEmpty()) {
-            audioOnly.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
+            audioOnly.filter { matchesLanguage(it, requested) }.highestBitrate()?.let { return it }
         }
 
-        audioOnly.firstOrNull {
+        audioOnly.filter {
             it.audioTrackName?.lowercase()?.let { n -> "original" in n || "default" in n } == true
-        }?.let { return it }
-        audioOnly.firstOrNull { it.audioTrackLang.isNullOrBlank() || it.audioTrackLang == "und" }
-            ?.let { return it }
-        audioOnly.firstOrNull()?.let { return it }
+        }.highestBitrate()?.let { return it }
+        audioOnly.filter { it.audioTrackLang.isNullOrBlank() || it.audioTrackLang == "und" }
+            .highestBitrate()?.let { return it }
+        audioOnly.highestBitrate()?.let { return it }
 
         if (chosenVideo != null && chosenVideo.type.hasAudio) return chosenVideo
         if (requested.isNotEmpty()) {
-            audioStreams.firstOrNull { matchesLanguage(it, requested) }?.let { return it }
+            audioStreams.filter { matchesLanguage(it, requested) }.highestBitrate()?.let { return it }
         }
         return audioStreams.firstOrNull()
     }
 
+    /**
+     * The highest-bitrate stream, or the first one when no candidate reports a bitrate (`maxByOrNull`
+     * keeps the earliest of equal values, so an all-unknown list preserves the resolver's own order).
+     */
+    private fun List<MediaStream>.highestBitrate(): MediaStream? = maxByOrNull { it.bitrate ?: 0 }
+
     /** Case-insensitive partial match of [lang] against the stream's language tag and track name. */
     fun matchesLanguage(stream: MediaStream, lang: String): Boolean {
         val needle = lang.lowercase()
-        if (needle.isEmpty()) return false
-        return stream.audioTrackLang?.lowercase()?.contains(needle) == true
-                || stream.audioTrackName?.lowercase()?.contains(needle) == true
+        return needle.isNotEmpty() && (stream.audioTrackLang?.lowercase()?.contains(needle) == true
+                || stream.audioTrackName?.lowercase()?.contains(needle) == true)
     }
 }

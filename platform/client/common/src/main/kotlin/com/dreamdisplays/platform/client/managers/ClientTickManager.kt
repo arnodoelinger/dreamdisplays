@@ -1,31 +1,36 @@
 package com.dreamdisplays.platform.client.managers
 
-import com.dreamdisplays.api.display.model.DisplayId
+import com.dreamdisplays.api.display.model.property.DisplayId
+import com.dreamdisplays.api.media.audio.service.keys.AudioAcousticsServices
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
+import com.dreamdisplays.platform.client.audio.ListenerPoseTracker
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.input.DisplayInteraction
-import com.dreamdisplays.platform.client.input.DisplayInteractionService
-import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler
-import com.dreamdisplays.platform.client.input.InputAction
-import com.dreamdisplays.platform.client.input.InputHandler
-import com.dreamdisplays.platform.client.input.KeyBindingRegistry
-import com.dreamdisplays.platform.client.overlay.OverlayManager
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
 import com.dreamdisplays.platform.client.displays.DisplayScreen
+import com.dreamdisplays.platform.client.input.*
+import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
+import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
 import net.minecraft.client.Minecraft
+import net.minecraft.client.gui.screens.TitleScreen
+import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.multiplayer.ClientLevel
-import net.minecraft.world.effect.MobEffectInstance
-import net.minecraft.world.effect.MobEffects
 import org.lwjgl.glfw.GLFW
-import java.util.UUID
+import java.util.*
 
 /**
- * Handles per-tick client display state: level changes, hover, unloading, shortcuts, and focus mode.
+ * Handles per-tick client display state: level changes, hover, unloading, and shortcuts.
  */
 object ClientTickManager {
+    /**
+     * Deadband around a display's renderDistance so a player lingering near the boundary doesn't
+     * flip park / wake every tick (block-quantized position drift across a single threshold).
+     */
+    private const val DORMANT_HYSTERESIS_BLOCKS = 4
+
     /** Edge-detect state for the menu-open button. */
     private var wasPressed = false
 
@@ -35,9 +40,6 @@ object ClientTickManager {
     /** The level seen last tick, used to detect level changes. */
     @Volatile
     private var lastLevel: ClientLevel? = null
-
-    /** Whether focus-mode blindness was applied last tick. */
-    private var wasFocused = false
 
     /** Counter that throttles the unloaded-screen restore check. */
     private var unloadCheckTick = 0
@@ -51,11 +53,15 @@ object ClientTickManager {
     /** Monotonic tick counter emitted with [ClientLifecycleEvent.Tick]. */
     private var tickCount = 0L
 
-    /** Main per-tick update: level changes, hover, render-distance (un)loading, the menu shortcut, and focus mode. */
+    /** Main per-tick update: level changes, hover, render-distance (un)loading, and the menu shortcut. */
     fun tick(minecraft: Minecraft) {
         tickCount++
         DreamServices.registry.getOrNull<ClientApplication>()
             ?.emit(ClientLifecycleEvent.Tick(tickCount))
+
+        FullscreenOverlayManager.onClientTick(minecraft)
+        FullscreenController.onClientTick()
+        DisplayRegistry.tickReconfirm()
 
         val level = minecraft.level
         if (level != null && (minecraft.currentServer != null || minecraft.isLocalServer)) {
@@ -65,21 +71,25 @@ object ClientTickManager {
             }
             if (level !== lastLevel) {
                 lastLevel = level
-                DisplayRegistry.unloadAll()
-                DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
+                DisplayRegistry.unloadAllForServerSwitch()
                 hoveredDisplayScreen = null
                 checkVersionAndSendPacket()
             }
             wasInMultiplayer = true
         } else {
-            if (wasInMultiplayer) {
+            val screen = MinecraftScreenUtil.currentScreen(minecraft)
+            val leftForGood = screen is TitleScreen || screen is JoinMultiplayerScreen
+            if (wasInMultiplayer && leftForGood) {
                 wasInMultiplayer = false
                 DisplayRegistry.unloadAll()
                 DreamServices.registry.getOrNull<OverlayManager>()?.closeAll()
+                FullscreenOverlayManager.closeAll()
                 hoveredDisplayScreen = null
                 lastLevel = null
                 return
             }
+            lastLevel = null
+            return
         }
 
         // Display under the crosshair, resolved through the DisplayInteractionService contract
@@ -91,6 +101,8 @@ object ClientTickManager {
         ClientStateManager.isOnScreen = false
         val player = minecraft.player ?: return
         val playerPos = player.blockPosition()
+        DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)
+            ?.updateListener(ListenerPoseTracker.currentPose(minecraft))
 
         unloadCheckTick++
         if (unloadCheckTick >= 10 && ClientStateManager.displaysEnabled && DisplayRegistry.unloadedScreens.isNotEmpty()) {
@@ -99,17 +111,23 @@ object ClientTickManager {
         }
 
         for (displayScreen in DisplayRegistry.getScreens()) {
-            val outOfRange = displayScreen.renderDistance < displayScreen.getDistanceToScreen(playerPos)
-            val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) && !displayScreen.isPopoutActive
+            // Hysteresis
+            val threshold = if (displayScreen.isDormant) {
+                displayScreen.renderDistance - DORMANT_HYSTERESIS_BLOCKS
+            } else {
+                displayScreen.renderDistance + DORMANT_HYSTERESIS_BLOCKS
+            }
+            val outOfRange = threshold < displayScreen.getDistanceToScreen(playerPos)
+            val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) &&
+                    !displayScreen.isPopoutActive && !displayScreen.virtual
 
             // Already parked warm: wake it when back in range, or tear it down once it has been dormant
             // past the pool TTL (freeing its decoder + texture; the snapshot cache then bridges a return).
+            // demoteAfterNanos is not a second, earlier TTL here — it only makes a display a preferred
+            // eviction victim in reserveWarmSlot once a newer candidate needs its slot (see below).
             if (displayScreen.isDormant) {
-                when {
-                    !shouldUnload -> displayScreen.wake()
-                    displayScreen.dormantExpired(WarmParkPolicy.ttlNanos) -> compressDormant(displayScreen)
-                    displayScreen.dormantExpired(WarmParkPolicy.demoteAfterNanos) -> compressDormant(displayScreen)
-                }
+                if (!shouldUnload) displayScreen.wake()
+                else if (displayScreen.dormantExpired(WarmParkPolicy.ttlNanos)) compressDormant(displayScreen)
                 continue
             }
 
@@ -139,7 +157,11 @@ object ClientTickManager {
 
         // The menu-open button comes from the KeyBindingRegistry; the click itself is routed
         // through the InputHandler chain (DisplayMenuInputHandler consumes sneak + click-on-display).
-        val window = minecraft.window.handle()
+        val window =
+            //? if >=1.21.11 {
+            minecraft.window.handle()
+        //?} else
+        /*minecraft.window.window*/
         val menuButton = DreamServices.registry.getOrNull<KeyBindingRegistry>()
             ?.findById(DisplayMenuInputHandler.OPEN_MENU_BINDING_ID)?.defaultKey
             ?: GLFW.GLFW_MOUSE_BUTTON_RIGHT
@@ -150,15 +172,6 @@ object ClientTickManager {
             )
         }
         wasPressed = pressed
-
-        // TODO: implement focus mode in future
-        if (ClientStateManager.focusMode && hoveredDisplayScreen != null) {
-            player.addEffect(MobEffectInstance(MobEffects.BLINDNESS, 20 * 2, 1, false, false, false))
-            wasFocused = true
-        } else if (!ClientStateManager.focusMode && wasFocused) {
-            player.removeEffect(MobEffects.BLINDNESS)
-            wasFocused = false
-        }
     }
 
     /** Frees a fully warm dormant display, keeping only its cheap replay snapshot for fast reappearance. */
@@ -167,13 +180,19 @@ object ClientTickManager {
         DisplayRegistry.unregisterScreen(displayScreen)
     }
 
-    /** Ensures there is budget for [candidate], evicting oldest parked displays into snapshots when needed. */
+    /**
+     * Ensures there is budget for [candidate], evicting parked displays into snapshots when needed.
+     * Prefers the display furthest from the viewer as the eviction target.
+     */
     private fun reserveWarmSlot(candidate: DisplayScreen): Boolean {
         if (WarmParkPolicy.maxFullWarmDisplays <= 0) return false
         repeat(WarmParkPolicy.maxFullWarmDisplays + 1) {
             val dormant = DisplayRegistry.dormantScreens()
             if (WarmParkPolicy.fits(dormant, candidate)) return true
-            val victim = dormant.minByOrNull { it.dormantSinceNanos() } ?: return false
+            val victim = dormant.filter { it.dormantExpired(WarmParkPolicy.demoteAfterNanos) }
+                .minByOrNull { it.dormantSinceNanos() }
+                ?: dormant.minByOrNull { it.dormantSinceNanos() }
+                ?: return false
             compressDormant(victim)
         }
         return false

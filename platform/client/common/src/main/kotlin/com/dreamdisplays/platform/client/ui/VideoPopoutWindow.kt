@@ -1,20 +1,18 @@
 package com.dreamdisplays.platform.client.ui
 
+import com.dreamdisplays.api.media.sink.service.VideoFrameSink
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.popout.PopoutEvent
 import com.dreamdisplays.platform.client.popout.PopoutWindow
 import com.dreamdisplays.platform.client.popout.WindowBackend
 import com.dreamdisplays.platform.client.popout.WindowConfig
-import com.dreamdisplays.api.media.sink.VideoFrameSink
 import com.dreamdisplays.platform.client.render.AsyncTextureUploader
 import com.dreamdisplays.platform.client.render.UploadPixelFormat
+import com.dreamdisplays.util.OsInfo
+import kotlinx.atomicfu.atomic
 import net.minecraft.client.Minecraft
 import org.lwjgl.glfw.GLFW
-import org.lwjgl.opengl.GL
-import org.lwjgl.opengl.GL11
-import org.lwjgl.opengl.GL15
-import org.lwjgl.opengl.GL20
-import org.lwjgl.opengl.GL30
-import org.lwjgl.opengl.GLCapabilities
+import org.lwjgl.opengl.*
 import org.slf4j.LoggerFactory
 import java.awt.Color
 import java.awt.Graphics
@@ -27,8 +25,6 @@ import java.awt.image.BufferedImage
 import java.awt.image.DataBufferInt
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.atomic.AtomicLong
 import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
@@ -105,12 +101,7 @@ class VideoPopoutWindow(
         fun close()
     }
 
-    /**
-     * Thread model:
-     *  - [open] / [close] dispatch to Minecraft's render thread (= main thread on macOS).
-     *  - [updateFrame] copies the frame on the video-reader thread via a double buffer.
-     *  - [renderFrame] is called from the Minecraft render thread; briefly switches GL context.
-     */
+    /** GLFW backend: [open] / [close] go to render thread, [updateFrame] is thread-safe. */
     private class GlfwBackend(private val onClose: () -> Unit) : PopoutBackend {
 
         @Volatile
@@ -130,14 +121,14 @@ class VideoPopoutWindow(
         @Volatile
         private var contentAspect = 0.0
 
-        private val frameVersion = AtomicLong(0)
+        private val frameVersion = atomic(0L)
         private var uploadedVersion = 0L
 
         @Volatile
         private var windowHandle = 0L
 
-        private val winW = AtomicInteger(0)
-        private val winH = AtomicInteger(0)
+        private val winW = atomic(0)
+        private val winH = atomic(0)
 
         private var renderer: QuadRenderer? = null
         private var popoutCaps: GLCapabilities? = null
@@ -145,14 +136,14 @@ class VideoPopoutWindow(
         @Volatile
         private var fullscreen = false
 
-        private var savedX = 0;
+        private var savedX = 0
         private var savedY = 0
-        private var savedW = 0;
+        private var savedW = 0
         private var savedH = 0
 
         override val isOpen: Boolean get() = windowHandle != 0L
-        override val width: Int get() = winW.get()
-        override val height: Int get() = winH.get()
+        override val width: Int get() = winW.value
+        override val height: Int get() = winH.value
 
         override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat) {
             if (windowHandle == 0L) return
@@ -161,7 +152,7 @@ class VideoPopoutWindow(
             var back = backBuf
             if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
             back.clear()
-            val savedLimit = buf.limit();
+            val savedLimit = buf.limit()
             val savedPos = buf.position()
             buf.limit(savedPos + size)
             back.put(buf)
@@ -180,21 +171,21 @@ class VideoPopoutWindow(
         override fun renderFrame() {
             val handle = windowHandle
             if (handle == 0L) return
-            val fw = frameW;
-            val fh = frameH;
+            val fw = frameW
+            val fh = frameH
             val buf = frontBuf
             val format = frameFormat
-            val vw = winW.get();
-            val vh = winH.get()
+            val vw = winW.value
+            val vh = winH.value
             if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
 
-            val version = frameVersion.get()
+            val version = frameVersion.value
             val haveNewFrame = version != uploadedVersion
 
             val prevCtx = GLFW.glfwGetCurrentContext()
             // Only restore capabilities when there is an active GL context to restore.
             // Skipping setCapabilities(null) avoids corrupting LWJGL state for mods that
-            // replace the GL pipeline (e.g. Vulkan-based renderers).
+            // replace the GL pipeline (e.g., Vulkan-based renderers).
             val prevCaps = if (prevCtx != 0L) runCatching { GL.getCapabilities() }.getOrNull() else null
 
             GLFW.glfwMakeContextCurrent(handle)
@@ -246,7 +237,7 @@ class VideoPopoutWindow(
             }
 
             windowHandle = handle
-            winW.set(w); winH.set(h)
+            winW.value = w; winH.value = h
 
             GLFW.glfwSetWindowCloseCallback(handle) { _ -> destroyWindow() }
             GLFW.glfwSetKeyCallback(handle) { _, key, _, action, _ ->
@@ -255,12 +246,12 @@ class VideoPopoutWindow(
                     GLFW.GLFW_KEY_F -> toggleFullscreen(handle)
                 }
             }
-            GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.set(fw); winH.set(fh) }
-            val wa = IntArray(1);
+            GLFW.glfwSetFramebufferSizeCallback(handle) { _, fw, fh -> winW.value = fw; winH.value = fh }
+            val wa = IntArray(1)
             val ha = IntArray(1)
             GLFW.glfwGetFramebufferSize(handle, wa, ha)
             if (wa[0] > 0 && ha[0] > 0) {
-                winW.set(wa[0]); winH.set(ha[0])
+                winW.value = wa[0]; winH.value = ha[0]
             }
         }
 
@@ -287,10 +278,10 @@ class VideoPopoutWindow(
                 val monitor = GLFW.glfwGetPrimaryMonitor()
                 if (monitor == 0L) return
                 val mode = GLFW.glfwGetVideoMode(monitor) ?: return
-                val xa = IntArray(1);
+                val xa = IntArray(1)
                 val ya = IntArray(1)
                 GLFW.glfwGetWindowPos(handle, xa, ya)
-                savedX = xa[0]; savedY = ya[0]; savedW = winW.get(); savedH = winH.get()
+                savedX = xa[0]; savedY = ya[0]; savedW = winW.value; savedH = winH.value
                 GLFW.glfwSetWindowMonitor(handle, monitor, 0, 0, mode.width(), mode.height(), mode.refreshRate())
                 fullscreen = true
             } else {
@@ -300,8 +291,8 @@ class VideoPopoutWindow(
         }
 
         companion object {
-            private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
-            private val EMPTY_DIRECT = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())!!
+            private val logger = LoggerFactory.getLogger(javaClass)
+            private val EMPTY_DIRECT = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
 
             private fun contentRect(frameW: Int, frameH: Int, contentAspect: Double): ContentRect {
                 if (frameW <= 0 || frameH <= 0) return ContentRect(0, 0, frameW, frameH)
@@ -318,23 +309,19 @@ class VideoPopoutWindow(
         }
     }
 
-    /**
-     * Thread model:
-     *  - [open] / [close] dispatch to the AWT Event Dispatch Thread via [SwingUtilities.invokeLater].
-     *  - [updateFrame] copies the frame on the video-reader thread and schedules a repaint.
-     *  - [renderFrame] is a no-op: AWT drives its own repaints independently.
-     */
+    /** Thread model: [open] / [close] dispatch to AWT Event Dispatch Thread via [SwingUtilities.invokeLater]. */
     private class AwtBackend(private val onClose: () -> Unit) : PopoutBackend {
 
         @Volatile
         private var currentImage: BufferedImage? = null
+
         @Volatile
         private var contentAspect = 0.0
 
         private var frame: JFrame? = null
         private var panel: VideoPanel? = null
 
-        private val logger = LoggerFactory.getLogger("DreamDisplays/VideoPopout")
+        private val logger = LoggerFactory.getLogger(javaClass)
 
         override val isOpen: Boolean get() = frame?.isDisplayable == true
         override val width: Int get() = frame?.width ?: 0
@@ -375,35 +362,40 @@ class VideoPopoutWindow(
         }
 
         private fun createFrame(videoW: Int, videoH: Int) {
-            try {
+            runCatching {
                 val w = videoW.coerceIn(480, 1280)
                 val h = videoH.coerceIn(270, 720)
-                val p = VideoPanel(); panel = p
-                val f = JFrame("Dream Displays"); frame = f
-                f.defaultCloseOperation = JFrame.DO_NOTHING_ON_CLOSE
-                f.contentPane = p
-                f.setSize(w, h)
-                f.setLocationRelativeTo(null)
-                f.addWindowListener(object : WindowAdapter() {
-                    override fun windowClosing(e: WindowEvent) = destroyFrame()
-                })
-                f.addKeyListener(object : KeyAdapter() {
-                    override fun keyPressed(e: KeyEvent) {
-                        when (e.keyCode) {
-                            KeyEvent.VK_ESCAPE -> destroyFrame()
-                            KeyEvent.VK_F -> {
-                                val state = f.extendedState
-                                f.extendedState =
-                                    if (state and JFrame.MAXIMIZED_BOTH != 0) JFrame.NORMAL
+
+                val p = VideoPanel().also { panel = it }
+
+                JFrame("Dream Displays").apply {
+                    frame = this
+                    defaultCloseOperation = JFrame.DO_NOTHING_ON_CLOSE
+                    contentPane = p
+                    setSize(w, h)
+                    setLocationRelativeTo(null)
+
+                    addWindowListener(object : WindowAdapter() {
+                        override fun windowClosing(e: WindowEvent) = destroyFrame()
+                    })
+
+                    addKeyListener(object : KeyAdapter() {
+                        override fun keyPressed(e: KeyEvent) {
+                            when (e.keyCode) {
+                                KeyEvent.VK_ESCAPE -> destroyFrame()
+                                KeyEvent.VK_F -> extendedState =
+                                    if (extendedState and JFrame.MAXIMIZED_BOTH != 0) JFrame.NORMAL
                                     else JFrame.MAXIMIZED_BOTH
                             }
                         }
-                    }
-                })
-                f.isVisible = true
-            } catch (e: Exception) {
-                logger.error("Failed to create AWT popout window", e)
-                frame = null; panel = null
+                    })
+
+                    isVisible = true
+                }
+            }.onFailure { e ->
+                logger.error("Failed to create AWT popout window.", e)
+                frame = null
+                panel = null
                 onClose()
             }
         }
@@ -422,7 +414,7 @@ class VideoPopoutWindow(
                 super.paintComponent(g)
                 val img = currentImage ?: return
                 val aspect = contentAspect
-                val vw = width;
+                val vw = width
                 val vh = height
                 if (vw <= 0 || vh <= 0) return
                 val drawW: Int;
@@ -449,18 +441,11 @@ class VideoPopoutWindow(
     }
 
     companion object {
-        private val IS_MACOS = System.getProperty("os.name", "").lowercase().startsWith("mac")
+        private val IS_MACOS = OsInfo.isMac
 
-        /**
-         * True when a popout window can be opened.
-         * Always true on macOS (GLFW backend needs no extra preconditions).
-         * On Windows / Linux, false only in headless environments (servers, CI).
-         * Evaluated lazily so the AWT check sees the correct [java.awt.headless] value
-         * set by [com.dreamdisplays.platform.client.Initializer] during mod init.
-         */
+        /** True when a popout window can be opened. Always true on macOS; AWT checks for headless mode. */
         val isAvailable: Boolean by lazy {
-            if (IS_MACOS) true
-            else try {
+            IS_MACOS || try {
                 !GraphicsEnvironment.isHeadless()
             } catch (_: Exception) {
                 false

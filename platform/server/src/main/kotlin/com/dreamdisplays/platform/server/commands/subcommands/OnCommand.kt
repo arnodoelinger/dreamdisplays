@@ -1,15 +1,15 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
-import com.dreamdisplays.platform.server.Main
-import com.dreamdisplays.platform.server.Server
+import com.dreamdisplays.platform.server.PaperServer
+import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.PlayerManager
 import com.dreamdisplays.platform.server.utils.MessageUtil
-import com.dreamdisplays.platform.server.utils.net.FabricPacketUtil
+import com.dreamdisplays.platform.server.utils.VanillaPermissions
 import com.dreamdisplays.platform.server.utils.net.PacketUtil
-import com.dreamdisplays.platform.server.utils.net.ServerPacketHandler
+import com.dreamdisplays.platform.server.utils.net.VanillaPacketUtil
+import com.dreamdisplays.platform.server.ModLoaderOnly
 import com.mojang.brigadier.context.CommandContext
-import io.github.arsmotorin.ofrat.FabricOnly
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import net.minecraft.commands.CommandSourceStack
 import net.minecraft.network.chat.Component
 import net.minecraft.server.level.ServerPlayer
@@ -33,7 +33,7 @@ class OnCommand : SubCommand {
         val target = resolveTarget(sender, args) ?: return
         val selfTarget = sender is Player && sender.uniqueId == target.uniqueId
 
-        if (!selfTarget && !sender.hasPermission(Main.config.permissions.toggleOthers)) {
+        if (!selfTarget && !sender.hasPermission(PaperServer.config.permissions.toggleOthers)) {
             MessageUtil.sendMessage(sender, "displayCommandMissingPermission")
             return
         }
@@ -41,7 +41,10 @@ class OnCommand : SubCommand {
         if (PlayerManager.isDisplaysEnabled(target)) {
             MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
-                MessageUtil.sendColoredMessage(sender, format(sender, "display.already-enabled.target", target.name))
+                MessageUtil.sendColoredMessage(
+                    sender,
+                    MessageUtil.formatPrintf(sender, "display.already-enabled.target", target.name)
+                )
             }
             return
         }
@@ -50,14 +53,17 @@ class OnCommand : SubCommand {
         PacketUtil.sendDisplayEnabled(target, true)
         MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
-            MessageUtil.sendColoredMessage(sender, format(sender, "display.enabled.target", target.name))
+            MessageUtil.sendColoredMessage(
+                sender,
+                MessageUtil.formatPrintf(sender, "display.enabled.target", target.name)
+            )
         }
     }
 
     /** Suggests online player names when [sender] is allowed to toggle others. */
     override fun complete(sender: CommandSender, args: Array<String?>): List<String> {
         if (args.size != 2) return emptyList()
-        if (!sender.hasPermission(Main.config.permissions.toggleOthers)) return emptyList()
+        if (!sender.hasPermission(PaperServer.config.permissions.toggleOthers)) return emptyList()
         return Bukkit.getOnlinePlayers().map { it.name }.sorted()
     }
 
@@ -83,27 +89,21 @@ class OnCommand : SubCommand {
         val target = Bukkit.getPlayerExact(targetName)
         if (target != null) return target
 
-        MessageUtil.sendColoredMessage(sender, format(sender, "displayTargetNotFound", targetName))
+        MessageUtil.sendColoredMessage(sender, MessageUtil.formatPrintf(sender, "displayTargetNotFound", targetName))
         return null
-    }
-
-    /** Looks up the localized template for [key] and substitutes [values] via `String.format`. */
-    private fun format(sender: CommandSender, key: String, vararg values: Any): String {
-        val template = Main.config.getMessageForPlayer(sender as? Player, key) as? String ?: key
-        return runCatching { String.format(template, *values) }.getOrElse { template }
     }
 }
 
 /**
- * `Fabric`-specific implementation of the `/display on` command.
+ * Shared `Fabric` / `NeoForge` implementation of the `/display on` command.
  */
 @Deprecated("This command is being replaced by UI interface. Will be removed in a future update.")
-@FabricOnly
-object FabricOnCommand {
+@ModLoaderOnly
+object VanillaOnCommand {
     /** Enables displays for the executing player or the named [targetName], checking op-level permission for the latter. */
     fun execute(ctx: CommandContext<CommandSourceStack>, targetName: String? = null): Int {
         val self = ctx.source.entity as? ServerPlayer
-        val config = Server.config
+        val config = VanillaServerState.config
 
         val target: ServerPlayer = if (targetName == null) {
             self ?: run {
@@ -121,7 +121,13 @@ object FabricOnCommand {
 
         val selfTarget = self?.uuid == target.uuid
 
-        if (!selfTarget && (self == null || !ServerPacketHandler.isOpLevel2(self))) {
+        if (!selfTarget &&
+            (self == null || !VanillaPermissions.has(
+                self,
+                config.permissions.toggleOthers,
+                VanillaPermissions.Fallback.OP
+            ))
+        ) {
             if (self != null) MessageUtil.sendMessage(self, "displayCommandMissingPermission")
             else ctx.source.sendFailure(Component.literal("Missing permission."))
             return 0
@@ -137,7 +143,7 @@ object FabricOnCommand {
         }
 
         PlayerManager.setDisplaysEnabled(target, true)
-        FabricPacketUtil.sendDisplayEnabled(target, true)
+        VanillaPacketUtil.sendDisplayEnabled(target, true)
         MessageUtil.sendMessage(target, "display.enabled")
         if (!selfTarget) {
             val msg = config.getMessageForPlayer(self, "display.enabled.target") as? String

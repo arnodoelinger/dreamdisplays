@@ -1,34 +1,40 @@
 package com.dreamdisplays.platform.server.metrics
 
-import com.dreamdisplays.core.protocol.ClientHello
 import com.dreamdisplays.api.protocol.ProtocolVersion
-import com.dreamdisplays.platform.server.Main
+import com.dreamdisplays.core.protocol.common.packets.ClientHello
+import com.dreamdisplays.platform.server.PaperServer
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.net.V2PlayerTracker
-import io.github.arsmotorin.ofrat.PaperOnly
+import io.github.arnodoelinger.platformweaver.PaperOnly
 import org.bstats.bukkit.Metrics
 import org.bstats.charts.AdvancedPie
 import org.bstats.charts.SimplePie
 import org.bstats.charts.SingleLineChart
+import org.bstats.json.JsonObjectBuilder
 import org.bukkit.entity.Player
 import org.jspecify.annotations.NullMarked
 
-/** Registers bStats charts for protocol, client render / media capabilities, and server display usage. */
+/** Registers `bStats` charts for protocol, client render / media capabilities, and server display usage. */
 @PaperOnly
 @NullMarked
 object TelemetryMetrics {
-    /** Registers all bStats charts. */
-    fun register(plugin: Main, metrics: Metrics) {
+    /** Forces `bStats`' JSON builder classes to classload now, at enable time. */
+    fun warmUp() {
+        JsonObjectBuilder().build()
+    }
+
+    /** Registers all `bStats` charts. */
+    fun register(plugin: PaperServer, metrics: Metrics) {
         metrics.addCustomChart(SimplePie("server_protocol_current") { ProtocolVersion.CURRENT.toString() })
         metrics.addCustomChart(SimplePie("storage_backend") {
-            StorageBackend.fromConfig(Main.config.storage.type).metricToken
+            StorageBackend.fromConfig(PaperServer.config.storage.type).metricToken
         })
         metrics.addCustomChart(SimplePie("reports_enabled") {
-            if (Main.config.settings.webhookUrl.isNotBlank()) "enabled" else "disabled"
+            if (PaperServer.config.settings.webhookUrl.isNotBlank()) "enabled" else "disabled"
         })
         metrics.addCustomChart(SimplePie("max_display_area_bucket") {
-            bucketArea(Main.config.settings.maxWidth * Main.config.settings.maxHeight)
+            bucketArea(PaperServer.config.settings.maxWidth * PaperServer.config.settings.maxHeight)
         })
         metrics.addCustomChart(SingleLineChart("display_count") { DisplayManager.getDisplays().size })
         metrics.addCustomChart(AdvancedPie("display_state") { displayState() })
@@ -49,17 +55,27 @@ object TelemetryMetrics {
         metrics.addCustomChart(AdvancedPie("client_lav_status") {
             helloDistribution(plugin) { lavStatus(it) }
         })
+        metrics.addCustomChart(AdvancedPie("client_native_unavailable_reason") {
+            helloDistribution(plugin) {
+                if (it.nativeBackendAvailable) "available" else it.nativeUnavailableReason.ifBlank { "unknown" }
+            }
+        })
+        metrics.addCustomChart(AdvancedPie("client_lav_unavailable_reason") {
+            helloDistribution(plugin) {
+                if (it.lavAvailable) "available" else it.lavUnavailableReason.ifBlank { "unknown" }
+            }
+        })
         metrics.addCustomChart(AdvancedPie("client_capabilities") {
             capabilityDistribution(plugin)
         })
     }
 
     /** Returns a list of online players. */
-    private fun onlinePlayers(plugin: Main): List<Player> =
+    private fun onlinePlayers(plugin: PaperServer): List<Player> =
         runCatching { plugin.server.onlinePlayers.toList() }.getOrDefault(emptyList())
 
     /** Returns a list of online player's client hello messages. */
-    private fun onlineHellos(plugin: Main): List<ClientHello> {
+    private fun onlineHellos(plugin: PaperServer): List<ClientHello> {
         val onlineIds = onlinePlayers(plugin).mapTo(HashSet()) { it.uniqueId }
         if (onlineIds.isEmpty()) return emptyList()
         return V2PlayerTracker.snapshot()
@@ -69,7 +85,7 @@ object TelemetryMetrics {
     }
 
     /** Returns a map of online player's protocol version. */
-    private fun protocolDistribution(plugin: Main): Map<String, Int> {
+    private fun protocolDistribution(plugin: PaperServer): Map<String, Int> {
         val online = onlinePlayers(plugin)
         if (online.isEmpty()) return emptyMap()
         val snapshot = V2PlayerTracker.snapshot()
@@ -83,11 +99,11 @@ object TelemetryMetrics {
     }
 
     /** Returns a map of online player's client hello message. */
-    private fun helloDistribution(plugin: Main, keyOf: (ClientHello) -> String): Map<String, Int> =
+    private fun helloDistribution(plugin: PaperServer, keyOf: (ClientHello) -> String): Map<String, Int> =
         onlineHellos(plugin).countBy(keyOf)
 
     /** Returns a map of online player's client capability. */
-    private fun capabilityDistribution(plugin: Main): Map<String, Int> {
+    private fun capabilityDistribution(plugin: PaperServer): Map<String, Int> {
         val counts = linkedMapOf<String, Int>()
         for (hello in onlineHellos(plugin)) {
             if (hello.supportsPopout) counts.increment("popout")

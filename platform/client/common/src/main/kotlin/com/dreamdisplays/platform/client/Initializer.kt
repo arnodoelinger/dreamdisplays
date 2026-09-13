@@ -1,25 +1,24 @@
 package com.dreamdisplays.platform.client
 
+import com.dreamdisplays.api.runtime.registry.service.getOrNull
+import com.dreamdisplays.core.protocol.common.packets.DreamPacket
 import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
-import com.dreamdisplays.api.runtime.getOrNull
-import com.dreamdisplays.platform.client.overlay.OverlayManager
-import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
-import com.dreamdisplays.platform.client.managers.ClientPacketManager
-import com.dreamdisplays.platform.client.managers.ClientStateManager
-import com.dreamdisplays.platform.client.managers.ClientShutdownManager
-import com.dreamdisplays.platform.client.managers.ClientStartupManager
-import com.dreamdisplays.platform.client.managers.ClientTickManager
-import com.dreamdisplays.platform.client.managers.DisplayLifecycleManager
+import com.dreamdisplays.platform.client.managers.*
 import com.dreamdisplays.platform.client.net.LegacyAdapter
 import com.dreamdisplays.platform.client.net.ProtocolRouter
-import com.dreamdisplays.core.protocol.DreamPacket
+import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
+import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
+import com.dreamdisplays.media.source.youtube.NewPipeResolver
+import com.dreamdisplays.util.OsInfo
 import net.minecraft.client.Minecraft
 //? if >=26 {
 import net.minecraft.client.gui.GuiGraphicsExtractor
+
 //?} else
 /*import net.minecraft.client.gui.GuiGraphics*/
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload
@@ -31,14 +30,14 @@ object Initializer {
     const val MOD_ID: String = "dreamdisplays"
 
     /** Logger for startup and lifecycle messages. */
-    private val logger = LoggerFactory.getLogger("DreamDisplays/Initializer")
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /** Called once during mod startup; initializes config, `yt-dlp`, `FFmpeg`, disk cache, and the focuser thread. */
     fun onModInit(dreamDisplaysMod: Mod) {
         // On macOS, VideoPopoutWindow uses GLFW (not AWT), so no AWT setup is needed.
         // On Windows / Linux, AWT is used: override java.awt.headless so a JFrame can open.
         // Must run before any AWT class initializes the Toolkit.
-        if (!System.getProperty("os.name", "").lowercase().startsWith("mac")) {
+        if (!OsInfo.isMac) {
             System.setProperty("java.awt.headless", "false")
         }
         ClientPacketManager.bind(dreamDisplaysMod)
@@ -54,6 +53,7 @@ object Initializer {
     fun onServerJoined(serverId: String) {
         ClientStateManager.connectedServerId = serverId
         DisplayRegistry.loadScreensForServer(serverId)
+        NewPipeResolver.warmConnection()
         DreamServices.registry.getOrNull<ClientApplication>()
             ?.emit(ClientLifecycleEvent.ServerJoined(serverId))
     }
@@ -63,6 +63,13 @@ object Initializer {
      * the per-server flags, and emits [ClientLifecycleEvent.ServerLeft].
      */
     fun onServerLeft() {
+        // Fabric fires its disconnect event on the Netty IO thread
+        val mc = Minecraft.getInstance()
+        if (!mc.isSameThread) { // Not our problem
+            mc.execute(::onServerLeft)
+            return
+        }
+
         val serverId = ClientStateManager.connectedServerId
         DisplayRegistry.saveAllScreens()
         DisplayRegistry.unloadAll()
@@ -95,13 +102,17 @@ object Initializer {
         ClientTickManager.tick(minecraft)
     }
 
-    /** Renders all active PiP overlays on the HUD when the player is in-world and no screen is open. */
+    /** Renders the fullscreen and PiP overlays on the HUD when the player is in-world and no screen is open. */
     //? if >=26 {
     fun onRenderHud(mc: Minecraft, graphics: GuiGraphicsExtractor, partialTick: Float) {
         //?} else
         /*fun onRenderHud(mc: Minecraft, graphics: GuiGraphics, partialTick: Float) {*/
         if (mc.level == null || mc.player == null) return
         if (MinecraftScreenUtil.currentScreen(mc) != null) return
+        //? if >=1.21.11 {
+        graphics.nextStratum()
+        //?}
+        FullscreenOverlayManager.renderAll(mc, graphics, partialTick)
         DreamServices.registry.getOrNull<OverlayManager>()
             ?.renderAll(MinecraftOverlayRenderContext(mc, graphics, -1, -1, false, partialTick))
     }

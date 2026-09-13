@@ -1,25 +1,10 @@
 package com.dreamdisplays.platform.client.displays
 
-/**
- * Follows the server-authoritative timeline for a [DisplayScreen]. The server is the single source
- * of truth: every [com.dreamdisplays.core.protocol.DisplaySync] (and watch-party snapshot) reports the
- * intended position *as of* send time, so the follower matches pause state and re-seeks only when
- * local drift leaves a tolerance band.
- *
- * The hard constraint shaping this class is that a corrective seek is not free: it restarts the
- * decoder (`FFmpeg`) from the new position, stalling playback for up to a few seconds while the stream
- * re-buffers. Naively re-seeking on every broadcast therefore creates a runaway loop — the seek
- * stalls, the server clock advances past the player during the stall, the next broadcast sees the
- * player "behind", and it seeks again, restarting forever. Three rules keep it stable:
- *  - Don't measure during a stall. While playing, drift is only evaluated once the player clock
- *    is actually running again ([DisplayScreen.isClockRunning]); a restarting stream is ignored.
- *  - Cool down between seeks. After a corrective seek we leave the stream alone for the full
- *    [SEEK_COOLDOWN_MS] — unconditionally, even when far behind.
- *  - Overshoot when catching up. A forward catch-up seek aims [SEEK_LEAD_MS] ahead of the live
- *    target so that, by the time the restart stall ends, the player lands on the live point instead
- *    of permanently behind. The band is also asymmetric: one-way network latency makes a synced
- *    player read slightly ahead, so we tolerate "ahead" generously and only catch up when behind.
- */
+import com.dreamdisplays.core.protocol.common.packets.DisplaySync
+import com.dreamdisplays.platform.client.displays.TimelineFollower.Companion.SEEK_COOLDOWN_MS
+import com.dreamdisplays.platform.client.displays.TimelineFollower.Companion.SEEK_LEAD_MS
+
+/** Follows server-authoritative playback timeline with drift correction and optional seek cooldown. */
 internal class TimelineFollower(private val screen: DisplayScreen) {
     /** [System.nanoTime] of the last corrective seek; gates the re-seek cooldown. 0 = never. */
     private var lastSeekNanos = 0L
@@ -81,6 +66,12 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
             // Pause-state matching is cheap and must never be gated by the seek cooldown
             if (packet.paused && !screen.isPaused) screen.applyServerPaused(true)
             if (!packet.paused && screen.isPaused) screen.applyServerPaused(false)
+
+            if (screen.isLive) {
+                screen.markInitialTimelineReady()
+                pending = null
+                return@waitForMFInit
+            }
 
             if (!screen.canSeek()) {
                 screen.markInitialTimelineReady()
