@@ -46,8 +46,10 @@ object MouseButtons {
         val window =
             //? if >=1.21.11 {
             mc.window.handle()
-            //?} else
+            //?}
+            //? if <1.21.11 {
             mc.window.window
+            //?}
         return GLFW.glfwGetMouseButton(window, button) == GLFW.GLFW_PRESS
     }*/
 }
