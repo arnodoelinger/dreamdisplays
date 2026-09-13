@@ -35,12 +35,9 @@ object Initializer {
 
     /** Called once during mod startup; initializes config, `yt-dlp`, `FFmpeg`, disk cache, and the focuser thread. */
     fun onModInit(dreamDisplaysMod: Mod) {
-        //? if >=26.3 {
-        System.setProperty("java.awt.headless", "false")
-        //?} else
-        /*if (!OsInfo.isMac) {
+        if (!OsInfo.isMac) {
             System.setProperty("java.awt.headless", "false")
-        }*/
+        }
         ClientPacketManager.bind(dreamDisplaysMod)
 
         logger.info("Starting Dream Displays...")

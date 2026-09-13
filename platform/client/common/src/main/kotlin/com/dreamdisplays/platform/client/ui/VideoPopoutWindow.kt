@@ -11,6 +11,20 @@ import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.util.OsInfo
 import kotlinx.atomicfu.atomic
 import net.minecraft.client.Minecraft
+//? if >=26.3 {
+import org.lwjgl.sdl.SDLError
+import org.lwjgl.sdl.SDLEvents
+import org.lwjgl.sdl.SDLPixels
+import org.lwjgl.sdl.SDLRender
+import org.lwjgl.sdl.SDLScancode
+import org.lwjgl.sdl.SDLVideo
+import org.lwjgl.sdl.SDL_Event
+import org.lwjgl.sdl.SDL_EventFilter
+import org.lwjgl.sdl.SDL_FRect
+import org.lwjgl.sdl.SDL_Texture
+import org.lwjgl.system.MemoryStack
+import org.lwjgl.system.MemoryUtil
+//?}
 //? if <26.3 {
 import org.lwjgl.glfw.GLFW
 //?}
@@ -31,6 +45,8 @@ import javax.swing.JFrame
 import javax.swing.JPanel
 import javax.swing.SwingUtilities
 
+// TODO: rewrite
+
 /**
  * Detached window that mirrors the decoded video.
  */
@@ -45,14 +61,15 @@ class VideoPopoutWindow(
 
     private val impl: PopoutBackend =
         //? if >=26.3 {
-        AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        if (IS_MACOS) SdlBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        else AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
         //?} else
         /*if (IS_MACOS) GlfwBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
         else AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }*/
 
     override val backend: WindowBackend =
         //? if >=26.3 {
-        WindowBackend.AWT
+        if (IS_MACOS) WindowBackend.SDL else WindowBackend.AWT
         //?} else
         /*if (IS_MACOS) WindowBackend.GLFW else WindowBackend.AWT*/
     override val isOpen: Boolean get() = impl.isOpen
@@ -320,6 +337,249 @@ class VideoPopoutWindow(
     }
     //?}
 
+    //? if >=26.3 {
+    /**
+     * SDL backend for 26.3+ macOS.
+     *
+     * AWT deadlocks the SDL / Metal game window, so we don't use GLFW.
+     * Uploads CPU frames through SDL's renderer (Metal / software) so we never share GL / Vulkan.
+     */
+    private class SdlBackend(private val onClose: () -> Unit) : PopoutBackend {
+        @Volatile
+        private var frontBuf: ByteBuffer = EMPTY_DIRECT
+        private var backBuf: ByteBuffer = EMPTY_DIRECT
+
+        @Volatile
+        private var frameW = 0
+
+        @Volatile
+        private var frameH = 0
+
+        @Volatile
+        private var frameFormat = UploadPixelFormat.RGB24
+
+        @Volatile
+        private var contentAspect = 0.0
+
+        private val frameVersion = atomic(0L)
+        private var uploadedVersion = 0L
+
+        @Volatile
+        private var windowHandle = 0L
+        private var renderer = 0L
+        private var texture: SDL_Texture? = null
+        private var textureW = 0
+        private var textureH = 0
+        private var textureFormat = 0
+
+        private val winW = atomic(0)
+        private val winH = atomic(0)
+
+        @Volatile
+        private var fullscreen = false
+
+        private var eventFilter: SDL_EventFilter? = null
+
+        override val isOpen: Boolean get() = windowHandle != 0L
+        override val width: Int get() = winW.value
+        override val height: Int get() = winH.value
+
+        override fun updateFrame(buf: ByteBuffer, w: Int, h: Int, aspect: Double, format: UploadPixelFormat) {
+            if (windowHandle == 0L) return
+            val size = w * h * format.bytesPerPixel
+            if (size <= 0 || buf.remaining() < size) return
+            var back = backBuf
+            if (back.capacity() < size) back = ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+            back.clear()
+            val savedLimit = buf.limit()
+            val savedPos = buf.position()
+            buf.limit(savedPos + size)
+            back.put(buf)
+            buf.limit(savedLimit)
+            buf.position(savedPos)
+            back.flip()
+            val prev = frontBuf
+            frontBuf = back
+            backBuf = if (prev.capacity() >= size) prev
+            else ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder())
+            contentAspect = aspect
+            frameFormat = format
+            frameW = w
+            frameH = h
+            frameVersion.incrementAndGet()
+        }
+
+        override fun renderFrame() {
+            val window = windowHandle
+            val gpu = renderer
+            if (window == 0L || gpu == 0L) return
+            val fw = frameW
+            val fh = frameH
+            val buf = frontBuf
+            val format = frameFormat
+            val vw = winW.value
+            val vh = winH.value
+            if (fw <= 0 || fh <= 0 || buf.remaining() < fw * fh * format.bytesPerPixel || vw <= 0 || vh <= 0) return
+
+            val sdlFormat = if (format == UploadPixelFormat.RGBA32) {
+                SDLPixels.SDL_PIXELFORMAT_ABGR8888
+            } else {
+                SDLPixels.SDL_PIXELFORMAT_RGB24
+            }
+            var tex = texture
+            if (tex == null || textureW != fw || textureH != fh || textureFormat != sdlFormat) {
+                if (tex != null) SDLRender.SDL_DestroyTexture(tex)
+                tex = SDLRender.SDL_CreateTexture(gpu, sdlFormat, SDLRender.SDL_TEXTUREACCESS_STREAMING, fw, fh)
+                if (tex == null) return
+                texture = tex
+                textureW = fw
+                textureH = fh
+                textureFormat = sdlFormat
+            }
+
+            val version = frameVersion.value
+            if (version != uploadedVersion) {
+                val pitch = fw * format.bytesPerPixel
+                SDLRender.nSDL_UpdateTexture(tex.address(), 0L, MemoryUtil.memAddress(buf), pitch)
+                uploadedVersion = version
+            }
+
+            val box = letterbox(fw, fh, contentAspect)
+            val scale = minOf(vw / box.w.toFloat(), vh / box.h.toFloat())
+            val dw = box.w * scale
+            val dh = box.h * scale
+            val dx = (vw - dw) / 2f
+            val dy = (vh - dh) / 2f
+
+            SDLRender.SDL_SetRenderDrawColor(gpu, 0, 0, 0, 255.toByte())
+            SDLRender.SDL_RenderClear(gpu)
+            MemoryStack.stackPush().use { stack ->
+                val dest = SDL_FRect.malloc(stack).set(dx, dy, dw, dh)
+                SDLRender.SDL_RenderTexture(gpu, tex, null, dest)
+            }
+            SDLRender.SDL_RenderPresent(gpu)
+        }
+
+        override fun open(videoW: Int, videoH: Int) {
+            Minecraft.getInstance().execute {
+                if (windowHandle != 0L) {
+                    SDLVideo.SDL_ShowWindow(windowHandle)
+                    SDLVideo.SDL_RaiseWindow(windowHandle)
+                    return@execute
+                }
+                createWindow(videoW, videoH)
+            }
+        }
+
+        override fun close() {
+            Minecraft.getInstance().execute { destroyWindow() }
+        }
+
+        private fun createWindow(videoW: Int, videoH: Int) {
+            val w = videoW.coerceIn(480, 1280)
+            val h = videoH.coerceIn(270, 720)
+            val flags = SDLVideo.SDL_WINDOW_RESIZABLE or SDLVideo.SDL_WINDOW_HIGH_PIXEL_DENSITY
+            val window = SDLVideo.SDL_CreateWindow("Dream Displays", w, h, flags)
+            if (window == 0L) {
+                logger.warn("SDL_CreateWindow failed: {}", SDLError.SDL_GetError())
+                return
+            }
+            var gpu = SDLRender.nSDL_CreateRenderer(window, 0L)
+            if (gpu == 0L) {
+                gpu = SDLRender.SDL_CreateRenderer(window, "metal")
+            }
+            if (gpu == 0L) {
+                gpu = SDLRender.SDL_CreateRenderer(window, "software")
+            }
+            if (gpu == 0L) {
+                logger.warn("SDL_CreateRenderer failed: {}", SDLError.SDL_GetError())
+                SDLVideo.SDL_DestroyWindow(window)
+                return
+            }
+            SDLRender.SDL_SetRenderVSync(gpu, 1)
+            windowHandle = window
+            renderer = gpu
+            refreshSize()
+            val filter = SDL_EventFilter.create { _, eventPtr ->
+                val event = SDL_Event.create(eventPtr)
+                if (SDLEvents.SDL_GetWindowFromEvent(event) != windowHandle) true
+                else {
+                    onPopoutEvent(event)
+                    false
+                }
+            }
+            eventFilter = filter
+            SDLEvents.SDL_SetEventFilter(filter, 0L)
+        }
+
+        private fun onPopoutEvent(event: SDL_Event) {
+            when (event.type()) {
+                SDLEvents.SDL_EVENT_WINDOW_CLOSE_REQUESTED ->
+                    Minecraft.getInstance().execute { destroyWindow() }
+                SDLEvents.SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED,
+                SDLEvents.SDL_EVENT_WINDOW_RESIZED -> refreshSize()
+                SDLEvents.SDL_EVENT_KEY_DOWN -> {
+                    when (event.key().scancode()) {
+                        SDLScancode.SDL_SCANCODE_ESCAPE ->
+                            Minecraft.getInstance().execute { destroyWindow() }
+                        SDLScancode.SDL_SCANCODE_F -> {
+                            fullscreen = !fullscreen
+                            SDLVideo.SDL_SetWindowFullscreen(windowHandle, fullscreen)
+                        }
+                    }
+                }
+            }
+        }
+
+        private fun refreshSize() {
+            val window = windowHandle
+            if (window == 0L) return
+            MemoryStack.stackPush().use { stack ->
+                val w = stack.mallocInt(1)
+                val h = stack.mallocInt(1)
+                if (SDLVideo.SDL_GetWindowSizeInPixels(window, w, h) && w.get(0) > 0 && h.get(0) > 0) {
+                    winW.value = w.get(0)
+                    winH.value = h.get(0)
+                }
+            }
+        }
+
+        private fun destroyWindow() {
+            val window = windowHandle
+            val gpu = renderer
+            windowHandle = 0L
+            renderer = 0L
+            eventFilter?.let { filter ->
+                SDLEvents.nSDL_SetEventFilter(0L, 0L)
+                filter.free()
+                eventFilter = null
+            }
+            texture?.let { SDLRender.SDL_DestroyTexture(it); texture = null }
+            if (gpu != 0L) SDLRender.SDL_DestroyRenderer(gpu)
+            if (window != 0L) SDLVideo.SDL_DestroyWindow(window)
+            onClose()
+        }
+
+        private fun letterbox(frameW: Int, frameH: Int, contentAspect: Double): ContentRect {
+            if (frameW <= 0 || frameH <= 0) return ContentRect(0, 0, frameW, frameH)
+            if (contentAspect <= 0.0 || !contentAspect.isFinite()) return ContentRect(0, 0, frameW, frameH)
+            val frameAspect = frameW / frameH.toDouble()
+            return if (contentAspect > frameAspect) {
+                val ch = (frameW / contentAspect).toInt().coerceIn(1, frameH)
+                ContentRect(0, (frameH - ch) / 2, frameW, ch)
+            } else {
+                val cw = (frameH * contentAspect).toInt().coerceIn(1, frameW)
+                ContentRect((frameW - cw) / 2, 0, cw, frameH)
+            }
+        }
+
+        companion object {
+            private val logger = LoggerFactory.getLogger(javaClass)
+            private val EMPTY_DIRECT = ByteBuffer.allocateDirect(0).order(ByteOrder.nativeOrder())
+        }
+    }
+    //?}
+
     /** Thread model: [open] / [close] dispatch to AWT Event Dispatch Thread via [SwingUtilities.invokeLater]. */
     private class AwtBackend(private val onClose: () -> Unit) : PopoutBackend {
 
@@ -457,7 +717,7 @@ class VideoPopoutWindow(
         /** True when a popout window can be opened. */
         val isAvailable: Boolean by lazy {
             //? if >=26.3 {
-            try {
+            IS_MACOS || try {
                 !GraphicsEnvironment.isHeadless()
             } catch (_: Exception) {
                 false
