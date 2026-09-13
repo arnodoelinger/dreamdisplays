@@ -118,8 +118,12 @@ object Initializer {
                 MinecraftOverlayRenderContext(
                     mc,
                     graphics,
+                    //? if >=1.21.11 {
                     mouse.getScaledXPos(window).toInt(),
                     mouse.getScaledYPos(window).toInt(),
+                    //?} else
+                    /*(mouse.xpos() * window.guiScaledWidth / window.screenWidth).toInt(),
+                    (mouse.ypos() * window.guiScaledHeight / window.screenHeight).toInt(),*/
                     MouseButtons.hardwareLeftDown(),
                     partialTick,
                 )
