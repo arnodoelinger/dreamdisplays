@@ -2,7 +2,9 @@ package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
 //? if >=1.21.11 {
+//? if <26.3 {
 import com.mojang.blaze3d.pipeline.RenderPipeline
+//?}
 import net.minecraft.client.renderer.rendertype.RenderSetup
 import net.minecraft.client.renderer.rendertype.RenderType
 import net.minecraft.resources.Identifier
@@ -30,8 +32,16 @@ object DisplayUnlitRenderTypes {
     private val texturedPipeline: RenderPipeline by lazy {
         val pipeline = RenderPipelineCompat.createDisplayPipeline(
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_unlit_textured"),
-            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"),
-            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog" +
+                //? if >=26.3 {
+                "_rp"
+                //?} else
+                /*""*/),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog" +
+                //? if >=26.3 {
+                "_rp"
+                //?} else
+                /*""*/),
             listOf(SAMPLER_TEXTURE),
         )
         assignIrisTexturedProgram(pipeline)

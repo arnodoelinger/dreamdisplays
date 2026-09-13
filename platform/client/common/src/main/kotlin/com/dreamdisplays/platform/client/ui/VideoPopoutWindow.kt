@@ -11,7 +11,9 @@ import com.dreamdisplays.platform.client.render.UploadPixelFormat
 import com.dreamdisplays.util.OsInfo
 import kotlinx.atomicfu.atomic
 import net.minecraft.client.Minecraft
+//? if <26.3 {
 import org.lwjgl.glfw.GLFW
+//?}
 import org.lwjgl.opengl.*
 import org.slf4j.LoggerFactory
 import java.awt.Color
@@ -42,10 +44,17 @@ class VideoPopoutWindow(
     private fun emitEvent(event: PopoutEvent) = eventListeners.forEach { it(event) }
 
     private val impl: PopoutBackend =
-        if (IS_MACOS) GlfwBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
-        else AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        //? if >=26.3 {
+        AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        //?} else
+        /*if (IS_MACOS) GlfwBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }
+        else AwtBackend { emitEvent(PopoutEvent.Closed(displayId)); onClose() }*/
 
-    override val backend: WindowBackend = if (IS_MACOS) WindowBackend.GLFW else WindowBackend.AWT
+    override val backend: WindowBackend =
+        //? if >=26.3 {
+        WindowBackend.AWT
+        //?} else
+        /*if (IS_MACOS) WindowBackend.GLFW else WindowBackend.AWT*/
     override val isOpen: Boolean get() = impl.isOpen
     override val width: Int get() = impl.width
     override val height: Int get() = impl.height
@@ -101,6 +110,7 @@ class VideoPopoutWindow(
         fun close()
     }
 
+    //? if <26.3 {
     /** GLFW backend: [open] / [close] go to render thread, [updateFrame] is thread-safe. */
     private class GlfwBackend(private val onClose: () -> Unit) : PopoutBackend {
 
@@ -308,6 +318,7 @@ class VideoPopoutWindow(
             }
         }
     }
+    //?}
 
     /** Thread model: [open] / [close] dispatch to AWT Event Dispatch Thread via [SwingUtilities.invokeLater]. */
     private class AwtBackend(private val onClose: () -> Unit) : PopoutBackend {
@@ -443,13 +454,20 @@ class VideoPopoutWindow(
     companion object {
         private val IS_MACOS = OsInfo.isMac
 
-        /** True when a popout window can be opened. Always true on macOS; AWT checks for headless mode. */
+        /** True when a popout window can be opened. */
         val isAvailable: Boolean by lazy {
-            IS_MACOS || try {
+            //? if >=26.3 {
+            try {
                 !GraphicsEnvironment.isHeadless()
             } catch (_: Exception) {
                 false
             }
+            //?} else
+            /*IS_MACOS || try {
+                !GraphicsEnvironment.isHeadless()
+            } catch (_: Exception) {
+                false
+            }*/
         }
     }
 }

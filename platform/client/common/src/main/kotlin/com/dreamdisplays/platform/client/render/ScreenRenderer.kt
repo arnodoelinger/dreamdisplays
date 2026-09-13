@@ -22,7 +22,9 @@ import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.render.ScreenRenderer.drawLayer
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
+//? if <26.3 {
 import com.mojang.blaze3d.vertex.VertexFormat
+//?}
 import net.minecraft.client.Camera
 import net.minecraft.world.phys.Vec3
 import kotlin.math.sin

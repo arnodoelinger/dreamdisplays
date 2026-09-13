@@ -2,11 +2,13 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.platform.client.Initializer
-import com.mojang.blaze3d.pipeline.RenderPipeline
 import com.mojang.blaze3d.systems.RenderSystem
-import com.mojang.blaze3d.textures.GpuTexture
 import com.mojang.blaze3d.vertex.DefaultVertexFormat
+//? if <26.3 {
+import com.mojang.blaze3d.pipeline.RenderPipeline
+import com.mojang.blaze3d.textures.GpuTexture
 import com.mojang.blaze3d.vertex.VertexFormat
+//?}
 import net.minecraft.client.renderer.texture.AbstractTexture
 import net.minecraft.resources.Identifier
 
@@ -59,9 +61,7 @@ internal object Yuv262Reflect {
         val builderClass = builder.javaClass
 
         val withBindGroupLayout = builderClass.getMethod("withBindGroupLayout", bglClass)
-        withBindGroupLayout.invoke(builder, vanillaLayout("GLOBALS"))
-        withBindGroupLayout.invoke(builder, vanillaLayout("MATRICES_PROJECTION"))
-        withBindGroupLayout.invoke(builder, vanillaLayout("FOG"))
+        RenderPipelineCompat.bindWorldDisplayUniforms(withBindGroupLayout, builder)
         withBindGroupLayout.invoke(builder, samplerLayout())
 
         builderClass.getMethod("withVertexBinding", Int::class.javaPrimitiveType, VertexFormat::class.java)
@@ -73,8 +73,16 @@ internal object Yuv262Reflect {
         builderClass.getMethod("withPrimitiveTopology", topologyClass).invoke(builder, quads)
 
         builder.withLocation(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"))
-        builder.withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"))
-        builder.withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"))
+        builder.withVertexShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog" +
+            //? if >=26.3 {
+            "_rp"
+            //?} else
+            /*""*/))
+        builder.withFragmentShader(Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv" +
+            //? if >=26.3 {
+            "_rp"
+            //?} else
+            /*""*/))
         RenderPipelineCompat.configureDepth(builder)
         RenderPipelineCompat.configureBlend(builder)
         builder.withCull(false)

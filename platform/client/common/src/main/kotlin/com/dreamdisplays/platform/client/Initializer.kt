@@ -6,6 +6,7 @@ import com.dreamdisplays.platform.client.core.ClientApplication
 import com.dreamdisplays.platform.client.core.ClientLifecycleEvent
 import com.dreamdisplays.platform.client.core.DreamServices
 import com.dreamdisplays.platform.client.displays.DisplayRegistry
+import com.dreamdisplays.platform.client.input.MouseButtons
 import com.dreamdisplays.platform.client.managers.*
 import com.dreamdisplays.platform.client.net.LegacyAdapter
 import com.dreamdisplays.platform.client.net.ProtocolRouter
@@ -34,12 +35,12 @@ object Initializer {
 
     /** Called once during mod startup; initializes config, `yt-dlp`, `FFmpeg`, disk cache, and the focuser thread. */
     fun onModInit(dreamDisplaysMod: Mod) {
-        // On macOS, VideoPopoutWindow uses GLFW (not AWT), so no AWT setup is needed.
-        // On Windows / Linux, AWT is used: override java.awt.headless so a JFrame can open.
-        // Must run before any AWT class initializes the Toolkit.
-        if (!OsInfo.isMac) {
+        //? if >=26.3 {
+        System.setProperty("java.awt.headless", "false")
+        //?} else
+        /*if (!OsInfo.isMac) {
             System.setProperty("java.awt.headless", "false")
-        }
+        }*/
         ClientPacketManager.bind(dreamDisplaysMod)
 
         logger.info("Starting Dream Displays...")
@@ -113,8 +114,19 @@ object Initializer {
         graphics.nextStratum()
         //?}
         FullscreenOverlayManager.renderAll(mc, graphics, partialTick)
+        val window = mc.window
+        val mouse = mc.mouseHandler
         DreamServices.registry.getOrNull<OverlayManager>()
-            ?.renderAll(MinecraftOverlayRenderContext(mc, graphics, -1, -1, false, partialTick))
+            ?.renderAll(
+                MinecraftOverlayRenderContext(
+                    mc,
+                    graphics,
+                    mouse.getScaledXPos(window).toInt(),
+                    mouse.getScaledYPos(window).toInt(),
+                    MouseButtons.hardwareLeftDown(),
+                    partialTick,
+                )
+            )
     }
 
     /** Routes an outgoing [packet] through protocol negotiation (v2 when available, else v1). */

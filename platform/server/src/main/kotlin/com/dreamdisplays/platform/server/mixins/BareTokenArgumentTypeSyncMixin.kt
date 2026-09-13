@@ -14,12 +14,20 @@ import org.spongepowered.asm.mixin.injection.Redirect
 open class BareTokenArgumentTypeSyncMixin {
     @Redirect(
         method = ["createBuilder"],
-        at = At(
+        //? if >=26.3 {
+        at = [At(
             value = "INVOKE",
             target = "Lcom/mojang/brigadier/builder/RequiredArgumentBuilder;" +
                     "argument(Ljava/lang/String;Lcom/mojang/brigadier/arguments/ArgumentType;)" +
                     "Lcom/mojang/brigadier/builder/RequiredArgumentBuilder;",
-        ),
+        )],
+        //?} else
+        /*at = At(
+            value = "INVOKE",
+            target = "Lcom/mojang/brigadier/builder/RequiredArgumentBuilder;" +
+                    "argument(Ljava/lang/String;Lcom/mojang/brigadier/arguments/ArgumentType;)" +
+                    "Lcom/mojang/brigadier/builder/RequiredArgumentBuilder;",
+        ),*/
     )
     open fun networkSafeArgumentType(name: String, type: ArgumentType<Any>): RequiredArgumentBuilder<Any, Any> {
         val networkType: ArgumentType<Any> =

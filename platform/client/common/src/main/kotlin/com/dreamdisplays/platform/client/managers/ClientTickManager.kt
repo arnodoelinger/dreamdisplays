@@ -18,7 +18,6 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.multiplayer.ClientLevel
-import org.lwjgl.glfw.GLFW
 import java.util.*
 
 /**
@@ -157,21 +156,22 @@ object ClientTickManager {
 
         // The menu-open button comes from the KeyBindingRegistry; the click itself is routed
         // through the InputHandler chain (DisplayMenuInputHandler consumes sneak + click-on-display).
-        val window =
-            //? if >=1.21.11 {
-            minecraft.window.handle()
-        //?} else
-        /*minecraft.window.window*/
-        val menuButton = DreamServices.registry.getOrNull<KeyBindingRegistry>()
-            ?.findById(DisplayMenuInputHandler.OPEN_MENU_BINDING_ID)?.defaultKey
-            ?: GLFW.GLFW_MOUSE_BUTTON_RIGHT
-        val pressed = GLFW.glfwGetMouseButton(window, menuButton) == GLFW.GLFW_PRESS
-        if (pressed && !wasPressed) {
-            DreamServices.registry.getOrNull<InputHandler>()?.handle(
-                InputAction.MouseClicked(minecraft.mouseHandler.xpos(), minecraft.mouseHandler.ypos(), menuButton)
-            )
+        // 26.3 only updates isRightPressed while no screen is open, so ignore the shortcut (and
+        // freeze wasPressed) whenever a GUI is showing.
+        if (MinecraftScreenUtil.currentScreen(minecraft) != null) {
+            wasPressed = MouseButtons.hardwareRightDown()
+        } else {
+            val menuButton = DreamServices.registry.getOrNull<KeyBindingRegistry>()
+                ?.findById(DisplayMenuInputHandler.OPEN_MENU_BINDING_ID)?.defaultKey
+                ?: DisplayMenuInputHandler.OPEN_MENU_BINDING.defaultKey
+            val pressed = MouseButtons.hardwareRightDown()
+            if (pressed && !wasPressed) {
+                DreamServices.registry.getOrNull<InputHandler>()?.handle(
+                    InputAction.MouseClicked(minecraft.mouseHandler.xpos(), minecraft.mouseHandler.ypos(), menuButton)
+                )
+            }
+            wasPressed = pressed
         }
-        wasPressed = pressed
     }
 
     /** Frees a fully warm dormant display, keeping only its cheap replay snapshot for fast reappearance. */

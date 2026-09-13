@@ -1,9 +1,8 @@
 package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.api.media.player.GpuTextureRef
-//? if >=1.21.11 {
+//? if >=1.21.11 <26.3 {
 import com.mojang.blaze3d.textures.GpuTexture
-
 //?}
 
 /**

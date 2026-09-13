@@ -2,7 +2,9 @@
 package com.dreamdisplays.platform.client.render
 
 import com.mojang.blaze3d.systems.RenderSystem
+//? if <26.3 {
 import com.mojang.blaze3d.textures.GpuTexture
+//?}
 import net.minecraft.client.renderer.texture.AbstractTexture
 
 /**

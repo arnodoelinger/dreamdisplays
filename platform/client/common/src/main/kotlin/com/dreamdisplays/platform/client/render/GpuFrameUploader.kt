@@ -26,7 +26,10 @@ class GpuFrameUploader : FrameUploader {
     /** False while the window is minimized (no GL context to upload into). */
     override fun canUpload(): Boolean =
         //? if >=1.21.11 {
-        !Minecraft.getInstance().window.isMinimized
+        //? if >=26.3 {
+        !Minecraft.getInstance().window.isIconified
+        //?} else
+        /*!Minecraft.getInstance().window.isMinimized*/
     //?} else
     /*true*/
 

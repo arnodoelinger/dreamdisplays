@@ -22,6 +22,7 @@ repositories {
     }
     maven("https://thedarkcolour.github.io/KotlinForForge/")
     maven("https://maven.enginehub.org/repo/")
+    maven("https://prmaven.neoforged.net/NeoForge/pr3403")
 }
 
 sourceSets.main {

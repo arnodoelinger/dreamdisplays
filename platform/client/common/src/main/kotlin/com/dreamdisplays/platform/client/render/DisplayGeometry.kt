@@ -160,7 +160,10 @@ internal object DisplayGeometry {
 
             DisplayFacing.DOWN -> Quaternionf().rotationX(Math.toRadians(90.0).toFloat())
         }
-        stack.mulPose(rotation)
+        //? if >=26.3 {
+        stack.rotate(rotation)
+        //?} else
+        /*stack.mulPose(rotation)*/
     }
 
     /**

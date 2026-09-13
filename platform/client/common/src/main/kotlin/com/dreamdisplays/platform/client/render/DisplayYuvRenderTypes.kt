@@ -2,15 +2,13 @@ package com.dreamdisplays.platform.client.render
 
 import com.dreamdisplays.media.player.nativebridge.NativeMedia
 import com.dreamdisplays.platform.client.Initializer
-//? if >=1.21.11 {
+//? if >=1.21.11 <26.3 {
 import com.mojang.blaze3d.pipeline.RenderPipeline
-//?}
-import com.mojang.blaze3d.platform.NativeImage
-//? if >=1.21.11 {
 import com.mojang.blaze3d.textures.AddressMode
 import com.mojang.blaze3d.textures.FilterMode
 import com.mojang.blaze3d.textures.GpuSampler
 //?}
+import com.mojang.blaze3d.platform.NativeImage
 import net.minecraft.client.Minecraft
 //? if >=1.21.11 {
 import net.minecraft.client.renderer.rendertype.RenderSetup
@@ -57,7 +55,7 @@ object DisplayYuvRenderTypes {
      */
     val isSupported: Boolean by lazy {
         runCatching {
-            RenderPipeline.Builder::class.java.getMethod("withSampler", String::class.java)
+            RenderPipelineBuilder::class.java.getMethod("withSampler", String::class.java)
             Class.forName("com.mojang.blaze3d.textures.TextureFormat")
             true
         }.getOrDefault(false)
@@ -88,8 +86,16 @@ object DisplayYuvRenderTypes {
         if (!isSupported) return@lazy Yuv262Reflect.createPipeline()
         RenderPipelineCompat.createDisplayPipeline(
             Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "pipeline/display_yuv"),
-            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog"),
-            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv"),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_fog" +
+                //? if >=26.3 {
+                "_rp"
+                //?} else
+                /*""*/),
+            Identifier.fromNamespaceAndPath(Initializer.MOD_ID, "core/display_yuv" +
+                //? if >=26.3 {
+                "_rp"
+                //?} else
+                /*""*/),
             listOf(SAMPLER_Y, SAMPLER_U, SAMPLER_V),
         )
     }

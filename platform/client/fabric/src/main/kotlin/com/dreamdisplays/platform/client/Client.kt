@@ -35,6 +35,9 @@ import com.dreamdisplays.platform.client.render.UnshadedDisplayPass
 import com.mojang.blaze3d.vertex.PoseStack
 import com.mojang.blaze3d.vertex.VertexConsumer
 import net.fabricmc.api.ClientModInitializer
+import com.dreamdisplays.platform.client.input.DisplayMenuInputHandler
+import net.fabricmc.fabric.api.event.player.UseBlockCallback
+import net.minecraft.world.InteractionResult
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents
@@ -142,6 +145,12 @@ class Client : ClientModInitializer, Mod {
         }*/
 
         ClientTickEvents.END_CLIENT_TICK.register { Initializer.onEndTick(it) }
+
+        UseBlockCallback.EVENT.register { _, world, _, _ ->
+            if (!world.isClientSide) InteractionResult.PASS
+            else if (DisplayMenuInputHandler.tryOpenFromWorld()) InteractionResult.FAIL
+            else InteractionResult.PASS
+        }
 
         ClientPlayConnectionEvents.JOIN.register { _, _, client ->
             if (client.level != null && client.player != null) {

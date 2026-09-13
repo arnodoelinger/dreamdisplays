@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client.ui.widgets
 
 import com.dreamdisplays.api.media.search.model.MediaSearchResult
+import com.dreamdisplays.platform.client.input.MouseButtons
 import com.dreamdisplays.platform.client.render.Thumbnails
 import com.dreamdisplays.platform.client.ui.GuiGraphicsCompat
 import com.dreamdisplays.platform.client.ui.drawText
@@ -28,7 +29,10 @@ import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import net.minecraft.sounds.SoundEvents
-import org.lwjgl.glfw.GLFW
+//? if >=26.3 {
+import com.mojang.blaze3d.platform.InputConstants
+//?} else
+/*import org.lwjgl.glfw.GLFW*/
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -590,7 +594,15 @@ class SuggestionsPanel(
         if (mouseY < stripTop || mouseY > stripBottom) return false
         val viewportW = stripRight() - stripLeft()
         val maxOff = maxScroll(viewportW, stripBottom - stripTop)
-        val delta = if (vertical) dy * 32 else (if (dx != 0.0) dx else dy) * 32
+        val axis =
+            if (vertical) dy
+            else if (dx != 0.0)
+                //? if >=26.3 {
+                -dx
+                //?} else
+                /*dx*/
+            else dy
+        val delta = axis * 32
         targetScroll = (targetScroll - delta.toInt()).coerceIn(0, maxOff)
         return true
     }
@@ -603,7 +615,7 @@ class SuggestionsPanel(
         val mx = mouseX.toInt()
         val my = mouseY.toInt()
         val onSortButton = sortButton.isMouseOver(mouseX, mouseY)
-        if (sortDropdown.visible && event.button() == 0 && !onSortButton && sortDropdown.handleClick(
+        if (sortDropdown.visible && MouseButtons.isLeft(event.button()) && !onSortButton && sortDropdown.handleClick(
                 mx,
                 my
             )
@@ -617,14 +629,14 @@ class SuggestionsPanel(
             return handled
         }
         searchBox.isFocused = false
-        if (event.button() == 0 && overScrollbar(mouseX, mouseY)) {
+        if (MouseButtons.isLeft(event.button()) && overScrollbar(mouseX, mouseY)) {
             draggingScrollbar = true
             scrollFromPos(if (sbVertical) mouseY else mouseX)
             return true
         }
         // Right-clicking a remembered link removes it from "My links"; a plain left-click plays it.
-        if (event.button() == 1 && forgetCardAt(mx, my)) return true
-        val card = if (event.button() == 0) cardAt(mouseX, mouseY) else -1
+        if (MouseButtons.isRight(event.button()) && forgetCardAt(mx, my)) return true
+        val card = if (MouseButtons.isLeft(event.button())) cardAt(mouseX, mouseY) else -1
         if (card in controller.visibleCards.indices) {
             val s = SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK.value(), 1.0f)
             Minecraft.getInstance().soundManager.play(s)
@@ -745,7 +757,12 @@ class SuggestionsPanel(
     override fun keyPressed(event: KeyEvent): Boolean {
         if (!available()) return super.keyPressed(event)
         if (searchBox.isFocused) {
-            if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER) {
+            if (event.key() ==
+                //? if >=26.3 {
+                InputConstants.KEY_RETURN || event.key() == InputConstants.KEY_NUMPADENTER
+                //?} else
+                /*GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER*/
+            ) {
                 controller.runSearch(searchBox.value)
                 return true
             }

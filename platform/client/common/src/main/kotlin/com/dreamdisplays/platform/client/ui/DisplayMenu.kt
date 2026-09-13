@@ -20,6 +20,7 @@ import com.dreamdisplays.api.watchparty.service.keys.WatchPartyServices
 import com.dreamdisplays.media.source.youtube.cache.VideoMetadataCache
 import com.dreamdisplays.media.source.youtube.cache.VideoTitleCache
 import com.dreamdisplays.platform.client.core.DreamServices
+import com.dreamdisplays.platform.client.input.MouseButtons
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.platform.client.popout.PopoutManager
@@ -581,15 +582,15 @@ class DisplayMenu private constructor(
         val mx = event.x().toInt()
         val my = event.y().toInt()
         val onPopoutButton = popoutButton.isMouseOver(mx.toDouble(), my.toDouble())
-        if (dropdown.visible && event.button() == 0 && !onPopoutButton && dropdown.handleClick(mx, my)) return true
+        if (dropdown.visible && MouseButtons.isLeft(event.button()) && !onPopoutButton && dropdown.handleClick(mx, my)) return true
         val onAudioTrackButton = audioTrackButton.isMouseOver(mx.toDouble(), my.toDouble())
-        if (audioTrackDropdown.visible && event.button() == 0 && !onAudioTrackButton && audioTrackDropdown.handleClick(
+        if (audioTrackDropdown.visible && MouseButtons.isLeft(event.button()) && !onAudioTrackButton && audioTrackDropdown.handleClick(
                 mx,
                 my
             )
         ) return true
         val onSubtitleButton = subtitleButton.isMouseOver(mx.toDouble(), my.toDouble())
-        if (subtitleDropdown.visible && event.button() == 0 && !onSubtitleButton && subtitleDropdown.handleClick(mx, my)) return true
+        if (subtitleDropdown.visible && MouseButtons.isLeft(event.button()) && !onSubtitleButton && subtitleDropdown.handleClick(mx, my)) return true
         return modLabel.handleClick(mx, my)
     }
 

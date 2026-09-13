@@ -87,7 +87,11 @@ jobs:
 
           tasks = (
               [{"kind": "fabric", "mc": version} for version in versions] +
-              [{"kind": "neoforge", "mc": version} for version in versions] +
+              [
+                  {"kind": "neoforge", "mc": version}
+                  for version in versions
+                  if "neoform.version" not in versions_data["versions"][version]
+              ] +
               [{"kind": "paper", "mc": paper_build_version}] +
               [{"kind": "velocity", "mc": paper_build_version}] +
               [{"kind": "bungeecord", "mc": paper_build_version}]
@@ -159,9 +163,9 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
 
           # Version channels and their "pretty" display names:
-          #   1.8.4-dev        -> Developer  (build artifacts only, never published)
-          #   1.9.0-preview.5  -> Preview 5  (public alpha pre-release)
-          #   1.8.4            -> Release    (stable, public release)
+          # 1.8.4-dev          -> Developer    (build artifacts only, never published)
+          # 1.9.0-preview.5    -> Preview 5    (public alpha pre-release)
+          # 1.8.4              -> Release      (stable, public release)
           if [[ "$VERSION" =~ ^([0-9]+(\.[0-9]+)*)-dev$ ]]; then
             echo "is_dev=true" >> $GITHUB_OUTPUT
             echo "is_preview=false" >> $GITHUB_OUTPUT
@@ -611,8 +615,6 @@ jobs:
           DREAMDISPLAYS_REQUIRED_NATIVE_PLATFORMS: ${{ needs.metadata.outputs.required_native_platforms }}
           GRADLE_OPTS: -Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4G
 
-      # The Paper jar is one cross-version artifact built only in the paper_build_version job
-      # (>=1.21.11); it dispatches 1.21.1 and 26.x at runtime, so it is not built per version.
       - name: Build Paper with Gradle
         if: matrix.mc == needs.metadata.outputs.paper_build_version
         run: |

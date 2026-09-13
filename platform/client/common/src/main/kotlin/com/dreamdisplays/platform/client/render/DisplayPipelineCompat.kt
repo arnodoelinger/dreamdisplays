@@ -1,20 +1,26 @@
 //? if >=1.21.11 {
 package com.dreamdisplays.platform.client.render
 
-import com.mojang.blaze3d.pipeline.BlendFunction
+//? if >=26.3 {
+//?} else
+/*import com.mojang.blaze3d.pipeline.BlendFunction
 import com.mojang.blaze3d.pipeline.RenderPipeline
+*/
 
 /**
  * Applies the display pipelines' translucent blend and default depth state across Minecraft versions.
  * 26.x exposes typed builder methods; older versions fall back to reflection.
  */
-internal fun RenderPipeline.Builder.withDisplayColorAndDepth(): RenderPipeline.Builder {
+internal fun RenderPipelineBuilder.withDisplayColorAndDepth(): RenderPipelineBuilder {
     val builderClass = javaClass
-    val colorTargetState = runCatching { Class.forName("com.mojang.blaze3d.pipeline.ColorTargetState") }.getOrNull()
+    val colorTargetState = runCatching { Class.forName("com.mojang.renderpearl.api.pipeline.ColorTargetState") }.getOrNull()
+        ?: runCatching { Class.forName("com.mojang.blaze3d.pipeline.ColorTargetState") }.getOrNull()
     if (colorTargetState != null) {
         val state = colorTargetState.getConstructor(BlendFunction::class.java).newInstance(BlendFunction.TRANSLUCENT)
         builderClass.getMethod("withColorTargetState", colorTargetState).invoke(this, state)
-        val depthStencilState = Class.forName("com.mojang.blaze3d.pipeline.DepthStencilState")
+        val depthStencilState = runCatching { Class.forName("com.mojang.renderpearl.api.pipeline.DepthStencilState") }.getOrElse {
+            Class.forName("com.mojang.blaze3d.pipeline.DepthStencilState")
+        }
         builderClass.getMethod("withDepthStencilState", depthStencilState)
             .invoke(this, depthStencilState.getField("DEFAULT").get(null))
     } else {

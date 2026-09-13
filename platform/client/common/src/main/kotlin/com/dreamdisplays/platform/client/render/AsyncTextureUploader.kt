@@ -1,9 +1,11 @@
 package com.dreamdisplays.platform.client.render
 
-//? if >=1.21.11 {
+//? if >=1.21.11 <26.3 {
 import com.mojang.blaze3d.opengl.GlStateManager
-//?} else
-/*import com.mojang.blaze3d.platform.GlStateManager*/
+//?}
+//? if <1.21.11 {
+import com.mojang.blaze3d.platform.GlStateManager
+//?}
 import com.dreamdisplays.api.media.sink.model.DecodedVideoFrame
 import com.dreamdisplays.api.render.texture.model.TextureHandle
 import com.dreamdisplays.api.render.texture.service.TextureUploaderService
