@@ -24,14 +24,7 @@ open class ExplosionProtectionMixin {
     @Shadow
     open fun level(): ServerLevel = throw AssertionError()
 
-    @Inject(
-        method = ["calculateExplodedPositions"],
-        //? if >=26.3 {
-        at = At("RETURN"),
-        //?} else
-        /*at = [At("RETURN")],*/
-        require = 1,
-    )
+    @Inject(method = ["calculateExplodedPositions"], at = [At("RETURN")], require = 1)
     open fun dd_filterExplodedBlocks(cir: CallbackInfoReturnable<MutableList<BlockPos>>) {
         val worldKey = RegionUtil.getLevelKey(level())
         cir.returnValue.removeIf { pos ->

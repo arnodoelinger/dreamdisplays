@@ -26,15 +26,7 @@ open class PistonProtectionMixin {
     @Shadow
     open fun getToDestroy(): MutableList<BlockPos> = throw AssertionError()
 
-    @Inject(
-        method = ["resolve"],
-        //? if >=26.3 {
-        at = At("RETURN"),
-        //?} else
-        /*at = [At("RETURN")],*/
-        cancellable = true,
-        require = 1,
-    )
+    @Inject(method = ["resolve"], at = [At("RETURN")], cancellable = true, require = 1)
     open fun dd_protectPistonStructure(cir: CallbackInfoReturnable<Boolean>) {
         if (cir.returnValue != true) return
         val serverLevel = level as? ServerLevel ?: return
