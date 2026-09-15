@@ -9,7 +9,7 @@ version = "${version}"
 displayName = "Dream Displays"
 logoFile = "assets/dreamdisplays/icon.png"
 authors = "arnodoelinger, INotSleep, Kolyakot33, Toffikk"
-description = "Create in-game screens to stream videos on any Minecraft server."
+description = "Create in-game screens to stream your favorite videos in Minecraft."
 
 [[mixins]]
 config = "dreamdisplays.mixins.json"

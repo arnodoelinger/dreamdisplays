@@ -4,7 +4,7 @@
   "name": "Dream Displays",
   "version": "${version}",
   "license": "LGPL-3.0",
-  "description": "Create in-game screens to stream videos on any Minecraft server.",
+  "description": "Create in-game screens to stream your favorite videos in Minecraft.",
   "authors": [
     "arnodoelinger, INotSleep, Kolyakot33, Toffikk"
   ],
