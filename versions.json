@@ -67,23 +67,23 @@
       "neoforge.loader.range": "[26.2.0.0-beta,)",
       "neoforge.minecraft.range": "[26.2]"
     },
-    "26.3-rc-2": {
-      "minecraft.version": "26.3-rc-2",
+    "26.3": {
+      "minecraft.version": "26.3",
       "java.version": "25",
       "loom.version": "1.17.13",
-      "moddev.version": "2.0.141",
+      "moddev.version": "2.0.147",
       "fabric.loader.version": "0.19.5",
       "quilt.loader.version": "0.31.0-beta.4",
-      "fabric.api.version": "0.160.4+26.3",
-      "fabric.minecraft.version": "26.3-rc-2",
+      "fabric.api.version": "0.160.5+26.3",
+      "fabric.minecraft.version": "26.3",
       "fabric.minecraft.dependency": "~26.3-",
-      "neoform.version": "26.3-rc-2-1",
-      "neoforge.version": "26.3.0-alpha.0+rc-2.20260913.135326",
+      "neoform.version": "26.3-1",
+      "neoforge.version": "26.2.0.203-pr-3403-port-26.3",
       "neoforge.maven.url": "https://prmaven.neoforged.net/NeoForge/pr3403",
-      "paper.api.version": "26.2.build.112-stable",
+      "paper.api.version": "26.3-rc-3.build.1-alpha",
       "paper.minecraft.api": "26.3",
-      "neoforge.loader.range": "[26.3.0-alpha.0,)",
-      "neoforge.minecraft.range": "[26.3-rc-2]"
+      "neoforge.loader.range": "[26.2.0-alpha.0,)",
+      "neoforge.minecraft.range": "[26.3]"
     }
   }
 }

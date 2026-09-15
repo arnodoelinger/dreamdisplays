@@ -2,7 +2,7 @@
 
 ## Highlights
 
-- Support 26.3 version
+- Added experimental support for 26.3 version
 - Fixed duplicated displays on proxy
 - Minor rendering fixes and other improvements
 
@@ -10,7 +10,7 @@
 
 ### Features
 
-- Added support for 26.3 version
+- Added experimental support for 26.3 version
 
 ### Improvements
 
@@ -26,7 +26,7 @@
 
 ### Features
 
-- Added support for 26.3 version
+- Added experimental support for 26.3 version
 
 ### Improvements
 
