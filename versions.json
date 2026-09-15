@@ -1,5 +1,5 @@
 {
-  "active": "26.3-rc-2",
+  "active": "1.21.11",
   "versions": {
     "1.21.1": {
       "minecraft.version": "1.21.1",
@@ -81,7 +81,7 @@
       "neoforge.version": "26.3.0-alpha.0+rc-2.20260913.135326",
       "neoforge.maven.url": "https://prmaven.neoforged.net/NeoForge/pr3403",
       "paper.api.version": "26.2.build.112-stable",
-      "paper.minecraft.api": "26.2",
+      "paper.minecraft.api": "26.3",
       "neoforge.loader.range": "[26.3.0-alpha.0,)",
       "neoforge.minecraft.range": "[26.3-rc-2]"
     }

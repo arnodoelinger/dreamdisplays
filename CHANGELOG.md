@@ -1,3 +1,43 @@
+# 1.10.0 Preview 2
+
+## Highlights
+
+- Support 26.3 version
+- Fixed duplicated displays on proxy
+- Minor rendering fixes and other improvements
+
+## Client
+
+### Features
+
+- Added support for 26.3 version
+
+### Improvements
+
+- Added stabile support of `Window` mode on macOS
+
+### Fixes
+
+- Fixed a bug where changing the GUI scale while watching a Picture-in-Picture video caused the video to render incorrectly
+- Fixed `&nbsp;` on the end of some subtitles
+- Fixed subtitles blinking
+
+## Server
+
+### Features
+
+- Added support for 26.3 version
+
+### Improvements
+
+- Added `WorldGuard` as an optional dependency in workflow
+- Added `LuckPerms` as an optional dependency for proxy in workflow
+
+### Fixes
+
+- Fixed duplicated displays across servers when using proxy
+- Fixed `default_volume` not applying to newly created displays (`0` was dropped on the wire; 50 now matches the 50% client slider)
+
 # 1.10.0 Preview 1
 
 ## Highlights
