@@ -85,6 +85,9 @@ class PipOverlay(
     private var targetY: Float = 0f
     private var posInitialized = false
 
+    private var layoutW = 0
+    private var layoutH = 0
+
     var lastPipX = 0; private set
     var lastPipY = 0; private set
     var lastPipW = 0; private set
@@ -260,10 +263,16 @@ class PipOverlay(
         val pipW = (sw * sizeFraction).toInt().coerceAtLeast(80)
         val pipH = (pipW / contentAspect).toInt().coerceAtLeast(45)
 
-        if (!posInitialized) {
+        // Position is stored in GUI-scaled pixels. And always must be
+        if (!posInitialized || sw != layoutW || sh != layoutH) {
+            if (posInitialized) {
+                dragging = false; resizing = false; pressed = false
+                pressedInBody = false; pressedInResize = false; pressedInClose = false
+            }
             val (ax, ay) = anchor.position(sw, sh, pipW, pipH, MARGIN)
             posX = ax.toFloat(); posY = ay.toFloat()
             targetX = posX; targetY = posY
+            layoutW = sw; layoutH = sh
             posInitialized = true
         }
 
