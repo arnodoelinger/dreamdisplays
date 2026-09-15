@@ -87,11 +87,7 @@ jobs:
 
           tasks = (
               [{"kind": "fabric", "mc": version} for version in versions] +
-              [
-                  {"kind": "neoforge", "mc": version}
-                  for version in versions
-                  if "neoform.version" not in versions_data["versions"][version]
-              ] +
+              [{"kind": "neoforge", "mc": version} for version in versions] +
               [{"kind": "paper", "mc": paper_build_version}] +
               [{"kind": "velocity", "mc": paper_build_version}] +
               [{"kind": "bungeecord", "mc": paper_build_version}]

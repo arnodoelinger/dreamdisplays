@@ -140,7 +140,7 @@ jobs:
           import os
 
           paper_1_21 = ["1.21"] + [f"1.21.{p}" for p in range(1, 12)]
-          paper_26 = ["26.1", "26.1.1", "26.1.2", "26.2"]
+          paper_26 = ["26.1", "26.1.1", "26.1.2", "26.2", "26.3"]
           paper_versions = paper_1_21 + paper_26
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as f:
@@ -214,6 +214,8 @@ jobs:
           loaders: bungeecord
           game-versions: ${{ steps.versions.outputs.paper_versions }}
           game-version-filter: none
+          dependencies: |
+            luckperms(optional){modrinth:Vebnzrzj}
 
       - name: Publish Velocity to Modrinth
         if: needs.build.outputs.is_marketplace_publishable == 'true'
@@ -229,6 +231,8 @@ jobs:
           loaders: velocity
           game-versions: ${{ steps.versions.outputs.paper_versions }}
           game-version-filter: none
+          dependencies: |
+            luckperms(optional){modrinth:Vebnzrzj}
 
       - name: Publish Paper
         if: needs.build.outputs.is_marketplace_publishable == 'true'
@@ -249,6 +253,7 @@ jobs:
           game-version-filter: none
           dependencies: |
             luckperms(optional){modrinth:Vebnzrzj}
+            worldguard(optional){modrinth:DKY9btbd}
 
       - name: Download all build artifacts for GitHub Release
         if: needs.build.outputs.is_marketplace_publishable == 'true' && needs.build.outputs.is_release == 'true'
