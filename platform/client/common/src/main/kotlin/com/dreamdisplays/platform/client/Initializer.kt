@@ -11,6 +11,7 @@ import com.dreamdisplays.platform.client.managers.*
 import com.dreamdisplays.platform.client.net.LegacyAdapter
 import com.dreamdisplays.platform.client.net.ProtocolRouter
 import com.dreamdisplays.platform.client.overlay.OverlayManager
+import com.dreamdisplays.platform.client.render.DisplayYuvRenderTypes
 import com.dreamdisplays.platform.client.ui.FullscreenOverlayManager
 import com.dreamdisplays.platform.client.ui.MinecraftOverlayRenderContext
 import com.dreamdisplays.platform.client.utils.MinecraftScreenUtil
@@ -97,6 +98,7 @@ object Initializer {
      * handles the right-click shortcut, and applies focus-mode blindness.
      */
     fun onEndTick(minecraft: Minecraft) {
+        DisplayYuvRenderTypes.solidColorType()
         ClientTickManager.tick(minecraft)
     }
 

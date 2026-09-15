@@ -19,6 +19,10 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent
+//? if >=26.3 {
+import net.minecraft.client.renderer.SubmitNodeCollector
+import net.neoforged.neoforge.client.event.SubmitCustomGeometryEvent
+//?}
 //? if >=1.21.11 {
 import net.neoforged.neoforge.client.event.ExtractBlockOutlineRenderStateEvent
 import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent
@@ -68,14 +72,30 @@ class Client(modEventBus: IEventBus) : DreamMod {
     //?}
 
     //? if >=26 {
+    //? if >=26.3 {
     @SubscribeEvent
+    fun onSubmitDisplays(event: SubmitCustomGeometryEvent) {
+        val mc = Minecraft.getInstance()
+        if (mc.level == null || mc.player == null) return
+        val camera = mainCamera(mc)
+        val stack = event.poseStack
+        val collector = event.submitNodeCollector
+        UnshadedDisplayPass.capture(stack, camera)
+        ScreenRenderer.render(stack, camera) { type, appendVertices ->
+            collector.submitCustomGeometry(
+                stack, type, SubmitNodeCollector.CustomGeometryRenderer { pose, consumer -> appendVertices(pose, consumer) },
+            )
+        }
+    }
+    //?} else
+    /*@SubscribeEvent
     fun onRenderDisplays(event: RenderLevelStageEvent.AfterOpaqueFeatures) {
         val mc = Minecraft.getInstance()
         if (mc.level == null || mc.player == null) return
         val camera = mainCamera(mc)
         UnshadedDisplayPass.capture(event.poseStack, camera)
         ScreenRenderer.render(event.poseStack, camera)
-    }
+    }*/
     //?} else
     /*
     //? if ==1.21.11 {
