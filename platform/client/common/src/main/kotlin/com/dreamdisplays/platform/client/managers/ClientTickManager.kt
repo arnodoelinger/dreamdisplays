@@ -18,6 +18,7 @@ import net.minecraft.client.Minecraft
 import net.minecraft.client.gui.screens.TitleScreen
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen
 import net.minecraft.client.multiplayer.ClientLevel
+import net.minecraft.client.multiplayer.ClientPacketListener
 import java.util.*
 
 /**
@@ -39,6 +40,12 @@ object ClientTickManager {
     /** The level seen last tick, used to detect level changes. */
     @Volatile
     private var lastLevel: ClientLevel? = null
+
+    /**
+     * The play connection last seen in a level. A proxy server switch goes through the configuration phase and
+     * builds a new one, while a dimension change keeps it, so a different instance means a different backend.
+     */
+    private var lastConnection: ClientPacketListener? = null
 
     /** Counter that throttles the unloaded-screen restore check. */
     private var unloadCheckTick = 0
@@ -64,13 +71,20 @@ object ClientTickManager {
 
         val level = minecraft.level
         if (level != null && (minecraft.currentServer != null || minecraft.isLocalServer)) {
+            val connection = minecraft.connection
+            val newBackend = connection != null && lastConnection != null && connection !== lastConnection
+            if (connection != null) lastConnection = connection
             if (lastLevel == null) {
                 lastLevel = level
+                if (newBackend) {
+                    DisplayRegistry.unloadAllForServerSwitch(newBackend = true)
+                    hoveredDisplayScreen = null
+                }
                 checkVersionAndSendPacket()
             }
             if (level !== lastLevel) {
                 lastLevel = level
-                DisplayRegistry.unloadAllForServerSwitch()
+                DisplayRegistry.unloadAllForServerSwitch(newBackend)
                 hoveredDisplayScreen = null
                 checkVersionAndSendPacket()
             }
@@ -85,6 +99,7 @@ object ClientTickManager {
                 FullscreenOverlayManager.closeAll()
                 hoveredDisplayScreen = null
                 lastLevel = null
+                lastConnection = null
                 return
             }
             lastLevel = null

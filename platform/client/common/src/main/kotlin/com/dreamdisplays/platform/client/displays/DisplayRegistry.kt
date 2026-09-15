@@ -100,8 +100,12 @@ object DisplayRegistry {
     /** Display id -> instant after which an unconfirmed carry-over is torn down. */
     private val awaitingReconfirm = ConcurrentHashMap<UUID, Long>()
 
-    /** Server-switch teardown: world-anchored displays go immediately, popout-active ones held for reconfirm grace. */
-    fun unloadAllForServerSwitch() {
+    /**
+     * Level-change teardown: world-anchored displays go immediately, popout-active ones held for reconfirm grace.
+     * [newBackend] (a proxy moved the player to another server) also forgets the distance-restore cache, whose
+     * entries belong to the previous server and would otherwise reappear at the same coordinates on this one.
+     */
+    fun unloadAllForServerSwitch(newBackend: Boolean) {
         val now = System.currentTimeMillis()
         val carried = mutableSetOf<UUID>()
         for (screen in screens.values.toList()) {
@@ -114,7 +118,7 @@ object DisplayRegistry {
                 unregisterScreen(screen)
             }
         }
-        unloadedScreens.keys.removeAll(carried)
+        if (newBackend) unloadedScreens.clear() else unloadedScreens.keys.removeAll(carried)
         awaitingReconfirm.keys.retainAll(carried)
     }
 
