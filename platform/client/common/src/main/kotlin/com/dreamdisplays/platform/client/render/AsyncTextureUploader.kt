@@ -82,23 +82,23 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploaderSer
     override fun upload(frame: DecodedVideoFrame): TextureHandle {
         if (managedTexId == -1) {
             managedTexId = GL11.glGenTextures()
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)
+            bindTexture(managedTexId)
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
             GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            bindTexture(0)
         }
         val w = frame.width
         val h = frame.height
         val buf = ByteBuffer.wrap(frame.data)
         if (w != managedTexW || h != managedTexH) {
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, managedTexId)
+            bindTexture(managedTexId)
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 1)
             GL11.glTexImage2D(
                 GL11.GL_TEXTURE_2D, 0, GL11.GL_RGB, w, h, 0,
                 GL11.GL_RGB, GL11.GL_UNSIGNED_BYTE, buf,
             )
             GL11.glPixelStorei(GL11.GL_UNPACK_ALIGNMENT, 4)
-            GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+            bindTexture(0)
             managedTexW = w; managedTexH = h
         } else {
             upload(managedTexId, buf, w, h, UploadPixelFormat.RGB24)
@@ -288,10 +288,8 @@ class AsyncTextureUploader(private val stateCache: Boolean) : TextureUploaderSer
         if (stateCache) GlStateManager._glBindBuffer(target, id) else GL15.glBindBuffer(target, id)
     }
 
-    /** Binds a 2D texture. */
-    private fun bindTexture(id: Int) {
-        if (stateCache) GlStateManager._bindTexture(id) else GL11.glBindTexture(GL11.GL_TEXTURE_2D, id)
-    }
+    /** Binds a 2D texture. Always issues a real `glBindTexture` - see [bindTexture2D]. */
+    private fun bindTexture(id: Int) = bindTexture2D(stateCache, id)
 
     /** Sets pixel storage parameters. */
     private fun pixelStore(name: Int, value: Int) {

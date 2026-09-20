@@ -24,10 +24,13 @@ object TextureUploadUtil {
         val glId = (tex.getTexture() as? GlTexture)?.glId() ?: return
         //?} else
         /*val glId = tex.getId()*/
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, glId)
+        // Bind through the state cache: a raw glBindTexture here would leave GlStateManager's
+        // cache pointing at this texture while the driver is actually unbound, and later cached
+        // binds (both ours and Minecraft's) could then be dropped entirely.
+        bindTexture2D(stateCache = true, id = glId)
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, GL11.GL_LINEAR)
         GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, GL11.GL_LINEAR)
-        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0)
+        bindTexture2D(stateCache = true, id = 0)
     }
 
     /** Uploads raw pixels into a [DynamicTexture] across both legacy GL-id and new GpuTexture APIs. */
