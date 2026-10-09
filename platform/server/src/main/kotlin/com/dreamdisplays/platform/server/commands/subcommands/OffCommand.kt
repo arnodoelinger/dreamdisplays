@@ -39,6 +39,7 @@ class OffCommand : SubCommand {
         }
 
         if (!PlayerManager.isDisplaysEnabled(target)) {
+            PacketUtil.sendDisplayEnabled(target, false)
             MessageUtil.sendMessage(target, "display.already-disabled")
             if (!selfTarget) {
                 MessageUtil.sendColoredMessage(
@@ -134,6 +135,7 @@ object VanillaOffCommand {
         }
 
         if (!PlayerManager.isDisplaysEnabled(target)) {
+            VanillaPacketUtil.sendDisplayEnabled(target, false)
             MessageUtil.sendMessage(target, "display.already-disabled")
             if (!selfTarget) {
                 val msg = config.getMessageForPlayer(self, "display.already-disabled.target") as? String

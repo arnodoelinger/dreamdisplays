@@ -39,6 +39,7 @@ class OnCommand : SubCommand {
         }
 
         if (PlayerManager.isDisplaysEnabled(target)) {
+            PacketUtil.sendDisplayEnabled(target, true)
             MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
                 MessageUtil.sendColoredMessage(
@@ -134,6 +135,7 @@ object VanillaOnCommand {
         }
 
         if (PlayerManager.isDisplaysEnabled(target)) {
+            VanillaPacketUtil.sendDisplayEnabled(target, true)
             MessageUtil.sendMessage(target, "display.already-enabled")
             if (!selfTarget) {
                 val msg = config.getMessageForPlayer(self, "display.already-enabled.target") as? String

@@ -5,6 +5,7 @@ import com.dreamdisplays.api.display.service.DisplaySystem
 import com.dreamdisplays.api.runtime.registry.service.getOrNull
 import com.dreamdisplays.core.protocol.common.packets.*
 import com.dreamdisplays.core.services.DisplayStorage
+import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.platform.client.Mod
 import com.dreamdisplays.platform.client.capabilities.CapabilityNegotiationService
 import com.dreamdisplays.platform.client.core.DreamServices
@@ -69,6 +70,7 @@ object ClientPacketManager {
         ClientStateManager.isReportingEnabled = packet.isReportingEnabled
         DreamServices.registry.getOrNull<CapabilityNegotiationService>()
             ?.onServerCapabilities(packet)
+        Initializer.sendPacket(SetDisplaysEnabled(ClientStateManager.displaysEnabled))
     }
 
     /** Server-forced display toggle (admin command), persisted like the legacy channel did. */

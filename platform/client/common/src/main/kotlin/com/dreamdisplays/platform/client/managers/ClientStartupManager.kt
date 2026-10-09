@@ -60,6 +60,7 @@ object ClientStartupManager {
     /** Loads config, wires services, hosts the application, prewarms backends, and launches maintenance loops. */
     fun start() {
         config.reload()
+        ClientStateManager.displaysEnabled = config.displaysEnabled
         ClientSettingsStore.load()
         WatchedVideoStore.load()
         CustomVideoStore.load()
