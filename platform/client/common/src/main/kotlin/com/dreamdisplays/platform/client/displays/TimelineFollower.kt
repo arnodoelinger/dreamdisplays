@@ -114,7 +114,7 @@ internal class TimelineFollower(private val screen: DisplayScreen) {
                 )
             } else target
 
-            screen.clearRenderedFrameForTimeline()
+            if (!packet.paused) screen.clearRenderedFrameForTimeline()
             screen.seekVideoTo(seekMs * 1_000_000L)
             lastSeekNanos = System.nanoTime()
             screen.markInitialTimelineReady()
