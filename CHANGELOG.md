@@ -1,3 +1,53 @@
+# 1.10.0 Preview 4
+
+## Highlights
+
+- Major `Twitch` playback stability improvements
+- Players without the mod can now join `Fabric` servers running `Dream Displays`
+- Improved `/display` command suggestions
+- `/display fullscreen` now works in command blocks and the server console
+- Fixed a crash on Minecraft 26.3 with `Improved Transparency` enabled
+- Fixed several display synchronization and playback issues
+
+## Client
+
+### Features
+
+- Now you can join `Fabric` running `Dream Displays` servers without `Dream Displays` installed (server 1.10.0 Preview 4 or higher required)
+- Improved `/display` command suggestions and tab completion
+
+### Improvements
+
+- `Twitch` stability improvements
+
+### Fixes
+
+- Fixed paused displays sometimes switching to "Waiting for video..." after a while ([#228](https://github.com/arnodoelinger/dreamdisplays/issues/228))
+- Fixed the game crashing on 26.3 when a display is in view with `Improved Transparency` turned on ([#244](https://github.com/arnodoelinger/dreamdisplays/issues/244))
+- Fixed displays turned off with `/display off` not turning back on after rejoining the world, and turning back on by themselves after a game restart ([#243](https://github.com/arnodoelinger/dreamdisplays/issues/243))
+- Fixed videos from plain `http://` links not playing, with "Option tls_verify not found" in the log ([#246](https://github.com/arnodoelinger/dreamdisplays/issues/246))
+- Fixed `Twitch` streams starting with a 30 second "Commercial Break in Progress" screen ([#231](https://github.com/arnodoelinger/dreamdisplays/issues/231))
+- Fixed `Twitch` sound breaking up into short chunks and the picture stuttering after a stall or an ad break ([#231](https://github.com/arnodoelinger/dreamdisplays/issues/231))
+- Fixed `Twitch` sound sometimes running a couple of seconds behind the picture
+- Fixed many `Twitch` channels playing without sound and restarting over and over
+- Fixed live streams sometimes taking 20 seconds of black screen to start on synced displays
+
+## Server
+
+### Features
+
+- Players without the mod now can join `Fabric` servers that have `Dream Displays` installed
+- `/display fullscreen` now supported for command blocks and the server console ([#248](https://github.com/arnodoelinger/dreamdisplays/issues/248))
+
+### Improvements
+
+- `/display` tab completion now covers every command and argument
+
+### Fixes
+
+- Fixed `Fabric` and `NeoForge` servers crashing on startup when another mod that also bundles SQLite is installed ([#242](https://github.com/arnodoelinger/dreamdisplays/issues/242))
+- Fixed `/display on` answering "already enabled" and doing nothing for players who rejoined with displays turned off ([#243](https://github.com/arnodoelinger/dreamdisplays/issues/243))
+
 # 1.10.0 Preview 3
 
 ## Highlights
@@ -497,6 +547,10 @@
 - Fixed audio issues in `Fabric` 1.21.1 & 1.21.11 versions
 
 ## Client
+
+### Features
+
+- Added volume normalization: quiet and loud videos now play at about the same loudness, so the volume no longer has to be changed between them. On by default, `audio-normalization` in `config.yml` turns it off ([#233](https://github.com/arnodoelinger/dreamdisplays/issues/233))
 
 ### Fixes
 
