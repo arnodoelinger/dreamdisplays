@@ -22,8 +22,8 @@ internal class AudioRenderChain(
     private companion object {
         const val TARGET_LUFS = -16f
         const val MAX_LOUDNESS_BOOST_DB = 12f
-        const val MAX_LOUDNESS_CUT_DB = 3f
-        const val MAX_LOUDNESS_SLEW_DB_PER_SEC = 0.5f
+        const val MAX_LOUDNESS_CUT_DB = 12f
+        const val MAX_LOUDNESS_SLEW_DB_PER_SEC = 1f
         const val GAIN_SMOOTH_SECONDS = 0.08f
         const val AZIMUTH_SMOOTH_SECONDS = 0.06f
         const val OCCLUSION_SMOOTH_SECONDS = 0.10f
@@ -67,11 +67,14 @@ internal class AudioRenderChain(
     private var floatL = FloatArray(0)
     private var floatR = FloatArray(0)
 
+    private var lastMakeup = 1f
+
     override fun process(buf: ByteArray, len: Int, legacyGain: Double) {
         val st = state
         val tier = engine.currentQuality()
+        val normalize = engine.currentNormalization()
         if (tier == AcousticQuality.OFF || st == null || st.bypassSpatial || !st.acousticsEnabled) {
-            applyLegacyGain(buf, len, legacyGain)
+            if (normalize) applyNormalizedGain(buf, len, legacyGain) else applyLegacyGain(buf, len, legacyGain)
             return
         }
 
@@ -118,15 +121,9 @@ internal class AudioRenderChain(
 
         val advanced = tier == AcousticQuality.ADVANCED || tier == AcousticQuality.ULTRA
         val userGain = if (st.muted) 0f else st.userVolume
-        val makeup = if (advanced) {
-            loudness.makeupGain(
-                TARGET_LUFS,
-                MAX_LOUDNESS_BOOST_DB,
-                MAX_LOUDNESS_CUT_DB,
-                MAX_LOUDNESS_SLEW_DB_PER_SEC,
-                dtBlock
-            )
-        } else 1f
+        val makeupFrom = lastMakeup
+        val makeupStep = (nextMakeup(normalize, dtBlock) - makeupFrom) / frames
+        val limit = advanced || normalize
 
         val env = st.environment
         val occ = env.occlusion.coerceIn(0f, 1f)
@@ -157,6 +154,7 @@ internal class AudioRenderChain(
 
             val srcL = if (advanced) occlusionFilterL.process(rawL) else rawL
             val srcR = if (advanced) occlusionFilterR.process(rawR) else rawR
+            val makeup = makeupFrom + makeupStep * (i + 1)
             val l = srcL * gL * userGain * makeup * occGain
             val r = srcR * gR * userGain * makeup * occGain
 
@@ -172,7 +170,7 @@ internal class AudioRenderChain(
                     outR += reverb.lastR * wetGain
                 }
 
-                if (advanced) {
+                if (limit) {
                     limiter.process(outL, outR)
                     outL = limiter.lastL
                     outR = limiter.lastR
@@ -191,7 +189,7 @@ internal class AudioRenderChain(
                     outR += reverb.lastR * wetGain
                 }
 
-                if (advanced) {
+                if (limit) {
                     limiter.process(outL, outR)
                     outL = limiter.lastL
                     outR = limiter.lastR
@@ -205,7 +203,7 @@ internal class AudioRenderChain(
     }
 
     override fun reset() {
-        loudness.reset()
+        loudness.restart()
         limiter.reset()
         leftBinaural.reset()
         rightBinaural.reset()
@@ -217,6 +215,42 @@ internal class AudioRenderChain(
         occlusionCutoff.snap(MAX_CUTOFF_HZ)
         occlusionGain.snap(1f)
         reverbWet.snap(0f)
+    }
+
+    private fun nextMakeup(normalize: Boolean, dtBlock: Float): Float {
+        val makeup = if (normalize) {
+            loudness.makeupGain(
+                TARGET_LUFS,
+                MAX_LOUDNESS_BOOST_DB,
+                MAX_LOUDNESS_CUT_DB,
+                MAX_LOUDNESS_SLEW_DB_PER_SEC,
+                dtBlock
+            )
+        } else 1f
+        lastMakeup = makeup
+        return makeup
+    }
+
+    private fun applyNormalizedGain(buf: ByteArray, len: Int, gain: Double) {
+        val frames = len / 4
+        if (frames <= 0) return
+        ensureCapacity(frames)
+        decode(buf, frames)
+
+        val makeupFrom = lastMakeup
+        val makeupStep = (nextMakeup(true, frames / sampleRate) - makeupFrom) / frames
+        val dtSample = 1f / sampleRate
+        val volume = gain.toFloat()
+        for (i in 0 until frames) {
+            val rawL = floatL[i]
+            val rawR = floatR[i]
+            loudness.observe(rawL, rawR, dtSample)
+            val scale = volume * (makeupFrom + makeupStep * (i + 1))
+            limiter.process(rawL * scale, rawR * scale)
+            floatL[i] = limiter.lastL
+            floatR[i] = limiter.lastR
+        }
+        encode(buf, frames)
     }
 
     private fun ensureCapacity(frames: Int) {

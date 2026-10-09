@@ -39,6 +39,9 @@ class Config(private val baseDir: File) {
     /** Output profile for spatialized audio: `true` renders binaural for headphones, `false` a plain stereo pan for speakers. */
     var audioBinauralOutput: Boolean = true
 
+    /** Whether every display's audio is brought to one loudness, so quiet and loud videos need no volume change. */
+    var audioNormalization: Boolean = true
+
     init {
         load()
     }
@@ -79,6 +82,7 @@ class Config(private val baseDir: File) {
         audioAcoustics = data["audio-acoustics"]?.let { token ->
             AcousticQuality.entries.firstOrNull { it.name.equals(token, ignoreCase = true) }
         } ?: audioAcoustics
+        audioNormalization = data["audio-normalization"]?.toBooleanStrictOrNull() ?: audioNormalization
         audioBinauralOutput = when (data["audio-output-profile"]?.lowercase()) {
             "speakers" -> false
             "headphones", "auto" -> true
@@ -100,6 +104,7 @@ class Config(private val baseDir: File) {
             appendLine("unshaded-displays: $unshadedDisplays")
             appendLine("audio-acoustics: ${audioAcoustics.name.lowercase()}")
             appendLine("audio-output-profile: ${if (audioBinauralOutput) "headphones" else "speakers"}")
+            appendLine("audio-normalization: $audioNormalization")
         })
     }
 

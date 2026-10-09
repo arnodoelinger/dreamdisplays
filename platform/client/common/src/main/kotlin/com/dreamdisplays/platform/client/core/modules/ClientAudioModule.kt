@@ -6,7 +6,7 @@ import com.dreamdisplays.api.runtime.module.ModuleContext
 import com.dreamdisplays.media.audio.engine.AcousticsEngine
 import com.dreamdisplays.platform.client.managers.ClientStateManager
 
-/** Installs the 3D acoustics engine and seeds it with the current config (quality tier, output profile). */
+/** Installs the 3D acoustics engine and seeds it with the current config (quality tier, output profile, loudness normalization). */
 object ClientAudioModule : DreamDisplaysModule {
     /** The ID of this module. */
     override val id: String = "dreamdisplays:client_audio"
@@ -16,6 +16,7 @@ object ClientAudioModule : DreamDisplaysModule {
         val engine = AcousticsEngine()
         engine.setGlobalQuality(ClientStateManager.config.audioAcoustics)
         engine.setBinauralOutput(ClientStateManager.config.audioBinauralOutput)
+        engine.setLoudnessNormalization(ClientStateManager.config.audioNormalization)
         context.services.register(AudioAcousticsServices.ACOUSTICS, engine)
     }
 }

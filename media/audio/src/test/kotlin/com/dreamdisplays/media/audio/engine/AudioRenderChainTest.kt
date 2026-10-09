@@ -10,11 +10,13 @@ import kotlin.test.assertTrue
 class AudioRenderChainTest {
     private fun newChain(
         quality: AcousticQuality = AcousticQuality.ADVANCED,
-        binaural: Boolean = true
+        binaural: Boolean = true,
+        normalization: Boolean = false,
     ): AudioRenderChain {
         val engine = AcousticsEngine(44100f)
         engine.setGlobalQuality(quality)
         engine.setBinauralOutput(binaural)
+        engine.setLoudnessNormalization(normalization)
         return AudioRenderChain(44100f, engine)
     }
 
@@ -73,6 +75,64 @@ class AudioRenderChainTest {
         }
     }
 
+    @Test
+    fun `normalization brings a quiet and a loud source to about the same level`() {
+        for (quality in listOf(AcousticQuality.OFF, AcousticQuality.ADVANCED)) {
+            val quiet = settledRms(quality, amplitude = 0.06)
+            val loud = settledRms(quality, amplitude = 0.6)
+            val apartDb = 20 * kotlin.math.log10(loud / quiet)
+            assertTrue(apartDb < 2.0, "$quality: sources 20 dB apart ended ${"%.1f".format(apartDb)} dB apart.")
+        }
+    }
+
+    @Test
+    fun `normalization holds its gain through silence instead of winding up`() {
+        val chain = newChain(quality = AcousticQuality.OFF, normalization = true)
+        repeat(200) { chain.process(tone(0.3), 2205 * 4, 1.0) }
+        val before = rms(tone(0.3).also { chain.process(it, it.size, 1.0) })
+        repeat(400) { chain.process(ByteArray(2205 * 4), 2205 * 4, 1.0) }
+        val after = rms(tone(0.3).also { chain.process(it, it.size, 1.0) })
+        val driftDb = 20 * kotlin.math.log10(after / before)
+        assertTrue(kotlin.math.abs(driftDb) < 1.0, "Gain drifted ${"%.1f".format(driftDb)} dB over 20 s of silence.")
+    }
+
+    @Test
+    fun `a session reset keeps the normalization gain, so a seek does not jump in volume`() {
+        val chain = newChain(quality = AcousticQuality.OFF, normalization = true)
+        repeat(200) { chain.process(tone(0.6), 2205 * 4, 1.0) }
+        val before = rms(tone(0.6).also { chain.process(it, it.size, 1.0) })
+        chain.reset()
+        val after = rms(tone(0.6).also { chain.process(it, it.size, 1.0) })
+        val jumpDb = 20 * kotlin.math.log10(after / before)
+        assertTrue(kotlin.math.abs(jumpDb) < 1.0, "Volume jumped ${"%.1f".format(jumpDb)} dB across a reset.")
+    }
+
+    private fun settledRms(quality: AcousticQuality, amplitude: Double): Double {
+        val chain = newChain(quality = quality, binaural = false, normalization = true)
+        chain.updateState(defaultState())
+        var last = 0.0
+        repeat(400) { last = rms(tone(amplitude).also { chain.process(it, it.size, 1.0) }) }
+        return last
+    }
+
+    private fun tone(amplitude: Double): ByteArray {
+        val buf = ByteArray(2205 * 4)
+        for (i in 0 until 2205) {
+            val v = (Short.MAX_VALUE * amplitude * kotlin.math.sin(2 * Math.PI * 440.0 * i / 44100.0)).toInt().toShort()
+            System.arraycopy(frame(v, v), 0, buf, i * 4, 4)
+        }
+        return buf
+    }
+
+    private fun rms(buf: ByteArray): Double {
+        var sum = 0.0
+        for (i in 0 until buf.size / 2) {
+            val s = ((buf[i * 2 + 1].toInt() shl 8) or (buf[i * 2].toInt() and 0xFF)) / 32768.0
+            sum += s * s
+        }
+        return kotlin.math.sqrt(sum / (buf.size / 2))
+    }
+
     private fun defaultState(bypassSpatial: Boolean = false) = SourceAcousticState(
         plane = SourcePlane(
             centerX = 0.0, centerY = 0.0, centerZ = -5.0,
@@ -86,7 +146,6 @@ class AudioRenderChainTest {
         bypassSpatial = bypassSpatial,
     )
 
-    /** Reference implementation matching [AudioRenderChain]'s bypass path (and `MediaBufferEffects`). */
     private fun expectedLegacyGain(buf: ByteArray, gain: Double): ByteArray {
         val out = buf.copyOf()
         if (kotlin.math.abs(gain - 1.0) < 1e-5) return out
