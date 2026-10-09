@@ -4,7 +4,6 @@
   "package": "com.dreamdisplays.platform.server.mixins",
   "compatibilityLevel": "JAVA_${javaVersion}",
   "mixins": [
-    "BareTokenArgumentTypeSyncMixin",
     "ExplosionProtectionMixin",
     "PistonProtectionMixin"
   ],

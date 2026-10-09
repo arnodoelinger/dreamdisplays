@@ -118,9 +118,6 @@ object FullscreenBroadcastManager {
         return true
     }
 
-    /** Display target suggestions (name if set, else the same short-id `/display list` shows) — see [shortLabel]. */
-    fun displayIdSuggestions(): List<String> = DisplayManager.getDisplays().map { it.shortLabel }
-
     /**
      * Starts a new session. [namedTargets] and [radius] are combined by OR - at least one must be
      * given. Returns the started session's id, or null if neither targeting condition was set, a

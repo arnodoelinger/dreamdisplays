@@ -363,8 +363,10 @@ internal fun mapLocaleToLang(locale: String): String {
     }
 }
 
-private fun loadLanguageMessages(file: File): Map<String, Any> {
-    val root = DreamJson.compact.parseToJsonElement(file.readText()).asJsonObjectOrNull()
+private fun loadLanguageMessages(file: File): Map<String, Any> = parseLanguageMessages(file.readText())
+
+private fun parseLanguageMessages(text: String): Map<String, Any> {
+    val root = DreamJson.compact.parseToJsonElement(text).asJsonObjectOrNull()
         ?: error("Language file root must be a JSON object.")
     return root.mapNotNull { (key, value) ->
         value.toPlainJsonValue()?.let { key to it }
@@ -406,21 +408,29 @@ internal class LanguageStore(
         }
     }
 
+    private fun bundledMessages(fileName: String): Map<String, Any> = runCatching {
+        val resource = resourceLookup("assets/dreamdisplays/lang/server/$fileName")
+            ?: resourceLookup("assets/dreamdisplays/lang/$fileName")
+        resource?.use { parseLanguageMessages(it.readBytes().decodeToString()) }
+    }.getOrNull() ?: emptyMap()
+
     private fun isValidLangFile(file: File): Boolean =
         runCatching { loadLanguageMessages(file) }.isSuccess
 
-    /** Parses every language JSON in [dataDir]/lang into [languages] and reseeds the English fallback map. */
     fun loadMessages(logger: Logger) {
         languages.clear()
         LANGUAGE_FILES.forEach { fileName ->
             val langCode = fileName.removeSuffix(".json")
             val langFile = File(dataDir, "lang/$fileName")
+            val bundled = bundledMessages(fileName)
             if (langFile.exists()) {
                 runCatching {
-                    languages[langCode] = loadLanguageMessages(langFile)
+                    languages[langCode] = bundled + loadLanguageMessages(langFile)
                 }.onFailure {
                     logger.error("Error loading language file: $fileName.", it)
                 }
+            } else if (bundled.isNotEmpty()) {
+                languages[langCode] = bundled
             }
         }
         messages.clear()
