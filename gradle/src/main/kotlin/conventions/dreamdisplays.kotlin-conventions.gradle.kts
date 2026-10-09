@@ -72,6 +72,10 @@ tasks.withType<KotlinCompile>().configureEach {
     compilerOptions.optIn.add("com.dreamdisplays.api.Unstable")
 }
 
+pluginManager.withPlugin("io.github.arnodoelinger.platformweaver") {
+    tasks.withType<KotlinCompile>().configureEach { incremental = false }
+}
+
 tasks.withType<Jar>().configureEach {
     from(rootProject.file("LICENSE"))
 }

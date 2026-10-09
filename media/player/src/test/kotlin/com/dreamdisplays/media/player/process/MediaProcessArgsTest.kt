@@ -11,7 +11,7 @@ class MediaProcessArgsTest {
 
     private val httpOnly = listOf(
         "-headers", "-reconnect", "-reconnect_streamed", "-reconnect_delay_max",
-        "-reconnect_on_network_error", "-reconnect_on_http_error", "-multiple_requests",
+        "-reconnect_on_network_error", "-reconnect_on_http_error",
     )
 
     private fun args(offsetNanos: Long, seekByDecoding: Boolean, trimmed: HlsSeekPlaylist.Trimmed? = null) =
@@ -52,6 +52,22 @@ class MediaProcessArgsTest {
         )
         assertFalse("-tls_verify" in plain, "Plain http fails to open with \"Option tls_verify not found\".")
         assertTrue(plain.containsAll(httpOnly), "A plain http input should keep its connection options.")
+    }
+
+    @Test
+    fun `only a plain file is pulled over a kept-alive connection`() {
+        val file = MediaProcess.inputCommand(
+            "FFMPEG", "https://rr1---sn-ajh0j5-5x.googlevideo.com/videoplayback?itag=137", 0L,
+            HwAccelBackend.NONE, false, null,
+        )
+        assertEquals("1", file.valueOf("-multiple_requests"))
+
+        val live = MediaProcess.inputCommand(
+            "FFMPEG", "https://euc12.playlist.ttvnw.net/v1/playlist/CvYE", 0L, HwAccelBackend.NONE, false, null,
+        )
+        assertFalse("-multiple_requests" in live)
+        assertFalse("-multiple_requests" in args(0L, seekByDecoding = false), "A .m3u8 input is a playlist too.")
+        assertTrue(live.containsAll(httpOnly), "The playlist is still an http input.")
     }
 
     @Test

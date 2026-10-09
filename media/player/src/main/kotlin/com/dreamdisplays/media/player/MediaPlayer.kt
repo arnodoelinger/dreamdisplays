@@ -710,7 +710,7 @@ class MediaPlayer(
             }
 
             val primed = primedStartPositionNanos.get().takeIf { it >= 0L } ?: 0L
-            val initialOffset = replayBootstrapRef.get()?.positionNanos ?: primed
+            val initialOffset = if (liveStream) 0L else replayBootstrapRef.get()?.positionNanos ?: primed
 
             safeExecute { if (!terminated.get()) startStreams(prepared.streamSet, initialOffset) }
         }.onSuccess {
@@ -936,6 +936,16 @@ class MediaPlayer(
         }
         if (liveStream && sessionManager.audioSourceGone()) {
             handleSessionStall("live audio source stopped serving")
+            return
+        }
+        if (liveStream && sessionManager.audioSpliced()) {
+            safeExecute {
+                val ss = streams
+                if (terminated.get() || ss == null) return@safeExecute
+                if (!sessionManager.restartAudio(ss, 0L)) {
+                    handleSessionStall("audio restart not possible in current session state")
+                }
+            }
             return
         }
         val now = System.nanoTime()
