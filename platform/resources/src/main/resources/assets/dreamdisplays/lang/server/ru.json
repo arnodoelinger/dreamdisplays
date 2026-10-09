@@ -193,6 +193,8 @@
   "fullscreenAlreadyRunning": "&7D |&f На этом дисплее уже идёт полноэкранная трансляция, либо ID сессии занят",
   "fullscreenForcedDisallowed": "&7D |&f Принудительные полноэкранные трансляции отключены в конфиге",
   "fullscreenNoDisplay": "&7D |&f Дисплей не найден, и нет загруженного мира для трансляции по URL",
+  "fullscreenPlayerOnly": "&7D |&f \"this\" и \"@s\" работают, только когда команду выполняет игрок",
+  "fullscreenNetworkNoPlayers": "&7D |&f Для трансляции на сеть на этом сервере должен быть хотя бы один игрок онлайн",
   "fullscreenNetworkNoProxy": "&7D |&f Этот сервер не подключён к прокси Dream Displays, проверьте [proxy] в config.toml.",
   "fullscreenNetworkNotYetSupported": "&7D |&f Полноэкранная трансляция на всю сеть (server <имя>/<global>) пока не реализована",
   "fullscreenNetworkUrlOnly": "&7D |&f Полноэкранная трансляция на всю сеть поддерживает только URL видео, а не id существующего дисплея",

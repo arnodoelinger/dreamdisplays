@@ -231,9 +231,7 @@ object CommandRegistrar {
                 }
             }
             literal("start", tip("suggestFullscreenStart")) {
-                requires {
-                    it.sender is Player && it.sender.hasPermission(PaperServer.config.permissions.fullscreenStart)
-                }
+                requires { it.sender.hasPermission(PaperServer.config.permissions.fullscreenStart) }
                 literal("id", tip("suggestFullscreenId")) {
                     fullscreenSource(flags) { ctx, typed -> DisplaySuggestions.targets(typed, remote(ctx.source)) }
                 }
@@ -308,6 +306,7 @@ object CommandRegistrar {
         }
         PaperFullscreenCommand.start(
             ctx.source.sender,
+            origin = ctx.source.location,
             id = StringArgumentType.getString(ctx, "id"),
             serverScope = tryArg(ctx, "name", String::class.java),
             players = tryArg(ctx, "players", String::class.java),

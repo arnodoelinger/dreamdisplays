@@ -193,6 +193,8 @@
   "fullscreenAlreadyRunning": "&7D |&f That display already hosts a fullscreen broadcast, or the session ID is taken",
   "fullscreenForcedDisallowed": "&7D |&f Forced fullscreen broadcasts are disabled in the config",
   "fullscreenNoDisplay": "&7D |&f No display found and no world is loaded to host a URL broadcast",
+  "fullscreenPlayerOnly": "&7D |&f \"this\" and \"@s\" only work when a player runs the command",
+  "fullscreenNetworkNoPlayers": "&7D |&f A network broadcast needs at least one player online on this server",
   "fullscreenNetworkNoProxy": "&7D |&f This backend is not connected to a Dream Displays proxy, check [proxy] in config.toml.",
   "fullscreenNetworkNotYetSupported": "&7D |&f Network-wide fullscreen (server <name>/<global>) is not wired up.",
   "fullscreenNetworkUrlOnly": "&7D |&f Network-wide fullscreen only supports a video URL, not an existing display id",

@@ -71,7 +71,7 @@ object VanillaProxyBridge {
      * so the answer just fills in the last blank and the normal [startNetworkFullscreen] runs.
      */
     private class PendingNetworkStart(
-        val playerId: UUID,
+        val ownerId: UUID,
         val token: String,
         val scope: String,
         val mode: FullscreenMode?,
@@ -138,13 +138,18 @@ object VanillaProxyBridge {
 
     /** Same as [send], but picks any online player to ride the message — for packets with no natural sender. */
     private fun sendViaAnyPlayer(packet: ProxyPacket) {
-        val rider = VanillaServerState.server?.playerList?.players?.firstOrNull() ?: return
-        send(rider, packet)
+        sendVia(null, packet)
+    }
+
+    private fun sendVia(rider: ServerPlayer?, packet: ProxyPacket): Boolean {
+        send(rider ?: VanillaServerState.server?.playerList?.players?.firstOrNull() ?: return false, packet)
+        return true
     }
 
     /** Forwards a fullscreen start command with a server scope to the proxy for network-wide fan-out. */
     fun startNetworkFullscreen(
-        player: ServerPlayer,
+        rider: ServerPlayer?,
+        ownerId: UUID,
         scope: String,
         url: String,
         mode: FullscreenMode?,
@@ -153,13 +158,13 @@ object VanillaProxyBridge {
         loop: Boolean,
         quality: String?,
         targetsRaw: String? = null,
-    ) {
-        send(
-            player,
+    ): Boolean =
+        sendVia(
+            rider,
             StartNetworkFullscreen(
                 targetsRaw = targetsRaw ?: "",
                 scope = scope,
-                ownerId = player.uuid.toString(),
+                ownerId = ownerId.toString(),
                 url = url,
                 mode = (mode ?: FullscreenMode.STANDARD).ordinal,
                 forced = forced,
@@ -168,7 +173,6 @@ object VanillaProxyBridge {
                 quality = quality ?: "",
             ),
         )
-    }
 
     /**
      * Same as [startNetworkFullscreen], but for a `<id>` this backend doesn't know: asks the network
@@ -176,7 +180,8 @@ object VanillaProxyBridge {
      * expires after [RESOLVE_TIMEOUT_MS] if nothing claims the id.
      */
     fun startNetworkFullscreenByDisplayId(
-        player: ServerPlayer,
+        rider: ServerPlayer?,
+        ownerId: UUID,
         scope: String,
         token: String,
         mode: FullscreenMode?,
@@ -185,12 +190,12 @@ object VanillaProxyBridge {
         loop: Boolean,
         quality: String?,
         targetsRaw: String? = null,
-    ) {
+    ): Boolean {
         val now = System.currentTimeMillis()
         pendingStarts.values.removeIf { it.expiresAtMs < now }
         val requestId = UUID.randomUUID().toString().take(8)
         pendingStarts[requestId] = PendingNetworkStart(
-            playerId = player.uuid,
+            ownerId = ownerId,
             token = token,
             scope = scope,
             mode = mode,
@@ -201,7 +206,7 @@ object VanillaProxyBridge {
             targetsRaw = targetsRaw,
             expiresAtMs = now + RESOLVE_TIMEOUT_MS,
         )
-        send(player, ResolveDisplayToken(requestId = requestId, token = token))
+        return sendVia(rider, ResolveDisplayToken(requestId = requestId, token = token))
     }
 
     /** Forwards `/display fullscreen stop <id>` to the proxy when [sessionId] isn't a live local session. */
@@ -426,10 +431,10 @@ object VanillaProxyBridge {
             is DisplayTokenResolved -> {
                 val pending = pendingStarts.remove(packet.requestId) ?: return
                 if (pending.expiresAtMs < System.currentTimeMillis()) return
-                val requester = server.playerList.getPlayer(pending.playerId) ?: return
                 logger.debug("Display '{}' resolved network-wide to {}.", pending.token, packet.url)
                 startNetworkFullscreen(
-                    player = requester,
+                    rider = server.playerList.getPlayer(pending.ownerId),
+                    ownerId = pending.ownerId,
                     scope = pending.scope,
                     url = packet.url,
                     mode = pending.mode,

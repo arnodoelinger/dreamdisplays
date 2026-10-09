@@ -193,6 +193,8 @@
   "fullscreenAlreadyRunning": "&7D |&f Ten wyświetlacz już hostuje transmisję pełnoekranową, albo ID sesji jest zajęte",
   "fullscreenForcedDisallowed": "&7D |&f Wymuszone transmisje pełnoekranowe są wyłączone w konfiguracji",
   "fullscreenNoDisplay": "&7D |&f Nie znaleziono wyświetlacza ani wczytanego świata do hostowania transmisji z URL",
+  "fullscreenPlayerOnly": "&7D |&f \"this\" i \"@s\" działają tylko wtedy, gdy komendę wykonuje gracz",
+  "fullscreenNetworkNoPlayers": "&7D |&f Transmisja sieciowa wymaga co najmniej jednego gracza online na tym serwerze",
   "fullscreenNetworkNoProxy": "&7D |&f Ten serwer nie jest połączony z proxy Dream Displays, sprawdź [proxy] w config.toml.",
   "fullscreenNetworkNotYetSupported": "&7D |&f Sieciowy pełny ekran (server <nazwa>/<global>) nie jest jeszcze obsługiwany.",
   "fullscreenNetworkUrlOnly": "&7D |&f Sieciowy pełny ekran obsługuje tylko URL wideo, a nie istniejące id wyświetlacza",

@@ -76,7 +76,7 @@ object ProxyBridge : PluginMessageListener {
      * so the answer just fills in the last blank and the normal [startNetworkFullscreen] runs.
      */
     private class PendingNetworkStart(
-        val playerId: UUID,
+        val ownerId: UUID,
         val token: String,
         val scope: String,
         val mode: FullscreenMode?,
@@ -143,8 +143,12 @@ object ProxyBridge : PluginMessageListener {
 
     /** Same as [send], but picks any online player to ride the message — for packets with no natural sender. */
     private fun sendViaAnyPlayer(packet: ProxyPacket) {
-        val rider = Bukkit.getOnlinePlayers().firstOrNull() ?: return
-        send(rider, packet)
+        sendVia(null, packet)
+    }
+
+    private fun sendVia(rider: Player?, packet: ProxyPacket): Boolean {
+        send(rider ?: Bukkit.getOnlinePlayers().firstOrNull() ?: return false, packet)
+        return true
     }
 
     /**
@@ -153,7 +157,8 @@ object ProxyBridge : PluginMessageListener {
      * of [FullscreenBroadcastManager.start] when the command carried a `server` scope.
      */
     fun startNetworkFullscreen(
-        player: Player,
+        rider: Player?,
+        ownerId: UUID,
         scope: String,
         url: String,
         mode: FullscreenMode?,
@@ -162,13 +167,13 @@ object ProxyBridge : PluginMessageListener {
         loop: Boolean,
         quality: String?,
         targetsRaw: String? = null,
-    ) {
-        send(
-            player,
+    ): Boolean =
+        sendVia(
+            rider,
             StartNetworkFullscreen(
                 targetsRaw = targetsRaw ?: "",
                 scope = scope,
-                ownerId = player.uniqueId.toString(),
+                ownerId = ownerId.toString(),
                 url = url,
                 mode = (mode ?: FullscreenMode.STANDARD).ordinal,
                 forced = forced,
@@ -177,11 +182,11 @@ object ProxyBridge : PluginMessageListener {
                 quality = quality ?: "",
             ),
         )
-    }
 
     /** Starts a network fullscreen for an unknown id; asks the network to resolve it first. */
     fun startNetworkFullscreenByDisplayId(
-        player: Player,
+        rider: Player?,
+        ownerId: UUID,
         scope: String,
         token: String,
         mode: FullscreenMode?,
@@ -190,12 +195,12 @@ object ProxyBridge : PluginMessageListener {
         loop: Boolean,
         quality: String?,
         targetsRaw: String? = null,
-    ) {
+    ): Boolean {
         val now = System.currentTimeMillis()
         pendingStarts.values.removeIf { it.expiresAtMs < now }
         val requestId = UUID.randomUUID().toString().take(8)
         pendingStarts[requestId] = PendingNetworkStart(
-            playerId = player.uniqueId,
+            ownerId = ownerId,
             token = token,
             scope = scope,
             mode = mode,
@@ -206,7 +211,7 @@ object ProxyBridge : PluginMessageListener {
             targetsRaw = targetsRaw,
             expiresAtMs = now + RESOLVE_TIMEOUT_MS,
         )
-        send(player, ResolveDisplayToken(requestId = requestId, token = token))
+        return sendVia(rider, ResolveDisplayToken(requestId = requestId, token = token))
     }
 
     /** Forwards `/display fullscreen stop <id>` to the proxy when [sessionId] isn't a live local session. */
@@ -429,10 +434,10 @@ object ProxyBridge : PluginMessageListener {
             is DisplayTokenResolved -> {
                 val pending = pendingStarts.remove(packet.requestId) ?: return
                 if (pending.expiresAtMs < System.currentTimeMillis()) return
-                val player = Bukkit.getPlayer(pending.playerId) ?: return
                 logger.debug("Display '{}' resolved network-wide to {}.", pending.token, packet.url)
                 startNetworkFullscreen(
-                    player = player,
+                    rider = Bukkit.getPlayer(pending.ownerId),
+                    ownerId = pending.ownerId,
                     scope = pending.scope,
                     url = packet.url,
                     mode = pending.mode,
