@@ -217,7 +217,9 @@ internal class PlaybackSessionManager(
             // Same SSRF gate the FFmpeg URL path applies in MediaProcess.baseCommand
             val safeUrl = MediaHostGuard.resolveSafeUrl(url)
             val proc = MediaProcess.buildAudioPiped(ffmpeg, AudioSink.SAMPLE_RATE)
-            audioFeeder = HlsAudioFeeder(safeUrl, proc.outputStream, stopFlag, terminated, debugLabel)
+            // A session that ended at an ad splice is continued from that very segment, not from the live edge
+            val resumeSeq = audioFeeder?.splicedAtSeq ?: -1L
+            audioFeeder = HlsAudioFeeder(safeUrl, proc.outputStream, stopFlag, terminated, debugLabel, resumeSeq)
                 .also { it.start() }
             return proc
         }
@@ -228,10 +230,11 @@ internal class PlaybackSessionManager(
         )
     }
 
-    /** True if audio starts at known position (real -ss seek, not live HLS join). */
     private fun audioOriginKnown(): Boolean = !liveSession && audioFeeder == null
 
     fun audioSourceGone(): Boolean = audioFeeder?.sourceGone == true
+
+    fun audioSpliced(): Boolean = (audioFeeder?.splicedAtSeq ?: -1L) >= 0L
 
     /** True once source has no audio (separate from transient gap between processes). */
     @Volatile
@@ -964,13 +967,12 @@ internal class PlaybackSessionManager(
     /** The position playback is actually at, for callers that need to freeze or save it. */
     fun currentPacingNanos(): Long = pacingClockNanos()
 
-    /** Exact audio-vs-video offset from shared PTS: audio feeder's first PES PTS minus video first raw PTS. */
     private fun exactAvBiasNanos(): Long? {
         val a0 = audioFeeder?.firstPtsNanos ?: return null
         if (a0 < 0) return null
-        val r0 = active?.nativePipe?.firstRawPtsNanos ?: return null
-        if (r0 == Long.MIN_VALUE) return null
-        return a0 - r0
+        val videoBias = active?.nativePipe?.rawPtsBiasNanos ?: return null
+        if (videoBias == Long.MIN_VALUE) return null
+        return a0 + videoBias
     }
 
     /** Resolves the decode dimensions: the current/target texture size when known, else from quality. */

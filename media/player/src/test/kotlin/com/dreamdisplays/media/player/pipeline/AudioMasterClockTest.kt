@@ -43,23 +43,53 @@ class AudioMasterClockTest {
     @Test
     fun `an exact stream-PTS offset wins over the wall clock for an unknown origin`() {
         val clock = AudioMasterClock("test")
-        // Live: the audio line came up 600 ms after video started, and the shared segmenter PTS say
-        // the audio actually joined 250 ms ahead of the video. The exact figure must win over the
-        // 600 ms the wall clock would have guessed.
-        val out = clock.nanos(sample(0, originKnown = false), wallNanos = 600 * ms, suspended = false) { 250 * ms }
-        assertEquals(250 * ms, out)
+        val out = clock.nanos(sample(0, originKnown = false), wallNanos = 250 * ms, suspended = false) { 600 * ms }
+        assertEquals(600 * ms, out)
     }
 
     @Test
-    fun `an exact offset that would rewind live video too far is floored`() {
-        val clock = AudioMasterClock("test")
-        // Audio claims to be 5 s ahead of the video join, i.e. the clock would have to sit 5 s behind
-        // the wall position. Video can't rewind, so the anchor is floored to what pacing can absorb.
-        val out = clock.nanos(sample(5 * second, originKnown = false), wallNanos = 5 * second, suspended = false) {
-            -5 * second
+    fun `live sound that joined behind the picture is skipped up to it`() {
+        val skips = ArrayList<Long>()
+        val clock = AudioMasterClock("test", requestAudioResync = { skips.add(it) })
+        val out = clock.nanos(sample(0, originKnown = false), wallNanos = second, suspended = false) { -2 * second }
+        assertEquals(listOf(3 * second), skips)
+        assertEquals(second, out, "The clock holds at the picture's position until the skip lands.")
+
+        val synced = clock.nanos(sample(3 * second, originKnown = false), wallNanos = second, suspended = false) {
+            -2 * second
         }
-        assertTrue(out > 4 * second, "Expected the anchor to be floored near the wall position, got $out.")
-        assertTrue(out <= 5 * second, "The floor must not push the clock past the wall position, got $out.")
+        assertEquals(second, synced)
+        assertEquals(1, skips.size, "An anchored session must not be re-aligned.")
+    }
+
+    @Test
+    fun `a live session is pinned as soon as the picture's PTS is known`() {
+        val clock = AudioMasterClock("test")
+        var exact: Long? = 4 * 60 * 60 * second
+        assertEquals(40 * second, clock.nanos(sample(0, originKnown = false), 40 * second, suspended = false) { exact })
+
+        exact = 44 * second
+        assertEquals(45 * second, clock.nanos(sample(second, originKnown = false), 41 * second, false) { exact })
+    }
+
+    @Test
+    fun `a stalled live line holds the clock instead of running ahead on wall time`() {
+        val fake = FakeNanos()
+        val skips = ArrayList<Long>()
+        val clock = AudioMasterClock("test", fake::now, requestAudioResync = { skips.add(it) })
+        var wall = 40 * second
+        clock.nanos(sample(0, originKnown = false), wall, suspended = false) { null }
+
+        repeat(4) {
+            fake.advance(second)
+            wall += second
+            assertEquals(40 * second, clock.nanos(sample(0, originKnown = false), wall, suspended = false) { null })
+        }
+
+        fake.advance(100 * ms)
+        wall += 100 * ms
+        assertEquals(40 * second + 100 * ms, clock.nanos(sample(100 * ms, originKnown = false), wall, false) { null })
+        assertTrue(skips.isEmpty(), "A live line must never be asked to skip past the live edge.")
     }
 
     @Test

@@ -64,18 +64,16 @@ data class TwitchClipPlayback(
  * web-player client id via a GQL call.
  */
 object TwitchApi {
-    /** Logger. */
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    /** GQL URL. */
     private const val GQL_URL = "https://gql.twitch.tv/gql"
-
-    /** Twitch's public web-player client id (also hardcoded in `yt-dlp`); not a user credential. */
     private const val WEB_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
 
-    /** The token params Twitch's own web player sends; usher rejects tokens minted for other player types. */
     private const val TOKEN_PARAMS =
         """params:{platform:"web",playerBackend:"mediaplayer",playerType:"site"}"""
+
+    private const val LIVE_TOKEN_PARAMS =
+        """params:{platform:"web",playerBackend:"mediaplayer",playerType:"popout"}"""
 
     /** Resolves metadata for [source], preferring the GQL fast path over the yt-dlp fallback. */
     fun resolve(source: MediaSource.Twitch): TwitchMetadata? =
@@ -89,7 +87,7 @@ object TwitchApi {
         val data = gql(
             """{user(login:"${escape(login)}"){displayName profileImageURL(width:70) broadcastSettings{title} """ +
                     """stream{viewersCount game{displayName} previewImageURL(width:640,height:360)}} """ +
-                    """streamPlaybackAccessToken(channelName:"${escape(login)}",$TOKEN_PARAMS){value signature}}"""
+                    """streamPlaybackAccessToken(channelName:"${escape(login)}",$LIVE_TOKEN_PARAMS){value signature}}"""
         )
         val user = data.obj("user") ?: return null
         if (user.obj("stream") == null) return null // Channel exists but is offline

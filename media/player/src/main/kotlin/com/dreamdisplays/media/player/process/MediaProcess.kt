@@ -150,14 +150,14 @@ object MediaProcess {
         return ProcessBuilder(cmd).start()
     }
 
-    /** Builds `FFmpeg` process that decodes audio from MPEG-TS piped to stdin. */
+    /** Builds `FFmpeg` process that decodes audio from HLS segments (MPEG-TS or fragmented MP4) piped to stdin. */
     @Throws(IOException::class)
     fun buildAudioPiped(ffmpeg: String, sampleRate: Int): Process {
         val cmd = listOf(
             ffmpeg,
             "-hide_banner", "-loglevel", "error", "-nostats",
             "-probesize", "1M", "-analyzeduration", "1000000",
-            "-f", "mpegts", "-i", "pipe:0",
+            "-i", "pipe:0",
             "-vn", "-f", "s16le", "-ar", sampleRate.toString(), "-ac", "2", "-",
         )
         return ProcessBuilder(cmd).start()
@@ -271,10 +271,9 @@ object MediaProcess {
                 "-reconnect_delay_max", "10",
                 "-reconnect_on_network_error", "1",
                 "-reconnect_on_http_error", "5xx",
-                // Pull googlevideo over one connection with range requests so it doesn't cut at ~10s
-                "-multiple_requests", "1",
             )
         )
+        if (!HlsAudioFeeder.supports(url)) addAll(listOf("-multiple_requests", "1"))
     }
 
     /** `-ss` with [offsetNanos] rendered as seconds. */

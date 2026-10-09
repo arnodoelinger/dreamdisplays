@@ -117,11 +117,11 @@ internal class NativeVideoFramePipe(
     }
 
     /**
-     * Raw (unbiased) LAV PTS of the first frame of the current session / in-place seek, in nanos, or [Long.MIN_VALUE]
-     * before any frame has arrived.
+     * Offset that puts a raw LAV stream PTS on this pipe's timeline, in nanos, or [Long.MIN_VALUE] before any frame of
+     * the current session / in-place seek has arrived. Moves when the stream splices onto another timeline.
      */
     @Volatile
-    var firstRawPtsNanos: Long = Long.MIN_VALUE; private set
+    var rawPtsBiasNanos: Long = Long.MIN_VALUE; private set
 
     private val lavSeekMonitor = Any()
 
@@ -417,7 +417,7 @@ internal class NativeVideoFramePipe(
             videoPts = seek.offsetNanos
             lavPtsBiasNanos = null
             prevRawLavPtsNanos = null
-            firstRawPtsNanos = Long.MIN_VALUE
+            rawPtsBiasNanos = Long.MIN_VALUE
             firstFrame = false
             passFirstFrameAfterSeek = true
             lastFrameReceivedNanos.set(System.nanoTime())
@@ -507,7 +507,6 @@ internal class NativeVideoFramePipe(
             lastFrameReceivedNanos.set(System.nanoTime())
 
             val hasLavPts = lav && rawLavPtsNanos != NativeMedia.LAV_NO_PTS_NANOS
-            if (hasLavPts && firstRawPtsNanos == Long.MIN_VALUE) firstRawPtsNanos = rawLavPtsNanos
             val framePts = if (hasLavPts) {
                 var bias = lavPtsBiasNanos ?: run {
                     val delta = currentSeekOffsetNanos - rawLavPtsNanos
@@ -541,6 +540,7 @@ internal class NativeVideoFramePipe(
                     }
                 }
                 prevRawLavPtsNanos = rawLavPtsNanos
+                rawPtsBiasNanos = bias
                 rawLavPtsNanos + bias
             } else {
                 videoPts
