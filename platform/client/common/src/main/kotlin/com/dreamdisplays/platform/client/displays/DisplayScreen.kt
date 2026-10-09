@@ -1230,8 +1230,15 @@ class DisplayScreen(
         /** Maximum server-prescribed default volume accepted by the client (200% in the UI). */
         private const val MAX_SERVER_DEFAULT_VOLUME = 1.0f
 
-        /** The client's own chunk render distance option, converted to blocks. */
-        internal fun clientRenderDistanceBlocks(): Int =
-            Minecraft.getInstance().options.renderDistance().get() * 16
+        /**
+         * How far displays stay alive, in blocks: the client's chunk render distance, capped by the
+         * server's simulation distance when that is the shorter of the two.
+         */
+        internal fun clientRenderDistanceBlocks(): Int {
+            val minecraft = Minecraft.getInstance()
+            val render = minecraft.options.renderDistance().get()
+            val simulation = minecraft.level?.serverSimulationDistance?.takeIf { it > 0 } ?: render
+            return minOf(render, simulation) * 16
+        }
     }
 }

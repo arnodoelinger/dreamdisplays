@@ -172,14 +172,17 @@ object DisplayManager {
     @PaperOnly
     fun isPlayerInRange(player: Player, display: PaperDisplayData): Boolean = player.isInRange(display)
 
-    /** Returns true if this location lies within the world's view distance of the [display]'s box. */
+    /** Returns true if this location lies within the world's view or simulation distance, whichever is shorter, of the [display]'s box. */
     @PaperOnly
     private fun Location.isInRange(display: PaperDisplayData): Boolean =
         isInRangeImpl(
             blockX, blockY, blockZ,
             display.box.minX.toInt(), display.box.minY.toInt(), display.box.minZ.toInt(),
             display.box.maxX.toInt(), display.box.maxY.toInt(), display.box.maxZ.toInt(),
-            ((world?.viewDistance ?: Bukkit.getViewDistance()) * 16).toDouble(),
+            (minOf(
+                world?.viewDistance ?: Bukkit.getViewDistance(),
+                world?.simulationDistance ?: Bukkit.getSimulationDistance(),
+            ) * 16).toDouble(),
         )
 
     /** Returns true if [player] is in [display]'s world and within render range. Must run on the player's thread on `Folia`. */
@@ -404,13 +407,13 @@ object DisplayManager {
     fun isPlayerInRange(player: ServerPlayer, display: VanillaDisplayData): Boolean =
         RegionUtil.getPlayerLevelKey(player) == display.worldKey && player.blockPosition().isInRange(display)
 
-    /** Returns true if this block position lies within the server's view distance of the [display]'s box. */
+    /** Returns true if this block position lies within the server's view or simulation distance, whichever is shorter, of the [display]'s box. */
     private fun BlockPos.isInRange(display: VanillaDisplayData): Boolean =
         isInRangeImpl(
             x, y, z,
             display.minX, display.minY, display.minZ,
             display.maxX, display.maxY, display.maxZ,
-            (VanillaServerState.server?.playerList?.viewDistance ?: 10) * 16.0,
+            (VanillaServerState.server?.playerList?.let { minOf(it.viewDistance, it.simulationDistance) } ?: 10) * 16.0,
         )
 
     /** Sends a `DisplayInfo` packet describing [display] to the given [players]. */
