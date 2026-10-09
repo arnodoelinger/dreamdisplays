@@ -89,6 +89,12 @@ configurations.all {
     resolutionStrategy.force("org.slf4j:slf4j-api:2.0.9")
 }
 
+val isolatedSqliteJdbc = configurations.register("isolatedSqliteJdbc") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
     compileOnly(libs.luckpermsApi)
@@ -114,7 +120,7 @@ dependencies {
     implementation(libs.exposedMigrationJdbc)
     implementation(libs.hikari)
     runtimeOnly(libs.sqliteJdbc)
-    jarJar(libs.sqliteJdbc)
+    isolatedSqliteJdbc(libs.sqliteJdbc)
     vendoredLibraries(libs.tomlj)
     vendoredLibraries(libs.semver4j)
     vendoredLibraries(libs.caffeine)
@@ -214,15 +220,11 @@ java {
     withSourcesJar()
 }
 
-val sqliteJdbcJarJarFile = configurations.named("jarJar").map { configuration ->
-    configuration.first { it.name.startsWith("sqlite-jdbc-") }
-}
-
-val trimmedSqliteJdbcJarJar = tasks.register<Zip>("trimmedSqliteJdbcJarJar") {
-    from(sqliteJdbcJarJarFile.map { zipTree(it) })
+val trimmedSqliteJdbc = tasks.register<Zip>("trimmedSqliteJdbc") {
+    from(isolatedSqliteJdbc.map { configuration -> configuration.map { zipTree(it) } })
     excludeDreamDisplaysSqliteNativeExtras()
-    archiveFileName.set(sqliteJdbcJarJarFile.map { it.name })
-    destinationDirectory.set(layout.buildDirectory.dir("generated/trimmedJarJar"))
+    archiveFileName.set("sqlite-jdbc.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("generated/isolatedSqliteJdbc"))
 }
 
 tasks.shadowJar {
@@ -231,11 +233,8 @@ tasks.shadowJar {
     archiveVersion.set("$activeStonecutterVersion-${rootProject.version}")
     includeDreamDisplaysSharedContents()
     relocateDreamDisplaysSharedPackages()
-    from(tasks.named("jarJar")) {
-        exclude("META-INF/jarjar/sqlite-jdbc-*.jar")
-    }
-    from(trimmedSqliteJdbcJarJar) {
-        into("META-INF/jarjar")
+    from(trimmedSqliteJdbc) {
+        into("META-INF/dreamdisplays")
     }
 }
 

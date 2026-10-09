@@ -7,6 +7,7 @@ import com.dreamdisplays.api.security.policy.MediaUrlPolicy
 import com.dreamdisplays.platform.server.datatypes.display.DisplayData
 import com.dreamdisplays.platform.server.datatypes.display.PaperDisplayData
 import com.dreamdisplays.platform.server.datatypes.display.VanillaDisplayData
+import com.dreamdisplays.platform.server.storage.IsolatedSqliteDataSource
 import com.dreamdisplays.platform.server.storage.StorageBackend
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.DIRECTION_TO_ORDINAL
 import com.dreamdisplays.platform.server.utils.StoragePackingUtil.ORDINAL_TO_DIRECTION
@@ -130,11 +131,16 @@ class StorageManager(
     private val logger: Logger = LoggerFactory.getLogger(javaClass)
     private val table = DisplaysTable(tablePrefix)
 
+    private val jdbcUrl = when (backend) {
+        StorageBackend.SQLITE -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
+        StorageBackend.MYSQL -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=$useSSL&useInformationSchema=false"
+    }
+
+    private val isolatedSqlite =
+        if (backend == StorageBackend.SQLITE) IsolatedSqliteDataSource.createOrNull(jdbcUrl) else null
+
     private val dataSource = HikariDataSource(HikariConfig().apply {
-        jdbcUrl = when (backend) {
-            StorageBackend.SQLITE -> "jdbc:sqlite:${File(dataDir, "dreamdisplays.db").absolutePath}"
-            StorageBackend.MYSQL -> "jdbc:mysql://$host:$port/$database?autoReconnect=true&useSSL=$useSSL&useInformationSchema=false"
-        }
+        if (isolatedSqlite != null) dataSource = isolatedSqlite else jdbcUrl = this@StorageManager.jdbcUrl
         if (backend != StorageBackend.SQLITE) {
             this.username = username
             this.password = password
@@ -161,7 +167,10 @@ class StorageManager(
     }
 
     /** Persists all in-memory displays and closes the database connection on plugin shutdown. */
-    fun disconnect() = dataSource.close()
+    fun disconnect() {
+        dataSource.close()
+        isolatedSqlite?.close()
+    }
 
     /** Load all displays from the database, returning a list of [DisplayData] objects. */
     @PaperOnly

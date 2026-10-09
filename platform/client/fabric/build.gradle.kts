@@ -106,6 +106,12 @@ configurations.register("mappedFabricApiElements") {
     extendsFrom(configurations.getByName("modCompileClasspathMapped"))
 }
 
+val isolatedSqliteJdbc = configurations.register("isolatedSqliteJdbc") {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    isTransitive = false
+}
+
 dependencies {
     compileOnly(libs.platformweaverAnnotations)
     compileOnly(libs.luckpermsApi)
@@ -161,7 +167,7 @@ dependencies {
     shadow(libs.caffeine)
     shadow(libs.okhttp)
     shadow(libs.okio)
-    shadow(libs.sqliteJdbc)
+    isolatedSqliteJdbc(libs.sqliteJdbc)
     shadow(libs.exposedCore)
     shadow(libs.exposedJdbc)
     shadow(libs.exposedMigrationJdbc)
@@ -203,6 +209,13 @@ java {
 // TODO: when a stable Loom for 26.1.2/26.2 is released, this should be removed
 tasks.findByName("validateAccessWidener")?.enabled = false
 
+val trimmedSqliteJdbc = tasks.register<Zip>("trimmedSqliteJdbc") {
+    from(isolatedSqliteJdbc.map { configuration -> configuration.map { zipTree(it) } })
+    excludeDreamDisplaysSqliteNativeExtras()
+    archiveFileName.set("sqlite-jdbc.jar")
+    destinationDirectory.set(layout.buildDirectory.dir("generated/isolatedSqliteJdbc"))
+}
+
 tasks.shadowJar {
     configurations = listOf(project.configurations.getByName("shadow"))
     archiveBaseName.set("dreamdisplays-fabric")
@@ -213,7 +226,9 @@ tasks.shadowJar {
     }
     includeDreamDisplaysSharedContents()
     relocateDreamDisplaysSharedPackages()
-    excludeDreamDisplaysSqliteNativeExtras()
+    from(trimmedSqliteJdbc) {
+        into("META-INF/dreamdisplays")
+    }
 }
 
 // If it's a legacy version (like 1.21.11 where the shadow jar is obfuscated), we need to remap the shadow jar with
