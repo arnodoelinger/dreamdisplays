@@ -101,13 +101,15 @@ object DisplayYuvRenderTypes {
     }
 
     /** Creates the [RenderType] drawing a display through the YUV pipeline from its three plane textures. */
-    fun create(yId: Identifier, uId: Identifier, vId: Identifier): RenderType = RenderType.create(
-        "dream-displays-yuv",
-        RenderSetup.builder(pipeline)
-            .withTexture(SAMPLER_Y, yId) { planeSampler() }
-            .withTexture(SAMPLER_U, uId) { planeSampler() }
-            .withTexture(SAMPLER_V, vId) { planeSampler() }
-            .createRenderSetup(),
+    fun create(yId: Identifier, uId: Identifier, vId: Identifier): RenderType = DisplaySolidPhase.mark(
+        RenderType.create(
+            "dream-displays-yuv",
+            RenderSetup.builder(pipeline)
+                .withTexture(SAMPLER_Y, yId) { planeSampler() }
+                .withTexture(SAMPLER_U, uId) { planeSampler() }
+                .withTexture(SAMPLER_V, vId) { planeSampler() }
+                .createRenderSetup(),
+        )
     )
 
     /** Shared 1x1 white texture used for the loading / error quads in YUV mode. */

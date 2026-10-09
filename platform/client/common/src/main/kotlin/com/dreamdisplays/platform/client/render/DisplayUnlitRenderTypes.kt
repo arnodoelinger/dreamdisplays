@@ -49,11 +49,13 @@ object DisplayUnlitRenderTypes {
     }
 
     /** Creates an unlit [RenderType] named [name] that samples texture [id]. */
-    fun create(name: String, id: Identifier): RenderType = RenderType.create(
-        name,
-        RenderSetup.builder(texturedPipeline)
-            .withTexture(SAMPLER_TEXTURE, id)
-            .createRenderSetup(),
+    fun create(name: String, id: Identifier): RenderType = DisplaySolidPhase.mark(
+        RenderType.create(
+            name,
+            RenderSetup.builder(texturedPipeline)
+                .withTexture(SAMPLER_TEXTURE, id)
+                .createRenderSetup(),
+        )
     )
 
     /** Registers [pipeline] with Iris's `TEXTURED` program so shader packs treat it correctly; no-op without Iris. */
