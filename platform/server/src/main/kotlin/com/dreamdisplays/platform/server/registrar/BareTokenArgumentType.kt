@@ -5,9 +5,7 @@ import com.mojang.brigadier.StringReader
 import com.mojang.brigadier.arguments.ArgumentType
 import com.mojang.brigadier.arguments.StringArgumentType
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType
-import io.github.arnodoelinger.platformweaver.FabricOnly
 import io.github.arnodoelinger.platformweaver.NeoForgeOnly
-import net.fabricmc.fabric.api.command.v2.ArgumentTypeRegistry.registerArgumentType
 import net.minecraft.commands.synchronization.ArgumentTypeInfos
 import net.minecraft.commands.synchronization.SingletonArgumentInfo
 import net.minecraft.core.Registry
@@ -18,9 +16,7 @@ import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 
-/**
- * Space-delimited unquoted token for bare selectors, URLs in `/display fullscreen` commands.
- */
+/** Space-delimited unquoted token for bare selectors, URLs in `/display fullscreen` commands. */
 object BareTokenArgumentType : ArgumentType<String> {
     private val MISSING = SimpleCommandExceptionType(LiteralMessage("Expected a value."))
     val ID: Identifier = Identifier.fromNamespaceAndPath("dreamdisplays", "bare_token")
@@ -33,24 +29,6 @@ object BareTokenArgumentType : ArgumentType<String> {
         while (reader.canRead() && reader.peek() != ' ') reader.skip()
         if (reader.cursor == start) throw MISSING.create()
         return reader.string.substring(start, reader.cursor)
-    }
-}
-
-/**
- * Registers [BareTokenArgumentType]'s sync info via `Fabric` API's public `ArgumentTypeRegistry`.
- */
-@FabricOnly
-object FabricBareTokenArgumentType {
-    private var registered = false
-
-    /** Idempotent; call once, early, from mod init. */
-    fun register() {
-        if (registered) return
-        registered = true
-        val info = SingletonArgumentInfo.contextFree { BareTokenArgumentType }
-        registerArgumentType(
-            BareTokenArgumentType.ID, BareTokenArgumentType::class.java, info,
-        )
     }
 }
 
