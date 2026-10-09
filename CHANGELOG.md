@@ -4,6 +4,7 @@
 
 - Major `Twitch` playback stability improvements
 - Players without the mod can now join `Fabric` servers running `Dream Displays`
+- Volume normalization
 - Improved `/display` command suggestions
 - `/display fullscreen` now works in command blocks and the server console
 - Fixed a crash on Minecraft 26.3 with `Improved Transparency` enabled
@@ -15,6 +16,7 @@
 
 - Now you can join `Fabric` running `Dream Displays` servers without `Dream Displays` installed (server 1.10.0 Preview 4 or higher required)
 - Improved `/display` command suggestions and tab completion
+- Volume normalization
 
 ### Improvements
 
