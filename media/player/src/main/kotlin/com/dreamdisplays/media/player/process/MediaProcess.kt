@@ -214,7 +214,10 @@ object MediaProcess {
             addAll(listOf("-protocol_whitelist", "https,tls,tcp,crypto,data,http,httpproxy"))
             // https://github.com/arnodoelinger/dreamdisplays/issues/218
             // TODO: i should rewrite some parts of code to fix tls issue properly but i'm too lazy
-            addAll(listOf("-tls_verify", "0")) // https://github.com/arnodoelinger/dreamdisplays/issues/209
+            // https://github.com/arnodoelinger/dreamdisplays/issues/209
+            if (trimmed == null && safeUrl.startsWith("https:", ignoreCase = true)) {
+                addAll(listOf("-tls_verify", "0"))
+            }
             if (hwAccel.ffmpegName != null) {
                 addAll(listOf("-hwaccel", hwAccel.ffmpegName))
             }

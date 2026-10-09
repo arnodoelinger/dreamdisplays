@@ -40,6 +40,18 @@ class MediaProcessArgsTest {
         assertContentEquals(listOf("-f", "hls"), a.subList(a.indexOf("-f"), a.indexOf("-f") + 2))
         assertEquals("2.500000", a.valueOf("-ss"))
         assertTrue(a.indexOf("-ss") > a.indexOf("-i"), "The residual is an output-side skip.")
+        assertFalse("-tls_verify" in a, "A data: input has no tls context to take the option.")
+    }
+
+    @Test
+    fun `only an https input is given the tls option`() {
+        assertEquals("0", args(0L, seekByDecoding = false).valueOf("-tls_verify"))
+
+        val plain = MediaProcess.inputCommand(
+            "FFMPEG", "http://192.168.1.10:8080/movie.mp4", 0L, HwAccelBackend.NONE, false, null,
+        )
+        assertFalse("-tls_verify" in plain, "Plain http fails to open with \"Option tls_verify not found\".")
+        assertTrue(plain.containsAll(httpOnly), "A plain http input should keep its connection options.")
     }
 
     @Test
