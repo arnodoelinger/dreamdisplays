@@ -1,6 +1,7 @@
 package com.dreamdisplays.platform.client
 
 import com.dreamdisplays.api.media.audio.model.AcousticQuality
+import com.dreamdisplays.api.media.model.VideoQuality
 import com.dreamdisplays.media.source.youtube.cookie.CookieSource
 import java.io.File
 import kotlin.math.roundToInt
@@ -41,6 +42,18 @@ class Config(private val baseDir: File) {
 
     /** Whether every display's audio is brought to one loudness, so quiet and loud videos need no volume change. */
     var audioNormalization: Boolean = true
+
+    /** Volume a display starts at the first time it is seen, `0.0`..`1.0` (`1.0` is 200% in the menu); a server default wins over it. */
+    var newDisplayVolume: Double = DEFAULT_NEW_DISPLAY_VOLUME
+
+    /** Quality a display starts at the first time it is seen: `auto` or a height such as `1080`. */
+    var newDisplayQuality: String = DEFAULT_NEW_DISPLAY_QUALITY
+
+    /** Farthest displays stay alive, in chunks; `0` follows the render and simulation distance. */
+    var displayDistanceChunks: Int = 0
+
+    /** How many displays may play at once, nearest first; `0` is no limit. */
+    var maxActiveDisplays: Int = 0
 
     init {
         load()
@@ -83,6 +96,12 @@ class Config(private val baseDir: File) {
             AcousticQuality.entries.firstOrNull { it.name.equals(token, ignoreCase = true) }
         } ?: audioAcoustics
         audioNormalization = data["audio-normalization"]?.toBooleanStrictOrNull() ?: audioNormalization
+        newDisplayVolume = data["new-display-volume"]?.toDoubleOrNull()?.coerceIn(0.0, 1.0) ?: newDisplayVolume
+        newDisplayQuality = data["new-display-quality"]?.let { VideoQuality.parse(it).serialize() } ?: newDisplayQuality
+        displayDistanceChunks = data["display-distance-chunks"]?.toIntOrNull()?.coerceIn(0, MAX_DISTANCE_CHUNKS)
+            ?: displayDistanceChunks
+        maxActiveDisplays = data["max-active-displays"]?.toIntOrNull()?.coerceIn(0, MAX_ACTIVE_DISPLAYS)
+            ?: maxActiveDisplays
         audioBinauralOutput = when (data["audio-output-profile"]?.lowercase()) {
             "speakers" -> false
             "headphones", "auto" -> true
@@ -105,10 +124,19 @@ class Config(private val baseDir: File) {
             appendLine("audio-acoustics: ${audioAcoustics.name.lowercase()}")
             appendLine("audio-output-profile: ${if (audioBinauralOutput) "headphones" else "speakers"}")
             appendLine("audio-normalization: $audioNormalization")
+            appendLine("new-display-volume: $newDisplayVolume")
+            appendLine("new-display-quality: $newDisplayQuality")
+            appendLine("display-distance-chunks: $displayDistanceChunks")
+            appendLine("max-active-displays: $maxActiveDisplays")
         })
     }
 
     companion object {
+        const val DEFAULT_NEW_DISPLAY_VOLUME = 0.25
+        const val DEFAULT_NEW_DISPLAY_QUALITY = "1080"
+        const val MAX_DISTANCE_CHUNKS = 32
+        const val MAX_ACTIVE_DISPLAYS = 16
+
         init {
             System.setProperty("file.encoding", "UTF-8")
         }

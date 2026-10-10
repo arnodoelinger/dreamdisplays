@@ -124,6 +124,7 @@ object ClientTickManager {
             DisplayLifecycleManager.restoreVisibleUnloadedScreens(playerPos)
         }
 
+        val overBudget = DisplayLifecycleManager.overBudget(playerPos)
         for (displayScreen in DisplayRegistry.getScreens()) {
             // Hysteresis
             val threshold = if (displayScreen.isDormant) {
@@ -131,7 +132,7 @@ object ClientTickManager {
             } else {
                 displayScreen.renderDistance + DORMANT_HYSTERESIS_BLOCKS
             }
-            val outOfRange = threshold < displayScreen.getDistanceToScreen(playerPos)
+            val outOfRange = threshold < displayScreen.getDistanceToScreen(playerPos) || displayScreen in overBudget
             val shouldUnload = (outOfRange || !ClientStateManager.displaysEnabled) &&
                     !displayScreen.isPopoutActive && !displayScreen.virtual
 

@@ -3,6 +3,7 @@ package com.dreamdisplays.platform.client.storage
 import com.dreamdisplays.api.media.model.VideoQuality
 import com.dreamdisplays.api.display.model.settings.ClientDisplaySettings
 import com.dreamdisplays.api.display.model.settings.ClientSettingsStorage
+import com.dreamdisplays.platform.client.managers.ClientStateManager
 import com.dreamdisplays.util.json.JsonFileStore
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
@@ -54,7 +55,10 @@ object ClientSettingsStore : ClientSettingsStorage {
         defaultVolume: Float,
     ): ClientDisplaySettings =
         settings.computeIfAbsent(displayUuid) {
-            ClientDisplaySettings(volume = defaultVolume.coerceIn(0f, 1f))
+            ClientDisplaySettings(
+                volume = defaultVolume.coerceIn(0f, 1f),
+                quality = ClientStateManager.config.newDisplayQuality,
+            )
         }
 
     /** Updates all playback settings for [displayUuid] and immediately persists them to disk. */

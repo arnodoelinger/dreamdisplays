@@ -1203,7 +1203,7 @@ class DisplayScreen(
         internal fun defaultVolume(): Float {
             val serverDefault = ClientPacketManager.serverSnapshot.defaultVolume
             if (serverDefault >= 0f) return serverDefault.coerceIn(0f, MAX_SERVER_DEFAULT_VOLUME) // No to bad servers
-            return ClientDisplaySettings.DEFAULT_VOLUME
+            return ClientStateManager.config.newDisplayVolume.toFloat().coerceIn(0f, 1f)
         }
 
         /** Fallback target quality (pixel height) when none is resolvable. */
@@ -1232,13 +1232,14 @@ class DisplayScreen(
 
         /**
          * How far displays stay alive, in blocks: the client's chunk render distance, capped by the
-         * server's simulation distance when that is the shorter of the two.
+         * server's simulation distance and by the viewer's own display distance setting, whichever is shortest.
          */
         internal fun clientRenderDistanceBlocks(): Int {
             val minecraft = Minecraft.getInstance()
             val render = minecraft.options.renderDistance().get()
             val simulation = minecraft.level?.serverSimulationDistance?.takeIf { it > 0 } ?: render
-            return minOf(render, simulation) * 16
+            val own = ClientStateManager.config.displayDistanceChunks.takeIf { it > 0 } ?: render
+            return minOf(render, simulation, own) * 16
         }
     }
 }
