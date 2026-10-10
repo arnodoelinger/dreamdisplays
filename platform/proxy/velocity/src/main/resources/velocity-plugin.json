@@ -3,6 +3,7 @@
   "name": "Dream Displays Proxy",
   "version": "${version}",
   "description": "Network coordinator for Dream Displays.",
+  "url": "https://github.com/arnodoelinger/dreamdisplays",
   "authors": [
     "arnodoelinger"
   ],

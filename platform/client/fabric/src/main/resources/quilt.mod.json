@@ -13,6 +13,11 @@
         "Kolyakot33": "Developer",
         "Toffikk": "Developer"
       },
+      "contact": {
+        "homepage": "https://github.com/arnodoelinger/dreamdisplays",
+        "sources": "https://github.com/arnodoelinger/dreamdisplays",
+        "issues": "https://github.com/arnodoelinger/dreamdisplays/issues"
+      },
       "license": "LGPL-3.0",
       "icon": "assets/dreamdisplays/icon.png"
     },
@@ -20,6 +25,9 @@
     "entrypoints": {
       "client": [
         "com.dreamdisplays.platform.client.Client"
+      ],
+      "modmenu": [
+        "com.dreamdisplays.platform.client.ModMenuIntegration"
       ]
     },
     "depends": [

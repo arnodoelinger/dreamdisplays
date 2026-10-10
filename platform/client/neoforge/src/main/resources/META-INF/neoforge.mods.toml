@@ -1,12 +1,14 @@
 modLoader = "javafml"
 loaderVersion = "[1,)"
 license = "LGPL-3.0"
+issueTrackerURL = "https://github.com/arnodoelinger/dreamdisplays/issues"
 
 [[mods]]
 
 modId = "dreamdisplays"
 version = "${version}"
 displayName = "Dream Displays"
+displayURL = "https://github.com/arnodoelinger/dreamdisplays"
 logoFile = "assets/dreamdisplays/icon.png"
 authors = "arnodoelinger, INotSleep, Kolyakot33, Toffikk"
 description = "Create in-game screens to stream your favorite videos in Minecraft."
@@ -37,3 +39,10 @@ type = "optional"
 versionRange = "[5,)"
 ordering = "AFTER"
 side = "BOTH"
+
+[[dependencies.dreamdisplays]]
+modId = "cloth_config"
+type = "optional"
+versionRange = "*"
+ordering = "NONE"
+side = "CLIENT"
