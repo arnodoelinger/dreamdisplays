@@ -78,7 +78,7 @@ jobs:
               lines.append(f"## {header.strip()}")
 
               for item in body.splitlines():
-                  item = item.strip()
+                  item = item.rstrip()
                   if item:
                       lines.append(item)
 
@@ -188,7 +188,7 @@ jobs:
               lines.append(f"## {header.strip()}")
 
               for item in body.splitlines():
-                  item = item.strip()
+                  item = item.rstrip()
                   if item:
                       lines.append(item)
 
@@ -396,7 +396,7 @@ jobs:
               lines.append(f"## {header.strip()}")
 
               for item in body.splitlines():
-                  item = item.strip()
+                  item = item.rstrip()
                   if item:
                       lines.append(item)
 
