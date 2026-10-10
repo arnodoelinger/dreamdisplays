@@ -8,12 +8,20 @@
   "authors": [
     "arnodoelinger, INotSleep, Kolyakot33, Toffikk"
   ],
+  "contact": {
+    "homepage": "https://github.com/arnodoelinger/dreamdisplays",
+    "sources": "https://github.com/arnodoelinger/dreamdisplays",
+    "issues": "https://github.com/arnodoelinger/dreamdisplays/issues"
+  },
   "entrypoints": {
     "client": [
       "com.dreamdisplays.platform.client.Client"
     ],
     "main": [
       "com.dreamdisplays.platform.server.Server"
+    ],
+    "modmenu": [
+      "com.dreamdisplays.platform.client.ModMenuIntegration"
     ]
   },
   "mixins": [
@@ -28,14 +36,9 @@
     "java": ">=${javaVersion}"
   },
   "suggests": {
-    "luckperms": "*"
-  },
-  "custom": {
-    "modmenu": {
-      "badges": [
-        "library"
-      ]
-    }
+    "luckperms": "*",
+    "cloth-config": "*",
+    "modmenu": "*"
   },
   "icon": "assets/dreamdisplays/icon.png"
 }

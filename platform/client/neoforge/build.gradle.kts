@@ -23,6 +23,9 @@ repositories {
     maven("https://thedarkcolour.github.io/KotlinForForge/")
     maven("https://maven.enginehub.org/repo/")
     maven("https://prmaven.neoforged.net/NeoForge/pr3403")
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
+    }
 }
 
 sourceSets.main {
@@ -120,6 +123,7 @@ dependencies {
     implementation(libs.exposedMigrationJdbc)
     implementation(libs.hikari)
     runtimeOnly(libs.sqliteJdbc)
+    runtimeOnly("maven.modrinth:cloth-config:${scVersion("cloth.config.version")}+neoforge")
     isolatedSqliteJdbc(libs.sqliteJdbc)
     vendoredLibraries(libs.tomlj)
     vendoredLibraries(libs.semver4j)

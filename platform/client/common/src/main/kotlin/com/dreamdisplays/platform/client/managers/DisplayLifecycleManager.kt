@@ -27,11 +27,10 @@ import java.util.*
  * Handles client-side display creation, restoration, and render-distance lifecycle.
  */
 object DisplayLifecycleManager {
-    /** Logger. */
     private val logger = LoggerFactory.getLogger(javaClass)
 
-    /** Maximum allowed display dimension, in blocks. */
     private const val MAX_DISPLAY_BLOCKS = 256
+    private const val BUDGET_HYSTERESIS_BLOCKS = 4
 
     /** Creates or updates a display from a server [DisplayInfo] packet, honoring render distance and size limits. */
     fun handleInfoPacket(packet: DisplayInfo) {
@@ -63,7 +62,7 @@ object DisplayLifecycleManager {
                     packet.width, packet.height, facing.toDisplayFacing(),
                     player.blockPosition(), packet.depth,
                 )
-                if (dist > renderDistance) {
+                if (dist > renderDistance || !fitsBudget(dist, player.blockPosition())) {
                     cacheUnloadedDisplay(packet, facing, mode, currentDimensionKey())
                     return
                 }
@@ -135,11 +134,38 @@ object DisplayLifecycleManager {
         val renderDistance = DisplayScreen.clientRenderDistanceBlocks()
         DisplayRegistry.unloadedScreens.values
             .filter { sameDimension(it.dimensionKey, dimensionKey) && distanceToData(it, playerPos) <= renderDistance }
-            .toList()
+            .sortedBy { distanceToData(it, playerPos) }
             .forEach { data ->
+                if (!fitsBudget(distanceToData(data, playerPos), playerPos)) return@forEach
                 DisplayRegistry.unloadedScreens.remove(data.uuid)
                 restoreScreen(data)
             }
+    }
+
+    /**
+     * The displays past the viewer's "max playing displays" setting: everything but the nearest ones.
+     *
+     * A display already playing keeps its place against one a few blocks nearer, so two at about the
+     * same distance do not keep swapping. Popped-out and virtual displays are not counted.
+     */
+    fun overBudget(playerPos: BlockPos): Set<DisplayScreen> {
+        val max = ClientStateManager.config.maxActiveDisplays
+        if (max <= 0) return emptySet()
+        val counted = DisplayRegistry.getScreens().filter { !it.isPopoutActive && !it.virtual }
+        if (counted.size <= max) return emptySet()
+        return counted
+            .sortedBy { it.getDistanceToScreen(playerPos) + if (it.isDormant) BUDGET_HYSTERESIS_BLOCKS else 0 }
+            .drop(max)
+            .toSet()
+    }
+
+    private fun fitsBudget(distance: Double, playerPos: BlockPos): Boolean {
+        val max = ClientStateManager.config.maxActiveDisplays
+        if (max <= 0) return true
+        val playing = DisplayRegistry.getScreens()
+            .filter { !it.isPopoutActive && !it.virtual && !it.isDormant }
+            .map { it.getDistanceToScreen(playerPos) }
+        return playing.size < max || distance + BUDGET_HYSTERESIS_BLOCKS < playing.max()
     }
 
     private fun sameDimension(cached: String, current: String): Boolean =

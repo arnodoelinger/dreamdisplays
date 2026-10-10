@@ -9,6 +9,9 @@ repositories {
     mavenCentral()
     maven("https://jitpack.io")
     maven("https://prmaven.neoforged.net/NeoForge/pr3403")
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
+    }
 }
 
 val scVersions = gradle.extensions.getByType<StonecutterVersions>()
@@ -30,6 +33,7 @@ dependencies {
     api(libs.newpipeExtractor)
     api(libs.kotlinxCoroutinesCore)
     compileOnly(libs.kotlinStdlib)
+    compileOnly("maven.modrinth:cloth-config:${scVersion("cloth.config.version")}+neoforge")
     if (scVersions.getOrNull("neoform.version") != null) {
         compileOnly("org.spongepowered:mixin:0.8.7")
         compileOnly("org.lwjgl:lwjgl:3.4.3")

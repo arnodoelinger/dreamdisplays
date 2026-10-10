@@ -14,7 +14,11 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload
 import net.neoforged.api.distmarker.Dist
 import net.neoforged.bus.api.IEventBus
 import net.neoforged.bus.api.SubscribeEvent
+import com.dreamdisplays.platform.client.ui.config.ClothConfigScreen
+import net.neoforged.fml.ModContainer
+import net.neoforged.fml.ModList
 import net.neoforged.fml.common.Mod
+import net.neoforged.neoforge.client.gui.IConfigScreenFactory
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent
 import net.neoforged.neoforge.client.event.ClientTickEvent
 import net.neoforged.neoforge.client.event.RenderGuiEvent
@@ -31,8 +35,15 @@ import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent
 import net.neoforged.neoforge.common.NeoForge
 
 @Mod(value = Initializer.MOD_ID, dist = [Dist.CLIENT])
-class Client(modEventBus: IEventBus) : DreamMod {
+class Client(modEventBus: IEventBus, container: ModContainer) : DreamMod {
     init {
+        if (ModList.get().isLoaded("cloth_config")) {
+            container.registerExtensionPoint(
+                IConfigScreenFactory::class.java,
+                IConfigScreenFactory { _, parent -> ClothConfigScreen.create(parent) },
+            )
+        }
+
         // The Platform must be in the registry before onModInit, so ClientStartupManager
         // can host the ClientApplication on top of it during bootstrap.
         DreamServices.registry.register(PlatformServices.PLATFORM, NeoForgePlatformIntegrationProvider.create())

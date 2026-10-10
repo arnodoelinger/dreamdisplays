@@ -36,6 +36,9 @@ repositories {
     maven("https://maven.neoforged.net/releases")
     maven("https://prmaven.neoforged.net/NeoForge/pr3403")
     maven("https://maven.enginehub.org/repo/")
+    maven("https://api.modrinth.com/maven") {
+        content { includeGroup("maven.modrinth") }
+    }
 }
 
 val scVersions = gradle.extensions.getByType<StonecutterVersions>()
@@ -146,7 +149,13 @@ dependencies {
         })
         "modImplementation"("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
         "modImplementation"("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
+        "modCompileOnly"("maven.modrinth:modmenu:${scVersion("modmenu.version")}")
+        "modLocalRuntime"("maven.modrinth:modmenu:${scVersion("modmenu.version")}")
+        "modLocalRuntime"("maven.modrinth:cloth-config:${scVersion("cloth.config.version")}+fabric")
     } else {
+        compileOnly("maven.modrinth:modmenu:${scVersion("modmenu.version")}")
+        "localRuntime"("maven.modrinth:modmenu:${scVersion("modmenu.version")}")
+        "localRuntime"("maven.modrinth:cloth-config:${scVersion("cloth.config.version")}+fabric")
         implementation("net.fabricmc:fabric-loader:${scVersion("fabric.loader.version")}")
         implementation("net.fabricmc.fabric-api:fabric-api:${scVersion("fabric.api.version")}")
     }
