@@ -13,7 +13,7 @@ import net.neoforged.fml.loading.FMLEnvironment
 import net.neoforged.fml.loading.FMLPaths
 import java.nio.file.Path
 
-/** NeoForge client [Platform]. Versions come from [ModList]; paths from [FMLPaths]. */
+/** `NeoForge` client [Platform]. Versions come from [ModList]; paths from [FMLPaths]. */
 object NeoForgePlatform : Platform {
 
     override val platformId: PlatformId = PlatformId.NEOFORGE
@@ -35,7 +35,6 @@ object NeoForgePlatform : Platform {
     override val scheduler: PlatformScheduler = MinecraftClientScheduler
     override val logger: PlatformLogger = Slf4jPlatformLogger("DreamDisplays")
 
-    /** Mirrors the mod's existing layout: `config/dreamdisplays` for config and caches, `libs` for binaries. */
     override val paths: PlatformPaths = object : PlatformPaths {
         override val configDir: Path get() = FMLPaths.CONFIGDIR.get().resolve(Initializer.MOD_ID)
         override val cacheDir: Path get() = configDir.resolve("yt-cache")
