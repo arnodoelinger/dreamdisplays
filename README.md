@@ -27,9 +27,19 @@ Create a display, paste a link and that's it!
 | <img src="https://cdn.simpleicons.org/kick" width="32" height="32" alt="Kick">                                                                                                                                                                                            | **Kick**                      | Live channels and VODs                                                   |
 | <img src="https://cdn.simpleicons.org/vimeo" width="32" height="32" alt="Vimeo">                                                                                                                                                                                          | **Vimeo**                     | Public videos and live events                                            |
 | <img src="https://cdn.simpleicons.org/bilibili" width="32" height="32" alt="Bilibili">                                                                                                                                                                                    | **Bilibili**                  | Videos, live channels, bungumi                                                 |
+| <img src="https://cdn.simpleicons.org/tiktok" width="32" height="32" alt="TikTok">                                                                                                                                                                                        | **TikTok**                    | Public videos, short share links, and livestreams                              |
+| <img src="https://cdn.simpleicons.org/douyin" width="32" height="32" alt="Douyin">                                                                                                                                                                                        | **Douyin**                    | Public videos and `v.douyin.com` share links                                   |
 | <img src="https://cdn.simpleicons.org/ffmpeg" width="32" height="32" alt="Video file">                                                                                                                                                                                    | **Any video link**            | Direct video files and live streams                                      |
 | <img src="https://cdn.simpleicons.org/googledrive" width="32" height="32" alt="Google Drive"><br><img src="https://cdn.simpleicons.org/dropbox" width="32" height="32" alt="Dropbox"><br><img src="https://cdn.simpleicons.org/imgur" width="32" height="32" alt="Imgur"> | **Share links**               | Google Drive, Dropbox, and Imgur direct links                            |
 | <img src="https://cdn.simpleicons.org/googlechrome" width="32" height="32" alt="Web">                                                                                                                                                                                     | **Pretty much anywhere else** | Not on the list? Try it anyway                                           |
+
+TikTok and Douyin playback depends on `yt-dlp` and regional availability. Browser cookies configured
+through `ytdlp-cookies-from-browser` can help extraction; media URLs that require cookies during
+playback are not supported.
+
+Douyin needs an extractor with the [updated request signing](https://github.com/yt-dlp/yt-dlp/pull/17826).
+Older builds can return HTTP 403 even with fresh browser cookies. A compatible executable can be selected
+with `-Ddreamdisplays.ytdlp=/path/to/yt-dlp` or the `DREAMDISPLAYS_YTDLP` environment variable.
 
 # Built for multiplayer
 

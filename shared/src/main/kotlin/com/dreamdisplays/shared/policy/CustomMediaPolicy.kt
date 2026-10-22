@@ -38,12 +38,12 @@ object CustomMediaPolicy {
         MALFORMED,
     }
 
-    /** True when [url] is a custom link rather than supported platforms (YouTube, Twitch, Vimeo, Kick, Bilibili). */
+    /** True when [url] is a custom link rather than one of the explicitly supported platforms. */
     fun isCustom(url: String): Boolean {
         if (url.isBlank()) return false
         return when (MediaSource.from(url).platform) {
             MediaPlatform.YOUTUBE, MediaPlatform.TWITCH, MediaPlatform.VIMEO, MediaPlatform.KICK,
-            MediaPlatform.BILIBILI,
+            MediaPlatform.BILIBILI, MediaPlatform.TIKTOK, MediaPlatform.DOUYIN,
             -> false
 
             MediaPlatform.DIRECT, MediaPlatform.OTHER -> true

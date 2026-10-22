@@ -19,6 +19,10 @@ class MediaHostsTest {
         assertEquals(MediaPlatform.VIMEO, MediaHosts.platformOf("https://player.vimeo.com/video/1/config"))
         assertEquals(MediaPlatform.KICK, MediaHosts.platformOf("https://stream.kick.com/x.m3u8"))
         assertEquals(MediaPlatform.BILIBILI, MediaHosts.platformOf("https://upos-sz.bilivideo.com/x.m4s"))
+        assertEquals(MediaPlatform.TIKTOK, MediaHosts.platformOf("https://v16-webapp.tiktok.com/video/tos/useast2a/x"))
+        assertEquals(MediaPlatform.TIKTOK, MediaHosts.platformOf("https://p16-sign-va.tiktokcdn.com/tos-maliva/x.jpeg"))
+        assertEquals(MediaPlatform.DOUYIN, MediaHosts.platformOf("https://v3-dy.douyinvod.com/video/tos/cn/x"))
+        assertEquals(MediaPlatform.DOUYIN, MediaHosts.platformOf("https://p3-pc-sign.douyinpic.com/tos-cn-i/x.jpeg"))
     }
 
     @Test
@@ -53,6 +57,8 @@ class MediaHostsTest {
         assertEquals("https://www.bilibili.com/", MediaHosts.refererFor("https://upos-sz.bilivideo.com/x.m4s"))
         assertEquals("https://kick.com/", MediaHosts.refererFor("https://stream.kick.com/x.m3u8"))
         assertEquals("https://www.youtube.com/", MediaHosts.refererFor("https://rr3.googlevideo.com/videoplayback"))
+        assertEquals("https://www.tiktok.com/", MediaHosts.refererFor("https://v16-webapp.tiktok.com/video/x"))
+        assertEquals("https://www.douyin.com/", MediaHosts.refererFor("https://v9-dy.douyinvod.com/video/x"))
         assertNull(
             MediaHosts.refererFor("https://example.com/clip.mp4"),
             "A pasted host must not be told which site we came from.",

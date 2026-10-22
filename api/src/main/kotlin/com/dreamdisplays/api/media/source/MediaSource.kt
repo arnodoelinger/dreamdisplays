@@ -48,6 +48,31 @@ sealed interface MediaSource {
         val seasonId: Long? = null,
     ) : MediaSource
 
+    /**
+     * TikTok video, short link, or live room.
+     *
+     * @since 1.10.3
+     */
+    data class TikTok(
+        val url: String,
+        val videoId: String? = null,
+        val username: String? = null,
+        val shortCode: String? = null,
+        val liveRoomId: String? = null,
+        val isLive: Boolean = liveRoomId != null,
+    ) : MediaSource
+
+    /**
+     * Douyin video or unresolved `v.douyin.com` share link.
+     *
+     * @since 1.10.3
+     */
+    data class Douyin(
+        val url: String,
+        val videoId: String? = null,
+        val shortCode: String? = null,
+    ) : MediaSource
+
     /** Direct playable stream URL or manifest; [kind] records what [CustomMediaUrls] recognized. */
     data class DirectStream(
         val streamUrl: String,
@@ -62,6 +87,8 @@ sealed interface MediaSource {
             is Vimeo -> MediaPlatform.VIMEO
             is Kick -> MediaPlatform.KICK
             is Bilibili -> MediaPlatform.BILIBILI
+            is TikTok -> MediaPlatform.TIKTOK
+            is Douyin -> MediaPlatform.DOUYIN
             is DirectStream -> MediaPlatform.DIRECT
             is Remote -> MediaPlatform.OTHER
         }
@@ -75,6 +102,8 @@ sealed interface MediaSource {
         is Vimeo -> url
         is Kick -> url
         is Bilibili -> url
+        is TikTok -> url
+        is Douyin -> url
     }
 
     companion object {
@@ -105,6 +134,8 @@ sealed interface MediaSource {
             VimeoUrls.parse(url)?.let { return it }
             KickUrls.parse(url)?.let { return it }
             BilibiliUrls.parse(url)?.let { return it }
+            TikTokUrls.parse(url)?.let { return it }
+            DouyinUrls.parse(url)?.let { return it }
 
             val normalized = CustomMediaUrls.normalize(url)
             if (normalized != null) {

@@ -5,6 +5,7 @@ import net.minecraft.resources.Identifier
 //?} else
 /*import net.minecraft.resources.ResourceLocation as Identifier*/
 import com.dreamdisplays.api.media.source.YouTubeUrls
+import com.dreamdisplays.shared.policy.MediaHosts
 import com.dreamdisplays.platform.client.Initializer
 import com.dreamdisplays.util.AsyncMemo
 import com.dreamdisplays.util.DreamCoroutines
@@ -27,7 +28,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.security.NoSuchAlgorithmException
-import java.util.*
+import java.util.HexFormat
 import java.util.concurrent.TimeUnit
 import javax.imageio.ImageIO
 import kotlin.coroutines.cancellation.CancellationException
@@ -291,15 +292,11 @@ object Thumbnails {
         Decoded(image, avg, ambientImage)
     }
 
-    private fun refererFor(url: String): String? {
-        val host = runCatching { java.net.URI(url).host }.getOrNull()?.lowercase(Locale.ROOT) ?: return null
-        return when {
-            host.endsWith("kick.com") -> "https://kick.com/"
-            host.endsWith("vimeocdn.com") || host.endsWith("vimeo.com") -> "https://vimeo.com/"
-            host.endsWith("bilibili.com") || host.endsWith("hdslb.com") -> "https://www.bilibili.com/"
-            else -> null
-        }
-    }
+    /**
+     * Keeps thumbnail requests aligned with the supported-platform host policy: platform CDNs get
+     * their own site's `Referer` when needed for hotlink protection, while custom hosts get none.
+     */
+    private fun refererFor(url: String): String? = MediaHosts.refererFor(url)
 
     private fun fetch(url: String): ByteArray? {
         return try {
