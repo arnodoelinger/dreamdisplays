@@ -33,14 +33,6 @@ Create a display, paste a link and that's it!
 | <img src="https://cdn.simpleicons.org/googledrive" width="32" height="32" alt="Google Drive"><br><img src="https://cdn.simpleicons.org/dropbox" width="32" height="32" alt="Dropbox"><br><img src="https://cdn.simpleicons.org/imgur" width="32" height="32" alt="Imgur"> | **Share links**               | Google Drive, Dropbox, and Imgur direct links                            |
 | <img src="https://cdn.simpleicons.org/googlechrome" width="32" height="32" alt="Web">                                                                                                                                                                                     | **Pretty much anywhere else** | Not on the list? Try it anyway                                           |
 
-TikTok and Douyin playback depends on `yt-dlp` and regional availability. Browser cookies configured
-through `ytdlp-cookies-from-browser` can help extraction; media URLs that require cookies during
-playback are not supported.
-
-Douyin needs an extractor with the [updated request signing](https://github.com/yt-dlp/yt-dlp/pull/17826).
-Older builds can return HTTP 403 even with fresh browser cookies. A compatible executable can be selected
-with `-Ddreamdisplays.ytdlp=/path/to/yt-dlp` or the `DREAMDISPLAYS_YTDLP` environment variable.
-
 # Built for multiplayer
 
 Watch together with your friends with seamless multiplayer synchronization. Choose between local, synchronized, and
