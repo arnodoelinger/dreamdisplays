@@ -25,6 +25,20 @@ enum class MediaPlatform {
     /** A Bilibili video, live room, or `b23.tv` short link. */
     BILIBILI,
 
+    /**
+     * A TikTok video or live room.
+     *
+     * @since 1.10.3
+     */
+    TIKTOK,
+
+    /**
+     * A Douyin video or `v.douyin.com` short link.
+     *
+     * @since 1.10.3
+     */
+    DOUYIN,
+
     /** A direct media file or streaming manifest the player opens itself. */
     DIRECT,
 

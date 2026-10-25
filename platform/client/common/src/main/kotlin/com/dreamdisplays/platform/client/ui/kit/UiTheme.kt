@@ -37,6 +37,8 @@ object UiTheme {
     const val ACCENT_VIMEO_TAG = 0xFF17D5FF.toInt()
     const val ACCENT_KICK_TAG = 0xFF53FC18.toInt()
     const val ACCENT_BILIBILI_TAG = 0xFF00A1D6.toInt()
+    const val ACCENT_TIKTOK_TAG = 0xFF25F4EE.toInt()
+    const val ACCENT_DOUYIN_TAG = 0xFFFF2C55.toInt()
     const val ACCENT_CUSTOM_TAG = 0xFF2E9E7B.toInt()
     const val CUSTOM_ART_TOP = 0xFF243A34.toInt()
     const val CUSTOM_ART_BOTTOM = 0xFF16221E.toInt()

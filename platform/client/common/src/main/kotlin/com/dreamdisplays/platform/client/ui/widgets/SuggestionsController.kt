@@ -9,6 +9,7 @@ import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.source.bilibili.BilibiliApi
 import com.dreamdisplays.media.source.bilibili.BilibiliMetadataCache
 import com.dreamdisplays.media.source.bilibili.BilibiliSearchItem
+import com.dreamdisplays.media.source.bytedance.ByteDanceMetadataCache
 import com.dreamdisplays.media.source.kick.KickMetadataCache
 import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.media.source.twitch.TwitchApi
@@ -167,9 +168,10 @@ class SuggestionsController {
         val source = MediaSource.from(q)
 
         // A direct / long-tail link needs no network to show its card, so publish it synchronously.
-        // Platform links (Twitch / Vimeo / Kick / Bilibili) instead resolve real metadata below.
+        // Platform links instead resolve real metadata below.
         if (maybeId == null && source !is MediaSource.Twitch &&
-            source !is MediaSource.Vimeo && source !is MediaSource.Kick && source !is MediaSource.Bilibili
+            source !is MediaSource.Vimeo && source !is MediaSource.Kick && source !is MediaSource.Bilibili &&
+            source !is MediaSource.TikTok && source !is MediaSource.Douyin
         ) {
             customUrlOf(source)?.let {
                 publish(seq, listOf(customResult(it)), null)
@@ -233,6 +235,34 @@ class SuggestionsController {
                             .getOrNull()
                         val fallback = source.bvid ?: source.avid?.let { "av$it" } ?: source.roomId?.toString() ?: "Bilibili"
                         listOf(platformResult(source.url, MediaPlatform.BILIBILI, meta, fallbackTitle = fallback))
+                    }
+
+                    source is MediaSource.TikTok -> {
+                        val meta = runCatching {
+                            withContext(Dispatchers.IO) { ByteDanceMetadataCache.resolveBlocking(source) }
+                        }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("TikTok meta: ${it.message}") }
+                            .getOrNull()
+                        val fallback = source.videoId ?: source.username?.let { "@$it" } ?: "TikTok"
+                        listOf(
+                            platformResult(
+                                source.url,
+                                MediaPlatform.TIKTOK,
+                                meta,
+                                fallbackTitle = fallback,
+                                fallbackIsLive = source.isLive,
+                            )
+                        )
+                    }
+
+                    source is MediaSource.Douyin -> {
+                        val meta = runCatching {
+                            withContext(Dispatchers.IO) { ByteDanceMetadataCache.resolveBlocking(source) }
+                        }
+                            .onFailure { if (it is CancellationException) throw it; logger.warn("Douyin meta: ${it.message}") }
+                            .getOrNull()
+                        val fallback = source.videoId ?: "Douyin"
+                        listOf(platformResult(source.url, MediaPlatform.DOUYIN, meta, fallbackTitle = fallback))
                     }
 
                     else -> {
@@ -652,15 +682,16 @@ class SuggestionsController {
     }
 
     /**
-     * Builds a single-card result for a pasted Vimeo / Kick link. The card is keyed by the watch URL
-     * (unlike Twitch, whose id is a cache key) so its thumbnail slot never collides with a YouTube id;
-     * [meta] fills in the title / uploader / thumbnail when the metadata lookup succeeded.
+     * Builds a single-card result for a pasted named-platform link. The card is keyed by the watch
+     * URL (unlike Twitch, whose id is a cache key) so its thumbnail slot never collides with a
+     * YouTube id; [meta] fills in the title / uploader / thumbnail when metadata lookup succeeds.
      */
     private fun platformResult(
         url: String,
         platform: MediaPlatform,
         meta: PlatformVideoMetadata?,
         fallbackTitle: String,
+        fallbackIsLive: Boolean = false,
     ): MediaSearchResult = MediaSearchResult(
         id = url,
         title = meta?.title?.takeIf { it.isNotBlank() } ?: fallbackTitle,
@@ -669,7 +700,7 @@ class SuggestionsController {
         viewCount = meta?.viewCount,
         watchUrlOverride = url,
         thumbnailUrlOverride = meta?.thumbnailUrl,
-        isLive = meta?.isLive ?: false,
+        isLive = meta?.isLive ?: fallbackIsLive,
         platform = platform,
     )
 

@@ -37,7 +37,7 @@ const USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/
                           (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
 /// Some CDNs 403 a correct URL unless `Referer` matches their own site (seen on Bilibili's
-/// `bilivideo.com`); mirrors the host mapping in the client's `Thumbnails.refererFor`.
+/// `bilivideo.com`); mirrors the supported-platform host policy used by the client.
 fn referer_for(url: &str) -> Option<&'static str> {
     let host = url
         .split("://")
@@ -53,7 +53,32 @@ fn referer_for(url: &str) -> Option<&'static str> {
         Some("https://vimeo.com/")
     } else if covers("bilibili.com") || covers("hdslb.com") || covers("bilivideo.com") {
         Some("https://www.bilibili.com/")
-    } else if covers("twitch.tv") || covers("ttvnw.net") || covers("jtvnw.net") || covers("live-video.net") {
+    } else if covers("tiktok.com")
+        || covers("tiktokv.com")
+        || covers("tiktokcdn.com")
+        || covers("tiktokcdn-us.com")
+        || covers("muscdn.com")
+        || covers("byteoversea.com")
+        || covers("ibytedtos.com")
+        || covers("ibyteimg.com")
+    {
+        Some("https://www.tiktok.com/")
+    } else if covers("douyin.com")
+        || covers("iesdouyin.com")
+        || covers("douyincdn.com")
+        || covers("douyinvod.com")
+        || covers("idouyinvod.com")
+        || covers("douyinpic.com")
+        || covers("douyinliving.com")
+        || covers("douyinstatic.com")
+        || covers("amemv.com")
+    {
+        Some("https://www.douyin.com/")
+    } else if covers("twitch.tv")
+        || covers("ttvnw.net")
+        || covers("jtvnw.net")
+        || covers("live-video.net")
+    {
         Some("https://www.twitch.tv/")
     } else if covers("youtube.com")
         || covers("youtu.be")
@@ -1796,6 +1821,14 @@ mod tests {
         assert_eq!(
             referer_for("https://upos-sz.bilivideo.com/x.m4s"),
             Some("https://www.bilibili.com/"),
+        );
+        assert_eq!(
+            referer_for("https://v16-webapp.tiktok.com/video/tos/useast2a/x"),
+            Some("https://www.tiktok.com/"),
+        );
+        assert_eq!(
+            referer_for("https://v9-dy.douyinvod.com/video/tos/cn/x"),
+            Some("https://www.douyin.com/"),
         );
         assert_eq!(referer_for("https://example.com/clip.mp4"), None);
         assert_eq!(referer_for("https://youtube.com.evil.tld/clip.mp4"), None);

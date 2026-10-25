@@ -23,6 +23,14 @@ object MediaHosts {
         MediaPlatform.VIMEO to listOf("vimeo.com", "vimeocdn.com"),
         MediaPlatform.KICK to listOf("kick.com"),
         MediaPlatform.BILIBILI to listOf("bilibili.com", "hdslb.com", "bilivideo.com"),
+        MediaPlatform.TIKTOK to listOf(
+            "tiktok.com", "tiktokv.com", "tiktokcdn.com", "tiktokcdn-us.com", "muscdn.com",
+            "byteoversea.com", "ibytedtos.com", "ibyteimg.com",
+        ),
+        MediaPlatform.DOUYIN to listOf(
+            "douyin.com", "iesdouyin.com", "douyincdn.com", "douyinvod.com", "idouyinvod.com",
+            "douyinpic.com", "douyinliving.com", "douyinstatic.com", "amemv.com",
+        ),
     )
 
     private val PLATFORM_REFERERS: Map<MediaPlatform, String> = mapOf(
@@ -31,6 +39,8 @@ object MediaHosts {
         MediaPlatform.VIMEO to "https://vimeo.com/",
         MediaPlatform.KICK to "https://kick.com/",
         MediaPlatform.BILIBILI to "https://www.bilibili.com/",
+        MediaPlatform.TIKTOK to "https://www.tiktok.com/",
+        MediaPlatform.DOUYIN to "https://www.douyin.com/",
     )
 
     /** The platform [url]'s host belongs to, or null when it belongs to none of them. */

@@ -12,6 +12,7 @@ import com.dreamdisplays.api.media.source.CustomMediaUrls
 import com.dreamdisplays.api.media.source.MediaPlatform
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.media.source.bilibili.BilibiliMetadataCache
+import com.dreamdisplays.media.source.bytedance.ByteDanceMetadataCache
 import com.dreamdisplays.media.source.kick.KickMetadataCache
 import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.media.source.twitch.TwitchMetadataCache
@@ -324,8 +325,8 @@ class PreviewSection(
 
     /**
      * Resolves [OverlayInfo] for the current display URL: YouTube via [VideoMetadataCache], Twitch
-     * via [TwitchMetadataCache], Vimeo / Kick via their platform caches, and a bare file / long-tail
-     * link from the URL alone.
+     * via [TwitchMetadataCache], the other named platforms via their metadata caches, and a bare
+     * file / long-tail link from the URL alone.
      */
     private fun overlayInfo(): OverlayInfo {
         when (val source = currentSource()) {
@@ -362,6 +363,18 @@ class PreviewSection(
                 val meta = BilibiliMetadataCache.cacheKey(source)?.let { BilibiliMetadataCache.get(it) }
                 if (meta == null) BilibiliMetadataCache.requestAsync(source)
                 return platformOverlayInfo(source.url, MediaPlatform.BILIBILI, meta)
+            }
+
+            is MediaSource.TikTok -> {
+                val meta = ByteDanceMetadataCache.get(source)
+                if (meta == null) ByteDanceMetadataCache.requestAsync(source)
+                return platformOverlayInfo(source.url, MediaPlatform.TIKTOK, meta)
+            }
+
+            is MediaSource.Douyin -> {
+                val meta = ByteDanceMetadataCache.get(source)
+                if (meta == null) ByteDanceMetadataCache.requestAsync(source)
+                return platformOverlayInfo(source.url, MediaPlatform.DOUYIN, meta)
             }
 
             // A custom / long-tail link carries no metadata anywhere: its file name and host are all
@@ -444,7 +457,7 @@ class PreviewSection(
 
         var titleX = x + padX
         val titleY = boxY + padY
-        // The platform tag (Twitch / Vimeo / Kick / Link) takes precedence over the generic "New"
+        // A named-platform or custom-link tag takes precedence over the generic "New" tag.
         val badge = PlatformBadge.forPlatform(info.platform)
         val tagText = when {
             badge != null -> Component.translatable(badge.labelKey).string
@@ -538,6 +551,7 @@ class PreviewSection(
         is MediaSource.Vimeo -> VimeoMetadataCache.cacheKey(source)
         is MediaSource.Kick -> KickMetadataCache.cacheKey(source)
         is MediaSource.Bilibili -> BilibiliMetadataCache.cacheKey(source)
+        is MediaSource.TikTok, is MediaSource.Douyin -> ByteDanceMetadataCache.cacheKey(source)
         is MediaSource.YouTube -> source.videoId
         else -> null
     }
@@ -573,6 +587,13 @@ class PreviewSection(
                 val key = BilibiliMetadataCache.cacheKey(source) ?: return
                 val meta = BilibiliMetadataCache.get(key)
                 if (meta == null) BilibiliMetadataCache.requestAsync(source)
+                else meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
+            }
+
+            is MediaSource.TikTok, is MediaSource.Douyin -> {
+                val key = ByteDanceMetadataCache.cacheKey(source) ?: return
+                val meta = ByteDanceMetadataCache.get(source)
+                if (meta == null) ByteDanceMetadataCache.requestAsync(source)
                 else meta.thumbnailUrl?.let { Thumbnails.request(key, it) }
             }
 

@@ -102,8 +102,20 @@ class CustomMediaPolicyTest {
     }
 
     @Test
-    fun disablingCustomDoesNotBlockVimeoOrKick() {
+    fun disablingCustomDoesNotBlockPlatforms() {
         assertEquals(CustomMediaPolicy.Verdict.ALLOWED, CustomMediaPolicy.evaluate("https://vimeo.com/123456789", off))
         assertEquals(CustomMediaPolicy.Verdict.ALLOWED, CustomMediaPolicy.evaluate("https://kick.com/xqc", off))
+        assertEquals(CustomMediaPolicy.Verdict.ALLOWED, CustomMediaPolicy.evaluate("https://vm.tiktok.com/ZMabcdef1/", off))
+        assertEquals(CustomMediaPolicy.Verdict.ALLOWED, CustomMediaPolicy.evaluate("https://v.douyin.com/iF3xYzAb/", off))
+    }
+
+    @Test
+    fun malformedPlatformLinksStillFollowCustomPolicy() {
+        for (url in listOf(
+            "https://www.tiktok.com/@scout2015/video/6718335390845095173/extra",
+            "https://www.douyin.com/video/6961737553342991651/extra",
+        )) {
+            assertEquals(CustomMediaPolicy.Verdict.DISABLED, CustomMediaPolicy.evaluate(url, off), url)
+        }
     }
 }
