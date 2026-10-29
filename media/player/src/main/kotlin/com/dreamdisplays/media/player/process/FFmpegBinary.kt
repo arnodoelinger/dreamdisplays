@@ -16,6 +16,7 @@ object FFmpegBinary {
     private val logger = LoggerFactory.getLogger(javaClass)
     private const val CACHE_ROOT = "./dreamdisplays/ffmpeg"
     private const val BTBN_BASE = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest"
+    private const val FFMPEG_VERSION = "9.0"
 
     @Volatile
     private var cachedPath: String? = null
@@ -50,7 +51,7 @@ object FFmpegBinary {
             return findSystemFfmpeg()
         }
 
-        val cacheDir = File("$CACHE_ROOT/${p.key}")
+        val cacheDir = File("$CACHE_ROOT/${p.key}-$FFMPEG_VERSION")
         val binary = File(cacheDir, p.binaryName)
 
         if (binary.isFile && binary.length() > 0 && binary.canExecute()) {
@@ -68,12 +69,22 @@ object FFmpegBinary {
             }
             Processes.markExecutable(binary.toPath())
             Processes.removeMacQuarantine(binary.toPath())
+            deleteStaleBuilds(p.key)
             logger.info("Ready to work.")
             binary.absolutePath
         }.getOrElse { e ->
             logger.error("Download failed, falling back to system ffmpeg", e)
             findSystemFfmpeg()
         }
+    }
+
+    private fun deleteStaleBuilds(platformKey: String) {
+        val current = "$platformKey-$FFMPEG_VERSION"
+        File(CACHE_ROOT).listFiles()
+            ?.filter { it.isDirectory && it.name != current && (it.name == platformKey || it.name.startsWith("$platformKey-")) }
+            ?.forEach { stale ->
+                if (stale.deleteRecursively()) logger.info("Removed stale FFmpeg build: ${stale.name}.")
+            }
     }
 
     @Throws(IOException::class)
@@ -109,7 +120,7 @@ object FFmpegBinary {
         ZipInputStream(BufferedInputStream(FileInputStream(archive))).use { zis ->
             var e = zis.nextEntry
             while (e != null) {
-                if (!e.isDirectory && e.name.endsWith(suffix)) {
+                if (!e.isDirectory && !e.name.startsWith("__MACOSX/") && e.name.endsWith(suffix)) {
                     BufferedOutputStream(FileOutputStream(dest)).use { out -> zis.transferTo(out) }
                     return
                 }
@@ -168,21 +179,21 @@ object FFmpegBinary {
             OsInfo.isWindows -> if (isArm) null else
                 Platform(
                     "windows-x64",
-                    "$BTBN_BASE/ffmpeg-master-latest-win64-gpl.zip",
+                    "$BTBN_BASE/ffmpeg-n$FFMPEG_VERSION-latest-win64-gpl-$FFMPEG_VERSION.zip",
                     "ffmpeg.exe",
                     "/bin/ffmpeg.exe",
                     false
                 )
 
             OsInfo.isMac -> if (isArm)
-                Platform("macos-aarch64", "https://www.osxexperts.net/ffmpeg71arm.zip", "ffmpeg", "ffmpeg", false)
+                Platform("macos-aarch64", "https://www.osxexperts.net/ffmpeg9arm.zip", "ffmpeg", "ffmpeg", false)
             else
-                Platform("macos-x64", "https://evermeet.cx/ffmpeg/getrelease/zip", "ffmpeg", "ffmpeg", false)
+                Platform("macos-x64", "https://evermeet.cx/ffmpeg/ffmpeg-9.0.2.zip", "ffmpeg", "ffmpeg", false)
 
             else -> if (isArm)
                 Platform(
                     "linux-aarch64",
-                    "$BTBN_BASE/ffmpeg-master-latest-linuxarm64-gpl.tar.xz",
+                    "$BTBN_BASE/ffmpeg-n$FFMPEG_VERSION-latest-linuxarm64-gpl-$FFMPEG_VERSION.tar.xz",
                     "ffmpeg",
                     "/bin/ffmpeg",
                     true
@@ -190,7 +201,7 @@ object FFmpegBinary {
             else
                 Platform(
                     "linux-x64",
-                    "$BTBN_BASE/ffmpeg-master-latest-linux64-gpl.tar.xz",
+                    "$BTBN_BASE/ffmpeg-n$FFMPEG_VERSION-latest-linux64-gpl-$FFMPEG_VERSION.tar.xz",
                     "ffmpeg",
                     "/bin/ffmpeg",
                     true

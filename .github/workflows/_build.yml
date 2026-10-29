@@ -28,7 +28,7 @@ on:
         value: ${{ jobs.metadata.outputs.required_native_platforms }}
 
 env:
-  BTBN_FFMPEG_TAG: autobuild-2026-08-31-13-27
+  BTBN_FFMPEG_TAG: autobuild-2026-10-28-19-47
 
 permissions:
   contents: read
