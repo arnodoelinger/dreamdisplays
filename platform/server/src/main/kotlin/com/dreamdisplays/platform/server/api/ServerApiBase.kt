@@ -11,6 +11,7 @@ import com.dreamdisplays.api.playback.model.DisplayAccess
 import com.dreamdisplays.api.playback.model.PlaybackMode
 import com.dreamdisplays.api.server.ServerDisplay
 import com.dreamdisplays.api.server.ServerDisplayEvent
+import com.dreamdisplays.api.server.ServerEvents
 import com.dreamdisplays.api.server.ServerDisplays
 import com.dreamdisplays.core.addon.AddonManager
 import com.dreamdisplays.core.addon.ServerAddonBinder
@@ -22,6 +23,7 @@ import com.dreamdisplays.shared.policy.MediaUrlPolicy
 import org.slf4j.LoggerFactory
 import java.util.UUID
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.function.Consumer
 import java.util.function.Predicate
 
@@ -154,6 +156,19 @@ abstract class ServerDisplayBase internal constructor(
 
     override fun moveTo(x1: Int, y1: Int, z1: Int, x2: Int, y2: Int, z2: Int, facing: DisplayFacing): CommandResult =
         moveTo(world, x1, y1, z1, x2, y2, z2, facing)
+
+    override val events: ServerEvents = object : ServerEvents {
+        override fun <T : ServerDisplayEvent> on(type: Class<T>, listener: Consumer<T>): AutoCloseable {
+            val closed = AtomicBoolean(false)
+            lateinit var upstream: AutoCloseable
+            upstream = backend.on { event ->
+                if (closed.get() || event.display.id != id) return@on
+                if (type.isInstance(event)) listener.accept(type.cast(event))
+                if (event is ServerDisplayEvent.Removed && closed.compareAndSet(false, true)) upstream.close()
+            }
+            return AutoCloseable { if (closed.compareAndSet(false, true)) upstream.close() }
+        }
+    }
 
     override val customData: MutableDisplayCustomData = object : MutableDisplayCustomData {
         override val keys: Set<String> get() = data.customData.keys.toSet()
