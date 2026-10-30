@@ -29,6 +29,7 @@ import java.util.Collections
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Manages `FFmpeg` session (processes, threads, pipes). Quality switch runs parallel video channel.
@@ -257,11 +258,22 @@ internal class PlaybackSessionManager(
     private var audioHalf: AudioHalf? = null
     private val noFrames = AtomicLong(0)
 
-    @Volatile
-    private var bridgeCeilingNanos: Long = Long.MAX_VALUE
+    private sealed interface Phase {
+        data object Stopped : Phase
+        data object Active : Phase
 
-    @Volatile
-    var isPlaying = false; private set
+        class Bridging(val liveEdgeNanos: Long) : Phase
+        class Parked(val frozenNanos: Long, val sinceNanos: Long) : Phase
+    }
+
+    private val phase = AtomicReference<Phase>(Phase.Stopped)
+
+    val isPlaying: Boolean get() = phase.get() !is Phase.Stopped
+
+    private val bridging: Boolean get() = phase.get() is Phase.Bridging
+
+    private val bridgeCeilingNanos: Long
+        get() = (phase.get() as? Phase.Bridging)?.liveEdgeNanos ?: Long.MAX_VALUE
 
     /** True once the first decoded frame of the live channel is ready for GPU upload. */
     fun textureFilled(): Boolean = active?.pipe?.textureFilled() == true
@@ -342,7 +354,6 @@ internal class PlaybackSessionManager(
         if (terminated.get()) return
         liveSession = live
         silentSession = false
-        bridgeCeilingNanos = Long.MAX_VALUE // A full start is not a bridge
 
         val ffmpeg = FFmpegBinary.getPath() ?: run {
             logger.error("$debugLabel FFmpeg binary not available.")
@@ -381,7 +392,7 @@ internal class PlaybackSessionManager(
                 )
             }
             updateRawFrameSink()
-            isPlaying = true
+            phase.set(Phase.Active)
         } catch (e: IOException) {
             logger.error("$debugLabel Failed to start FFmpeg", e)
             events.onError(DreamMediaException.Decode("Failed to start FFmpeg: ${e.message}", e))
@@ -393,7 +404,7 @@ internal class PlaybackSessionManager(
         if (!isPlaying || terminated.get() || parkFlag.get()) return false
         // The shadows hold PCM for the position we are leaving; the refresh pass re-warms at the new one.
         audioWarmPool.invalidateAll()
-        if (bridgeCeilingNanos != Long.MAX_VALUE) return false
+        if (bridging) return false
         synchronized(switchLock) { if (incoming != null) return false }
         val old = active ?: return false
         val ffmpeg = FFmpegBinary.getPath() ?: return false
@@ -503,7 +514,7 @@ internal class PlaybackSessionManager(
     /** Replaces audio half of playing session with fresh process on same audio URL, leaving video unchanged. */
     fun restartAudio(streamSet: ActiveStreams, offsetNanos: Long): Boolean {
         if (!isPlaying || terminated.get() || parkFlag.get()) return false
-        if (bridgeCeilingNanos != Long.MAX_VALUE) return false
+        if (bridging) return false
         synchronized(switchLock) { if (incoming != null) return false }
         val ffmpeg = FFmpegBinary.getPath() ?: return false
         val oldAudio = audioHalf
@@ -542,7 +553,7 @@ internal class PlaybackSessionManager(
     /** Seamless audio-track switch for seekable content: spawns new track's FFmpeg on background thread, then swaps. */
     fun beginAudioTrackSwitch(streamSet: ActiveStreams): Boolean {
         if (!isPlaying || terminated.get() || parkFlag.get()) return false
-        if (bridgeCeilingNanos != Long.MAX_VALUE) return false
+        if (bridging) return false
         synchronized(switchLock) { if (incoming != null) return false }
         val ffmpeg = FFmpegBinary.getPath() ?: return false
         val generation = audioSwitchGeneration.incrementAndGet()
@@ -693,11 +704,11 @@ internal class PlaybackSessionManager(
         // Both replay and the warming-up live channel pace on this shared clock, clamped to the live
         // edge: replay plays toward it and the live channel's first frame lands exactly there.
         clock.reset(resumeNanos)
-        bridgeCeilingNanos = liveEdgeNanos.coerceAtLeast(resumeNanos)
+        phase.set(Phase.Bridging(liveEdgeNanos.coerceAtLeast(resumeNanos)))
 
         val (w, h) = targetDims(null)
         val channel = VideoChannel()
-        val pipe = channel.nativePipe ?: run { bridgeCeilingNanos = Long.MAX_VALUE; return false }
+        val pipe = channel.nativePipe ?: run { phase.set(Phase.Stopped); return false }
         val vt = pipe.startReplay(
             snapshot = snapshot, w = w, h = h, resumeNanos = resumeNanos, sourceFps = REPLAY_FPS,
             stopFlag = channel.stop, terminated = terminated, getAudioClock = ::pacingClockNanos,
@@ -706,11 +717,10 @@ internal class PlaybackSessionManager(
             onEos = { _, normalEos ->
                 logger.debug("$debugLabel [reappear] replay-only video reached end (normalEos=$normalEos), holding last frame.")
             },
-        ) ?: run { bridgeCeilingNanos = Long.MAX_VALUE; return false }
+        ) ?: run { phase.set(Phase.Stopped); return false }
         channel.thread = vt
         active = channel
         updateRawFrameSink()
-        isPlaying = true
         logger.debug(
             "$debugLabel [reappear] replay-only video started $w x $h resume=${ms(resumeNanos)} ms " +
                     "edge=${ms(liveEdgeNanos)} ms.",
@@ -754,7 +764,7 @@ internal class PlaybackSessionManager(
                     // Live reached the edge: re-anchor the clock there (matching the audio offset), lift the
                     // bridge clamp, then open the live audio gate
                     clock.rebaseTo(liveOffsetNanos)
-                    bridgeCeilingNanos = Long.MAX_VALUE
+                    phase.updateAndGet { if (it is Phase.Bridging) Phase.Active else it }
                     firstLiveFrame.countDown()
                     logger.debug(
                         "$debugLabel [reappear] live channel presented first frame; handoff at ${ms(liveOffsetNanos)} ms."
@@ -815,19 +825,15 @@ internal class PlaybackSessionManager(
 
     /** Captures live channel's entire encoded-packet cache (rolling window) for later replay. */
     fun captureVideoCacheSnapshot(): ByteArray? {
-        val bridging = bridgeCeilingNanos != Long.MAX_VALUE
         val channel = if (bridging) (incoming ?: active) else active
         return channel?.snapshotCache(Long.MIN_VALUE)
     }
 
     /** The live edge a replay -> live bridge is currently resuming toward, or null when no bridge is in flight. */
-    fun activeBridgeEdgeNanos(): Long? = bridgeCeilingNanos.takeIf { it != Long.MAX_VALUE }
+    fun activeBridgeEdgeNanos(): Long? = (phase.get() as? Phase.Bridging)?.liveEdgeNanos
 
-    @Volatile
-    private var parkStartNanos = 0L
-
-    @Volatile
-    private var frozenPositionNanos = -1L
+    /** True while a replay -> live bridge is in flight. */
+    fun isBridging(): Boolean = bridging
 
     /**
      * Whether this session can be parked warm for out-of-render-distance dormancy: steady
@@ -837,8 +843,8 @@ internal class PlaybackSessionManager(
     fun canPark(): Boolean = canHoldWarm() && active?.inProcess == true
 
     private fun canHoldWarm(): Boolean =
-        isPlaying && !terminated.get() && active != null &&
-                bridgeCeilingNanos == Long.MAX_VALUE && incoming == null &&
+        phase.get().let { it is Phase.Active || it is Phase.Parked } && !terminated.get() && active != null &&
+                incoming == null &&
                 (audioHalf != null || silentSession)
 
     fun suspend(allowExternalProcess: Boolean = false, retainBuffered: Boolean = false): Boolean {
@@ -848,18 +854,18 @@ internal class PlaybackSessionManager(
         audioWarmPool.invalidateAll()
         audio.pauseForPark()
         if (!retainBuffered) active?.pipe?.trimForPark()
-        frozenPositionNanos = pacingClockNanos().takeIf { it >= 0L } ?: clock.currentTime()
-        clock.moveTo(frozenPositionNanos)
-        parkStartNanos = System.nanoTime()
-        logger.debug("$debugLabel [park] session parked warm at ${ms(frozenPositionNanos)}ms.")
+        val frozen = pacingClockNanos().takeIf { it >= 0L } ?: clock.currentTime()
+        clock.moveTo(frozen)
+        phase.set(Phase.Parked(frozen, System.nanoTime()))
+        logger.debug("$debugLabel [park] session parked warm at ${ms(frozen)}ms.")
         return true
     }
 
     /** Un-parks suspended session: readers resume from frozen position; wall clock shifted past dormant interval. */
     fun resume() {
         if (!parkFlag.get()) return
-        clock.addPausedDuration(System.nanoTime() - parkStartNanos)
-        frozenPositionNanos = -1L
+        (phase.get() as? Phase.Parked)?.let { clock.addPausedDuration(System.nanoTime() - it.sinceNanos) }
+        phase.updateAndGet { if (it is Phase.Parked) Phase.Active else it }
         audio.resumeFromPark()
         parkFlag.set(false)
         logger.debug("$debugLabel [park] session un-parked; resuming from frozen position.")
@@ -870,7 +876,8 @@ internal class PlaybackSessionManager(
 
     /** The frozen playback position while parked (so an evicted park saves where the viewer left, not a
      *  position drifted forward by the dormant wall-clock time), or null when not parked. */
-    fun parkedPositionNanos(): Long? = frozenPositionNanos.takeIf { parkFlag.get() && it >= 0 }
+    fun parkedPositionNanos(): Long? =
+        (phase.get() as? Phase.Parked)?.frozenNanos?.takeIf { parkFlag.get() && it >= 0 }
 
     private val masterClock = AudioMasterClock(debugLabel, requestAudioResync = audio::requestResync)
 
@@ -1045,9 +1052,8 @@ internal class PlaybackSessionManager(
      * reader threads. Tears down any in-flight quality switch too. Safe to call when idle.
      */
     fun stop() {
-        isPlaying = false
+        phase.set(Phase.Stopped)
         audioWarmPool.invalidateAll()
-        bridgeCeilingNanos = Long.MAX_VALUE
         audioFeeder = null
         masterClock.reset()
         parkFlag.set(false) // Release any parked readers so they observe the stop flags and exit
