@@ -6,6 +6,7 @@ import com.dreamdisplays.api.DisplayLifecycle
 import com.dreamdisplays.api.display.data.DisplayCustomData
 import com.dreamdisplays.api.display.data.MapCustomData
 import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.property.DisplayState
@@ -70,22 +71,13 @@ internal class LiveDisplay(
     override fun delete() = command { displayService.delete(id) }
     override fun report() = command { displayService.report(id) }
 
-    override fun on(listener: Consumer<DisplayEvent>): AutoCloseable {
-        lateinit var subscription: Subscription
-        val upstream = displayService.on { event ->
-            if (event.displayId != id || subscription.isClosed) return@on
-            listener.accept(event)
-            if (event is DisplayEvent.Removed) subscription.close()
-        }
-        subscription = Subscription { upstream.close() }
-        owner?.own(subscription)
-        return subscription
-    }
+    override val events: Events = DefaultEvents(displayService, owner, id)
 
-    override fun watch(configure: Consumer<DisplayLifecycle>): AutoCloseable {
-        val handlers = LifecycleHandlers().also { configure.accept(it) }
-        return on { handlers.dispatch(it) }
-    }
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun on(listener: Consumer<DisplayEvent>): AutoCloseable = events.on(DisplayEvent::class.java, listener)
+
+    @Suppress("OVERRIDE_DEPRECATION")
+    override fun watch(configure: Consumer<DisplayLifecycle>): AutoCloseable = events.lifecycle(configure)
 
     private inline fun command(action: () -> Unit): CommandResult {
         if (!isAlive) return CommandResult.STALE
@@ -98,7 +90,7 @@ internal class LiveDisplay(
     override fun toString(): String = "Display($id)"
 }
 
-private class LifecycleHandlers : DisplayLifecycle {
+internal class LifecycleHandlers : DisplayLifecycle {
     private val playing = ArrayList<Consumer<DisplayState.Playing>>()
     private val paused = ArrayList<Consumer<DisplayState.Paused>>()
     private val buffering = ArrayList<Consumer<DisplayState.Buffering>>()

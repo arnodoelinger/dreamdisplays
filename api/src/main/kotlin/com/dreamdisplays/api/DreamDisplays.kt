@@ -1,5 +1,6 @@
 package com.dreamdisplays.api
 
+import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.placement.DisplayPlacements
 import com.dreamdisplays.api.internal.ApiBackend
@@ -59,6 +60,10 @@ object DreamDisplays {
     /** All displays, as a view you can narrow and act on as a group. */
     @JvmStatic
     val displays: Displays get() = backend.displays
+
+    /** Events of every display. Narrower scopes are `Display.events` and `Session.events`. */
+    @JvmStatic
+    val events: Events get() = backend.events
 
     /** Starts a session that owns everything you subscribe to; close it (or use try-with-resources) when done. */
     @JvmStatic

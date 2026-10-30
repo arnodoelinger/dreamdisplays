@@ -1,5 +1,9 @@
 package com.dreamdisplays.api
 
+import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.event.Events
+import java.util.function.Consumer
+
 /**
  * Describes how to react to the display's life in one block. Ends by itself when the display is removed.
  *
@@ -16,4 +20,18 @@ package com.dreamdisplays.api
  */
 @Unstable
 inline fun Display.lifecycle(crossinline block: DisplayLifecycle.() -> Unit): AutoCloseable =
-    watch { it.block() }
+    events.lifecycle { it.block() }
+
+/**
+ * Listens to events of type [T] in this scope.
+ *
+ * Example:
+ * ```
+ * display.events.on<DisplayEvent.StateChanged> { println(it.current) }
+ * ```
+ *
+ * @since 1.10.x
+ */
+@Unstable
+inline fun <reified T : DisplayEvent> Events.on(crossinline action: (T) -> Unit): AutoCloseable =
+    on(T::class.java, Consumer { action(it) })

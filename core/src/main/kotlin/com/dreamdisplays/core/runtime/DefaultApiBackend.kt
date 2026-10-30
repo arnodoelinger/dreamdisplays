@@ -15,7 +15,9 @@ import com.dreamdisplays.api.watchparty.WatchPartyService
 import com.dreamdisplays.api.display.placement.DisplayPlacements
 import com.dreamdisplays.core.addon.AddonManager
 import com.dreamdisplays.core.display.PlacementHub
+import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.core.api.DefaultDisplays
+import com.dreamdisplays.core.api.DefaultEvents
 import com.dreamdisplays.core.api.DefaultSession
 import com.dreamdisplays.core.api.LiveDisplay
 import com.dreamdisplays.core.services.keys.DisplayServices
@@ -41,6 +43,7 @@ class DefaultApiBackend(
         displayService.getDisplay(id)?.let { LiveDisplay(id, displayService, playbackService) }
 
     override val displays: Displays get() = DefaultDisplays(displayService, playbackService, owner = null)
+    override val events: Events get() = DefaultEvents(displayService, owner = null, displayId = null)
     override fun session(name: String): Session = DefaultSession(name, displayService, playbackService)
     override val watchParty: WatchPartyService get() = registry.get(WatchPartyServices.WATCH_PARTY)
     override val search: MediaSearchService get() = registry.get(MediaServices.SEARCH)

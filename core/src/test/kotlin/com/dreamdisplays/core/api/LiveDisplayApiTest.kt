@@ -56,7 +56,7 @@ class LiveDisplayApiTest {
         system.recordDisplay(info(1))
         system.recordDisplay(info(2))
         val seen = mutableListOf<DisplayEvent>()
-        live(1).on { seen.add(it) }
+        live(1).events.on(DisplayEvent::class.java) { seen.add(it) }
 
         system.publish(DisplayEvent.UrlChanged(id(2), "other"))
         system.publish(DisplayEvent.UrlChanged(id(1), "mine"))
@@ -64,6 +64,37 @@ class LiveDisplayApiTest {
         system.publish(DisplayEvent.UrlChanged(id(1), "after"))
 
         assertEquals(["UrlChanged", "Removed"], seen.map { it::class.simpleName })
+    }
+
+    @Test
+    fun `typed events filter by type and a wider scope hears every display`() {
+        system.recordDisplay(info(1))
+        system.recordDisplay(info(2))
+        val urls = mutableListOf<String?>()
+        val everything = mutableListOf<DisplayEvent>()
+        val scoped = DefaultEvents(displayService, owner = null, displayId = id(1))
+        val global = DefaultEvents(displayService, owner = null, displayId = null)
+        scoped.on(DisplayEvent.UrlChanged::class.java) { urls += it.url }
+        global.on(DisplayEvent::class.java) { everything += it }
+
+        system.publish(DisplayEvent.UrlChanged(id(1), "a"))
+        system.publish(DisplayEvent.UrlChanged(id(2), "b"))
+        system.publish(DisplayEvent.CustomDataChanged(id(1), setOf("x:y")))
+
+        assertEquals("a", urls.single())
+        assertEquals(3, everything.size)
+    }
+
+    @Test
+    fun `deprecated on and watch still work through events`() {
+        system.recordDisplay(info(1))
+        val seen = mutableListOf<DisplayEvent>()
+        @Suppress("DEPRECATION")
+        live(1).on { seen.add(it) }
+
+        system.publish(DisplayEvent.UrlChanged(id(1), "a"))
+
+        assertEquals(1, seen.size)
     }
 
     @Test
@@ -93,7 +124,7 @@ class LiveDisplayApiTest {
         session.own(AutoCloseable { order += 1 })
         session.own(AutoCloseable { order += 2 })
         val log = mutableListOf<DisplayEvent>()
-        session.display(id(1))!!.on { log.add(it) }
+        session.display(id(1))!!.events.on(DisplayEvent::class.java) { log.add(it) }
 
         system.publish(DisplayEvent.UrlChanged(id(1), "a"))
         session.close()

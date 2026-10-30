@@ -1,6 +1,7 @@
 package com.dreamdisplays.api
 
 import com.dreamdisplays.api.display.event.DisplayEvent
+import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.api.display.data.DisplayCustomData
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
@@ -76,6 +77,9 @@ interface Display {
     /** Playback mode: `Local`, `Synced`, `Watch party` or `Broadcast`. */
     var mode: PlaybackMode
 
+    /** Events of this display only. */
+    val events: Events
+
     /** Starts or resumes playback. */
     fun play(): CommandResult
 
@@ -119,13 +123,25 @@ interface Display {
     /**
      * Subscribes to events of this display only. The subscription ends by itself when the display is removed;
      * close the returned handle to end it earlier.
+     *
+     * *Deprecated. Use [events].*
      */
+    @Deprecated(
+        "Use events.on(type, listener).",
+        ReplaceWith("events.on(DisplayEvent::class.java, listener)"),
+    )
     fun on(listener: Consumer<DisplayEvent>): AutoCloseable
 
     /**
      * Describes how to react to the display's life in one block; ends by itself when the display is removed.
      *
      * `Kotlin` code can use the nicer `display.lifecycle { onPlaying { ... } }` extension.
+     *
+     * *Deprecated. Use [events].*
      */
+    @Deprecated(
+        "Use events.lifecycle(configure).",
+        ReplaceWith("events.lifecycle(configure)"),
+    )
     fun watch(configure: Consumer<DisplayLifecycle>): AutoCloseable
 }
