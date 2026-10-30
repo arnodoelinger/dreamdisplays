@@ -90,9 +90,9 @@ jobs:
 
           props = versions_data["versions"]
           tasks = (
-              [{"kind": "fabric", "mc": version} for version in versions if "fabric.api.version" in props[version]] +
-              [{"kind": "neoforge", "mc": version} for version in versions if "neoforge.version" in props[version]] +
               [{"kind": "forge", "mc": version} for version in versions if "forge.version" in props[version]] +
+              [{"kind": "neoforge", "mc": version} for version in versions if "neoforge.version" in props[version]] +
+              [{"kind": "fabric", "mc": version} for version in versions if "fabric.api.version" in props[version]] +
               [{"kind": "paper", "mc": paper_build_version}] +
               [{"kind": "velocity", "mc": paper_build_version}] +
               [{"kind": "bungeecord", "mc": paper_build_version}]
