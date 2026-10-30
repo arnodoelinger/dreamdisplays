@@ -1,3 +1,45 @@
+# 1.10.7 Release
+
+## Highlights
+
+- Playback fixes and minor improvements
+- Updated `FFmpeg` to 9.0 on every platform
+- API improvements
+
+## Client
+
+### Features
+
+- Removed LOD feature that was introduced in 1.10.1
+- API: added `Events`, a single way to listen to display events
+- API: `Display.on(...)` and `Display.watch(...)` are deprecated in favor of `Display.events`
+
+### Improvements
+
+- Updated `FFmpeg` to 9.0 on every platform
+- Already downloaded copies of `FFmpeg` are now replaced automatically when the mod moves to a new
+  `FFmpeg` version, instead of being kept forever
+- Changed order of version publishing
+- Minor codebase improvements
+
+### Fixes
+
+- Fixed videos not playing at all on Intel Macs for anyone who hadn't downloaded `FFmpeg` yet
+- Fixed video quality switching back and forth every few seconds at some distances
+  ([#269](https://github.com/arnodoelinger/dreamdisplays/issues/269))
+- API: fixed the API reporting a display as "preparing" while its video is already playing
+  ([#268](https://github.com/arnodoelinger/dreamdisplays/issues/268))
+
+## Server
+
+### Features
+
+- API: added `DreamDisplaysServer.events` to listen to a single type of display event
+- API: added `DreamDisplaysServer.vetoes`: plugins can refuse a video change, creating a display or removing one before 
+  it happens, with a reason shown to the player
+- API: added `ServerDisplay.events` to listen to a single display; it ends by itself when the display is removed
+- API: `DreamDisplaysServer.on(...)` is deprecated in favor of `DreamDisplaysServer.events`
+
 # 1.10.6 Release
 
 ## Highlights
