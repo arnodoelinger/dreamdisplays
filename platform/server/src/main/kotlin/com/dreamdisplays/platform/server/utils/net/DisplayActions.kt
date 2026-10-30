@@ -65,6 +65,11 @@ object DisplayActions {
             return ServerMessage.NO_DISPLAY.sendTo(player)
         }
 
+        ServerApiHost.current?.askDelete(displayData, player.uniqueId)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         DisplayManager.delete(displayId)
         ServerMessage.DISPLAY_DELETED.sendTo(player)
     }
@@ -87,8 +92,14 @@ object DisplayActions {
         if (!DisplayManager.isPlayerInRange(player, displayData)) return
         if (!setVideoThrottle.tryAcquire(displayId, SET_VIDEO_COOLDOWN_MS)) return
 
+        val sanitizedLang = MediaUrlPolicy.sanitizeLang(lang)
+        ServerApiHost.current?.askSetUrl(displayData, url, sanitizedLang, player.uniqueId)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         displayData.url = url
-        displayData.lang = MediaUrlPolicy.sanitizeLang(lang)
+        displayData.lang = sanitizedLang
 
         runAsync { PaperServer.getInstance().storage.saveDisplay(displayData) }
         DisplayManager.broadcastUpdate(displayData)

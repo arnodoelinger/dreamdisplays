@@ -112,6 +112,7 @@ internal class PaperServerDisplays(
             region.getMinLocation(bukkitWorld), region.getMaxLocation(bukkitWorld),
             screenWidth, screenHeight, face, DisplayRotation.NONE,
         )
+        if (PaperServerApi.askCreate(data, null) != null) return null
         DisplayManager.register(data)
         return wrap(data)
     }

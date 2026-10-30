@@ -48,6 +48,13 @@ object DreamDisplaysServer {
     fun display(id: UUID): ServerDisplay? = backend.displays[id]
 
     /**
+     * Requests that listeners may refuse before they happen: video changes, creating and
+     * removing displays.
+     */
+    @JvmStatic
+    val vetoes: DisplayVetoes get() = BackendVetoes
+
+    /**
      * Subscribes to display events.
      *
      * Close the handle to stop.
@@ -69,6 +76,11 @@ object DreamDisplaysServer {
      */
     @JvmStatic
     fun register(addon: Any): Unit = ServerHolder.whenReady { backend.registerAddon(addon) }
+
+    private object BackendVetoes : DisplayVetoes {
+        override fun <T : DisplayVeto> on(type: Class<T>, listener: Consumer<T>): AutoCloseable =
+            backend.onVeto { veto -> if (type.isInstance(veto)) listener.accept(type.cast(veto)) }
+    }
 
     private object BackendEvents : ServerEvents {
         override fun <T : ServerDisplayEvent> on(type: Class<T>, listener: Consumer<T>): AutoCloseable =

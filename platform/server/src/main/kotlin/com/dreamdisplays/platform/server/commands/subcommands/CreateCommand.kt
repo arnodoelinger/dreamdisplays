@@ -1,5 +1,6 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
+import com.dreamdisplays.platform.server.api.ServerApiHost
 import com.dreamdisplays.platform.client.utils.literalText
 import com.dreamdisplays.shared.geometry.SurfaceCensus
 import com.dreamdisplays.shared.geometry.SurfaceRole
@@ -95,6 +96,10 @@ class CreateCommand : SubCommand {
             (WorldGuardRegions.isProtectedTerritory(pos1) || WorldGuardRegions.isProtectedTerritory(pos2))
         ) {
             displayData.access = DisplayAccess.REGION
+        }
+        ServerApiHost.current?.askCreate(displayData, player.uniqueId)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
         }
         SelectionManager.selectionPoints.remove(player.uniqueId)
 
@@ -216,6 +221,10 @@ object VanillaCreateCommand {
         }
 
         val displayData = sel.generateDisplayData(player.uuid)
+        ServerApiHost.current?.askCreate(displayData, player.uuid)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return 0
+        }
         SelectionManager.selectionPoints.remove(player.uuid)
 
         DisplayManager.register(displayData)

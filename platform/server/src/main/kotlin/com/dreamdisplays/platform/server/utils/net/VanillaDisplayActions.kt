@@ -128,6 +128,11 @@ object VanillaDisplayActions {
             return ServerMessage.NO_DISPLAY.sendTo(player)
         }
 
+        ServerApiHost.current?.askDelete(displayData, player.uuid)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         DisplayManager.delete(displayData)
         ServerMessage.DISPLAY_DELETED.sendTo(player)
     }
@@ -152,8 +157,14 @@ object VanillaDisplayActions {
         if (!DisplayManager.isPlayerInRange(player, displayData)) return
         if (!setVideoThrottle.tryAcquire(displayId, SET_VIDEO_COOLDOWN_MS)) return
 
+        val sanitizedLang = MediaUrlPolicy.sanitizeLang(lang)
+        ServerApiHost.current?.askSetUrl(displayData, url, sanitizedLang, player.uuid)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         displayData.url = url
-        displayData.lang = MediaUrlPolicy.sanitizeLang(lang)
+        displayData.lang = sanitizedLang
         ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(displayData) }
 
         val receivers = DisplayManager.getReceivers(displayData, server)

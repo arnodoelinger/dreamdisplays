@@ -1,5 +1,7 @@
 package com.dreamdisplays.platform.server.commands.subcommands
 
+import com.dreamdisplays.platform.server.utils.MessageUtil
+import com.dreamdisplays.platform.server.api.ServerApiHost
 import com.dreamdisplays.platform.client.utils.literalText
 import com.dreamdisplays.platform.server.ModLoaderOnly
 import com.dreamdisplays.platform.server.PaperServer
@@ -42,6 +44,11 @@ class DeleteCommand : SubCommand {
             return
         }
 
+        ServerApiHost.current?.askDelete(data, player.uniqueId)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         DisplayManager.delete(data.id)
         ServerMessage.DISPLAY_DELETED.sendTo(player)
     }
@@ -69,6 +76,11 @@ object VanillaDeleteCommand {
         ))
         if (!canDelete) {
             ServerMessage.DISPLAY_COMMAND_MISSING_PERMISSION.sendTo(player)
+            return 0
+        }
+
+        ServerApiHost.current?.askDelete(data, player.uuid)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
             return 0
         }
 

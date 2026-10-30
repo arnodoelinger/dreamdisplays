@@ -79,9 +79,15 @@ class VideoCommand : SubCommand {
             return
         }
 
+        val canonicalLang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
+        ServerApiHost.current?.askSetUrl(data, requestedUrl, canonicalLang, player.uniqueId)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return
+        }
+
         data.apply {
             url = requestedUrl
-            lang = LanguageTag.canonicalAudioCode(args.getOrNull(2)).value
+            lang = canonicalLang
         }
 
         runAsync { PaperServer.getInstance().storage.saveDisplay(data) }
@@ -175,8 +181,14 @@ object VanillaVideoCommand {
             return 0
         }
 
+        val canonicalLang = LanguageTag.canonicalAudioCode(langRaw).value
+        ServerApiHost.current?.askSetUrl(data, requestedUrl, canonicalLang, player.uuid)?.let { reason ->
+            if (reason.isNotEmpty()) MessageUtil.sendColoredMessage(player, reason)
+            return 0
+        }
+
         data.url = requestedUrl
-        data.lang = LanguageTag.canonicalAudioCode(langRaw).value
+        data.lang = canonicalLang
         ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(data) }
 
         val receivers = DisplayManager.getReceivers(data, ctx.source.server)

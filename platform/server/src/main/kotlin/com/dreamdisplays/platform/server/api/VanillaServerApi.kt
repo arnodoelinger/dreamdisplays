@@ -114,6 +114,7 @@ internal class VanillaServerDisplays(
             pos1 = region.getMinBlockPos(), pos2 = region.getMaxBlockPos(),
             width = screenWidth, height = screenHeight, facing = direction, rotation = DisplayRotation.NONE,
         )
+        if (VanillaServerApi.askCreate(data, null) != null) return null
         DisplayManager.register(data)
         ServerCoroutines.io.launch { VanillaServerState.storage?.saveDisplay(data) }
         DisplayManager.sendUpdate(data, DisplayManager.getReceivers(data, server))
