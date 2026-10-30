@@ -363,38 +363,25 @@ internal class FramePrebuffer(
         private const val HEALTH_WINDOW_NS = 10_000_000_000L
         private const val DROP_WARN_PERCENT = 20L
         private const val BEHIND_WARN_NANOS = 80_000_000L
-        private const val DEFAULT_PREBUFFER_MS = 400L
-        private const val DEFAULT_PRIME_DEADLINE_MS = 800L
-
-        /** Prebuffer depth in ms. On by default; set `-Ddreamdisplays.playback.prebufferMs=0` to disable. */
-        val prebufferMs: Long =
-            System.getProperty("dreamdisplays.playback.prebufferMs")?.toLongOrNull()?.coerceIn(0, 5_000)
-                ?: DEFAULT_PREBUFFER_MS
-
-        private val PRIME_DEADLINE_NANOS: Long =
-            (System.getProperty("dreamdisplays.playback.prebufferPrimeMs")?.toLongOrNull()?.coerceIn(0, 5_000)
-                ?: maxOf(DEFAULT_PRIME_DEADLINE_MS, prebufferMs)) * 1_000_000L
-
-        /** True when the prebuffer is enabled and the pipes should route frames through it. */
-        val enabled: Boolean get() = prebufferMs > 0
+        private const val PREBUFFER_MS = 400L
+        private const val PRIME_DEADLINE_NANOS = 800_000_000L
 
         private const val OUTSIDE_QUEUE_FRAMES = 2 + FrameSurface.MAX_DISPLAY_QUEUE
         private const val MIN_BUDGET_CAPACITY = 6
 
         /**
-         * Builds a started prebuffer sized for [frameNs] (one frame's duration), or null when disabled.
+         * Builds a started prebuffer sized for [frameNs] (one frame's duration).
          * Capacity is the prefill plus headroom so the producer keeps a little slack above the prefill mark.
          * With [frameBytes] known, the queue is also held to this playback's share of [FrameMemoryBudget].
          */
-        fun createIfEnabled(
+        fun create(
             surface: FrameSurface, frameNs: Long,
             getAudioClock: () -> Long, onFirstFrame: () -> Unit,
             terminated: AtomicBoolean, stopFlag: AtomicBoolean, debugLabel: String,
             presentPreview: Boolean = true, tolerateLateness: Boolean = true,
             parkFlag: AtomicBoolean? = null, frameBytes: Int = 0,
-        ): FramePrebuffer? {
-            if (!enabled || frameNs <= 0) return null
-            val wantedPrefill = ((prebufferMs * 1_000_000L) / frameNs).toInt().coerceIn(2, 240)
+        ): FramePrebuffer {
+            val wantedPrefill = ((PREBUFFER_MS * 1_000_000L) / frameNs.coerceAtLeast(1)).toInt().coerceIn(2, 240)
             // A little slack above the prefill mark so the producer can run slightly ahead of playout.
             // Memory cost is capacity * frameSize, so keep it tight — raw frames are large at high-res.
             val capacity = FrameMemoryBudget.framesFor(

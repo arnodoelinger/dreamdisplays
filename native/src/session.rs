@@ -22,44 +22,9 @@ pub const ERR_BAD_HANDLE: i32 = -1;
 pub const ERR_BAD_ARGS: i32 = -2;
 pub const ERR_IO: i32 = -3;
 
-/// Wire pixel format coming out of the FFmpeg pipe.
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PixFmt {
-    Rgb24,
-    Nv12,
-}
-
-impl PixFmt {
-    pub fn from_u32(v: u32) -> Option<PixFmt> {
-        match v {
-            0 => Some(PixFmt::Rgb24),
-            1 => Some(PixFmt::Nv12),
-            _ => None,
-        }
-    }
-
-    fn frame_size(self, w: usize, h: usize) -> usize {
-        match self {
-            PixFmt::Rgb24 => w * h * 3,
-            PixFmt::Nv12 => convert::nv12_frame_size(w, h),
-        }
-    }
-
-    /// Human-readable name for log lines.
-    fn name(self) -> &'static str {
-        match self {
-            PixFmt::Rgb24 => "rgb24",
-            PixFmt::Nv12 => "nv12",
-        }
-    }
-}
-
 /// Mutable read-side state; locked only by the (single) reader thread.
 struct ReadState {
-    stdout: Option<ChildStdout>,
-    prefetch: Option<Nv12Prefetch>,
-    /// Scratch buffer holding one wire-format frame read from the pipe.
-    raw: Vec<u8>,
+    prefetch: Nv12Prefetch,
     lut: [u8; 256],
     lut_milli: u32,
 }
@@ -112,7 +77,6 @@ impl Nv12Prefetch {
 pub struct Session {
     w: usize,
     h: usize,
-    pix: PixFmt,
     read: Mutex<ReadState>,
     child: Mutex<Child>,
     stderr: Arc<Mutex<Vec<u8>>>,
@@ -147,13 +111,12 @@ impl Sessions {
 
     /// Spawns FFmpeg with `args` (args[0] is the binary path) and registers a session.
     /// Returns the new handle, or 0 if the spawn failed (the cause is logged).
-    pub fn open(&self, args: &[String], w: u32, h: u32, pix: PixFmt) -> i64 {
-        match self.try_open(args, w, h, pix) {
+    pub fn open(&self, args: &[String], w: u32, h: u32) -> i64 {
+        match self.try_open(args, w, h) {
             Ok(handle) => {
                 info!(
-                    "Opened FFmpeg session #{handle}: {} ({w} x {h}, {}).",
+                    "Opened FFmpeg session #{handle}: {} ({w} x {h}).",
                     args.first().map(String::as_str).unwrap_or("?"),
-                    pix.name(),
                 );
                 handle
             }
@@ -165,7 +128,7 @@ impl Sessions {
     }
 
     /// Fallible body of [`Sessions::open`]; every failure carries context for the log.
-    fn try_open(&self, args: &[String], w: u32, h: u32, pix: PixFmt) -> Result<i64> {
+    fn try_open(&self, args: &[String], w: u32, h: u32) -> Result<i64> {
         if args.is_empty() {
             bail!("empty argv.");
         }
@@ -216,26 +179,16 @@ impl Sessions {
                 .ok();
         }
 
-        let frame_size = pix.frame_size(w, h);
-        let (stdout, prefetch) = if pix == PixFmt::Nv12 {
-            (None, Nv12Prefetch::spawn(stdout, frame_size))
-        } else {
-            (Some(stdout), None)
-        };
-        if pix == PixFmt::Nv12 && prefetch.is_none() {
+        let Some(prefetch) = Nv12Prefetch::spawn(stdout, convert::nv12_frame_size(w, h)) else {
             let _ = child.kill();
             bail!("failed to start the NV12 prefetch thread.");
-        }
-        let raw = Vec::new();
+        };
 
         let session = Arc::new(Session {
             w,
             h,
-            pix,
             read: Mutex::new(ReadState {
-                stdout,
                 prefetch,
-                raw,
                 lut: convert::build_lut(1000),
                 lut_milli: 1000,
             }),
@@ -252,188 +205,69 @@ impl Sessions {
         Ok(handle)
     }
 
-    /// Blocking read of the next frame, converted to RGB24 with brightness applied.
-    /// `dst` must hold at least `w * h * 3` bytes.
-    pub fn read_frame(&self, handle: i64, dst: &mut [u8], brightness_milli: u32) -> i32 {
-        let Some(session) = self.get(handle) else {
-            return ERR_BAD_HANDLE;
-        };
-        if dst.len() < session.w * session.h * 3 {
-            return ERR_BAD_ARGS;
-        }
-        let Ok(mut guard) = session.read.lock() else {
-            return ERR_IO;
-        };
-        let state = &mut *guard;
-
-        if state.lut_milli != brightness_milli {
-            state.lut = convert::build_lut(brightness_milli);
-            state.lut_milli = brightness_milli;
-        }
-
-        match session.pix {
-            PixFmt::Nv12 => {
-                if let Some(prefetch) = &state.prefetch {
-                    let raw = match prefetch.ready.recv() {
-                        Ok(PrefetchedFrame::Frame(raw)) => raw,
-                        Ok(PrefetchedFrame::Eof) => return READ_EOF,
-                        Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
-                    };
-                    if convert::lut_is_identity(brightness_milli) {
-                        convert::nv12_to_rgb24_identity(&raw, session.w, session.h, dst);
-                    } else {
-                        convert::nv12_to_rgb24(&raw, session.w, session.h, dst, &state.lut);
-                    }
-                    let _ = prefetch.recycle.send(raw);
-                } else {
-                    let stdout = match state.stdout.as_mut() {
-                        Some(stdout) => stdout,
-                        None => return ERR_IO,
-                    };
-                    match read_exact_eof(stdout, &mut state.raw) {
-                        ReadOutcome::Frame => {}
-                        ReadOutcome::Eof => return READ_EOF,
-                        ReadOutcome::Error => return ERR_IO,
-                    }
-                    if convert::lut_is_identity(brightness_milli) {
-                        convert::nv12_to_rgb24_identity(&state.raw, session.w, session.h, dst);
-                    } else {
-                        convert::nv12_to_rgb24(&state.raw, session.w, session.h, dst, &state.lut);
-                    }
-                }
-            }
-            PixFmt::Rgb24 => {
-                let n = session.w * session.h * 3;
-                let Some(stdout) = state.stdout.as_mut() else {
-                    return ERR_IO;
-                };
-                match read_exact_eof(stdout, &mut dst[..n]) {
-                    ReadOutcome::Frame => {}
-                    ReadOutcome::Eof => return READ_EOF,
-                    ReadOutcome::Error => return ERR_IO,
-                }
-                if !convert::lut_is_identity(brightness_milli) {
-                    convert::rgb24_apply_lut_in_place(&mut dst[..n], &state.lut);
-                }
-            }
-        }
-        READ_OK
-    }
-
     /// Blocking read of the next frame as raw I420 planes (Y, then U, then V), with no
     /// color conversion or brightness applied — both happen in the fragment shader.
-    /// Only valid for NV12 sessions. `dst` must hold at least [`convert::nv12_frame_size`] bytes.
+    /// `dst` must hold at least [`convert::nv12_frame_size`] bytes.
     pub fn read_frame_i420(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else {
-            return ERR_BAD_HANDLE;
-        };
-        if session.pix != PixFmt::Nv12 || dst.len() < convert::nv12_frame_size(session.w, session.h)
-        {
-            return ERR_BAD_ARGS;
-        }
-        let Ok(mut guard) = session.read.lock() else {
-            return ERR_IO;
-        };
-        let state = &mut *guard;
-
-        if let Some(prefetch) = &state.prefetch {
-            let raw = match prefetch.ready.recv() {
-                Ok(PrefetchedFrame::Frame(raw)) => raw,
-                Ok(PrefetchedFrame::Eof) => return READ_EOF,
-                Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
-            };
-            convert::nv12_to_i420(&raw, session.w, session.h, dst);
-            let _ = prefetch.recycle.send(raw);
-        } else {
-            let stdout = match state.stdout.as_mut() {
-                Some(stdout) => stdout,
-                None => return ERR_IO,
-            };
-            match read_exact_eof(stdout, &mut state.raw) {
-                ReadOutcome::Frame => {}
-                ReadOutcome::Eof => return READ_EOF,
-                ReadOutcome::Error => return ERR_IO,
-            }
-            convert::nv12_to_i420(&state.raw, session.w, session.h, dst);
-        }
-        READ_OK
+        self.with_next_frame(
+            handle,
+            dst.len(),
+            convert::nv12_frame_size,
+            None,
+            |s, raw, _| convert::nv12_to_i420(raw, s.w, s.h, dst),
+        )
     }
 
     /// Blocking read of the next frame, converted to RGBA32 with brightness applied.
     /// `dst` must hold at least `w * h * 4` bytes.
     pub fn read_frame_rgba(&self, handle: i64, dst: &mut [u8], brightness_milli: u32) -> i32 {
+        self.with_next_frame(
+            handle,
+            dst.len(),
+            |w, h| w * h * 4,
+            Some(brightness_milli),
+            |s, raw, lut| {
+                if convert::lut_is_identity(brightness_milli) {
+                    convert::nv12_to_rgba32_identity(raw, s.w, s.h, dst);
+                } else {
+                    convert::nv12_to_rgba32(raw, s.w, s.h, dst, lut);
+                }
+            },
+        )
+    }
+
+    /// Takes the next prefetched NV12 frame of `handle` and hands it to `convert`.
+    fn with_next_frame(
+        &self,
+        handle: i64,
+        dst_len: usize,
+        min_dst_len: impl FnOnce(usize, usize) -> usize,
+        brightness_milli: Option<u32>,
+        convert: impl FnOnce(&Session, &[u8], &[u8; 256]),
+    ) -> i32 {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
         };
-        let rgb_len = session.w * session.h * 3;
-        let rgba_len = session.w * session.h * 4;
-        if dst.len() < rgba_len {
+        if dst_len < min_dst_len(session.w, session.h) {
             return ERR_BAD_ARGS;
         }
         let Ok(mut guard) = session.read.lock() else {
             return ERR_IO;
         };
         let state = &mut *guard;
-
-        if state.lut_milli != brightness_milli {
-            state.lut = convert::build_lut(brightness_milli);
-            state.lut_milli = brightness_milli;
+        if let Some(milli) = brightness_milli
+            && state.lut_milli != milli
+        {
+            state.lut = convert::build_lut(milli);
+            state.lut_milli = milli;
         }
-
-        match session.pix {
-            PixFmt::Nv12 => {
-                if let Some(prefetch) = &state.prefetch {
-                    let raw = match prefetch.ready.recv() {
-                        Ok(PrefetchedFrame::Frame(raw)) => raw,
-                        Ok(PrefetchedFrame::Eof) => return READ_EOF,
-                        Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
-                    };
-                    if convert::lut_is_identity(brightness_milli) {
-                        convert::nv12_to_rgba32_identity(&raw, session.w, session.h, dst);
-                    } else {
-                        convert::nv12_to_rgba32(&raw, session.w, session.h, dst, &state.lut);
-                    }
-                    let _ = prefetch.recycle.send(raw);
-                } else {
-                    let stdout = match state.stdout.as_mut() {
-                        Some(stdout) => stdout,
-                        None => return ERR_IO,
-                    };
-                    match read_exact_eof(stdout, &mut state.raw) {
-                        ReadOutcome::Frame => {}
-                        ReadOutcome::Eof => return READ_EOF,
-                        ReadOutcome::Error => return ERR_IO,
-                    }
-                    if convert::lut_is_identity(brightness_milli) {
-                        convert::nv12_to_rgba32_identity(&state.raw, session.w, session.h, dst);
-                    } else {
-                        convert::nv12_to_rgba32(&state.raw, session.w, session.h, dst, &state.lut);
-                    }
-                }
-            }
-            PixFmt::Rgb24 => {
-                if state.raw.len() < rgb_len {
-                    state.raw.resize(rgb_len, 0);
-                }
-                let Some(stdout) = state.stdout.as_mut() else {
-                    return ERR_IO;
-                };
-                match read_exact_eof(stdout, &mut state.raw[..rgb_len]) {
-                    ReadOutcome::Frame => {}
-                    ReadOutcome::Eof => return READ_EOF,
-                    ReadOutcome::Error => return ERR_IO,
-                }
-                if convert::lut_is_identity(brightness_milli) {
-                    convert::rgb24_to_rgba32_identity(&state.raw[..rgb_len], &mut dst[..rgba_len]);
-                } else {
-                    convert::rgb24_to_rgba32(
-                        &state.raw[..rgb_len],
-                        &mut dst[..rgba_len],
-                        &state.lut,
-                    );
-                }
-            }
-        }
+        let raw = match state.prefetch.ready.recv() {
+            Ok(PrefetchedFrame::Frame(raw)) => raw,
+            Ok(PrefetchedFrame::Eof) => return READ_EOF,
+            Ok(PrefetchedFrame::Error) | Err(_) => return ERR_IO,
+        };
+        convert(&session, &raw, &state.lut);
+        let _ = state.prefetch.recycle.send(raw);
         READ_OK
     }
 
@@ -486,7 +320,7 @@ impl Sessions {
         }
     }
 
-    /// Kills the child process, unblocking any reader stuck in [`Sessions::read_frame`].
+    /// Kills the child process, unblocking any reader stuck in [`Sessions::read_frame_rgba`].
     /// The session stays registered until [`Sessions::close`].
     pub fn kill(&self, handle: i64) {
         if let Some(session) = self.get(handle) {

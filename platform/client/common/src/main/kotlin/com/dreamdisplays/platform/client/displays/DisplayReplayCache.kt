@@ -15,40 +15,20 @@ internal object DisplayReplayCache {
     private const val DEFAULT_MAX_BYTES = 512L * 1024L * 1024L
     private const val POSITION_TOLERANCE_NS = 1_000_000_000L
 
-    @Suppress("ArrayInDataClass")
-    private data class Entry(
-        val url: String,
-        val positionNanos: Long,
-        val snapshot: ByteArray,
-        val audioPcm: ByteArray?,
-        val prepared: PreparedMedia?,
-    )
+    private class Entry(val url: String, val positionNanos: Long, val snapshot: ByteArray, val prepared: PreparedMedia?)
 
-    private val ttlMs: Long =
-        System.getProperty("dreamdisplays.cache.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: DEFAULT_TTL_MS
+    private val maxBytes: Long = WarmParkPolicy.replayCacheBudgetBytes.coerceAtMost(DEFAULT_MAX_BYTES)
 
-    private val maxBytes: Long =
-        System.getProperty("dreamdisplays.cache.jvmMaxBytes")?.toLongOrNull()?.coerceAtLeast(0L)
-            ?: WarmParkPolicy.replayCacheBudgetBytes.coerceAtMost(DEFAULT_MAX_BYTES)
-
-    private val cacheEnabled = ttlMs > 0L && maxBytes > 0L
     private val entries: Cache<UUID, Entry> = Caffeine.newBuilder()
-        .maximumWeight(if (cacheEnabled) maxBytes else 0L)
-        .weigher { _: UUID, entry: Entry -> entryBytes(entry).coerceAtMost(Int.MAX_VALUE.toLong()).toInt() }
-        .expireAfterWrite(ttlMs.coerceAtLeast(1L), TimeUnit.MILLISECONDS)
+        .maximumWeight(maxBytes)
+        .weigher { _: UUID, entry: Entry -> entry.snapshot.size }
+        .expireAfterWrite(DEFAULT_TTL_MS, TimeUnit.MILLISECONDS)
         .build()
 
-    /** Stores [snapshot] (plus optional cached [audioPcm] / resolved [prepared] streams) for [uuid]. */
-    fun put(
-        uuid: UUID,
-        url: String,
-        positionNanos: Long,
-        snapshot: ByteArray,
-        audioPcm: ByteArray?,
-        prepared: PreparedMedia?
-    ) {
-        if (snapshot.isEmpty() || !cacheEnabled) return
-        entries.put(uuid, Entry(url, positionNanos, snapshot, audioPcm, prepared))
+    /** Stores [snapshot] (plus optional resolved [prepared] streams) for [uuid]. */
+    fun put(uuid: UUID, url: String, positionNanos: Long, snapshot: ByteArray, prepared: PreparedMedia?) {
+        if (snapshot.isEmpty() || maxBytes <= 0L) return
+        entries.put(uuid, Entry(url, positionNanos, snapshot, prepared))
         entries.cleanUp()
     }
 
@@ -59,11 +39,9 @@ internal object DisplayReplayCache {
         if (entry.url != url || abs(entry.positionNanos - positionNanos) > POSITION_TOLERANCE_NS) {
             return null
         }
-        return MediaPlayer.ReplayBootstrap(entry.snapshot, entry.positionNanos, entry.audioPcm)
+        return MediaPlayer.ReplayBootstrap(entry.snapshot, entry.positionNanos)
             .also { it.prepared = entry.prepared }
     }
-
-    private fun entryBytes(e: Entry): Long = e.snapshot.size.toLong() + (e.audioPcm?.size?.toLong() ?: 0L)
 
     /** Drops any retained snapshot for [uuid]. */
     fun remove(uuid: UUID) {

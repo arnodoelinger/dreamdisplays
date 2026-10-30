@@ -27,7 +27,9 @@ const SCALE_FLAGS: c_int = ffi::SwsFlags::SWS_BILINEAR as c_int;
 fn scale_pool() -> Option<&'static ThreadPool> {
     static POOL: OnceLock<Option<ThreadPool>> = OnceLock::new();
     POOL.get_or_init(|| {
-        let cores = std::thread::available_parallelism().map(|n| n.get()).unwrap_or(1);
+        let cores = std::thread::available_parallelism()
+            .map(|n| n.get())
+            .unwrap_or(1);
         if cores < 4 {
             return None;
         }
@@ -54,7 +56,10 @@ struct Band {
     src_y: usize,
     src_h: c_int,
     dst_y: usize,
-    #[allow(dead_code, reason = "band geometry is asserted in tests; the scale call derives it")]
+    #[allow(
+        dead_code,
+        reason = "band geometry is asserted in tests; the scale call derives it"
+    )]
     dst_h: usize,
 }
 
@@ -91,7 +96,10 @@ impl BandedScaler {
             if desc.is_null() {
                 bail!("unknown source pixel format {src_format:?}.");
             }
-            (ffi::av_pix_fmt_count_planes(raw).max(1) as usize, (*desc).log2_chroma_h as u32)
+            (
+                ffi::av_pix_fmt_count_planes(raw).max(1) as usize,
+                (*desc).log2_chroma_h as u32,
+            )
         };
 
         let mut scaler = BandedScaler {
@@ -122,7 +130,13 @@ impl BandedScaler {
             if ctx.is_null() {
                 bail!("create swscale context {src_format:?} {sw} x {src_h} -> {dw} x {band_h}.");
             }
-            scaler.bands.push(Band { ctx, src_y, src_h: src_h as c_int, dst_y, dst_h: band_h });
+            scaler.bands.push(Band {
+                ctx,
+                src_y,
+                src_h: src_h as c_int,
+                dst_y,
+                dst_h: band_h,
+            });
         }
         Ok(scaler)
     }
@@ -162,7 +176,11 @@ impl BandedScaler {
         let (mut dst_y, mut src_y) = (0usize, 0usize);
         for i in 1..=n {
             let dst_end = if i == n { dh } else { (dh * i / n) & !1 };
-            let src_end = if i == n { sh } else { ((dst_end * sh + dh / 2) / dh) & !1 };
+            let src_end = if i == n {
+                sh
+            } else {
+                ((dst_end * sh + dh / 2) / dh) & !1
+            };
             if dst_end <= dst_y || src_end <= src_y {
                 continue;
             }
@@ -182,7 +200,12 @@ impl BandedScaler {
     }
 
     /// Scales `src` into a YUV420P target whose planes start at `dst` with strides `dst_strides`.
-    pub unsafe fn scale(&self, src: &VideoFrame, dst: [*mut u8; 4], dst_strides: [c_int; 4]) -> Result<()> {
+    pub unsafe fn scale(
+        &self,
+        src: &VideoFrame,
+        dst: [*mut u8; 4],
+        dst_strides: [c_int; 4],
+    ) -> Result<()> {
         let (src_planes, src_strides) = unsafe {
             let raw = *src.as_ptr();
             (Planes(raw.data), raw.linesize)
@@ -192,9 +215,15 @@ impl BandedScaler {
             let (src_planes, dst) = (src_planes, dst);
             let mut planes: [*const u8; 4] = [ptr::null(); 4];
             for i in 0..self.planes.min(4) {
-                let shift = if i == 1 || i == 2 { self.log2_chroma_h } else { 0 };
+                let shift = if i == 1 || i == 2 {
+                    self.log2_chroma_h
+                } else {
+                    0
+                };
                 let row = band.src_y >> shift;
-                planes[i] = src_planes.0[i].add(row * src_strides[i].unsigned_abs() as usize).cast_const();
+                planes[i] = src_planes.0[i]
+                    .add(row * src_strides[i].unsigned_abs() as usize)
+                    .cast_const();
             }
             let mut out = dst.0;
             out[0] = out[0].add(band.dst_y * dst_strides[0] as usize);
@@ -214,11 +243,16 @@ impl BandedScaler {
         let failed = match (self.bands.len(), scale_pool()) {
             (0, _) => 0,
             (1, _) => i32::from(run(&self.bands[0]) < 0),
-            (_, Some(pool)) => pool.install(|| self.bands.par_iter().map(|b| i32::from(run(b) < 0)).sum()),
+            (_, Some(pool)) => {
+                pool.install(|| self.bands.par_iter().map(|b| i32::from(run(b) < 0)).sum())
+            }
             (_, None) => self.bands.iter().map(|b| i32::from(run(b) < 0)).sum(),
         };
         if failed > 0 {
-            bail!("scale frame ({failed} of {} bands failed).", self.bands.len());
+            bail!(
+                "scale frame ({failed} of {} bands failed).",
+                self.bands.len()
+            );
         }
         Ok(())
     }
@@ -264,7 +298,12 @@ mod tests {
             );
             let (y_size, c_size) = ((dw * dh) as usize, (dw * dh) as usize / 4);
             let base = out.as_mut_ptr();
-            let planes = [base, base.add(y_size), base.add(y_size + c_size), ptr::null_mut()];
+            let planes = [
+                base,
+                base.add(y_size),
+                base.add(y_size + c_size),
+                ptr::null_mut(),
+            ];
             let strides = [dw as c_int, (dw / 2) as c_int, (dw / 2) as c_int, 0];
             ffi::sws_scale(
                 ctx,
@@ -293,7 +332,12 @@ mod tests {
             let (y_size, c_size) = ((dw * dh) as usize, (dw * dh) as usize / 4);
             unsafe {
                 let base = banded.as_mut_ptr();
-                let planes = [base, base.add(y_size), base.add(y_size + c_size), ptr::null_mut()];
+                let planes = [
+                    base,
+                    base.add(y_size),
+                    base.add(y_size + c_size),
+                    ptr::null_mut(),
+                ];
                 let strides = [dw as c_int, (dw / 2) as c_int, (dw / 2) as c_int, 0];
                 scaler.scale(&src, planes, strides).unwrap();
             }
@@ -322,19 +366,43 @@ mod tests {
 
     #[test]
     fn bands_tile_the_picture_without_gaps() {
-        for (sw, sh, dw, dh) in [(3840u32, 2160u32, 1920u32, 1080u32), (854, 480, 1918, 1078), (16, 2, 1920, 1080)] {
+        for (sw, sh, dw, dh) in [
+            (3840u32, 2160u32, 1920u32, 1080u32),
+            (854, 480, 1918, 1078),
+            (16, 2, 1920, 1080),
+        ] {
             let scaler = BandedScaler::new(Pixel::YUV420P, sw, sh, dw, dh).unwrap();
             let (mut src_next, mut dst_next) = (0usize, 0usize);
             for band in &scaler.bands {
-                assert_eq!(band.src_y, src_next, "{sw}x{sh}: source rows are not contiguous.");
-                assert_eq!(band.dst_y, dst_next, "{sw}x{sh}: target rows are not contiguous.");
-                assert_eq!(band.src_y % 2, 0, "{sw}x{sh}: source cut splits a chroma row.");
-                assert_eq!(band.dst_y % 2, 0, "{sw}x{sh}: target cut splits a chroma row.");
+                assert_eq!(
+                    band.src_y, src_next,
+                    "{sw}x{sh}: source rows are not contiguous."
+                );
+                assert_eq!(
+                    band.dst_y, dst_next,
+                    "{sw}x{sh}: target rows are not contiguous."
+                );
+                assert_eq!(
+                    band.src_y % 2,
+                    0,
+                    "{sw}x{sh}: source cut splits a chroma row."
+                );
+                assert_eq!(
+                    band.dst_y % 2,
+                    0,
+                    "{sw}x{sh}: target cut splits a chroma row."
+                );
                 src_next += band.src_h as usize;
                 dst_next += band.dst_h;
             }
-            assert_eq!(src_next, sh as usize, "{sw}x{sh}: bands do not cover every source row.");
-            assert_eq!(dst_next, dh as usize, "{sw}x{sh}: bands do not cover every target row.");
+            assert_eq!(
+                src_next, sh as usize,
+                "{sw}x{sh}: bands do not cover every source row."
+            );
+            assert_eq!(
+                dst_next, dh as usize,
+                "{sw}x{sh}: bands do not cover every target row."
+            );
         }
     }
 }

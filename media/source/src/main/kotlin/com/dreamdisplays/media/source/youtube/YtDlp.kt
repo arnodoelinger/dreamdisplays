@@ -16,13 +16,11 @@ import com.dreamdisplays.util.DreamCoroutines
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.IOException
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CopyOnWriteArrayList
-import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 private class AbandonFlag {
@@ -40,9 +38,6 @@ private class AbandonFlag {
  */
 object YtDlp {
     private val logger = LoggerFactory.getLogger(javaClass)
-
-    private val HEDGE_DELAY_MS: Long =
-        System.getProperty("dreamdisplays.ytdlpHedgeMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L
 
     private val cookies = YtCookieManager()
     private val clientRace = YtDlpClientRace(cookies)
@@ -119,7 +114,6 @@ object YtDlp {
         val ytProcesses = CopyOnWriteArrayList<Process>()
         val abandoned = AbandonFlag()
         val ytdlp = DreamCoroutines.clientIo.async {
-            if (HEDGE_DELAY_MS > 0) delay(HEDGE_DELAY_MS.milliseconds)
             if (abandoned.isAbandoned) return@async []
             clientRace.resolve(videoUrl) { proc ->
                 ytProcesses.add(proc)

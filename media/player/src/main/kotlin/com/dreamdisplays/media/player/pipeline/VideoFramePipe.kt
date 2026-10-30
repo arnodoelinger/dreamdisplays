@@ -86,29 +86,16 @@ internal class VideoFramePipe(
         lastFrameReceivedNanos.set(System.nanoTime())
         // Must be the same rate FFmpeg was pinned to -r, or synthesized timestamps drift
         val frameNs = (1_000_000_000.0 / MediaProcess.outputFps(sourceFps)).toLong()
-        val prebuffer = FramePrebuffer.createIfEnabled(
+        val prebuffer = FramePrebuffer.create(
             surface, frameNs, getAudioClock, onFirstFrame, terminated, stopFlag, debugLabel, presentPreview,
             tolerateLateness, parkFlag, frameBytes = w * h * 3,
         ).also { activePrebuffer = it }
         // Feed the popout / PiP sink from the prebuffer's paced consumer so it stays in sync with the
         // in-world display; feeding at decode time would run the popout ahead by the buffer depth.
-        prebuffer?.onPresent = { buf -> feedSink(buf, w, h) }
+        prebuffer.onPresent = { buf -> feedSink(buf, w, h) }
         return daemon(
             {
-                read(
-                    proc,
-                    w,
-                    h,
-                    frameNs,
-                    seekOffsetNanos,
-                    stopFlag,
-                    terminated,
-                    getAudioClock,
-                    onFirstFrame,
-                    getBrightness,
-                    onEos,
-                    prebuffer
-                )
+                read(proc, w, h, frameNs, seekOffsetNanos, stopFlag, terminated, getBrightness, onEos, prebuffer)
             },
             "MediaPlayer-video",
         ).also { it.start() }
@@ -116,15 +103,14 @@ internal class VideoFramePipe(
 
     private fun read(
         proc: Process, w: Int, h: Int, frameNs: Long, seekOffsetNanos: Long, stopFlag: AtomicBoolean,
-        terminated: AtomicBoolean, getAudioClock: () -> Long, onFirstFrame: () -> Unit, getBrightness: () -> Double,
-        onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer?,
+        terminated: AtomicBoolean, getBrightness: () -> Double,
+        onEos: (stderr: String, normalEos: Boolean) -> Unit, prebuffer: FramePrebuffer,
     ) {
         // Dimensions are fixed per session (mismatched frames are skipped in the loop), so the size never changes.
         val frameSize = w * h * 3
         var spare = surface.allocateFrameBuffer(frameSize)
         surface.recycleFrameBuffer(surface.allocateFrameBuffer(frameSize))
 
-        var firstFrame = false
         var videoPts = seekOffsetNanos
 
         val stderrBuf = StringBuilder()
@@ -195,42 +181,12 @@ internal class VideoFramePipe(
                         continue
                     }
 
-                    if (prebuffer != null) {
-                        // Producer path: hand the decoded frame to the jitter buffer; the consumer thread
-                        // paces and presents it (and feeds the popout via prebuffer.onPresent, and fires
-                        // onFirstFrame after the prefill).
-                        if (!MediaPlayer.captureSamples) {
-                            // Benchmark-only path: frames are never submitted / presented, so feed the
-                            // popout here (otherwise it would never receive a frame).
-                            feedSink(spare, w, h)
-                            videoPts += frameNs; continue
-                        }
+                    if (MediaPlayer.captureSamples) {
                         spare = prebuffer.submit(spare, videoPts, frameSize)
                         if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
-                        videoPts += frameNs
-                        continue
+                    } else {
+                        feedSink(spare, w, h)
                     }
-
-                    if (FramePacing.pace(videoPts, getAudioClock)) {
-                        if (MediaPlayer.DEBUG) MediaPlayer.framesDropped.incrementAndGet()
-                        videoPts += frameNs
-                        continue
-                    }
-
-                    feedSink(spare, w, h)
-
-                    if (!MediaPlayer.captureSamples) {
-                        videoPts += frameNs; continue
-                    }
-
-                    spare = surface.publish(spare, frameSize)
-                    if (MediaPlayer.DEBUG) MediaPlayer.samplesIn.incrementAndGet()
-                    if (!firstFrame) {
-                        firstFrame = true
-                        onFirstFrame()
-                        if (MediaPlayer.DEBUG) logger.debug("$debugLabel First frame $w x $h.")
-                    }
-
                     videoPts += frameNs
                 }
             }
@@ -244,9 +200,9 @@ internal class VideoFramePipe(
         // Normal EOF should drain queued frames; abort only for teardown / errors. This matters for
         // short replay / cached sources that can fill the prebuffer and EOF before live video is ready.
         if (!terminated.get() && !stopFlag.get() && normalEos) {
-            prebuffer?.finish()
+            prebuffer.finish()
         } else {
-            prebuffer?.abort()
+            prebuffer.abort()
         }
         if (activePrebuffer === prebuffer) activePrebuffer = null
 

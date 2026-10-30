@@ -4,25 +4,18 @@ import com.dreamdisplays.api.media.source.BilibiliUrls
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
+import com.dreamdisplays.media.source.platform.PlatformHttp
+import com.dreamdisplays.media.source.platform.PlatformPlayback
 import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.util.*
-import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import org.slf4j.LoggerFactory
 import java.net.URLEncoder
 import java.security.MessageDigest
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Instant
-
-/** A resolved BIlibili VOD or live room: playable [streams] and [metadata]. */
-data class BilibiliPlayback(
-    val streams: List<MediaStream>,
-    val metadata: PlatformVideoMetadata,
-    val isSeekable: Boolean,
-)
 
 /** One video card from a BIlibili keyword search. */
 data class BilibiliSearchItem(
@@ -39,10 +32,8 @@ data class BilibiliSearchItem(
  * website uses, gated behind WBI-signed `playurl` requests (no API key or auth required).
  */
 object BilibiliApi {
-    private val logger = LoggerFactory.getLogger(javaClass)
-
     private val HEADERS = DreamHttpClient.headersOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "User-Agent" to PlatformHttp.BROWSER_USER_AGENT,
         "Accept" to "application/json",
         "Referer" to "https://www.bilibili.com",
     )
@@ -60,7 +51,7 @@ object BilibiliApi {
     private var wbiCache: WbiKeys? = null
     private val WBI_TTL = 20.hours
 
-    fun resolve(source: MediaSource.Bilibili): BilibiliPlayback? = when {
+    fun resolve(source: MediaSource.Bilibili): PlatformPlayback? = when {
         source.bvid != null || source.avid != null -> resolveVod(source.bvid, source.avid, source.part ?: 1)
         source.epId != null || source.seasonId != null -> resolveBangumi(source.epId, source.seasonId)
         source.roomId != null -> resolveLive(source.roomId!!)
@@ -73,7 +64,7 @@ object BilibiliApi {
     /** Keyword video search, WBI-signed like `playurl` — used to mix BIlibili results into the free-text suggestions list. */
     fun searchVideos(keyword: String, page: Int = 1): List<BilibiliSearchItem> {
         val params = mapOf("search_type" to "video", "keyword" to keyword, "page" to page.toString())
-        val root = getJson("https://api.bilibili.com/x/web-interface/wbi/search/type?${signedQuery(params)}")
+        val root = PlatformHttp.getJson("https://api.bilibili.com/x/web-interface/wbi/search/type?${signedQuery(params)}", HEADERS)
         val results = root?.obj("data")?.array("result")?.mapNotNull { it.asJsonObjectOrNull() } ?: return []
         return results.mapNotNull { item ->
             val bvid = item.optString("bvid") ?: return@mapNotNull null
@@ -125,14 +116,14 @@ object BilibiliApi {
     private val MediaSource.Bilibili.isResolved: Boolean
         get() = bvid != null || avid != null || roomId != null || epId != null || seasonId != null
 
-    private fun resolveVod(bvid: String?, avid: Long?, part: Int): BilibiliPlayback? {
+    private fun resolveVod(bvid: String?, avid: Long?, part: Int): PlatformPlayback? {
         val viewParams = buildMap {
             bvid?.let { put("bvid", it) }
             avid?.let { put("aid", it.toString()) }
         }
         if (viewParams.isEmpty()) return null
 
-        val viewRoot = getJson("https://api.bilibili.com/x/web-interface/view?${plainQuery(viewParams)}")
+        val viewRoot = PlatformHttp.getJson("https://api.bilibili.com/x/web-interface/view?${plainQuery(viewParams)}", HEADERS)
         val data = viewRoot?.obj("data") ?: return null
 
         val pages = data.array("pages")?.mapNotNull { it.asJsonObjectOrNull() }
@@ -147,7 +138,7 @@ object BilibiliApi {
             put("fnval", "4048")
             put("fourk", "1")
         }
-        val playurlRoot = getJson("https://api.bilibili.com/x/player/playurl?${signedQuery(playurlParams)}")
+        val playurlRoot = PlatformHttp.getJson("https://api.bilibili.com/x/player/playurl?${signedQuery(playurlParams)}", HEADERS)
         val streams = buildStreams(playurlRoot?.obj("data"))
         if (streams.isEmpty()) return null
 
@@ -162,17 +153,17 @@ object BilibiliApi {
             durationSec = data.optLong("duration"),
             isLive = false,
         )
-        return BilibiliPlayback(streams = streams, metadata = metadata, isSeekable = true)
+        return PlatformPlayback(streams = streams, metadata = metadata, isSeekable = true)
     }
 
-    private fun resolveBangumi(epId: Long?, seasonId: Long?): BilibiliPlayback? {
+    private fun resolveBangumi(epId: Long?, seasonId: Long?): PlatformPlayback? {
         val seasonParams = buildMap {
             epId?.let { put("ep_id", it.toString()) }
             seasonId?.let { put("season_id", it.toString()) }
         }
         if (seasonParams.isEmpty()) return null
 
-        val seasonRoot = getJson("https://api.bilibili.com/pgc/view/web/season?${plainQuery(seasonParams)}")
+        val seasonRoot = PlatformHttp.getJson("https://api.bilibili.com/pgc/view/web/season?${plainQuery(seasonParams)}", HEADERS)
         val result = seasonRoot?.obj("result") ?: return null
         val episodes = result.array("episodes")?.mapNotNull { it.asJsonObjectOrNull() } ?: return null
         val episode = epId?.let { id -> episodes.firstOrNull { it.optLong("ep_id") == id } }
@@ -181,7 +172,7 @@ object BilibiliApi {
         val resolvedEpId = episode.optLong("ep_id") ?: return null
 
         val playurlRoot =
-            getJson("https://api.bilibili.com/pgc/player/web/v2/playurl?fnval=12240&fourk=1&ep_id=$resolvedEpId")
+            PlatformHttp.getJson("https://api.bilibili.com/pgc/player/web/v2/playurl?fnval=12240&fourk=1&ep_id=$resolvedEpId", HEADERS)
         val streams = buildStreams(playurlRoot?.obj("result")?.obj("video_info"))
         if (streams.isEmpty()) return null
 
@@ -199,11 +190,11 @@ object BilibiliApi {
             durationSec = episode.optLong("duration")?.let { it / 1000 },
             isLive = false,
         )
-        return BilibiliPlayback(streams = streams, metadata = metadata, isSeekable = true)
+        return PlatformPlayback(streams = streams, metadata = metadata, isSeekable = true)
     }
 
-    private fun resolveLive(roomId: Long): BilibiliPlayback {
-        val infoRoot = getJson("https://api.live.bilibili.com/room/v1/Room/get_info?room_id=$roomId")
+    private fun resolveLive(roomId: Long): PlatformPlayback {
+        val infoRoot = PlatformHttp.getJson("https://api.live.bilibili.com/room/v1/Room/get_info?room_id=$roomId", HEADERS)
         val info = infoRoot?.obj("data")
         val isLive = info?.optInt("live_status") == 1
 
@@ -217,7 +208,7 @@ object BilibiliApi {
             isLive = isLive,
         )
 
-        if (!isLive) return BilibiliPlayback(streams = [], metadata = metadata, isSeekable = false)
+        if (!isLive) return PlatformPlayback(streams = [], metadata = metadata, isSeekable = false)
 
         val playParams = mapOf(
             "room_id" to roomId.toString(),
@@ -226,11 +217,12 @@ object BilibiliApi {
             "codec" to "0,1",
             "qn" to "10000",
         )
-        val playRoot = getJson(
+        val playRoot = PlatformHttp.getJson(
             "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo?${signedQuery(playParams)}",
+            HEADERS,
         )
         val streams = buildLiveStreams(playRoot?.obj("data"))
-        return BilibiliPlayback(streams = streams, metadata = metadata, isSeekable = false)
+        return PlatformPlayback(streams = streams, metadata = metadata, isSeekable = false)
     }
 
     private fun buildStreams(playurlData: JsonObject?): List<MediaStream> {
@@ -316,7 +308,7 @@ object BilibiliApi {
     private fun wbiKeys(): WbiKeys? {
         wbiCache?.let { if (Clock.System.now() - it.fetchedAt < WBI_TTL) return it }
 
-        val wbiImg = getJson("https://api.bilibili.com/x/web-interface/nav")?.obj("data")?.obj("wbi_img")
+        val wbiImg = PlatformHttp.getJson("https://api.bilibili.com/x/web-interface/nav", HEADERS)?.obj("data")?.obj("wbi_img")
         val imgUrl = wbiImg?.optString("img_url")
         val subUrl = wbiImg?.optString("sub_url") ?: wbiImg?.optString("sub_key_url")
         if (imgUrl == null || subUrl == null) return wbiCache
@@ -360,12 +352,4 @@ object BilibiliApi {
 
     private fun md5(s: String): String =
         MessageDigest.getInstance("MD5").digest(s.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
-
-    private fun getJson(url: String): JsonObject? = runCatching {
-        val body = DreamHttpClient.readText(
-            url,
-            DreamHttpClient.RequestOptions(headers = HEADERS, connectTimeoutMs = 8_000, readTimeoutMs = 8_000),
-        )
-        DreamJson.compact.parseToJsonElement(body).asJsonObjectOrNull()
-    }.onFailure { logger.debug("Bilibili API fetch failed for {}: {}.", url, it.message) }.getOrNull()
 }

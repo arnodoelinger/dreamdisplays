@@ -4,16 +4,14 @@ pub mod cache;
 pub mod chunked;
 pub mod scale;
 pub mod session;
-pub mod surface;
 
 use session::{ERR_BAD_ARGS, ERR_IO, LavSessions, NO_PTS_NANOS};
 use std::any::Any;
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::sync::OnceLock;
-use surface::{LavSurfaceDesc, SURFACE_ABI_VERSION};
 
 /// Bumped on any breaking change of this ABI.
-pub const LAV_ABI_VERSION: u32 = 5;
+pub const LAV_ABI_VERSION: u32 = 6;
 
 /// Global state, one per process.
 static SESSIONS: OnceLock<LavSessions> = OnceLock::new();
@@ -41,13 +39,6 @@ fn on_panic<T: Copy>(entry: &'static str, code: T) -> impl FnOnce(Box<dyn Any + 
 pub extern "C" fn dd_lav_abi_version() -> u32 {
     dreamdisplays_logging::init();
     LAV_ABI_VERSION
-}
-
-/// Returns the optional hardware-surface ABI version. This ABI is additive to the I420 path:
-/// callers can probe it and fall back to [`dd_lav_read_frame_i420`] without reopening.
-#[unsafe(no_mangle)]
-pub extern "C" fn dd_lav_surface_abi_version() -> u32 {
-    SURFACE_ABI_VERSION
 }
 
 /// Opens an in-process decode session for the UTF-8 `url` and returns a handle (0 on failure).
@@ -113,32 +104,11 @@ pub unsafe extern "C" fn dd_lav_open_replay(
 }
 
 /// Blocking decode of the next frame into `dst` as tightly packed I420 (Y, then U, then V),
-/// aspect-fitted into the session's target size with black padding. No color conversion or
-/// brightness is applied; both happen in the display's fragment shader.
+/// aspect-fitted into the session's target size with black padding, and writes the frame's
+/// normalized playback timestamp in nanoseconds to `pts_nanos`. When libav cannot provide a
+/// timestamp, `pts_nanos` is set to `i64::MIN` and the caller should keep its synthetic FPS clock.
 ///
-/// Returns 0 on success, 1 on EOF, negative on error.
-///
-/// Safety: `dst` must point to `dst_len` writable bytes for the duration of the call.
-/// Only one thread may read a given handle at a time.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn dd_lav_read_frame_i420(handle: i64, dst: *mut u8, dst_len: u64) -> i32 {
-    if dst.is_null() {
-        return ERR_BAD_ARGS;
-    }
-    let dst = unsafe {
-        // Safety: the caller guarantees dst points to dst_len writable bytes for this call
-        std::slice::from_raw_parts_mut(dst, dst_len as usize)
-    };
-    catch_unwind(AssertUnwindSafe(|| sessions().read_frame(handle, dst)))
-        .unwrap_or_else(on_panic("dd_lav_read_frame_i420", ERR_IO))
-}
-
-/// Blocking decode of the next frame into `dst` as I420 and writes the frame's normalized
-/// playback timestamp in nanoseconds to `pts_nanos`. When libav cannot provide a timestamp,
-/// `pts_nanos` is set to `i64::MIN` and the caller should keep its synthetic FPS clock.
-///
-/// This is an additive ABI entry point; [`dd_lav_read_frame_i420`] stays available for older
-/// JVM bridges and simple callers.
+/// Returns 0 on success, 1 on EOF, negative on error. Only one thread may read a handle at a time.
 ///
 /// Safety: `dst` must point to `dst_len` writable bytes for the duration of the call. If
 /// `pts_nanos` is non-null, it must point to one writable `i64`.
@@ -187,52 +157,6 @@ pub extern "C" fn dd_lav_seek(handle: i64, target_micros: i64) -> i32 {
         .unwrap_or_else(on_panic("dd_lav_seek", ERR_IO))
 }
 
-/// Blocking decode of the next hardware frame as a retained GPU-importable surface.
-///
-/// On success, `desc->handle` is a surface handle owned by the caller. Release it with
-/// [`dd_lav_release_surface`] after the render thread has imported/bound the planes it needs.
-/// Returns 0 on success, 1 on EOF, negative on error or unsupported platform/format.
-///
-/// Safety: `desc` must point to writable memory for one [`LavSurfaceDesc`].
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn dd_lav_read_surface(handle: i64, desc: *mut LavSurfaceDesc) -> i32 {
-    if desc.is_null() {
-        return ERR_BAD_ARGS;
-    }
-    let desc = unsafe {
-        // Safety: the caller guarantees desc points to writable memory for one
-        // LavSurfaceDesc; null is rejected above.
-        &mut *desc
-    };
-    catch_unwind(AssertUnwindSafe(|| sessions().read_surface(handle, desc)))
-        .unwrap_or_else(on_panic("dd_lav_read_surface", ERR_IO))
-}
-
-/// Imports one retained surface plane into an existing OpenGL texture object.
-///
-/// The call must run on the render thread with the destination OpenGL context current. The
-/// texture object must match the descriptor's `texture_target` (currently GL_TEXTURE_RECTANGLE
-/// for macOS IOSurface).
-#[unsafe(no_mangle)]
-pub extern "C" fn dd_lav_bind_surface_plane_gl(
-    surface_handle: i64,
-    plane: u32,
-    texture_id: u32,
-) -> i32 {
-    catch_unwind(AssertUnwindSafe(|| {
-        sessions().bind_surface_plane_gl(surface_handle, plane, texture_id)
-    }))
-    .unwrap_or_else(on_panic("dd_lav_bind_surface_plane_gl", ERR_IO))
-}
-
-/// Releases a surface returned by [`dd_lav_read_surface`]. Safe to call with 0 or stale handles.
-#[unsafe(no_mangle)]
-pub extern "C" fn dd_lav_release_surface(surface_handle: i64) {
-    let _ = catch_unwind(AssertUnwindSafe(|| {
-        sessions().release_surface(surface_handle)
-    }));
-}
-
 /// Copies the session's last error description (UTF-8) into `dst`; returns bytes written
 /// or a negative error code.
 ///
@@ -270,30 +194,8 @@ pub extern "C" fn dd_lav_enable_cache(handle: i64, window_ms: u32, max_bytes: u6
 
 /// Copies the cache snapshot for `handle` into `dst` and returns the total blob length. When the
 /// return value exceeds `dst_len` nothing was copied: size a buffer to the returned length and call
-/// again (pass `dst_len = 0` first to query the size). Returns 0 when no cache/data is present.
-///
-/// The blob is self-contained (codec params + keyframe-aligned packets); the JVM retains it across a
-/// soft unload and later hands it to a replay session.
-///
-/// Safety: `dst` must point to `dst_len` writable bytes (or be null when `dst_len == 0`).
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn dd_lav_ring_snapshot(handle: i64, dst: *mut u8, dst_len: u64) -> i32 {
-    let dst_slice: &mut [u8] = if dst.is_null() || dst_len == 0 {
-        &mut []
-    } else {
-        unsafe {
-            // Safety: non-null dst is guaranteed by the caller to point to dst_len writable
-            // bytes for this call.
-            std::slice::from_raw_parts_mut(dst, dst_len as usize)
-        }
-    };
-    catch_unwind(AssertUnwindSafe(|| sessions().snapshot(handle, dst_slice)))
-        .unwrap_or_else(on_panic("dd_lav_ring_snapshot", ERR_IO))
-}
-
-/// Like [`dd_lav_ring_snapshot`], but the native side first tops the packet ring up toward
-/// `position_nanos + cache_window` by demuxing ahead. This is intended for display unload, where
-/// mutating the live demuxer is safe because the session is about to be closed.
+/// again (pass `dst_len = 0` first to query the size). Packets start at the keyframe at or before
+/// `position_nanos`; returns 0 when no cache data is present.
 ///
 /// Safety: `dst` must point to `dst_len` writable bytes (or be null when `dst_len == 0`).
 #[unsafe(no_mangle)]
@@ -312,22 +214,21 @@ pub unsafe extern "C" fn dd_lav_ring_snapshot_at(
             std::slice::from_raw_parts_mut(dst, dst_len as usize)
         }
     };
-    let top_up = dst_len == 0;
     catch_unwind(AssertUnwindSafe(|| {
-        sessions().snapshot_at(handle, position_nanos, dst_slice, top_up)
+        sessions().snapshot_at(handle, position_nanos, dst_slice)
     }))
     .unwrap_or_else(on_panic("dd_lav_ring_snapshot_at", ERR_IO))
 }
 
 /// Interrupts the session's network / decode loop, unblocking any reader stuck in
-/// [`dd_lav_read_frame_i420`]. The handle stays valid until [`dd_lav_close`].
+/// [`dd_lav_read_frame_i420_pts`]. The handle stays valid until [`dd_lav_close`].
 #[unsafe(no_mangle)]
 pub extern "C" fn dd_lav_kill(handle: i64) {
     let _ = catch_unwind(AssertUnwindSafe(|| sessions().kill(handle)));
 }
 
 /// Frees the session. Must not be called while another thread is inside
-/// [`dd_lav_read_frame_i420`] for the same handle (join the reader thread first).
+/// [`dd_lav_read_frame_i420_pts`] for the same handle (join the reader thread first).
 #[unsafe(no_mangle)]
 pub extern "C" fn dd_lav_close(handle: i64) {
     let _ = catch_unwind(AssertUnwindSafe(|| sessions().close(handle)));

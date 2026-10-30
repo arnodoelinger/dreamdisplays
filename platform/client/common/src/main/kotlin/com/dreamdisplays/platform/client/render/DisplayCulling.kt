@@ -15,7 +15,6 @@ import kotlin.math.tan
  * draw of a display the camera cannot see.
  */
 internal object DisplayCulling {
-    private val enabled: Boolean = System.getProperty("dreamdisplays.render.cull")?.toBooleanStrictOrNull() ?: true
     private const val FOV_HEADROOM = 1.5
     private const val SPHERE_MARGIN = 1.0
     private const val MAX_FOV_DEGREES = 179.0
@@ -32,7 +31,6 @@ internal object DisplayCulling {
     /** Captures the camera pose and the cone half-angle for the frame about to be drawn. */
     fun begin(camera: Camera, cameraPos: Vec3) {
         active = false
-        if (!enabled) return
         val mc = Minecraft.getInstance()
         val windowW = mc.window.width
         val windowH = mc.window.height

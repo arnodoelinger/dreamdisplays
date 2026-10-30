@@ -21,7 +21,6 @@ use ffmpeg_next as ffmpeg;
 
 use crate::cache::{CachedPacket, CodecParams, PacketRing, packets_from_position};
 use crate::scale::BandedScaler;
-use crate::surface::{ERR_UNSUPPORTED, LavSurfaceDesc, LavSurfaceFrame, LavSurfaceTable};
 
 /// Read result codes shared with the JVM bridge (mirror the main library).
 pub const READ_OK: i32 = 0;
@@ -44,7 +43,13 @@ fn referer_for(url: &str) -> Option<&'static str> {
         .nth(1)
         .and_then(|rest| rest.split('/').next())
         .and_then(|authority| authority.rsplit('@').next())
-        .map(|hostport| hostport.split(':').next().unwrap_or("").to_ascii_lowercase())
+        .map(|hostport| {
+            hostport
+                .split(':')
+                .next()
+                .unwrap_or("")
+                .to_ascii_lowercase()
+        })
         .unwrap_or_default();
     let covers = |domain: &str| host == domain || host.ends_with(&format!(".{domain}"));
     if covers("kick.com") {
@@ -53,7 +58,11 @@ fn referer_for(url: &str) -> Option<&'static str> {
         Some("https://vimeo.com/")
     } else if covers("bilibili.com") || covers("hdslb.com") || covers("bilivideo.com") {
         Some("https://www.bilibili.com/")
-    } else if covers("twitch.tv") || covers("ttvnw.net") || covers("jtvnw.net") || covers("live-video.net") {
+    } else if covers("twitch.tv")
+        || covers("ttvnw.net")
+        || covers("jtvnw.net")
+        || covers("live-video.net")
+    {
         Some("https://www.twitch.tv/")
     } else if covers("youtube.com")
         || covers("youtu.be")
@@ -93,9 +102,7 @@ unsafe extern "C" fn interrupt_cb(opaque: *mut c_void) -> i32 {
     if opaque.is_null() {
         return 0;
     }
-    let flag = unsafe {
-        &*(opaque as *const AtomicBool)
-    };
+    let flag = unsafe { &*(opaque as *const AtomicBool) };
     if flag.load(Ordering::Relaxed) { 1 } else { 0 }
 }
 
@@ -288,7 +295,10 @@ struct ReadState {
     pending_replay: VecDeque<CachedPacket>,
     stats: ReadStats,
     source: PacketSource,
-    #[allow(dead_code, reason = "owned for its lifetime, read through the AVIO pointer")]
+    #[allow(
+        dead_code,
+        reason = "owned for its lifetime, read through the AVIO pointer"
+    )]
     chunked: Option<crate::chunked::ChunkedIo>,
 }
 
@@ -359,7 +369,8 @@ impl ReadStats {
             elapsed.as_secs_f64(),
             self.frames as f64 / elapsed.as_secs_f64(),
             match self.scale_geometry {
-                Some((sw, sh, dw, dh, bands)) => format!(" {sw} x {sh}->{dw} x {dh} on {bands} band(s)"),
+                Some((sw, sh, dw, dh, bands)) =>
+                    format!(" {sw} x {sh}->{dw} x {dh} on {bands} band(s)"),
                 None => String::new(),
             },
             1_000.0 / (wait + demux_cpu + send + decode + write).max(0.001),
@@ -390,7 +401,15 @@ fn fill_bars(dst: &mut [u8], tw: usize, th: usize, x0: usize, y0: usize, fw: usi
 }
 
 /// Fills everything outside the `(x0, y0, w, h)` rectangle of one plane with `value`.
-fn fill_plane_bars(plane: &mut [u8], stride: usize, x0: usize, y0: usize, w: usize, h: usize, value: u8) {
+fn fill_plane_bars(
+    plane: &mut [u8],
+    stride: usize,
+    x0: usize,
+    y0: usize,
+    w: usize,
+    h: usize,
+    value: u8,
+) {
     let height = plane.len() / stride;
     let bottom = (y0 + h).min(height);
     plane[..y0 * stride].fill(value);
@@ -469,19 +488,6 @@ impl ReadState {
     }
 }
 
-enum SurfaceReadError {
-    Io(String),
-    Unsupported(String),
-}
-
-impl SurfaceReadError {
-    fn message(&self) -> &str {
-        match self {
-            SurfaceReadError::Io(e) | SurfaceReadError::Unsupported(e) => e,
-        }
-    }
-}
-
 pub struct LavSession {
     id: AtomicI64,
     w: usize,
@@ -497,7 +503,6 @@ pub struct LavSession {
 pub struct LavSessions {
     map: Mutex<HashMap<i64, Arc<LavSession>>>,
     next: AtomicI64,
-    surfaces: LavSurfaceTable,
 }
 
 impl LavSessions {
@@ -505,7 +510,6 @@ impl LavSessions {
         LavSessions {
             map: Mutex::new(HashMap::new()),
             next: AtomicI64::new(1),
-            surfaces: LavSurfaceTable::new(),
         }
     }
 
@@ -526,7 +530,10 @@ impl LavSessions {
                 handle
             }
             Err(e) => {
-                error!("Failed to open LAV session for {}: {e:#}.", url_for_log(url));
+                error!(
+                    "Failed to open LAV session for {}: {e:#}.",
+                    url_for_log(url)
+                );
                 0
             }
         }
@@ -563,13 +570,6 @@ impl LavSessions {
         } else {
             0
         }
-    }
-
-    pub fn read_frame(&self, handle: i64, dst: &mut [u8]) -> i32 {
-        let Some(session) = self.get(handle) else {
-            return ERR_BAD_HANDLE;
-        };
-        session.read_frame(dst)
     }
 
     pub fn read_frame_with_pts(&self, handle: i64, dst: &mut [u8], pts_nanos: &mut i64) -> i32 {
@@ -616,36 +616,6 @@ impl LavSessions {
         }
     }
 
-    pub fn read_surface(&self, handle: i64, desc: &mut LavSurfaceDesc) -> i32 {
-        let Some(session) = self.get(handle) else {
-            return ERR_BAD_HANDLE;
-        };
-        match session.read_surface() {
-            Ok(Some(surface)) => self.surfaces.insert(surface, desc),
-            Ok(None) if session.interrupted.load(Ordering::Relaxed) => READ_INTERRUPTED,
-            Ok(None) => READ_EOF,
-            Err(e) => {
-                warn!("LAV session #{handle} surface read failed: {}.", e.message());
-                if let Ok(mut err) = session.error.lock() {
-                    *err = e.message().to_string();
-                }
-                match e {
-                    SurfaceReadError::Io(_) => ERR_IO,
-                    SurfaceReadError::Unsupported(_) => ERR_UNSUPPORTED,
-                }
-            }
-        }
-    }
-
-    pub fn bind_surface_plane_gl(&self, surface_handle: i64, plane: u32, texture_id: u32) -> i32 {
-        self.surfaces
-            .bind_plane_gl(surface_handle, plane, texture_id)
-    }
-
-    pub fn release_surface(&self, surface_handle: i64) {
-        self.surfaces.release(surface_handle);
-    }
-
     pub fn error(&self, handle: i64, dst: &mut [u8]) -> i32 {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
@@ -672,28 +642,11 @@ impl LavSessions {
         READ_OK
     }
 
-    pub fn snapshot(&self, handle: i64, dst: &mut [u8]) -> i32 {
+    pub fn snapshot_at(&self, handle: i64, position_nanos: i64, dst: &mut [u8]) -> i32 {
         let Some(session) = self.get(handle) else {
             return ERR_BAD_HANDLE;
         };
-        let blob = session.snapshot();
-        if blob.len() <= dst.len() {
-            dst[..blob.len()].copy_from_slice(&blob);
-        }
-        blob.len().min(i32::MAX as usize) as i32
-    }
-
-    pub fn snapshot_at(
-        &self,
-        handle: i64,
-        position_nanos: i64,
-        dst: &mut [u8],
-        top_up: bool,
-    ) -> i32 {
-        let Some(session) = self.get(handle) else {
-            return ERR_BAD_HANDLE;
-        };
-        let blob = session.snapshot_at(position_nanos, top_up);
+        let blob = session.snapshot_at(position_nanos);
         if blob.len() <= dst.len() {
             dst[..blob.len()].copy_from_slice(&blob);
         }
@@ -757,11 +710,12 @@ impl LavSession {
         // opens directly.
         let interrupted = Arc::new(AtomicBool::new(false));
         let chunked = if chunked_enabled() {
-            crate::chunked::open_input(url, &net_opts, opts.clone(), &interrupted)
-                .unwrap_or_else(|e| {
+            crate::chunked::open_input(url, &net_opts, opts.clone(), &interrupted).unwrap_or_else(
+                |e| {
                     warn!("Bounded-request open failed ({e:#}); opening the source directly.");
                     None
-                })
+                },
+            )
         } else {
             None
         };
@@ -848,8 +802,8 @@ impl LavSession {
     fn open_replay(blob: &[u8], w: usize, h: usize, resume_nanos: i64) -> Result<LavSession> {
         init_ffmpeg()?;
 
-        let (codec_params, snapshot_packets) = crate::cache::deserialize_snapshot(blob)
-            .context("bad magic or truncated blob.")?;
+        let (codec_params, snapshot_packets) =
+            crate::cache::deserialize_snapshot(blob).context("bad magic or truncated blob.")?;
         if codec_params.time_base_den == 0 {
             bail!("snapshot carries an invalid time base (den is 0).");
         }
@@ -908,11 +862,7 @@ impl LavSession {
         }
     }
 
-    fn snapshot(&self) -> Vec<u8> {
-        self.snapshot_at(i64::MIN, false)
-    }
-
-    fn snapshot_at(&self, position_nanos: i64, _top_up: bool) -> Vec<u8> {
+    fn snapshot_at(&self, position_nanos: i64) -> Vec<u8> {
         let Ok(ring) = self.ring.lock() else {
             return Vec::new();
         };
@@ -935,16 +885,6 @@ impl LavSession {
         if let Ok(mut ring) = self.ring.lock() {
             if let Some(ring) = ring.as_mut() {
                 capture_packet_into_ring(time_base, stream_start_time, ring, packet);
-            }
-        }
-    }
-
-    fn read_frame(&self, dst: &mut [u8]) -> i32 {
-        let mut pts_nanos = NO_PTS_NANOS;
-        loop {
-            let rc = self.read_frame_with_pts(dst, &mut pts_nanos);
-            if rc != READ_PREVIEW {
-                return rc;
             }
         }
     }
@@ -1025,7 +965,11 @@ impl LavSession {
                 self.id.load(Ordering::Relaxed),
                 target_micros / 1_000,
                 demux_started.elapsed().as_millis(),
-                if bounded { "bounded" } else { "unbounded fallback" },
+                if bounded {
+                    "bounded"
+                } else {
+                    "unbounded fallback"
+                },
             );
             let _ = ictx.play();
             if let Ok(mut ring) = self.ring.lock() {
@@ -1044,22 +988,6 @@ impl LavSession {
         set_preroll_discard(&mut state.decoder, true);
         state.draining = false;
         Ok(())
-    }
-
-    fn read_surface(&self) -> Result<Option<LavSurfaceFrame>, SurfaceReadError> {
-        let mut state = self
-            .read
-            .lock()
-            .map_err(|_| SurfaceReadError::Io("LAV reader lock poisoned.".to_string()))?;
-        match self
-            .receive_frame(&mut state)
-            .map_err(|e| SurfaceReadError::Io(format!("{e:#}.")))?
-        {
-            Some(frame) => LavSurfaceFrame::from_video_frame(&frame)
-                .map(Some)
-                .map_err(SurfaceReadError::Unsupported),
-            None => Ok(None),
-        }
     }
 
     fn next_frame(&self, state: &mut ReadState, dst: &mut [u8]) -> Result<Option<(i64, bool)>> {
@@ -1127,10 +1055,7 @@ impl LavSession {
             let write_started = std::time::Instant::now();
             self.write_i420(state, &decoded, dst)?;
             if let Some(report) = state.stats.record_frame(write_started.elapsed().as_nanos()) {
-                debug!(
-                    "LAV session #{}: {report}",
-                    self.id.load(Ordering::Relaxed),
-                );
+                debug!("LAV session #{}: {report}", self.id.load(Ordering::Relaxed),);
             }
             return Ok(Some((pts_nanos, false)));
         }
@@ -1224,7 +1149,8 @@ impl LavSession {
                         state.decoder.send_eof().context("send EOF to decoder.")?;
                         state.draining = true;
                     } else {
-                        let packet = packet_from_cached(&packets[*next_packet], state.time_base, None);
+                        let packet =
+                            packet_from_cached(&packets[*next_packet], state.time_base, None);
                         *next_packet += 1;
                         state
                             .decoder
@@ -1272,12 +1198,19 @@ impl LavSession {
 
         let format = src.format();
         let rebuild = match &state.scaler {
-            Some(s) => s.src_format != format || s.src_w != sw || s.src_h != sh || s.dst_w != fw || s.dst_h != fh,
+            Some(s) => {
+                s.src_format != format
+                    || s.src_w != sw
+                    || s.src_h != sh
+                    || s.dst_w != fw
+                    || s.dst_h != fh
+            }
             None => true,
         };
         if rebuild {
-            let scaler = BandedScaler::new(format, sw, sh, fw, fh)
-                .with_context(|| format!("create swscale context {format:?} {sw} x {sh} -> {fw} x {fh}."))?;
+            let scaler = BandedScaler::new(format, sw, sh, fw, fh).with_context(|| {
+                format!("create swscale context {format:?} {sw} x {sh} -> {fw} x {fh}.")
+            })?;
             debug!(
                 "LAV session #{}: scaling {format:?} {sw} x {sh} -> {fw} x {fh} across {} band(s).",
                 self.id.load(Ordering::Relaxed),
@@ -1515,7 +1448,6 @@ fn is_hardware_frame(format: Pixel) -> bool {
     )
 }
 
-
 fn open_video_decoder(
     parameters: &codec::Parameters,
     packet_time_base: ffmpeg::Rational,
@@ -1688,6 +1620,20 @@ unsafe extern "C" fn prefer_selected_hw_format(
 mod tests {
     use super::*;
 
+    fn read_frame(sessions: &LavSessions, handle: i64, dst: &mut [u8]) -> i32 {
+        let mut pts = NO_PTS_NANOS;
+        loop {
+            let rc = sessions.read_frame_with_pts(handle, dst, &mut pts);
+            if rc != READ_PREVIEW {
+                return rc;
+            }
+        }
+    }
+
+    fn snapshot(sessions: &LavSessions, handle: i64, dst: &mut [u8]) -> i32 {
+        sessions.snapshot_at(handle, i64::MIN, dst)
+    }
+
     fn read_skipping_preview(
         sessions: &LavSessions,
         handle: i64,
@@ -1811,8 +1757,7 @@ mod tests {
     fn stats_report_attributes_each_stage() {
         let mut stats = ReadStats {
             window: Some(
-                std::time::Instant::now()
-                    - std::time::Duration::from_secs(STATS_WINDOW_SECS + 1),
+                std::time::Instant::now() - std::time::Duration::from_secs(STATS_WINDOW_SECS + 1),
             ),
             ..Default::default()
         };
@@ -1822,7 +1767,9 @@ mod tests {
         stats.decode_nanos = 2_000_000;
         stats.transfer_nanos = 3_000_000;
         stats.scale_nanos = 4_000_000;
-        let report = stats.record_frame(5_000_000).expect("the window has elapsed");
+        let report = stats
+            .record_frame(5_000_000)
+            .expect("the window has elapsed");
 
         for expected in [
             "network wait 10.00 ms",
@@ -1834,7 +1781,10 @@ mod tests {
             "convert total 5.00 ms",
             "2 reads, 1 of them on the wire",
         ] {
-            assert!(report.contains(expected), "{expected:?} missing from: {report}");
+            assert!(
+                report.contains(expected),
+                "{expected:?} missing from: {report}"
+            );
         }
     }
 
@@ -1861,15 +1811,17 @@ mod tests {
             return;
         }
 
-        for (tw, th, x0, y0, fw, fh) in [(640usize, 480usize, 0usize, 60usize, 640usize, 360usize),
-                                         (1280, 360, 320, 0, 640, 360)] {
+        for (tw, th, x0, y0, fw, fh) in [
+            (640usize, 480usize, 0usize, 60usize, 640usize, 360usize),
+            (1280, 360, 320, 0, 640, 360),
+        ] {
             let sessions = LavSessions::new();
             let handle = sessions.open(clip.to_str().unwrap(), tw, th, 0, 0);
             assert_ne!(handle, 0, "Open failed for {tw} x {th}.");
 
             let mut dst = vec![0u8; tw * th * 3 / 2];
             assert_eq!(
-                sessions.read_frame(handle, &mut dst),
+                read_frame(&sessions, handle, &mut dst),
                 READ_OK,
                 "Read failed for {tw} x {th}.",
             );
@@ -1935,18 +1887,18 @@ mod tests {
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         loop {
-            match sessions.read_frame(handle, &mut dst) {
+            match read_frame(&sessions, handle, &mut dst) {
                 READ_OK => {}
                 READ_EOF => break,
                 e => panic!("read error {e}."),
             }
         }
 
-        let len = sessions.snapshot(handle, &mut []);
+        let len = snapshot(&sessions, handle, &mut []);
         assert!(len > 0, "Snapshot should be non-empty after capture.");
         let mut blob = vec![0u8; len as usize];
         assert_eq!(
-            sessions.snapshot(handle, &mut blob),
+            snapshot(&sessions, handle, &mut blob),
             len,
             "Second call should write the whole blob."
         );
@@ -2011,12 +1963,12 @@ mod tests {
         );
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
-        while sessions.read_frame(live, &mut dst) == READ_OK {}
+        while read_frame(&sessions, live, &mut dst) == READ_OK {}
 
-        let len = sessions.snapshot(live, &mut []);
+        let len = snapshot(&sessions, live, &mut []);
         assert!(len > 0, "Snapshot should be non-empty.");
         let mut blob = vec![0u8; len as usize];
-        assert_eq!(sessions.snapshot(live, &mut blob), len);
+        assert_eq!(snapshot(&sessions, live, &mut blob), len);
         sessions.close(live);
 
         let resume_nanos = 900_000_000;
@@ -2076,7 +2028,7 @@ mod tests {
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         for _ in 0..10 {
-            assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+            assert_eq!(read_frame(&sessions, handle, &mut dst), READ_OK);
         }
 
         let target_nanos = 2_100_000_000_i64;
@@ -2141,7 +2093,10 @@ mod tests {
         let sessions = LavSessions::new();
         let handle = sessions.open(clip.to_str().unwrap(), 640, 360, 0, 0);
         assert_ne!(handle, 0, "Open failed.");
-        assert_eq!(sessions.enable_cache(handle, 60_000_000_000, 64 << 20), READ_OK);
+        assert_eq!(
+            sessions.enable_cache(handle, 60_000_000_000, 64 << 20),
+            READ_OK
+        );
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         let mut pts = NO_PTS_NANOS;
@@ -2170,13 +2125,16 @@ mod tests {
 
         let mut probe = [0u8; 0];
         assert!(
-            sessions.snapshot(handle, &mut probe) > 0,
+            snapshot(&sessions, handle, &mut probe) > 0,
             "Ring should survive a cache-served seek.",
         );
 
         for _ in 0..30 {
             let mut p = NO_PTS_NANOS;
-            assert_eq!(sessions.read_frame_with_pts(handle, &mut dst, &mut p), READ_OK);
+            assert_eq!(
+                sessions.read_frame_with_pts(handle, &mut dst, &mut p),
+                READ_OK
+            );
             assert!(p >= first_pts, "Post-seek PTS should be monotonic.");
         }
         sessions.close(handle);
@@ -2188,13 +2146,23 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         let clip = dir.join("clip.mp4");
         let mut args = vec![
-            "-y", "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=30:duration=4",
-            "-pix_fmt", "yuv420p", "-g", "30",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=320x180:rate=30:duration=4",
+            "-pix_fmt",
+            "yuv420p",
+            "-g",
+            "30",
         ];
         args.extend_from_slice(extra_args);
         let clip_str = clip.to_str().unwrap().to_owned();
         args.push(&clip_str);
-        let status = std::process::Command::new(&ffmpeg_bin).args(&args).status().ok()?;
+        let status = std::process::Command::new(&ffmpeg_bin)
+            .args(&args)
+            .status()
+            .ok()?;
         status.success().then_some(clip)
     }
 
@@ -2202,7 +2170,12 @@ mod tests {
     fn seek_to_start_with_shifted_timestamps() {
         let Some(clip) = generate_clip(
             "dd-lav-shifted-ts-test",
-            &["-output_ts_offset", "10", "-movflags", "frag_keyframe+empty_moov"],
+            &[
+                "-output_ts_offset",
+                "10",
+                "-movflags",
+                "frag_keyframe+empty_moov",
+            ],
         ) else {
             return;
         };
@@ -2213,7 +2186,7 @@ mod tests {
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
         for _ in 0..5 {
-            assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+            assert_eq!(read_frame(&sessions, handle, &mut dst), READ_OK);
         }
 
         assert_eq!(
@@ -2222,7 +2195,7 @@ mod tests {
             "Seek to 0 on a shifted-timestamp fragmented stream must succeed.",
         );
         assert_eq!(
-            sessions.read_frame(handle, &mut dst),
+            read_frame(&sessions, handle, &mut dst),
             READ_OK,
             "Decode should resume after seeking to the start.",
         );
@@ -2241,18 +2214,18 @@ mod tests {
         assert_ne!(handle, 0, "Open failed.");
 
         let mut dst = vec![0u8; 640 * 360 * 3 / 2];
-        assert_eq!(sessions.read_frame(handle, &mut dst), READ_OK);
+        assert_eq!(read_frame(&sessions, handle, &mut dst), READ_OK);
 
         sessions.kill(handle);
         assert_eq!(
-            sessions.read_frame(handle, &mut dst),
+            read_frame(&sessions, handle, &mut dst),
             READ_INTERRUPTED,
             "A killed read must be INTERRUPTED, not EOF.",
         );
 
         assert_eq!(sessions.seek(handle, 0), READ_OK);
         assert_eq!(
-            sessions.read_frame(handle, &mut dst),
+            read_frame(&sessions, handle, &mut dst),
             READ_OK,
             "Decode should resume after the interrupt is cleared by a seek.",
         );

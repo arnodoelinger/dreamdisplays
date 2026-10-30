@@ -59,7 +59,10 @@ fn content_length(url: &str) -> Option<i64> {
 
 /// Sustained byte ceiling from the URL's `clen` / `dur` (the video's own bitrate).
 fn pace_bytes_per_sec(url: &str) -> f64 {
-    let bitrate = match (content_length(url), query_value(url, "dur").and_then(|d| d.parse::<f64>().ok())) {
+    let bitrate = match (
+        content_length(url),
+        query_value(url, "dur").and_then(|d| d.parse::<f64>().ok()),
+    ) {
         (Some(clen), Some(dur)) if dur > 0.0 => clen as f64 / dur,
         _ => 0.0,
     };
@@ -209,8 +212,10 @@ impl ChunkedReader {
             return self.pos;
         }
         let ahead = target - self.pos;
-        let within_open_request =
-            !self.inner.is_null() && ahead > 0 && target < self.chunk_end && ahead <= SKIP_FORWARD_BYTES;
+        let within_open_request = !self.inner.is_null()
+            && ahead > 0
+            && target < self.chunk_end
+            && ahead <= SKIP_FORWARD_BYTES;
         if within_open_request && self.discard(ahead) {
             return self.pos;
         }
@@ -306,9 +311,9 @@ unsafe extern "C" fn seek(opaque: *mut c_void, offset: i64, whence: c_int) -> i6
             return reader.total;
         }
         let base = match whence & !(ffi::AVSEEK_FORCE as c_int) {
-            0 => 0,               // SEEK_SET
-            1 => reader.pos,      // SEEK_CUR
-            2 => reader.total,    // SEEK_END
+            0 => 0,            // SEEK_SET
+            1 => reader.pos,   // SEEK_CUR
+            2 => reader.total, // SEEK_END
             _ => return ffi::AVERROR(ffi::EINVAL) as i64,
         };
         reader.seek_to(base.saturating_add(offset))
@@ -384,7 +389,9 @@ mod tests {
         std::thread::spawn(move || {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { break };
-                let Ok(peek) = stream.try_clone() else { continue };
+                let Ok(peek) = stream.try_clone() else {
+                    continue;
+                };
                 let mut head = String::new();
                 let mut reader = BufReader::new(peek);
                 loop {
@@ -486,14 +493,18 @@ mod tests {
                 bytes += packet.size() as u64;
             }
         }
-        assert!(packets >= 80, "Expected the whole 3 s clip, got {packets} packets.");
+        assert!(
+            packets >= 80,
+            "Expected the whole 3 s clip, got {packets} packets."
+        );
         assert!(bytes > 0);
 
         // The seek path is the reason this exists: it must reposition through the callback and
         // keep delivering, both backwards (a fresh request) and forwards (a discard within one).
         for target_seconds in [0i64, 2] {
             let target = target_seconds * i64::from(ffi::AV_TIME_BASE);
-            ictx.seek(target, ..target).expect("seek through bounded requests");
+            ictx.seek(target, ..target)
+                .expect("seek through bounded requests");
             let mut after = 0;
             let mut packet = ffmpeg::Packet::empty();
             while packet.read(&mut ictx).is_ok() {
@@ -542,7 +553,9 @@ mod tests {
             !should_chunk(&PACED.replace("clen=110694680", "clen=0")),
             "Without a size there is nothing to bound requests against.",
         );
-        assert!(!should_chunk("https://example.com/video.mp4?gir=yes&clen=1000"));
+        assert!(!should_chunk(
+            "https://example.com/video.mp4?gir=yes&clen=1000"
+        ));
         assert!(!should_chunk("file:/tmp/clip.mp4"));
     }
 

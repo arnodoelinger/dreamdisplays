@@ -69,7 +69,7 @@ object DisplayYuvRenderTypes {
     val active: Boolean
         get() = !ShaderPackCompat.isShaderPackActive
                 && (isSupported || Yuv262Reflect.isAvailable)
-                && NativeMedia.yuvGpuEnabled
+                && NativeMedia.isAvailable
 
     /** Creates one RED8 plane texture through the built-in (26.1-era) or reflective 26.2 API. */
     fun createPlaneTexture(

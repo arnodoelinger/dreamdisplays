@@ -1,13 +1,9 @@
 package com.dreamdisplays.media.source.youtube.binary
 
+import com.dreamdisplays.media.runtime.download.SourceLoader
 import com.dreamdisplays.media.runtime.system.Processes
-import com.dreamdisplays.media.source.youtube.binary.YtDlpBinary.BINARY_REFRESH_MS
-import com.dreamdisplays.media.source.youtube.binary.YtDlpBinary.MIN_PYTHON_MINOR
-import com.dreamdisplays.media.source.youtube.binary.YtDlpBinary.PYTHON_CANDIDATES
-import com.dreamdisplays.media.source.youtube.binary.YtDlpBinary.maybeSelfUpdate
 import com.dreamdisplays.util.DreamCoroutines
 import com.dreamdisplays.util.OsInfo
-import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.launch
 import kotlinx.io.IOException
@@ -15,7 +11,6 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.util.concurrent.TimeUnit
 
@@ -71,10 +66,7 @@ object YtDlpBinary {
             resolved?.let { return it }
 
             val candidates = ArrayList<String>()
-            var override = System.getProperty("dreamdisplays.ytdlp")
-            if (override.isNullOrEmpty()) override = System.getenv("DREAMDISPLAYS_YTDLP")
-            if (!override.isNullOrEmpty()) candidates.add(override)
-
+            override()?.let(candidates::add)
             candidates.addAll(CANDIDATE_PATHS)
             val bundled = bundledDir.resolve(bundledBinaryName())
             candidates.add(bundled.toString())
@@ -103,18 +95,15 @@ object YtDlpBinary {
         resolvedCommand?.let { return it }
         synchronized(this) {
             resolvedCommand?.let { return it }
-            val zipapp = if (hasOverride()) null else zipappCommand()
+            val zipapp = if (override() != null) null else zipappCommand()
             val command = zipapp ?: [resolve()]
             resolvedCommand = command
             return command
         }
     }
 
-    private fun hasOverride(): Boolean {
-        var o = System.getProperty("dreamdisplays.ytdlp")
-        if (o.isNullOrEmpty()) o = System.getenv("DREAMDISPLAYS_YTDLP")
-        return !o.isNullOrEmpty()
-    }
+    private fun override(): String? =
+        System.getProperty("dreamdisplays.ytdlp")?.ifEmpty { null } ?: System.getenv("DREAMDISPLAYS_YTDLP")?.ifEmpty { null }
 
     private fun zipappCommand(): List<String>? {
         val python = usablePython() ?: return null
@@ -230,27 +219,8 @@ object YtDlpBinary {
 
     @Throws(IOException::class)
     private fun downloadAsset(target: Path, asset: String, executable: Boolean) {
-        Files.createDirectories(target.parent)
-        val tmp = target.resolveSibling("${target.fileName}.part")
-        val url = DOWNLOAD_BASE + asset
-        logger.debug("Downloading $asset from $url...")
-
-        DreamHttpClient.downloadToFile(
-            url,
-            tmp,
-            DreamHttpClient.RequestOptions(
-                headers = DreamHttpClient.headersOf("User-Agent" to "DreamDisplays-yt-dlp-bootstrap"),
-                connectTimeoutMs = 15_000,
-                readTimeoutMs = 120_000,
-            ),
-        )
-
-        Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-
-        if (executable && !OsInfo.isWindows) {
-            Processes.markExecutable(target)
-            Processes.removeMacQuarantine(target)
-        }
+        SourceLoader.download(DOWNLOAD_BASE + asset, target, asset, readTimeoutMs = 120_000)
+        if (executable && !OsInfo.isWindows) SourceLoader.makeExecutable(target)
     }
 
     private fun canExecute(path: String): Boolean {

@@ -1,18 +1,15 @@
 package com.dreamdisplays.media.player
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.api.media.model.DreamMediaException
 import com.dreamdisplays.api.media.model.FramePixelFormat
 import com.dreamdisplays.api.media.model.VideoQuality
-import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.api.media.player.GpuTextureRef
 import com.dreamdisplays.api.media.player.PlaybackEnvironment
 import com.dreamdisplays.api.media.player.PlaybackHost
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.SubtitleTrack
 import com.dreamdisplays.media.player.MediaPlayer.Companion.INIT_EXECUTOR
-import com.dreamdisplays.media.player.subtitle.SubtitleCue
-import com.dreamdisplays.media.player.subtitle.WebVttParser
-import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.managers.PlaybackSessionManager
 import com.dreamdisplays.media.player.managers.StatsReporter
@@ -26,9 +23,13 @@ import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.stream.MediaStreamSelector
+import com.dreamdisplays.media.player.subtitle.SubtitleCue
+import com.dreamdisplays.media.player.subtitle.WebVttParser
 import com.dreamdisplays.media.player.util.MediaUtil
+import com.dreamdisplays.media.player.util.MediaUtil.ms
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.runtime.security.MediaHostGuard
+import com.dreamdisplays.util.net.DreamHttpClient
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.util.concurrent.*
@@ -48,8 +49,8 @@ class MediaPlayer(
     replayBootstrap: ReplayBootstrap? = null,
     private val audioStage: AudioDspStage? = null,
 ) {
-    /** One-shot native packet-cache bootstrap for display reappearance (includes optional audio PCM). */
-    data class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long, val audioPcm: ByteArray? = null) {
+    /** One-shot native packet-cache bootstrap for display reappearance. */
+    class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long) {
         /** Cached resolved streams for fast reappear (null = skip / re-resolve). */
         var prepared: PreparedMedia? = null
     }
@@ -82,9 +83,6 @@ class MediaPlayer(
         private val STALL_RERESOLVE_BACKOFF_MS = longArrayOf(0L, 2_000L, 5_000L, 15_000L, 30_000L)
         private const val MAX_STALL_RERESOLVES = 6
         private const val AUDIO_EOS_NEAR_END_GUARD_NS = 3_000_000_000L
-
-        private val REPLAY_LEAD_NS: Long =
-            (System.getProperty("dreamdisplays.replayLeadMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L) * 1_000_000L
 
         private val INIT_THREAD_COUNTER = AtomicInteger()
 
@@ -539,9 +537,6 @@ class MediaPlayer(
     /** Captures the active native LAV packet-ring snapshot (whole window), if the live channel has one. */
     fun captureReplaySnapshot(): ByteArray? = sessionManager.captureVideoCacheSnapshot()
 
-    /** Captures the recent PCM window (matching the replay video lead) for the reappearance audio bridge. */
-    fun captureReplayAudio(): ByteArray? = sessionManager.captureAudioPcm(REPLAY_LEAD_NS)
-
     /**
      * Captures resolved streams for fast reappear (null for live streams or before init).
      */
@@ -649,7 +644,7 @@ class MediaPlayer(
         // and hand off by PTS instead of cold-starting, so the picture never blanks.
         val bootstrap = replayBootstrapRef.getAndSet(null)
         logger.debug(
-            "$debugLabel [reappear] startStreams offset=${"%.1f".format(offsetNanos / 1_000_000.0)}ms " +
+            "$debugLabel [reappear] startStreams offset=${ms(offsetNanos)}ms " +
                     "replayActive=${replayVideoActive.get()} bootstrap=${bootstrap != null} live=$liveStream",
         )
         if (replayVideoActive.get() && bootstrap != null && !liveStream) {
@@ -683,11 +678,11 @@ class MediaPlayer(
 
     private fun startReplayBootstrapVideo(boot: ReplayBootstrap) {
         if (terminated.get()) return
-        val resume = (boot.positionNanos - REPLAY_LEAD_NS).coerceAtLeast(0L)
-        if (sessionManager.startReplayVideoOnly(boot.snapshot, resume, boot.positionNanos, boot.audioPcm)) {
+        val resume = boot.positionNanos.coerceAtLeast(0L)
+        if (sessionManager.startReplayVideoOnly(boot.snapshot, resume, boot.positionNanos)) {
             replayVideoActive.set(true)
             state.set(PlaybackState.PLAYING)
-            logger.debug("$debugLabel Replay bootstrap shown instantly, resuming at ${"%.1f".format(resume / 1_000_000.0)}ms.")
+            logger.debug("$debugLabel Replay bootstrap shown instantly, resuming at ${ms(resume)}ms.")
         }
         // On failure the bootstrap is left in place (replayVideoActive stays false): startStreams then
         // cold-starts at the saved position instead of attaching live to a replay that never started.
@@ -702,7 +697,7 @@ class MediaPlayer(
         }
         state.set(PlaybackState.PLAYING)
         watchdog.start()
-        logger.debug("$debugLabel Attached live after replay at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)}ms.")
+        logger.debug("$debugLabel Attached live after replay at ${ms(liveOffsetNanos)}ms.")
         return true
     }
 
