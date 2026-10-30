@@ -47,8 +47,8 @@ object MediaHostGuard {
         .build()
 
     /**
-     * Returns true when [url] is safe to fetch: the guard is disabled, or the URL's host resolves
-     * exclusively to public unicast addresses. Returns false on any non-public address or when the
+     * @return `true` when [url] is safe to fetch: the guard is disabled, or the URL's host resolves
+     * exclusively to public unicast addresses. Returns `false` on any non-public address or when the
      * host cannot be parsed or resolved.
      */
     fun isAllowed(url: String): Boolean {

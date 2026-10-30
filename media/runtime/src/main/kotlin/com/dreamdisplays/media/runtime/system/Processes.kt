@@ -11,11 +11,7 @@ import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermissions
 import java.util.concurrent.TimeUnit
 
-/**
- * Shared subprocess plumbing for the external binaries the mod drives (`yt-dlp`, `ffmpeg`, `xattr`):
- * draining output without deadlocking, killing whole process trees, and post-download fixups for
- * executables. Replaces private near-identical copies in YtDlp and FFmpegBinary.
- */
+/** Shared subprocess plumbing for the external binaries. */
 object Processes {
     /**
      * Forcibly destroys [process] and all of its descendants, children first, so orphaned
@@ -24,8 +20,6 @@ object Processes {
     fun destroyTree(process: Process) {
         runCatching {
             val tree = process.toHandle().descendants().toList()
-            // Order by depth in the captured tree, deepest first: descending PID is not a reliable
-            // proxy for "children before parents" because PIDs recycle and wrap.
             val pids = tree.mapTo(HashSet()) { it.pid() }
             fun depth(handle: ProcessHandle): Int {
                 var d = 0
@@ -78,10 +72,7 @@ object Processes {
         }
     }
 
-    /**
-     * Removes the macOS quarantine flag from a downloaded [binary] so Gatekeeper doesn't block it.
-     * No-op on other platforms; failures are ignored (the binary usually still runs).
-     */
+    /** Removes the macOS quarantine flag from a downloaded [binary] so Gatekeeper doesn't block it. */
     fun removeMacQuarantine(binary: Path) {
         if (!OsInfo.isMac) return
         runCatching {
