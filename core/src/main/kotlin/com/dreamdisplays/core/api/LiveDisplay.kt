@@ -6,7 +6,7 @@ import com.dreamdisplays.api.DisplayLifecycle
 import com.dreamdisplays.api.display.data.DisplayCustomData
 import com.dreamdisplays.api.display.data.MapCustomData
 import com.dreamdisplays.api.display.event.DisplayEvent
-import com.dreamdisplays.api.display.event.Events
+import com.dreamdisplays.api.display.event.DisplayEvents
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.property.DisplayState
@@ -71,7 +71,7 @@ internal class LiveDisplay(
     override fun delete() = command { displayService.delete(id) }
     override fun report() = command { displayService.report(id) }
 
-    override val events: Events = DefaultEvents(displayService, owner, id)
+    override val events: DisplayEvents = DefaultEvents(displayService, owner, id)
 
     @Suppress("OVERRIDE_DEPRECATION")
     override fun on(listener: Consumer<DisplayEvent>): AutoCloseable = events.on(DisplayEvent::class.java, listener)

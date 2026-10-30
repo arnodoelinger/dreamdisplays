@@ -26,12 +26,20 @@ interface Events {
      * Close the returned handle to stop.
      */
     fun <T : DisplayEvent> on(type: Class<T>, listener: Consumer<T>): AutoCloseable
+}
 
+/**
+ * [Events] of a single display, which also knows how to describe its playback life in one block.
+ *
+ * @since 1.10.x
+ */
+@Unstable
+interface DisplayEvents : Events {
     /**
-     * Describes how to react to the playback life of the displays in this scope in one block.
+     * Describes how to react to this display's playback life in one block;
+     * ends by itself when the display is removed.
      *
-     * Handlers get no display, so this fits `Display.events`; on a wider scope use [on] to know which
-     * display fired.
+     * `Kotlin` code can use the nicer `display.lifecycle { onPlaying { ... } }` extension.
      */
     fun lifecycle(configure: Consumer<DisplayLifecycle>): AutoCloseable
 }

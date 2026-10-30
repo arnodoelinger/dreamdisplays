@@ -24,23 +24,40 @@ object DreamDisplaysServer {
         get() = ServerHolder.current
             ?: error("Dream Displays server API is not available yet. Use DreamDisplaysServer.onReady { ... }.")
 
-    /** True once the plugin has finished loading and the API can be used. */
+    /** `true` once the plugin has finished loading and the API can be used. */
     @JvmStatic
     val isAvailable: Boolean get() = ServerHolder.current != null
 
-    /** Runs [action] as soon as the API is available: right away if it already is, otherwise once it loads. */
+    /** Events of every display on this server. */
     @JvmStatic
-    fun onReady(action: Runnable): Unit = ServerHolder.whenReady { action.run() }
+    val events: ServerEvents get() = BackendEvents
 
     /** All displays on this server. */
     @JvmStatic
     val displays: ServerDisplays get() = backend.displays
 
+    /**
+     * Runs [action] as soon as the API is available: right away if it already is,
+     * otherwise once it loads.
+     */
+    @JvmStatic
+    fun onReady(action: Runnable): Unit = ServerHolder.whenReady { action.run() }
+
     /** The display with [id], or `null`. */
     @JvmStatic
     fun display(id: UUID): ServerDisplay? = backend.displays[id]
 
-    /** Subscribes to display events. Close the handle to stop. */
+    /**
+     * Subscribes to display events.
+     *
+     * Close the handle to stop.
+     *
+     * *Deprecated. Use [events].*
+     */
+    @Deprecated(
+        "Use events.on(type, listener).",
+        ReplaceWith("events.on(ServerDisplayEvent::class.java, listener)"),
+    )
     @JvmStatic
     fun on(listener: Consumer<ServerDisplayEvent>): AutoCloseable = backend.on(listener)
 
@@ -52,4 +69,9 @@ object DreamDisplaysServer {
      */
     @JvmStatic
     fun register(addon: Any): Unit = ServerHolder.whenReady { backend.registerAddon(addon) }
+
+    private object BackendEvents : ServerEvents {
+        override fun <T : ServerDisplayEvent> on(type: Class<T>, listener: Consumer<T>): AutoCloseable =
+            backend.on { event -> if (type.isInstance(event)) listener.accept(type.cast(event)) }
+    }
 }

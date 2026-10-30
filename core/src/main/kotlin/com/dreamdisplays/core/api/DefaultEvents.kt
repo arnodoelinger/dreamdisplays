@@ -2,13 +2,13 @@ package com.dreamdisplays.core.api
 
 import com.dreamdisplays.api.DisplayLifecycle
 import com.dreamdisplays.api.display.event.DisplayEvent
-import com.dreamdisplays.api.display.event.Events
+import com.dreamdisplays.api.display.event.DisplayEvents
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.core.services.DisplayService
 import java.util.function.Consumer
 
 /**
- * [Events] over the display service.
+ * [DisplayEvents] over the display service.
  *
  * With a [displayId] it hears only that display and ends when it is removed; with an [owner]
  * every subscription ends with the session.
@@ -17,7 +17,7 @@ internal class DefaultEvents(
     private val displayService: DisplayService,
     private val owner: DefaultSession?,
     private val displayId: DisplayId?,
-) : Events {
+) : DisplayEvents {
     override fun <T : DisplayEvent> on(type: Class<T>, listener: Consumer<T>): AutoCloseable {
         lateinit var subscription: Subscription
         val upstream = displayService.on { event ->

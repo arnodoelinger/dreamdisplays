@@ -1,7 +1,7 @@
 package com.dreamdisplays.api
 
 import com.dreamdisplays.api.display.event.DisplayEvent
-import com.dreamdisplays.api.display.event.Events
+import com.dreamdisplays.api.display.event.DisplayEvents
 import com.dreamdisplays.api.display.data.DisplayCustomData
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
@@ -78,7 +78,7 @@ interface Display {
     var mode: PlaybackMode
 
     /** Events of this display only. */
-    val events: Events
+    val events: DisplayEvents
 
     /** Starts or resumes playback. */
     fun play(): CommandResult
