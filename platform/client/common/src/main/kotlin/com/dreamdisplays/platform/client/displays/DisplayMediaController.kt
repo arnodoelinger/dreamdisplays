@@ -54,7 +54,6 @@ internal class DisplayMediaController(private val screen: DisplayScreen) {
         DisplayRegistry.recordScreen(screen)
         val shouldBePaused = preservePausedState && screen.paused
         val audioStage = DreamServices.registry.getOrNull(AudioAcousticsServices.ACOUSTICS)?.registerSource(screen.uuid)
-        screen.primeSizeLod()
         val newPlayer = MediaPlayer(
             videoUrl, lang, DisplayPlaybackHost(screen), DreamPlaybackEnvironment,
             screen.takeReplayBootstrap(videoUrl), audioStage,

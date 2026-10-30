@@ -349,91 +349,23 @@ class DisplayScreen(
 
     private fun effectiveQuality(requested: VideoQuality = quality): VideoQuality {
         val base = if (qualityCap > 0) VideoQuality.Fixed(qualityCap) else requested
-        val stepped = applyDistanceSteps(base)
-        val lod = sizeLodHeight
-        if (lod <= 0 || lod >= (stepped.targetHeight ?: DEFAULT_QUALITY)) return stepped
-        return VideoQuality.Fixed(lod)
+        return applyDistanceSteps(base)
     }
 
     /**
      * The quality the player opens a new video at: the requested quality, capped and stepped down for
-     * distance / on-screen size like every later switch, so a far display never starts at full resolution.
+     * distance like every later switch, so a far display never starts at full resolution.
      */
     internal val playbackQuality: VideoQuality get() = effectiveQuality()
 
     private var distanceQualitySteps = 0
-    private var sizeLodHeight = 0
-    private var sizeLodSinceNanos = 0L
-
-    private fun updateDistanceQuality(fraction: Float, distance: Double) {
+    private fun updateDistanceQuality(fraction: Float) {
         var steps = distanceQualitySteps
         while (steps < DISTANCE_STEP_THRESHOLDS.size && fraction >= DISTANCE_STEP_THRESHOLDS[steps]) steps++
         while (steps > 0 && fraction < DISTANCE_STEP_THRESHOLDS[steps - 1] - DISTANCE_STEP_HYSTERESIS) steps--
-        val lod = nextSizeLodHeight(distance)
-        if (steps == distanceQualitySteps && lod == sizeLodHeight) return
+        if (steps == distanceQualitySteps) return
         distanceQualitySteps = steps
-        sizeLodHeight = lod
         reloadQuality()
-    }
-
-    /**
-     * Size LOD: the display's projected height on screen decides how many pixels are worth decoding,
-     * converting and uploading. Sharpening happens right away (with a hysteresis band); softening waits out
-     * [SIZE_LOD_DWELL_NANOS] so walking past doesn't churn streams. Once playing, a paused picture holds its
-     * resolution (a switch would blank it) and a live stream only ever sharpens, after the same dwell, since
-     * each live switch restarts it.
-     */
-    private fun nextSizeLodHeight(distance: Double): Int {
-        // A fullscreen broadcast's synthetic display has no meaningful world position to size by
-        if (virtual) return 0
-        val started = videoStarted
-        if (started && paused) return sizeLodHeight
-        val live = started && isLive
-
-        val base = (if (qualityCap > 0) qualityCap else quality.targetHeight) ?: DEFAULT_QUALITY
-        val current = if (sizeLodHeight <= 0) base else min(sizeLodHeight, base)
-        val neededPx = height * focalLengthPx() / max(distance, 1.0) * SIZE_LOD_OVERSAMPLE
-        val strict = min(base, lodRungFor(neededPx))
-        val relaxed = min(base, lodRungFor(neededPx * SIZE_LOD_HYSTERESIS))
-
-        val wanted = when {
-            strict > current -> strict
-            relaxed < current && !live -> relaxed
-            else -> {
-                sizeLodSinceNanos = 0L
-                return sizeLodHeight
-            }
-        }
-        // Before playback starts there is no stream to switch yet: just pick the starting quality
-        if (!started) {
-            sizeLodSinceNanos = 0L
-            return wanted
-        }
-        if (wanted < current || live) {
-            val now = System.nanoTime()
-            if (sizeLodSinceNanos == 0L) sizeLodSinceNanos = now
-            if (now - sizeLodSinceNanos < SIZE_LOD_DWELL_NANOS) return sizeLodHeight
-        }
-        if (!tryAcquireLodSwitch()) return sizeLodHeight
-        sizeLodSinceNanos = 0L
-        return wanted
-    }
-
-    /** Works out the size cap before a new player resolves its first stream, so a far display starts small. */
-    internal fun primeSizeLod() {
-        if (isPopoutActive) return
-        val player = Minecraft.getInstance().player ?: return
-        sizeLodHeight = nextSizeLodHeight(getDistanceToScreen(player.blockPosition()))
-    }
-
-    private fun lodRungFor(neededPx: Double): Int {
-        var i = QUALITY_LADDER.lastIndex
-        while (i >= 0) {
-            val rung = QUALITY_LADDER[i]
-            if (rung >= SIZE_LOD_MIN_HEIGHT && rung >= neededPx) return rung
-            i--
-        }
-        return QUALITY_LADDER[0]
     }
 
     private fun applyDistanceSteps(base: VideoQuality): VideoQuality {
@@ -1205,15 +1137,6 @@ class DisplayScreen(
      */
     private fun parseQualityOrDefault(): Int = effectiveQuality().targetHeight ?: DEFAULT_QUALITY
 
-    private fun focalLengthPx(): Double {
-        val mc = Minecraft.getInstance()
-        //? if >=1.19 {
-        val fov = mc.options.fov().get().toDouble().coerceIn(1.0, 179.0)
-        //?} else
-        /*val fov = mc.options.fov.coerceIn(1.0, 179.0)*/
-        return mc.window.height.coerceAtLeast(1) / (2.0 * tan(Math.toRadians(fov) / 2.0))
-    }
-
     private var cachedEnvironment: AcousticEnvironment = AcousticEnvironment.OPEN_AIR
     private var cachedReverb: AcousticEnvironment? = null
     private var envProbeCountdown: Int = uuid.hashCode().mod(ENV_PROBE_INTERVAL_TICKS)
@@ -1228,14 +1151,12 @@ class DisplayScreen(
         restoreSubtitleTrackIfPending()
         publishStartedFlip()
         if (isPopoutActive) {
-            if (distanceQualitySteps != 0 || sizeLodHeight != 0) {
+            if (distanceQualitySteps != 0) {
                 distanceQualitySteps = 0
-                sizeLodHeight = 0
-                sizeLodSinceNanos = 0L
                 reloadQuality()
             }
         } else {
-            updateDistanceQuality((distance / renderDistance.coerceAtLeast(1)).toFloat(), distance)
+            updateDistanceQuality((distance / renderDistance.coerceAtLeast(1)).toFloat())
         }
         if (ClientStateManager.config.audioAcoustics == AcousticQuality.OFF) return
         val plane = sourcePlane()
@@ -1311,20 +1232,6 @@ class DisplayScreen(
         private val QUALITY_LADDER = intArrayOf(2160, 1440, 1080, 720, 480, 360, 240, 144)
         private val DISTANCE_STEP_THRESHOLDS = floatArrayOf(0.66f, 0.75f)
         private const val DISTANCE_STEP_HYSTERESIS = 0.05f
-
-        private const val SIZE_LOD_OVERSAMPLE = 1.5
-        private const val SIZE_LOD_MIN_HEIGHT = 360
-        private const val SIZE_LOD_HYSTERESIS = 1.3
-        private const val SIZE_LOD_DWELL_NANOS = 3_000_000_000L
-        private const val LOD_SWITCH_SPACING_NANOS = 250_000_000L
-        private var nextLodSwitchNanos = 0L
-
-        private fun tryAcquireLodSwitch(): Boolean {
-            val now = System.nanoTime()
-            if (now < nextLodSwitchNanos) return false
-            nextLodSwitchNanos = now + LOD_SWITCH_SPACING_NANOS
-            return true
-        }
 
         private const val RESTORE_SEEK_TOLERANCE_NS = 250_000_000L
         private const val APPEAR_FADE_NANOS = 260_000_000L
