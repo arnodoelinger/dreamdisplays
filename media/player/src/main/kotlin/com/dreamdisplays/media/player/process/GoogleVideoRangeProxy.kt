@@ -12,9 +12,6 @@ import java.net.http.HttpResponse
  * loopback [RangeProxyServer].
  */
 internal object GoogleVideoRangeProxy {
-    private val enabled: Boolean =
-        System.getProperty("dreamdisplays.media.rangeProxy")?.toBooleanStrictOrNull() ?: true
-
     private const val GOOGLEVIDEO_SUFFIX = ".googlevideo.com"
     private const val DRIVE_HOST = "drive.usercontent.google.com"
     private const val MAX_REDIRECTS = 3
@@ -36,12 +33,12 @@ internal object GoogleVideoRangeProxy {
     private const val CACHED_TAIL_BYTES = 32L shl 20
 
     fun wrap(url: String): String {
-        if (!enabled || !eligible(url)) return url
+        if (!eligible(url)) return url
         return server.register(url, contentLength(url)) ?: url
     }
 
     fun needsProxy(url: String): Boolean =
-        enabled && runCatching { URI(url) }.getOrNull()?.let(::isDrive) == true
+        runCatching { URI(url) }.getOrNull()?.let(::isDrive) == true
 
     internal fun eligible(url: String): Boolean {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false

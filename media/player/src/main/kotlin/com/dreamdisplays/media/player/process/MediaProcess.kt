@@ -15,7 +15,6 @@ object MediaProcess {
     internal const val USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 
-    private val HW_SCALE_ENABLED = System.getProperty("dreamdisplays.hwscale", "true").toBoolean()
 
     /** Frame rate assumed when the source reports none, or reports something implausible. */
     const val DEFAULT_OUTPUT_FPS = 30.0
@@ -45,13 +44,7 @@ object MediaProcess {
         /** PPM frames (header + RGB24), parsed by the JVM [VideoFramePipe]. */
         PPM,
 
-        /** Headerless RGB24 rawvideo, consumed by the native pipeline. */
-        RAW_RGB24,
-
-        /**
-         * Headerless NV12 rawvideo, consumed by the native pipeline. Halves pipe traffic vs.
-         * RGB24; the stream is pinned to BT.709 so the native converter can use a fixed matrix.
-         */
+        /** Headerless NV12 rawvideo for the native pipeline, pinned to BT.709 so it can convert with a fixed matrix. */
         RAW_NV12,
     }
 
@@ -73,33 +66,30 @@ object MediaProcess {
         transport: VideoTransport, fps: Double, alreadyResolved: Boolean = false,
         seekByDecoding: Boolean = false,
     ): List<String> {
-        val outFormat = if (transport == VideoTransport.RAW_NV12) "nv12" else "rgb24"
+        val nv12 = transport == VideoTransport.RAW_NV12
+        val outFormat = if (nv12) "nv12" else "rgb24"
         val pad = "pad=w=$w:h=$h:x=(ow-iw)/2:y=(oh-ih)/2:color=black,setsar=1,format=$outFormat"
         val vf = if (useHwScale(ffmpeg, hwAccel)) {
             // Scale on the GPU's video block before hwdownload so the CPU never touches
             // full-resolution frames.
             val fit = "min($w/iw\\,$h/ih)"
-            val matrix = if (transport == VideoTransport.RAW_NV12) ":color_matrix=bt709" else ""
+            val matrix = if (nv12) ":color_matrix=bt709" else ""
             "scale_vt=w=trunc($fit*iw/2)*2:h=trunc($fit*ih/2)*2$matrix,hwdownload,format=nv12,$pad"
         } else {
             val swPrefix = if (hwAccel.hwOutputFormat != null) "hwdownload,format=nv12," else ""
-            val scaleExtra = if (transport == VideoTransport.RAW_NV12) ":out_color_matrix=bt709" else ""
+            val scaleExtra = if (nv12) ":out_color_matrix=bt709" else ""
             val fitSw = "min($w/iw\\,$h/ih)"
             "${swPrefix}scale=w=min($w\\,iw*$fitSw):h=min($h\\,ih*$fitSw):flags=bilinear$scaleExtra,$pad"
         }
         return baseCommand(ffmpeg, url, offsetNanos, hwAccel, alreadyResolved, seekByDecoding).apply {
             addAll(["-an", "-vf", vf])
             addAll(["-r", String.format(Locale.US, "%.6f", outputFps(fps))])
-            when (transport) {
-                VideoTransport.PPM -> addAll(["-f", "image2pipe", "-c:v", "ppm", "-"])
-                VideoTransport.RAW_RGB24, VideoTransport.RAW_NV12 -> addAll(["-f", "rawvideo", "-"])
-            }
+            addAll(if (nv12) ["-f", "rawvideo", "-"] else ["-f", "image2pipe", "-c:v", "ppm", "-"])
         }
     }
 
     private fun useHwScale(ffmpeg: String, hwAccel: HwAccelBackend): Boolean =
-        HW_SCALE_ENABLED
-                && hwAccel == HwAccelBackend.VIDEOTOOLBOX
+        hwAccel == HwAccelBackend.VIDEOTOOLBOX
                 && FFmpegCapabilities.hasFilter(ffmpeg, "scale_vt")
 
     /** Builds FFmpeg process that seeks to offset in URL and writes a single letterboxed JPEG frame. */

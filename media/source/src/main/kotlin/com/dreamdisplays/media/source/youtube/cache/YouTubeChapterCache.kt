@@ -1,13 +1,9 @@
 package com.dreamdisplays.media.source.youtube.cache
 
 import com.dreamdisplays.api.media.search.MediaChapter
+import com.dreamdisplays.media.runtime.cache.MediaCache
 import com.dreamdisplays.media.source.youtube.YouTubeInnerTube
-import com.dreamdisplays.util.DreamCoroutines
-import com.github.benmanes.caffeine.cache.Cache
-import com.github.benmanes.caffeine.cache.Caffeine
-import kotlinx.coroutines.launch
-import org.slf4j.LoggerFactory
-import java.util.concurrent.TimeUnit
+import kotlin.time.Duration.Companion.minutes
 
 /**
  * In-memory cache of YouTube chapter markers keyed by video id. Deliberately separate from
@@ -15,35 +11,13 @@ import java.util.concurrent.TimeUnit
  * and would then block any fetch that could supply them.
  */
 object YouTubeChapterCache {
-    private val logger = LoggerFactory.getLogger(javaClass)
-    private const val CACHE_TTL_MINUTES = 30L
-    private const val IN_FLIGHT_TTL_MINUTES = 2L
-    private const val MAX_ENTRIES = 200L
-    private val CACHE: Cache<String, List<MediaChapter>> = Caffeine.newBuilder()
-        .maximumSize(MAX_ENTRIES)
-        .expireAfterAccess(CACHE_TTL_MINUTES, TimeUnit.MINUTES)
-        .build()
-
-    private val IN_FLIGHT: Cache<String, Boolean> = Caffeine.newBuilder()
-        .maximumSize(MAX_ENTRIES)
-        .expireAfterWrite(IN_FLIGHT_TTL_MINUTES, TimeUnit.MINUTES)
-        .build()
+    private val cache = MediaCache<String, List<MediaChapter>>("YouTube chapters", 200, MediaCache.fixed(30.minutes))
 
     /** Chapters for [videoId], or null while they have not been fetched yet. */
-    fun get(videoId: String): List<MediaChapter>? = CACHE.getIfPresent(videoId)
+    fun get(videoId: String): List<MediaChapter>? = cache.get(videoId)
 
     /** Fetches chapters for [videoId] in the background unless they are cached or already in flight. */
     fun requestAsync(videoId: String) {
-        if (videoId.isEmpty()) return
-        if (CACHE.getIfPresent(videoId) != null) return
-        if (IN_FLIGHT.asMap().putIfAbsent(videoId, true) != null) return
-        DreamCoroutines.clientIo.launch { fetchAndStore(videoId) }
-    }
-
-    private fun fetchAndStore(videoId: String) {
-        runCatching { YouTubeInnerTube.chapters(videoId) }
-            .onSuccess { CACHE.put(videoId, it) }
-            .onFailure { e -> logger.warn("Chapter fetch failed for $videoId: ${e.message}") }
-            .also { IN_FLIGHT.invalidate(videoId) }
+        if (videoId.isNotEmpty()) cache.requestAsync(videoId) { YouTubeInnerTube.chapters(videoId) }
     }
 }

@@ -1,18 +1,14 @@
 package com.dreamdisplays.media.player
 
+import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.api.media.model.DreamMediaException
 import com.dreamdisplays.api.media.model.FramePixelFormat
 import com.dreamdisplays.api.media.model.VideoQuality
-import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.api.media.player.GpuTextureRef
 import com.dreamdisplays.api.media.player.PlaybackEnvironment
 import com.dreamdisplays.api.media.player.PlaybackHost
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.SubtitleTrack
-import com.dreamdisplays.media.player.MediaPlayer.Companion.INIT_EXECUTOR
-import com.dreamdisplays.media.player.subtitle.SubtitleCue
-import com.dreamdisplays.media.player.subtitle.WebVttParser
-import com.dreamdisplays.util.net.DreamHttpClient
 import com.dreamdisplays.media.player.events.PlayerEvents
 import com.dreamdisplays.media.player.managers.PlaybackSessionManager
 import com.dreamdisplays.media.player.managers.StatsReporter
@@ -26,7 +22,9 @@ import com.dreamdisplays.media.player.process.HwAccelBackend
 import com.dreamdisplays.media.player.process.MediaProcess
 import com.dreamdisplays.media.player.stream.ActiveStreams
 import com.dreamdisplays.media.player.stream.MediaStreamSelector
+import com.dreamdisplays.media.player.subtitle.SubtitleController
 import com.dreamdisplays.media.player.util.MediaUtil
+import com.dreamdisplays.media.player.util.MediaUtil.ms
 import com.dreamdisplays.media.player.util.daemon
 import com.dreamdisplays.media.runtime.security.MediaHostGuard
 import org.slf4j.LoggerFactory
@@ -37,88 +35,55 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 
-/**
- * Manages media playback lifecycle: stream selection, FFmpeg, playback state, error handling.
- */
+/** Manages media playback lifecycle: stream selection, `FFmpeg`, playback state, error handling. */
 class MediaPlayer(
-    private val youtubeUrl: String,
+    private val url: String,
     private val lang: String,
     private val host: PlaybackHost,
     private val env: PlaybackEnvironment,
-    replayBootstrap: ReplayBootstrap? = null,
+    @Volatile private var replayBootstrap: ReplayBootstrap? = null,
     private val audioStage: AudioDspStage? = null,
 ) {
-    /** One-shot native packet-cache bootstrap for display reappearance (includes optional audio PCM). */
-    data class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long, val audioPcm: ByteArray? = null) {
-        /** Cached resolved streams for fast reappear (null = skip / re-resolve). */
-        var prepared: PreparedMedia? = null
-    }
-
-    companion object {
-        private val logger = LoggerFactory.getLogger(javaClass)
-
-        /** Debug. */
-        val DEBUG: Boolean = System.getProperty("dreamdisplays.debug")?.toBoolean() == true
-                || System.getenv("DREAMDISPLAYS_DEBUG").let { it == "1" || it.equals("true", ignoreCase = true) }
-
-        /** Capture samples. */
-        var captureSamples: Boolean = true
-
-        /** Sampler counter. */
-        internal val samplesIn = AtomicLong()
-
-        /** Frames to GPU. */
-        internal val framesToGpu = AtomicLong()
-
-        /** Dropped frames. */
-        internal val framesDropped = AtomicLong()
-
-        private const val MAX_FETCH_RETRIES = 3
-        private const val MAX_AUDIO_RESTARTS = 3
-        private const val AUDIO_RESTART_BUDGET_RESET_NS = 120_000_000_000L
-        private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
-        private const val QUALITY_STATUS_MAX_NS = 30_000_000_000L
-        private const val REPEATED_STALL_WINDOW_NS = 90_000_000_000L
-        private val STALL_RERESOLVE_BACKOFF_MS = longArrayOf(0L, 2_000L, 5_000L, 15_000L, 30_000L)
-        private const val MAX_STALL_RERESOLVES = 6
-        private const val AUDIO_EOS_NEAR_END_GUARD_NS = 3_000_000_000L
-
-        private val REPLAY_LEAD_NS: Long =
-            (System.getProperty("dreamdisplays.replayLeadMs")?.toLongOrNull()?.coerceAtLeast(0L) ?: 0L) * 1_000_000L
-
-        private val INIT_THREAD_COUNTER = AtomicInteger()
-
-        private val INIT_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(
-            Runtime.getRuntime().availableProcessors().coerceIn(4, 8),
-        ) { r -> daemon(r, "MediaPlayer-init-${INIT_THREAD_COUNTER.incrementAndGet()}") }
-
-        private val SUBTITLE_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(2) { r ->
-            daemon(r, "MediaPlayer-subtitles-${INIT_THREAD_COUNTER.incrementAndGet()}")
-        }
-
-        private val RETRY_SCHEDULER: ScheduledExecutorService =
-            Executors.newSingleThreadScheduledExecutor { r -> daemon(r, "MediaPlayer-retry") }
-    }
-
     private val debugLabel = "${host.uuid}/${Integer.toHexString(System.identityHashCode(this))}"
     private val terminated = AtomicBoolean(false)
-    private val restartPending = AtomicBoolean(false)
-    private val pauseRequested = AtomicBoolean(false)
-    private val endedAtEnd = AtomicBoolean(false)
-    private val audioTrackSwitching = AtomicBoolean(false)
-    private val qualitySwitching = AtomicBoolean(false)
-    private val qualitySwitchStartedNanos = AtomicLong(0L)
     private val clock = PlaybackClock()
-    private val state = AtomicReference(PlaybackState.IDLE)
-    private val replayBootstrapRef = AtomicReference(replayBootstrap)
-    private val primedStartPositionNanos = AtomicLong(-1L)
-    private val preparedBootstrapRef = AtomicReference(replayBootstrap?.prepared)
-    private val replayVideoActive = AtomicBoolean(false)
     private val startedFromReplay = replayBootstrap != null
     private val retryPolicy = RetryPolicy(MAX_FETCH_RETRIES)
 
+    @Volatile
+    private var lifecycle: PlayerState = PlayerState.Idle
+
+    @Volatile
+    private var media: ResolvedMedia? = null
+
+    @Volatile
+    private var qualitySwitch: QualitySwitch? = null
+
+    @Volatile
+    private var audioTrackSwitching = false
+
+    private var pauseRequested = false
+    private var restartPending = false
+    private var hwAccelDisabled = false
+    private var lastRequestedQuality = 0
+    private var sessionStartNanos = 0L
+    private var sessionStartOffsetNanos = 0L
+    private var lastStallNanos = 0L
+    private var stallReResolves = 0
+    private var audioRestartAttempts = 0
+    private var lastAudioFailureNanos = 0L
+
+    private var preparedBootstrap: PreparedMedia? = replayBootstrap?.prepared
+
+    private val state: PlayerState get() = if (terminated.get()) PlayerState.Stopped else lifecycle
+
+    private val isReady: Boolean get() = state.isReady
+
+    @Volatile
+    private var primedStartPositionNanos = -1L
+
     private val events = PlayerEvents(
-        onError = { e -> state.set(PlaybackState.ERROR); host.mediaError = e },
+        onError = { e -> onControl { lifecycle = PlayerState.Error }; host.mediaError = e },
         onSeek = { host.afterSeek() },
     )
 
@@ -135,15 +100,9 @@ class MediaPlayer(
         isLive = { liveStream },
     )
 
-    @Volatile
-    private var lastStallNanos = 0L
-    private var stallReResolves = 0
-    private val audioRestartAttempts = AtomicInteger(0)
+    private enum class InitGate { IDLE, RUNNING, RUNNING_QUEUED }
 
-    @Volatile
-    private var lastAudioFailureNanos = 0L
-    private val initializing = AtomicBoolean(false)
-    private val initQueued = AtomicBoolean(false)
+    private val initGate = AtomicReference(InitGate.IDLE)
 
     private val watchdog = StreamWatchdog(
         debugLabel = debugLabel,
@@ -162,93 +121,150 @@ class MediaPlayer(
         onStreamEnd = ::handleStreamEnd,
         onQualitySwitchAborted = { appliedAnyway -> handleQualitySwitchAborted(appliedAnyway) },
         onAudioFailure = { stderr -> handleAudioFailure(stderr) },
-        onAudioTrackSwitchSettled = { audioTrackSwitching.set(false) },
+        onAudioTrackSwitchSettled = { onControl { audioTrackSwitching = false } },
         renderExecutor = env.renderExecutor,
         uploaderFactory = env.uploaderFactory,
         gpuYuvActive = env.config.gpuYuvActive,
         audioStage = audioStage,
     )
 
-    private val controlExecutor = Executors.newSingleThreadExecutor { daemon(it, "MediaPlayer-ctrl") }
+    @Volatile
+    private var controlThread: Thread? = null
+    private val controlExecutor = Executors.newSingleThreadExecutor { r ->
+        daemon(r, "MediaPlayer-ctrl").also { controlThread = it }
+    }
+
     private val initCallbacks = CopyOnWriteArrayList<() -> Unit>()
-    private val initDrained = AtomicBoolean(false)
 
     @Volatile
-    private var streams: ActiveStreams? = null
+    private var initDrained = false
 
-    @Volatile
-    private var subtitleTracks: List<SubtitleTrack> = []
+    private val subtitles = SubtitleController(debugLabel) { terminated.get() }
 
-    @Volatile
-    private var subtitleTrack: SubtitleTrack? = null
+    private var streams: ActiveStreams?
+        get() = media?.streams
+        set(value) {
+            media = if (value == null) null else media?.copy(streams = value)
+        }
 
-    @Volatile
-    private var subtitleCues: List<SubtitleCue> = []
-    private val subtitlesEnabled = AtomicBoolean(false)
+    private var lastQuality: Int
+        get() = media?.quality ?: 0
+        set(value) {
+            media = media?.copy(quality = value)
+        }
 
-    // Bumped on every setSubtitleTrack call
-    private val subtitleFetchId = AtomicInteger(0)
-
-    @Volatile
-    private var liveStream = false
-
-    @Volatile
-    private var seekable = false
-
-    @Volatile
-    private var durationHintNanos = 0L
-
-    @Volatile
-    private var lastQuality = 0
-
-    @Volatile
-    private var lastRequestedQuality = 0
-
-    @Volatile
-    private var pendingQualityRollback: QualityRollback? = null
+    private val liveStream: Boolean get() = media?.live == true
+    private val seekable: Boolean get() = media?.seekable == true
+    private val durationHintNanos: Long get() = media?.durationNanos ?: 0L
 
     @Volatile
     private var brightness = 1.0
-
-    @Volatile
-    private var hwAccelDisabled = false
-
-    @Volatile
-    private var sessionStartNanos = 0L
-
-    @Volatile
-    private var sessionStartOffsetNanos = 0L
 
     private val volume = VolumeController(env.config.defaultDisplayVolume) {
         sessionManager.setVolume(it)
     }
 
-    private class QualityRollback(val previousStreams: ActiveStreams, val previousQuality: Int, val target: Int)
+    companion object {
+        private val logger = LoggerFactory.getLogger(javaClass)
+
+        val DEBUG: Boolean = System.getProperty("dreamdisplays.debug")?.toBoolean() == true
+                || System.getenv("DREAMDISPLAYS_DEBUG").let { it == "1" || it.equals("true", ignoreCase = true) }
+
+        var captureSamples: Boolean = true
+
+        internal val samplesIn = AtomicLong()
+        internal val framesToGpu = AtomicLong()
+        internal val framesDropped = AtomicLong()
+
+        private const val MAX_FETCH_RETRIES = 3
+        private const val MAX_AUDIO_RESTARTS = 3
+        private const val AUDIO_RESTART_BUDGET_RESET_NS = 120_000_000_000L
+        private const val HWACCEL_FAIL_WINDOW_NS = 5_000_000_000L
+        private const val QUALITY_STATUS_MAX_NS = 30_000_000_000L
+        private const val REPEATED_STALL_WINDOW_NS = 90_000_000_000L
+        private val STALL_RERESOLVE_BACKOFF_MS = longArrayOf(0L, 2_000L, 5_000L, 15_000L, 30_000L)
+        private const val MAX_STALL_RERESOLVES = 6
+        private const val AUDIO_EOS_NEAR_END_GUARD_NS = 3_000_000_000L
+
+        private val INIT_THREAD_COUNTER = AtomicInteger()
+
+        private val INIT_EXECUTOR: ExecutorService = Executors.newFixedThreadPool(
+            Runtime.getRuntime().availableProcessors().coerceIn(4, 8),
+        ) { r -> daemon(r, "MediaPlayer-init-${INIT_THREAD_COUNTER.incrementAndGet()}") }
+
+        private val RETRY_SCHEDULER: ScheduledExecutorService =
+            Executors.newSingleThreadScheduledExecutor { r -> daemon(r, "MediaPlayer-retry") }
+    }
+
+    /** One-shot native packet-cache bootstrap for display reappearance. */
+    class ReplayBootstrap(val snapshot: ByteArray, val positionNanos: Long) {
+        var prepared: PreparedMedia? = null
+    }
 
     init {
-        // Show cached replay video immediately (network-free) so a reappearing display is instant,
-        // in parallel with the live stream resolve happening on the init executor.
-        replayBootstrap?.let { boot -> safeExecute { startReplayBootstrapVideo(boot) } }
+        this.replayBootstrap?.let { boot -> safeExecute { startReplayBootstrapVideo(boot) } }
         dispatchInitialize()
     }
 
     /** Resumes playback from the current seek position. No-op if already playing. */
-    fun play() = safeExecute(::doPlay)
+    fun play() = safeExecute {
+        if (!isReady || terminated.get()) return@safeExecute
+        pauseRequested = false
+        if (isPausedWarm()) {
+            sessionManager.resume()
+            lifecycle = PlayerState.Playing
+            watchdog.start()
+            return@safeExecute
+        }
+        if (sessionManager.isPlaying) return@safeExecute
+        val ss = streams ?: return@safeExecute
+        if (liveStream) {
+            logger.debug("$debugLabel Live resume from cold pause; re-resolving playlist URLs.")
+            env.cacheInvalidator.invalidate(url)
+            forgetResolvedStreamUrls()
+            primedStartPositionNanos = 0L
+            lifecycle = PlayerState.Restarting
+            dispatchInitialize(coalesce = true)
+            return@safeExecute
+        }
+        val offset = if (lifecycle == PlayerState.Ended) 0L else clock.originNanos
+        startStreams(ss, offset)
+    }
 
     /** Pauses playback, capturing the current position for later resume. */
-    fun pause() = safeExecute(::doPause)
-
-    /** True when the session can be parked warm (steady in-process-libav playback). Read from any thread. */
-    fun canPark(): Boolean = isReady && sessionManager.canPark()
+    fun pause() = safeExecute {
+        pauseRequested = true
+        if (!sessionManager.isPlaying) return@safeExecute
+        if (!liveStream) {
+            watchdog.stop()
+            if (sessionManager.suspend(allowExternalProcess = true, retainBuffered = true)) {
+                lifecycle = PlayerState.Paused
+                return@safeExecute
+            }
+        }
+        val heard = sessionManager.currentPacingNanos()
+        clock.reset(
+            when {
+                liveStream -> 0L
+                heard >= 0L -> heard
+                else -> clock.currentTime()
+            }
+        )
+        lifecycle = PlayerState.Paused
+        stopSession()
+    }
 
     /**
-     * Parks the player warm while its display sits out of render distance: the decoder + audio line stay
-     * open and idle (position frozen), so [unpark] resumes instantly with no re-resolve or cold-decode.
-     * No-op (and the caller should fall back to a full stop) when the session is not parkable.
+     * `true` when the session can be parked warm.
+     *
+     * Read from any thread.
      */
+    fun canPark(): Boolean = isReady && sessionManager.canPark()
+
+    /** Parks the player warm while its display sits out of render distance. */
     fun park() = safeExecute {
         watchdog.stop()
-        if (!sessionManager.suspend()) watchdog.start() // Not parkable after all -> keep playing normally
+        if (!sessionManager.suspend()) watchdog.start()
     }
 
     /** Resumes a [park]ed player from its frozen position. */
@@ -262,7 +278,6 @@ class MediaPlayer(
     /** Stops playback permanently; the instance must not be used after this call. */
     fun stop() {
         if (terminated.getAndSet(true)) return
-        state.set(PlaybackState.STOPPED)
         val submitted = runCatching {
             controlExecutor.submit {
                 try {
@@ -277,7 +292,7 @@ class MediaPlayer(
         }
     }
 
-    /** Seeks to an absolute position in nanos. [fire] triggers [DisplayScreen.afterSeek]. */
+    /** Seeks to an absolute position in nanos. */
     fun seekTo(nanos: Long, fire: Boolean) = safeExecute { doSeek(nanos, fire) }
 
     /** Seeks [s] seconds relative to the current position. */
@@ -288,7 +303,11 @@ class MediaPlayer(
         doSeek((getCurrentTime() + (s * 1e9).toLong()).coerceIn(0, max), true)
     }
 
-    /** Current playback position in nanos. Falls back to the frozen / seek offset when paused or not started. */
+    /**
+     * Current playback position in nanos.
+     *
+     * Falls back to the frozen / seek offset when paused or not started.
+     */
     fun getCurrentTime(): Long {
         sessionManager.parkedPositionNanos()?.let { return it }
         if (!isReady || !sessionManager.isPlaying) return clock.originNanos
@@ -296,7 +315,9 @@ class MediaPlayer(
     }
 
     /**
-     * Position to save / resume from. Identical to [getCurrentTime] in normal playback, but while a replay -> live bridge
+     * Position to save / resume from.
+     *
+     * Identical to [getCurrentTime] in normal playback, but while a replay -> live bridge
      * is active it prefers the parked or bridge-edge position instead.
      */
     fun getResumePositionNanos(): Long =
@@ -307,102 +328,134 @@ class MediaPlayer(
 
     /** Primes the first live start offset before initialization opens the decoder. */
     fun primeStartPosition(nanos: Long) {
-        if (nanos >= 0L && !sessionManager.isPlaying) primedStartPositionNanos.set(nanos)
+        if (nanos >= 0L && !sessionManager.isPlaying) primedStartPositionNanos = nanos
     }
 
-    /** True when this player resumed from a cached replay bootstrap (already positioned at the saved time). */
+    /** `true` when this player resumed from a cached replay bootstrap (already positioned at the saved time). */
     fun isResumingFromReplay(): Boolean = startedFromReplay
 
     /**
      * Runs [callback] immediately if already initialized, otherwise queues it for when
-     * initialization completes. The callback is called on the init thread.
+     * initialization completes.
+     *
+     * The callback is called on the init thread.
      */
     fun whenInitialized(callback: () -> Unit) {
-        if (initDrained.get() || isReady) {
+        if (initDrained || isReady) {
             callback(); return
         }
         initCallbacks.add(callback)
-        if ((initDrained.get() || isReady) && initCallbacks.remove(callback)) callback()
+        if ((initDrained || isReady) && initCallbacks.remove(callback)) callback()
     }
 
     /**
-     * Returns true if the stream is a live stream. Livestreams start playing immediately
-     * and may not support seeking. Based on `yt-dlp` metadata; not always perfectly reliable.
+     * Livestreams start playing immediately and may not support seeking.
+     *
+     * @return `true` if the stream is a live stream.
      */
     fun isLive(): Boolean = liveStream
 
-    /** Returns true if the stream supports seeking. */
+    /** @return `true` if the stream supports seeking. */
     fun canSeek(): Boolean = isReady && seekable
 
-    /** Returns true once active playback is advancing (first frame arrived, not paused / parked). */
+    /** @return `true` once active playback is advancing (first frame arrived, not paused / parked). */
     fun isClockRunning(): Boolean =
         sessionManager.isPlaying && !sessionManager.isParked() && clock.isRunning
 
-    /** Connects or disconnects the popout window sink. Pass null to detach. */
+    /**
+     * Connects or disconnects the popout window sink.
+     *
+     * Pass `null` to detach.
+     */
     fun setPopoutSink(sink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?) {
         sessionManager.popoutFrameSink = sink
     }
 
-    /** Connects or disconnects the display menu preview sink. Pass null to detach. */
+    /**
+     * Connects or disconnects the display menu preview sink.
+     *
+     * Pass `null` to detach.
+     */
     fun setPreviewSink(sink: ((ByteBuffer, Int, Int, FramePixelFormat) -> Unit)?) {
         sessionManager.previewFrameSink = sink
     }
 
-    /** True once the first decoded frame is ready for GPU upload. */
+    /** `true` once the first decoded frame is ready for GPU upload. */
     fun textureFilled(): Boolean = sessionManager.textureFilled()
 
     /** Discards any ready raw frame so the renderer will not show stale content after a timeline jump. */
     fun clearFrame() = sessionManager.clearFrame()
 
     /**
-     * Uploads latest decoded frame to texture (render thread only).
+     * Uploads latest decoded frame to texture.
+     *
+     * Render thread only.
      */
     fun updateFrame(texture: GpuTextureRef, w: Int, h: Int): Boolean =
         sessionManager.updateFrame(texture, w, h)
 
-    /** Uploads the latest planar I420 frame into the three plane textures. Returns true if uploaded. Render thread only. */
+    /**
+     * Uploads the latest planar I420 frame into the three plane textures.
+     *
+     * Render thread only.
+     *
+     * @return `true` if uploaded.
+     */
     fun updateFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, w: Int, h: Int): Boolean =
         sessionManager.updateFramePlanar(y, u, v, w, h)
 
-    /** True while a parallel quality switch is warming up the new resolution. */
+    /** `true` while a parallel quality switch is warming up the new resolution. */
     fun hasIncomingVideo(): Boolean = sessionManager.hasIncoming()
 
-    /** Uploads the latest incoming (quality-switch) frame to [texture]. Returns true if uploaded. Render thread only. */
+    /**
+     * Uploads the latest incoming (quality-switch) frame to [texture].
+     *
+     * Render thread only.
+     *
+     * @return `true` if uploaded.
+     */
     fun updateIncomingFrame(texture: GpuTextureRef, w: Int, h: Int): Boolean =
         sessionManager.updateIncomingFrame(texture, w, h)
 
-    /** Uploads the latest incoming planar I420 frame into the staged plane textures. Returns true if uploaded. */
+    /**
+     * Uploads the latest incoming planar I420 frame into the staged plane textures.
+     *
+     * @return `true` if uploaded.
+     */
     fun updateIncomingFramePlanar(y: GpuTextureRef, u: GpuTextureRef, v: GpuTextureRef, w: Int, h: Int): Boolean =
         sessionManager.updateIncomingFramePlanar(y, u, v, w, h)
 
-    /** Promotes the warmed-up quality-switch channel to live; returns false if it was already aborted. */
+    /**
+     * Promotes the warmed-up quality-switch channel to live.
+     *
+     * @return `false` if it was already aborted.
+     */
     fun promoteIncomingVideo(): Boolean {
         val promoted = sessionManager.promoteIncoming()
-        if (promoted) {
-            pendingQualityRollback = null // The staged quality switch committed successfully
-            qualitySwitching.set(false)
-        }
+        if (promoted) onControl { qualitySwitch = null }
         return promoted
     }
 
     private fun handleQualitySwitchAborted(appliedAnyway: Boolean) {
         host.cancelQualityHandoff()
-        qualitySwitching.set(false)
-        val rollback = pendingQualityRollback
-        pendingQualityRollback = null
-        if (rollback == null || appliedAnyway) return
-        streams = rollback.previousStreams
-        lastQuality = rollback.previousQuality
-        host.videoContentAspect = rollback.previousStreams.currentVideo.contentAspect()
-        if (lastRequestedQuality == rollback.target) lastRequestedQuality = rollback.previousQuality
+        onControl {
+            val rollback = qualitySwitch?.rollback
+            qualitySwitch = null
+            if (rollback == null || appliedAnyway) return@onControl
+            media = media?.copy(streams = rollback.previousStreams, quality = rollback.previousQuality)
+            host.videoContentAspect = rollback.previousStreams.currentVideo.contentAspect()
+            if (lastRequestedQuality == rollback.target) lastRequestedQuality = rollback.previousQuality
+        }
     }
 
-    /** Sets the user-controlled volume (0.0–2.0). Distance attenuation is applied on top. */
+    /**
+     * Sets the user-controlled volume (0.0–2.0).
+     *
+     * Distance attenuation is applied on top.
+     */
     fun setVolume(volume: Float) = this.volume.setUserVolume(volume)
 
-    /**
-     * Seeds volume up-front (before audio starts) to avoid loud burst on reappear.
-     */
+    /** Seeds volume up-front (before audio starts) to avoid loud burst on reappear. */
     fun primeVolume(userVolume: Float, distance: Double, maxRadius: Double) {
         volume.setUserVolume(userVolume)
         volume.updateAttenuation(distance, maxRadius)
@@ -413,7 +466,7 @@ class MediaPlayer(
         this.brightness = brightness.toDouble().coerceIn(0.0, 2.0)
     }
 
-    /** Returns the list of available video quality levels (in pixels) for the current stream. */
+    /** @return the list of available video quality levels (in pixels) for the current stream. */
     fun getAvailableQualities(): List<Int> {
         val cap = if (env.config.isPremium) 2160 else 1080
         return streams?.availableVideo.orEmpty().asSequence()
@@ -422,17 +475,11 @@ class MediaPlayer(
             .distinct().sorted().toList()
     }
 
-    /**
-     * Switches to [quality]. [userInitiated] only controls whether the change is worth reporting through
-     * [isApplyingQuality]: the automatic distance ladder and settings restores re-push quality on their
-     * own and must stay silent, since the viewer never asked for anything.
-     */
+    /** Switches to [quality]. */
     fun setQuality(quality: VideoQuality, userInitiated: Boolean = false) =
         safeExecute { changeQuality(quality, userInitiated) }
 
-    /**
-     * Returns selectable audio tracks (deduped by language).
-     */
+    /** @return selectable audio tracks (deduped by language). */
     fun getAvailableAudioTracks(): List<MediaStream> {
         val audio = streams?.availableAudio?.filter { !it.type.hasVideo } ?: return []
         return audio
@@ -441,9 +488,7 @@ class MediaPlayer(
             .map { group -> group.maxByOrNull { it.bitrate ?: 0 } ?: group.first() }
     }
 
-    /**
-     * URL of currently-playing audio track for UI highlighting (null before stream resolves).
-     */
+    /** URL of currently-playing audio track for UI highlighting (`null` before stream resolves). */
     fun getCurrentAudioTrack(): String? {
         val current = streams?.currentAudio ?: return null
         val key = current.audioTrackLang ?: current.audioTrackName
@@ -455,74 +500,42 @@ class MediaPlayer(
     /** Switches the active audio track to the one identified by [trackUrl]. */
     fun setAudioTrack(trackUrl: String) = safeExecute { changeAudioTrack(trackUrl) }
 
-    /** True while a [setAudioTrack] switch is in flight; the actual audio can lag the UI selection by a few seconds. */
-    fun isSwitchingAudioTrack(): Boolean = audioTrackSwitching.get()
+    /** `true` while a [setAudioTrack] switch is in flight; the actual audio can lag the UI selection by a few seconds. */
+    fun isSwitchingAudioTrack(): Boolean = audioTrackSwitching
 
     /** Selectable subtitle tracks for the current video (empty when the source exposed none). */
-    fun getAvailableSubtitleTracks(): List<SubtitleTrack> = subtitleTracks
+    fun getAvailableSubtitleTracks(): List<SubtitleTrack> = subtitles.tracks
 
-    /** Language of the currently selected subtitle track, or null when subtitles are off. */
-    fun getCurrentSubtitleLang(): String? = subtitleTrack?.lang
+    /** Language of the currently selected subtitle track, or `null` when subtitles are off. */
+    fun getCurrentSubtitleLang(): String? = subtitles.currentLang
 
-    /** True while subtitles are enabled for this viewer, regardless of whether a cue is showing right now. */
-    fun isSubtitlesEnabled(): Boolean = subtitlesEnabled.get()
+    /** `true` while subtitles are enabled for this viewer, regardless of whether a cue is showing right now. */
+    fun isSubtitlesEnabled(): Boolean = subtitles.enabled
 
     /**
      * Selects the subtitle track by [lang] and enables display, or disables subtitles when [lang] is
-     * null /b lank. Fetches and parses the track's WebVTT file on a background thread; per-viewer only,
-     * never touches the decode pipeline.
+     * `null` or blank.
+     *
+     * Per-viewer only, never touches the decode pipeline.
      */
-    fun setSubtitleTrack(lang: String?) {
-        val wanted = lang?.takeIf { it.isNotBlank() }
-        if (wanted == null) {
-            subtitlesEnabled.set(false)
-            subtitleTrack = null
-            subtitleCues = []
-            return
-        }
-        val track = subtitleTracks.firstOrNull { it.lang == wanted } ?: return
-        subtitlesEnabled.set(true)
-        if (track == subtitleTrack) return
-        subtitleTrack = track
-        subtitleCues = []
-        val requestId = subtitleFetchId.incrementAndGet()
-        SUBTITLE_EXECUTOR.submit {
-            val cues = runCatching {
-                WebVttParser.parse(DreamHttpClient.readText(track.url))
-            }.onFailure { e ->
-                logger.debug("$debugLabel subtitle fetch failed for lang=$wanted: ${e.message}")
-            }.getOrDefault([])
-            if (!terminated.get() && subtitleFetchId.get() == requestId) subtitleCues = cues
-        }
-    }
+    fun setSubtitleTrack(lang: String?) = subtitles.select(lang)
 
-    /** Current subtitle line for [getCurrentTime], or null when subtitles are off or no cue is active. */
-    fun getCurrentSubtitleText(): String? {
-        if (!subtitlesEnabled.get()) return null
-        return WebVttParser.cueAt(subtitleCues, getCurrentTime())?.text
-    }
+    /** Current subtitle line for [getCurrentTime], or `null` when subtitles are off or no cue is active. */
+    fun getCurrentSubtitleText(): String? = subtitles.textAt(getCurrentTime())
 
     /**
      * True while a [setQuality] change is still being applied: the new resolution decodes in a second
      * channel and only replaces the picture once its first frame lands, so the switch outlives the click.
      */
     fun isApplyingQuality(): Boolean {
-        if (!qualitySwitching.get()) return false
-        // Every settle path below clears the flag, but a hint stuck on forever would be worse than one
-        // that disappears early, so it also expires on its own.
-        if (System.nanoTime() - qualitySwitchStartedNanos.get() > QUALITY_STATUS_MAX_NS) {
-            qualitySwitching.set(false)
-            return false
-        }
-        return true
+        val switch = qualitySwitch ?: return false
+        return switch.announced && System.nanoTime() - switch.startedNanos <= QUALITY_STATUS_MAX_NS
     }
 
-    private fun beginQualityStatus() {
-        qualitySwitchStartedNanos.set(System.nanoTime())
-        qualitySwitching.set(true)
-    }
-
-    /** Reopens the current stream without changing URL/quality; used when render backend requirements change. */
+    /**
+     * Reopens the current stream without changing URL / quality;
+     * used when render backend requirements change.
+     */
     fun restartVideoPipeline() = safeExecute {
         val ss = streams ?: return@safeExecute
         if (isPausedWarm()) freezePausedWarmSession()
@@ -539,73 +552,63 @@ class MediaPlayer(
     /** Captures the active native LAV packet-ring snapshot (whole window), if the live channel has one. */
     fun captureReplaySnapshot(): ByteArray? = sessionManager.captureVideoCacheSnapshot()
 
-    /** Captures the recent PCM window (matching the replay video lead) for the reappearance audio bridge. */
-    fun captureReplayAudio(): ByteArray? = sessionManager.captureAudioPcm(REPLAY_LEAD_NS)
-
-    /**
-     * Captures resolved streams for fast reappear (null for live streams or before init).
-     */
+    /** Captures resolved streams for fast reappear (`null` for live streams or before init). */
     fun capturePreparedMedia(): PreparedMedia? {
         if (liveStream) return null
         val ss = streams ?: return null
         return PreparedMedia(ss, liveStream, seekable, durationHintNanos)
     }
 
-    /**
-     * Raw stream URL for scrub-preview extraction (null for live or unresolved).
-     */
+    /** Raw stream URL for scrub-preview extraction (`null` for live or unresolved). */
     fun capturedStreamRawUrl(): String? = capturePreparedMedia()?.streamSet?.currentVideo?.url
 
-    /**
-     * Whether captured stream uses decode-forward seek path.
-     */
+    /** Whether captured stream uses decode-forward seek path. */
     fun capturedStreamSeeksByDecoding(): Boolean =
         capturePreparedMedia()?.streamSet?.currentVideo?.seekByDecoding == true
 
-    /**
-     * Updates distance-based volume attenuation (call every tick from game thread).
-     */
+    /** Updates distance-based volume attenuation (call every tick from game thread). */
     fun tick(distance: Double, maxRadius: Double) {
         if (!isReady) return
         volume.updateAttenuation(distance, maxRadius)
     }
 
+    private fun onControl(action: () -> Unit) {
+        if (Thread.currentThread() === controlThread) action() else safeExecute(action)
+    }
+
     private fun dispatchInitialize(coalesce: Boolean = false) {
         if (terminated.get()) return
-        if (!initializing.compareAndSet(false, true)) {
-            if (coalesce) initQueued.set(true)
+        if (!initGate.compareAndSet(InitGate.IDLE, InitGate.RUNNING)) {
+            if (coalesce) initGate.compareAndSet(InitGate.RUNNING, InitGate.RUNNING_QUEUED)
             return
         }
         INIT_EXECUTOR.submit {
             try {
                 if (!terminated.get()) initialize()
             } finally {
-                initializing.set(false)
-                if (initQueued.compareAndSet(true, false)) dispatchInitialize()
+                if (initGate.getAndSet(InitGate.IDLE) == InitGate.RUNNING_QUEUED) dispatchInitialize()
             }
         }
     }
 
     private fun initialize() {
-        state.set(PlaybackState.INITIALIZING)
+        onControl { lifecycle = PlayerState.Preparing }
         runCatching {
-            val prepared = preparedBootstrapRef.getAndSet(null)
-                ?: MediaPreparationService.prepare(youtubeUrl, lang, host.quality, env)
+            val prepared = preparedBootstrap?.also { preparedBootstrap = null }
+                ?: MediaPreparationService.prepare(url, lang, host.quality, env)
 
             if (terminated.get()) return
 
-            prepared.also {
-                liveStream = it.isLive
-                seekable = it.isSeekable
-                durationHintNanos = it.durationNanos
-                streams = it.streamSet
-                lastQuality = MediaStreamSelector.parseQuality(it.streamSet.currentVideo)
-                host.videoContentAspect = it.streamSet.currentVideo.contentAspect()
-                subtitleTracks = it.availableSubtitles
-                subtitleTrack = null
-                subtitleCues = []
-                subtitlesEnabled.set(false)
-            }
+            val resolved = ResolvedMedia(
+                streams = prepared.streamSet,
+                live = prepared.isLive,
+                seekable = prepared.isSeekable,
+                durationNanos = prepared.durationNanos,
+                quality = MediaStreamSelector.parseQuality(prepared.streamSet.currentVideo),
+            )
+            media = resolved
+            host.videoContentAspect = prepared.streamSet.currentVideo.contentAspect()
+            subtitles.reset(prepared.availableSubtitles)
 
             if (DEBUG) {
                 logger.debug(
@@ -618,15 +621,15 @@ class MediaPlayer(
                 stats.start()
             }
 
-            val primed = primedStartPositionNanos.get().takeIf { it >= 0L } ?: 0L
-            val initialOffset = if (liveStream) 0L else replayBootstrapRef.get()?.positionNanos ?: primed
+            val primed = primedStartPositionNanos.takeIf { it >= 0L } ?: 0L
+            val initialOffset = if (liveStream) 0L else replayBootstrap?.positionNanos ?: primed
 
             safeExecute { if (!terminated.get()) startStreams(prepared.streamSet, initialOffset) }
         }.onSuccess {
             drainInitCallbacks(run = true)
         }.onFailure { e ->
             logger.error("$debugLabel Initialization failed: ${e.message}.")
-            state.set(PlaybackState.ERROR)
+            onControl { lifecycle = PlayerState.Error }
             host.mediaError = e as? DreamMediaException
                 ?: DreamMediaException.Unknown(
                     e.message ?: "initialization failed",
@@ -638,31 +641,26 @@ class MediaPlayer(
 
     private fun startStreams(streamSet: ActiveStreams, offsetNanos: Long) {
         if (terminated.get()) return
-        if (pauseRequested.get()) {
-            // Paused while this was being resolved: honor that rather than starting under the viewer
+        if (pauseRequested) {
             logger.debug("$debugLabel Start skipped: playback was paused while the media was being prepared.")
-            state.set(PlaybackState.PAUSED)
+            lifecycle = PlayerState.Paused
             return
         }
-        endedAtEnd.set(false)
-        // Replay-only video may already be on screen (started at construction): attach the live source
-        // and hand off by PTS instead of cold-starting, so the picture never blanks.
-        val bootstrap = replayBootstrapRef.getAndSet(null)
+        if (lifecycle == PlayerState.Ended) lifecycle = PlayerState.Paused
+        val bootstrap = replayBootstrap?.also { replayBootstrap = null }
+        val replayActive = sessionManager.isBridging()
         logger.debug(
-            "$debugLabel [reappear] startStreams offset=${"%.1f".format(offsetNanos / 1_000_000.0)}ms " +
-                    "replayActive=${replayVideoActive.get()} bootstrap=${bootstrap != null} live=$liveStream",
+            "$debugLabel [reappear] startStreams offset=${ms(offsetNanos)}ms " +
+                    "replayActive=$replayActive bootstrap=${bootstrap != null} live=$liveStream",
         )
-        if (replayVideoActive.get() && bootstrap != null && !liveStream) {
+        if (replayActive && bootstrap != null && !liveStream) {
             if (attachLiveToReplay(streamSet, bootstrap.positionNanos)) return
             logger.debug("$debugLabel [reappear] attachLiveToReplay failed; falling back to cold start.")
-            replayVideoActive.set(false) // Attach failed: fall through to a normal cold start
         }
-        // A full restart decodes at the current texture's dimensions, so any staged quality handoff
-        // (which expects new dimensions) would never match and must be dropped to avoid a frozen frame.
         host.cancelQualityHandoff()
         sessionStartNanos = System.nanoTime()
         sessionStartOffsetNanos = offsetNanos
-        audioRestartAttempts.set(0)
+        audioRestartAttempts = 0
         lastAudioFailureNanos = 0L
         sessionManager.start(
             streamSet,
@@ -673,24 +671,20 @@ class MediaPlayer(
             onFirstFrame = retryPolicy::reset
         )
         if (sessionManager.isPlaying) {
-            state.set(PlaybackState.PLAYING)
+            lifecycle = PlayerState.Playing
             watchdog.start()
             refreshWarmAudioTracks()
-            // Settles the live quality path, which applies by restarting the whole session.
-            qualitySwitching.set(false)
+            qualitySwitch = qualitySwitch?.silenced()
         }
     }
 
     private fun startReplayBootstrapVideo(boot: ReplayBootstrap) {
         if (terminated.get()) return
-        val resume = (boot.positionNanos - REPLAY_LEAD_NS).coerceAtLeast(0L)
-        if (sessionManager.startReplayVideoOnly(boot.snapshot, resume, boot.positionNanos, boot.audioPcm)) {
-            replayVideoActive.set(true)
-            state.set(PlaybackState.PLAYING)
-            logger.debug("$debugLabel Replay bootstrap shown instantly, resuming at ${"%.1f".format(resume / 1_000_000.0)}ms.")
+        val resume = boot.positionNanos.coerceAtLeast(0L)
+        if (sessionManager.startReplayVideoOnly(boot.snapshot, resume, boot.positionNanos)) {
+            lifecycle = PlayerState.Playing
+            logger.debug("$debugLabel Replay bootstrap shown instantly, resuming at ${ms(resume)}ms.")
         }
-        // On failure the bootstrap is left in place (replayVideoActive stays false): startStreams then
-        // cold-starts at the saved position instead of attaching live to a replay that never started.
     }
 
     private fun attachLiveToReplay(streamSet: ActiveStreams, liveOffsetNanos: Long): Boolean {
@@ -700,9 +694,9 @@ class MediaPlayer(
             env.renderExecutor.execute { host.cancelQualityHandoff() }
             return false
         }
-        state.set(PlaybackState.PLAYING)
+        lifecycle = PlayerState.Playing
         watchdog.start()
-        logger.debug("$debugLabel Attached live after replay at ${"%.1f".format(liveOffsetNanos / 1_000_000.0)}ms.")
+        logger.debug("$debugLabel Attached live after replay at ${ms(liveOffsetNanos)}ms.")
         return true
     }
 
@@ -723,8 +717,8 @@ class MediaPlayer(
         sessionManager.stop()
     }
 
-    private fun handleStreamEnd(stderr: String, normalEos: Boolean) {
-        if (terminated.get()) return
+    private fun handleStreamEnd(stderr: String, normalEos: Boolean): Unit = onControl {
+        if (terminated.get()) return@onControl
         if (!hwAccelDisabled && !normalEos && !clock.isRunning
             && System.nanoTime() - sessionStartNanos < HWACCEL_FAIL_WINDOW_NS
             && HwAccelBackend.looksLikeHwAccelFailure(stderr)
@@ -739,44 +733,42 @@ class MediaPlayer(
             )
             val ss = streams
             val offset = if (liveStream) 0L else sessionStartOffsetNanos
-            if (ss != null) safeExecute { if (!terminated.get()) startStreams(ss, offset) }
-            return
+            if (ss != null) startStreams(ss, offset)
+            return@onControl
         }
 
         val decision = retryPolicy.evaluate(stderr, normalEos, liveStream)
         if (decision != null) {
             scheduleRetry(decision.invalidateCache)
-            return
+            return@onControl
         }
 
         if (normalEos && !liveStream) {
             if (host.shouldLoopOnEnd) {
                 restartFromBeginning()
             } else {
-                endedAtEnd.set(true)
-                safeExecute {
-                    stopSession()
-                    state.set(PlaybackState.PAUSED)
-                }
+                stopSession()
+                lifecycle = PlayerState.Ended
                 host.onPlaybackEnded(durationHintNanos)
             }
-            return
+            return@onControl
         }
 
         if (stderr.isNotEmpty()) {
             logger.error("$debugLabel Unrecoverable: ${MediaUtil.truncate(stderr)}.")
         }
-        state.set(PlaybackState.ERROR)
+        lifecycle = PlayerState.Error
         host.mediaError = DreamMediaException.Decode("Unrecoverable stream failure", isFatal = true)
     }
 
     private fun restartFromBeginning() {
-        if (!restartPending.compareAndSet(false, true)) return
+        if (restartPending) return
+        restartPending = true
         safeExecute {
             try {
                 val ss = streams
                 if (ss != null && !terminated.get() && !host.isPaused) {
-                    endedAtEnd.set(false)
+                    if (lifecycle == PlayerState.Ended) lifecycle = PlayerState.Paused
                     if (!sessionManager.beginSeek(ss, 0, lastQuality, currentHwAccel())) {
                         clock.reset(0)
                         startStreams(ss, 0)
@@ -784,7 +776,7 @@ class MediaPlayer(
                     events.onSeek()
                 }
             } finally {
-                restartPending.set(false)
+                restartPending = false
             }
         }
     }
@@ -793,70 +785,61 @@ class MediaPlayer(
         val delayMs = retryPolicy.nextDelay()
         logger.warn("$debugLabel ${if (invalidateCache) "Cache invalidated" else "Transient error"}. Retry ${retryPolicy.retries}/$MAX_FETCH_RETRIES in $delayMs ms.")
         if (invalidateCache) {
-            env.cacheInvalidator.invalidate(youtubeUrl)
+            env.cacheInvalidator.invalidate(url)
             forgetResolvedStreamUrls()
         }
-        state.set(PlaybackState.RESTARTING)
+        lifecycle = PlayerState.Restarting
         RETRY_SCHEDULER.schedule({ dispatchInitialize() }, delayMs, TimeUnit.MILLISECONDS)
     }
 
-    private fun handleAudioFailure(stderr: String) {
-        // A source with no audio track at all is not a failure to recover from: restarting it only
-        // produces the same empty output, which is how a silent video used to lock the player into an
-        // endless invalidate-and-re-resolve loop. Play it silently and stop spawning audio for it.
+    private fun handleAudioFailure(stderr: String): Unit = onControl {
         if (MediaProcess.indicatesNoAudioStream(stderr)) {
             val silentUrl = streams?.currentAudio?.url
             if (silentUrl == null || sessionManager.markSourceSilent(silentUrl)) {
                 logger.info("$debugLabel This source carries no audio track; playing it silently.")
             }
-            return
+            return@onControl
         }
         if (!liveStream && durationHintNanos > 0L && durationHintNanos - clock.currentTime() <= AUDIO_EOS_NEAR_END_GUARD_NS) {
             logger.debug("$debugLabel Audio pipe ended near VOD end (pos=${clock.currentTime()}, dur=$durationHintNanos); deferring to video EOS.")
-            return
+            return@onControl
         }
         if (liveStream && sessionManager.audioSourceGone()) {
             handleSessionStall("live audio source stopped serving")
-            return
+            return@onControl
         }
         if (liveStream && sessionManager.audioSpliced()) {
-            safeExecute {
-                val ss = streams
-                if (terminated.get() || ss == null) return@safeExecute
-                if (!sessionManager.restartAudio(ss, 0L)) {
-                    handleSessionStall("audio restart not possible in current session state")
-                }
-            }
-            return
+            restartAudioOrStall()
+            return@onControl
         }
         val now = System.nanoTime()
         if (lastAudioFailureNanos != 0L && now - lastAudioFailureNanos > AUDIO_RESTART_BUDGET_RESET_NS) {
-            audioRestartAttempts.set(0)
+            audioRestartAttempts = 0
         }
         lastAudioFailureNanos = now
-        val attempt = audioRestartAttempts.incrementAndGet()
+        val attempt = ++audioRestartAttempts
         if (liveStream && sessionManager.isPlaying && attempt <= MAX_AUDIO_RESTARTS) {
             logger.warn(
                 "$debugLabel Live audio ended (${MediaUtil.truncate(stderr)}); " +
                         "restarting audio only ($attempt/$MAX_AUDIO_RESTARTS), video keeps playing."
             )
-            RETRY_SCHEDULER.schedule({
-                safeExecute {
-                    val ss = streams
-                    if (terminated.get() || ss == null) return@safeExecute
-                    if (!sessionManager.restartAudio(ss, 0L)) {
-                        handleSessionStall("audio restart not possible in current session state")
-                    }
-                }
-            }, attempt * 1_000L, TimeUnit.MILLISECONDS)
-            return
+            RETRY_SCHEDULER.schedule({ safeExecute(::restartAudioOrStall) }, attempt * 1_000L, TimeUnit.MILLISECONDS)
+            return@onControl
         }
         handleSessionStall("audio ended: ${MediaUtil.truncate(stderr)}.")
     }
 
-    private fun handleSessionStall(reason: String) {
-        if (terminated.get()) return
-        val ss = streams ?: return
+    private fun restartAudioOrStall() {
+        val ss = streams
+        if (terminated.get() || ss == null) return
+        if (!sessionManager.restartAudio(ss, 0L)) {
+            handleSessionStall("audio restart not possible in current session state")
+        }
+    }
+
+    private fun handleSessionStall(reason: String): Unit = onControl {
+        if (terminated.get()) return@onControl
+        val ss = streams ?: return@onControl
         val now = System.nanoTime()
         val repeated = lastStallNanos != 0L && now - lastStallNanos < REPEATED_STALL_WINDOW_NS
         lastStallNanos = now
@@ -866,34 +849,28 @@ class MediaPlayer(
             val attempt = ++stallReResolves
             if (attempt > MAX_STALL_RERESOLVES) {
                 logger.error("$debugLabel $kind ($reason); giving up after $MAX_STALL_RERESOLVES re-resolves.")
-                state.set(PlaybackState.ERROR)
+                lifecycle = PlayerState.Error
                 host.mediaError = DreamMediaException.Decode("Stream keeps stalling", isFatal = true)
-                return
+                return@onControl
             }
             val delayMs = STALL_RERESOLVE_BACKOFF_MS[(attempt - 1).coerceAtMost(STALL_RERESOLVE_BACKOFF_MS.lastIndex)]
             logger.warn(
                 "$debugLabel $kind ($reason); invalidating cached URLs and re-resolving " +
                         "($attempt/$MAX_STALL_RERESOLVES, in $delayMs ms)."
             )
-            env.cacheInvalidator.invalidate(youtubeUrl)
+            env.cacheInvalidator.invalidate(url)
             forgetResolvedStreamUrls()
-            primedStartPositionNanos.set(if (liveStream) 0L else clock.currentTime())
-            state.set(PlaybackState.RESTARTING)
+            primedStartPositionNanos = if (liveStream) 0L else clock.currentTime()
+            lifecycle = PlayerState.Restarting
             if (delayMs == 0L) dispatchInitialize()
             else RETRY_SCHEDULER.schedule({ dispatchInitialize() }, delayMs, TimeUnit.MILLISECONDS)
         } else {
             logger.warn("$debugLabel Stream stalled ($reason); restarting.")
-            safeExecute {
-                val pos = if (liveStream) 0L else clock.currentTime()
-                // Restart in place when possible: the picture holds its last frame while the new
-                // session connects, instead of blanking through a blocking teardown.
-                if (sessionManager.beginSeek(ss, pos, lastQuality, currentHwAccel())) {
-                    // The watchdog stops itself when it reports a stall, and this path never goes
-                    // through startStreams, so nothing else would ever watch this session again.
-                    watchdog.start()
-                } else {
-                    startStreams(ss, pos)
-                }
+            val pos = if (liveStream) 0L else clock.currentTime()
+            if (sessionManager.beginSeek(ss, pos, lastQuality, currentHwAccel())) {
+                watchdog.start()
+            } else {
+                startStreams(ss, pos)
             }
         }
     }
@@ -904,59 +881,8 @@ class MediaPlayer(
         MediaHostGuard.invalidate(ss.currentAudio.url)
     }
 
-    private fun doPlay() {
-        if (!isReady || terminated.get()) return
-        pauseRequested.set(false)
-        if (isPausedWarm()) {
-            sessionManager.resume()
-            state.set(PlaybackState.PLAYING)
-            watchdog.start()
-            return
-        }
-        if (sessionManager.isPlaying) return
-        val ss = streams ?: return
-        if (liveStream) {
-            logger.debug("$debugLabel Live resume from cold pause; re-resolving playlist URLs.")
-            // A live playlist captured before the pause points at segments the server has already
-            // rotated away, so re-initializing on the cached resolve just hands FFmpeg dead URLs: it
-            // then spends its reconnect budget failing, trips the stall path, and only *then* does
-            // the re-resolve this branch always claimed to do — turning a resume into a minute of
-            // black screen. Drop the memo first so the very first attempt is a live one.
-            env.cacheInvalidator.invalidate(youtubeUrl)
-            forgetResolvedStreamUrls()
-            endedAtEnd.set(false)
-            primedStartPositionNanos.set(0L)
-            state.set(PlaybackState.RESTARTING)
-            dispatchInitialize(coalesce = true)
-            return
-        }
-        val offset = if (endedAtEnd.getAndSet(false)) 0L else clock.originNanos
-        startStreams(ss, offset)
-    }
-
-    private fun doPause() {
-        pauseRequested.set(true)
-        if (!sessionManager.isPlaying) return
-        if (!liveStream) {
-            watchdog.stop()
-            if (sessionManager.suspend(allowExternalProcess = true, retainBuffered = true)) {
-                state.set(PlaybackState.PAUSED)
-                return
-            }
-        }
-        val heard = sessionManager.currentPacingNanos()
-        clock.reset(
-            when {
-                liveStream -> 0L
-                heard >= 0L -> heard
-                else -> clock.currentTime()
-            }
-        )
-        state.set(PlaybackState.PAUSED)
-        stopSession()
-    }
-
     private fun doStop() {
+        lifecycle = PlayerState.Stopped
         sessionManager.clearFrame()
         stats.stop()
         stopSession()
@@ -966,10 +892,8 @@ class MediaPlayer(
 
     private fun doSeek(nanos: Long, fire: Boolean) {
         if (!isReady || !seekable) return
-        endedAtEnd.set(false)
+        if (lifecycle == PlayerState.Ended) lifecycle = PlayerState.Paused
         if (isPausedWarm()) freezePausedWarmSession()
-        // Park the clock at the target right away so the UI reads the seeked position, and so no
-        // pipe can pace one more frame against a half-updated timeline while the seek is set up.
         clock.reset(nanos)
         val ss = streams ?: return
         if (sessionManager.isPlaying && !sessionManager.isParked()) {
@@ -993,18 +917,16 @@ class MediaPlayer(
         lastRequestedQuality = target
         if (liveStream) {
             logger.debug("$debugLabel Live quality switch to ${target}p; re-resolving and restarting.")
-            // Cleared once the restarted session reaches [startStreams].
-            if (userInitiated) beginQualityStatus()
-            primedStartPositionNanos.set(0L)
-            state.set(PlaybackState.RESTARTING)
+            if (userInitiated) qualitySwitch = QualitySwitch(System.nanoTime(), announced = true, rollback = null)
+            primedStartPositionNanos = 0L
+            lifecycle = PlayerState.Restarting
             dispatchInitialize(coalesce = true)
             return
         }
         if (isPausedWarm()) freezePausedWarmSession()
         val newSs = MediaStreamSelector.switchQuality(ss, target) ?: return
         val previousQuality = lastQuality
-        streams = newSs
-        lastQuality = MediaStreamSelector.parseQuality(newSs.currentVideo)
+        media = media?.copy(streams = newSs, quality = MediaStreamSelector.parseQuality(newSs.currentVideo))
         host.videoContentAspect = newSs.currentVideo.contentAspect()
         env.renderExecutor.execute {
             if (sessionManager.isPlaying && !sessionManager.isParked()) {
@@ -1012,20 +934,25 @@ class MediaPlayer(
                 // decoding and rendering. The new resolution warms up in a second channel; fitTexture
                 // promotes both (channel + texture) on its first frame, so the picture never freezes.
                 // A genuine handoff failure rolls the metadata above back (see handleQualitySwitchAborted).
-                pendingQualityRollback = QualityRollback(ss, previousQuality, target)
-                // Announced only here: a real handoff outlives the click by seconds, whereas the direct
-                // swap below finishes inside this very block, so flagging it would only ever flicker.
-                if (userInitiated) beginQualityStatus()
                 host.beginQualityHandoff()
-                safeExecute { beginQualitySwitch(newSs, getCurrentTime()) }
+                safeExecute {
+                    // Announced only here: a real handoff outlives the click by seconds, whereas the direct
+                    // swap below finishes inside this very block, so flagging it would only ever flicker.
+                    qualitySwitch = QualitySwitch(
+                        System.nanoTime(), announced = userInitiated,
+                        rollback = QualityRollback(ss, previousQuality, target),
+                    )
+                    beginQualitySwitch(newSs, getCurrentTime())
+                }
             } else {
                 // Nothing decoding (so, just paused): no frames would arrive to drive a handoff, so swap
                 // directly — there's no async attempt in flight to roll back if this fails later.
-                pendingQualityRollback = null
                 host.reloadTexture()
-                safeExecute { clock.moveTo(getCurrentTime()) }
-                // A direct swap is done the moment it returns: there is no handoff to wait out.
-                qualitySwitching.set(false)
+                safeExecute {
+                    // A direct swap is done the moment it returns: there is no handoff to wait out.
+                    qualitySwitch = null
+                    clock.moveTo(getCurrentTime())
+                }
             }
         }
     }
@@ -1035,13 +962,15 @@ class MediaPlayer(
         if (trackUrl == ss.currentAudio.url) return
         val newSs = MediaStreamSelector.switchAudioTrack(ss, trackUrl) ?: return
         streams = newSs
-        audioTrackSwitching.set(true)
+        audioTrackSwitching = true
         val seamless = sessionManager.beginAudioTrackSwitch(newSs)
         refreshWarmAudioTracks()
         if (seamless) return
         env.renderExecutor.execute {
-            safeExecute { sessionManager.restartAudio(newSs, getCurrentTime()) }
-            audioTrackSwitching.set(false)
+            safeExecute {
+                sessionManager.restartAudio(newSs, getCurrentTime())
+                audioTrackSwitching = false
+            }
         }
     }
 
@@ -1060,23 +989,17 @@ class MediaPlayer(
     }
 
     private fun isPausedWarm(): Boolean =
-        state.get() == PlaybackState.PAUSED && sessionManager.isParked()
+        lifecycle == PlayerState.Paused && sessionManager.isParked()
 
     private fun freezePausedWarmSession() {
         val pos = sessionManager.parkedPositionNanos() ?: getCurrentTime()
         stopSession()
         clock.reset(pos)
-        state.set(PlaybackState.PAUSED)
-    }
-
-    private fun MediaStream.contentAspect(): Double {
-        val w = width ?: return 0.0
-        val h = height ?: return 0.0
-        return if (w > 0 && h > 0) w / h.toDouble() else 0.0
+        lifecycle = PlayerState.Paused
     }
 
     private fun drainInitCallbacks(run: Boolean) {
-        if (run) initDrained.set(true)
+        if (run) initDrained = true
         // Remove one at a time by identity so a callback added mid-drain is never wiped without running
         while (true) {
             val cb = initCallbacks.firstOrNull() ?: break
@@ -1088,8 +1011,4 @@ class MediaPlayer(
         if (!terminated.get() && !controlExecutor.isShutdown)
             runCatching { controlExecutor.submit(action) }
     }
-
-    private val isReady: Boolean
-        get() = state.get()
-            .let { it == PlaybackState.PLAYING || it == PlaybackState.PAUSED || it == PlaybackState.RESTARTING }
 }

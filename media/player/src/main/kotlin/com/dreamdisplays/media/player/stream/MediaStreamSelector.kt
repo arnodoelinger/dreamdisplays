@@ -8,13 +8,7 @@ import kotlin.math.abs
 
 /** Pure helpers for parsing quality values and picking video / audio tracks from a [MediaStream] list. */
 object MediaStreamSelector {
-    private val realtimeSafeSelection: Boolean =
-        System.getProperty("dreamdisplays.stream.realtimeSafe", "true").toBoolean()
-
-    private val defaultPreferFps60: Boolean = System.getProperty("dreamdisplays.stream.prefer60", "false").toBoolean()
-
-    private val defaultFps60Penalty: Int =
-        System.getProperty("dreamdisplays.stream.fps60Penalty", "420").toIntOrNull()?.coerceAtLeast(0) ?: 420
+    private const val FPS60_PENALTY = 420
 
     private val isMac: Boolean = OsInfo.isMac
     private val isWindows: Boolean = OsInfo.isWindows
@@ -66,7 +60,7 @@ object MediaStreamSelector {
      * the closest stream above it only when nothing at-or-below is available — a quality setting is
      * a ceiling, not just a target to get near, so this never silently serves more than asked for.
      */
-    fun pickVideo(streams: List<MediaStream>?, target: Int, preferFps60: Boolean = defaultPreferFps60): MediaStream? {
+    fun pickVideo(streams: List<MediaStream>?, target: Int, preferFps60: Boolean = false): MediaStream? {
         if (streams.isNullOrEmpty()) return null
         return streams.asSequence()
             .filter { it.height != null }
@@ -86,7 +80,7 @@ object MediaStreamSelector {
      * Human-readable selector explanation for debug logs. Keep it allocation-only-on-debug by
      * calling this from debug-only branches.
      */
-    fun describeVideoChoice(stream: MediaStream?, target: Int, preferFps60: Boolean = defaultPreferFps60): String {
+    fun describeVideoChoice(stream: MediaStream?, target: Int, preferFps60: Boolean = false): String {
         if (stream == null) return "none target=${target}p"
         return "selected=${stream.height ?: "?"}p" +
                 " fps=${stream.fps ?: "?"}" +
@@ -95,9 +89,7 @@ object MediaStreamSelector {
                 " target=${target}p" +
                 " score=${realtimeScore(stream, target, preferFps60)}" +
                 " codecPenalty=${platformCodecPenalty(stream)}" +
-                " fpsPenalty=${fpsPenalty(stream, preferFps60)}" +
-                " fps60Penalty=$defaultFps60Penalty" +
-                " realtimeSafe=$realtimeSafeSelection"
+                " fpsPenalty=${fpsPenalty(stream, preferFps60)}"
     }
 
     private fun realtimeScore(stream: MediaStream, target: Int, preferFps60: Boolean): Int {
@@ -106,7 +98,6 @@ object MediaStreamSelector {
     }
 
     private fun platformCodecPenalty(stream: MediaStream): Int {
-        if (!realtimeSafeSelection) return genericCodecRank(stream) * 32
         val height = stream.height ?: Int.MAX_VALUE
         return when {
             isMac -> when (codec(stream)) {
@@ -145,21 +136,11 @@ object MediaStreamSelector {
         return if (preferFps60) {
             if (fps >= 50.0) 0 else 48
         } else {
-            if (fps >= 50.0) defaultFps60Penalty else 0
+            if (fps >= 50.0) FPS60_PENALTY else 0
         }
     }
 
     private fun codec(stream: MediaStream): SupportedCodec = SupportedCodec.fromCodecName(stream.codec)
-
-    private fun genericCodecRank(stream: MediaStream): Int {
-        return when (codec(stream)) {
-            SupportedCodec.H264 -> 0
-            SupportedCodec.HEVC -> 1
-            SupportedCodec.VP9 -> 2
-            SupportedCodec.AV1 -> 3
-            SupportedCodec.UNKNOWN -> 4
-        }
-    }
 
     /** Pick the best audio stream for [lang], falling back to default / first available. */
     fun pickAudio(audioStreams: List<MediaStream>, lang: String, chosenVideo: MediaStream?): MediaStream? {

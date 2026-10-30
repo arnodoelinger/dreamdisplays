@@ -1,6 +1,7 @@
 //! End-to-end smoke test against a real `FFmpeg` binary.
 
-use dreamdisplays_native::session::{PixFmt, READ_EOF, READ_OK, Sessions};
+use dreamdisplays_native::convert;
+use dreamdisplays_native::session::{READ_EOF, READ_OK, Sessions};
 
 fn find_ffmpeg() -> Option<String> {
     if let Ok(p) = std::env::var("DD_TEST_FFMPEG") {
@@ -20,97 +21,49 @@ fn find_ffmpeg() -> Option<String> {
         .map(|p| p.to_string())
 }
 
-fn run_pipe(pix: PixFmt, vf: &str, frames: u32) {
-    let Some(ffmpeg) = find_ffmpeg() else {
-        eprintln!("Skipping: no FFmpeg binary found.");
-        return;
-    };
-    let (w, h) = (64u32, 48u32);
-    let args: Vec<String> = [
-        &ffmpeg,
+fn test_args(ffmpeg: &str, w: u32, h: u32, rate: u32) -> Vec<String> {
+    [
+        ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
         "-f",
         "lavfi",
         "-i",
-        &format!("testsrc=duration=1:size={w}x{h}:rate={frames}"),
+        &format!("testsrc=duration=1:size={w}x{h}:rate={rate}"),
         "-vf",
-        vf,
+        "format=nv12",
         "-f",
         "rawvideo",
         "-",
     ]
     .iter()
     .map(|s| s.to_string())
-    .collect();
-
-    let sessions = Sessions::new();
-    let handle = sessions.open(&args, w, h, pix);
-    assert_ne!(handle, 0, "Ffmpeg failed to spawn.");
-
-    let mut dst = vec![0u8; (w * h * 3) as usize];
-    let mut got = 0u32;
-    loop {
-        match sessions.read_frame(handle, &mut dst, 1000) {
-            READ_OK => got += 1,
-            READ_EOF => break,
-            rc => panic!(
-                "read_frame failed: {rc}, stderr: {}",
-                stderr_of(&sessions, handle)
-            ),
-        }
-    }
-    assert_eq!(
-        got,
-        frames,
-        "frame count mismatch; stderr: {}",
-        stderr_of(&sessions, handle)
-    );
-    assert_eq!(sessions.exit_code(handle, 2000), 0);
-    sessions.close(handle);
+    .collect()
 }
 
-fn run_pipe_rgba(pix: PixFmt, vf: &str, frames: u32) {
+/// Reads every frame of a 1 s test source through `read`, checking each with `check`.
+fn run_pipe(frame_bytes: usize, read: fn(&Sessions, i64, &mut [u8]) -> i32, check: fn(&[u8])) {
     let Some(ffmpeg) = find_ffmpeg() else {
         eprintln!("Skipping: no FFmpeg binary found.");
         return;
     };
-    let (w, h) = (64u32, 48u32);
-    let args: Vec<String> = [
-        &ffmpeg,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-f",
-        "lavfi",
-        "-i",
-        &format!("testsrc=duration=1:size={w}x{h}:rate={frames}"),
-        "-vf",
-        vf,
-        "-f",
-        "rawvideo",
-        "-",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
-
+    let (w, h, frames) = (64u32, 48u32, 10u32);
     let sessions = Sessions::new();
-    let handle = sessions.open(&args, w, h, pix);
+    let handle = sessions.open(&test_args(&ffmpeg, w, h, frames), w, h);
     assert_ne!(handle, 0, "Ffmpeg failed to spawn.");
 
-    let mut dst = vec![0u8; (w * h * 4) as usize];
+    let mut dst = vec![0u8; frame_bytes];
     let mut got = 0u32;
     loop {
-        match sessions.read_frame_rgba(handle, &mut dst, 1000) {
+        match read(&sessions, handle, &mut dst) {
             READ_OK => {
                 got += 1;
-                assert!(dst.chunks_exact(4).all(|px| px[3] == 0xff));
+                check(&dst);
             }
             READ_EOF => break,
             rc => panic!(
-                "read_frame_rgba failed: {rc}, stderr: {}",
+                "read failed: {rc}, stderr: {}",
                 stderr_of(&sessions, handle)
             ),
         }
@@ -132,23 +85,21 @@ fn stderr_of(sessions: &Sessions, handle: i64) -> String {
 }
 
 #[test]
-fn nv12_pipe_end_to_end() {
-    run_pipe(PixFmt::Nv12, "format=nv12", 10);
-}
-
-#[test]
-fn rgb24_pipe_end_to_end() {
-    run_pipe(PixFmt::Rgb24, "format=rgb24", 10);
-}
-
-#[test]
 fn nv12_pipe_rgba_end_to_end() {
-    run_pipe_rgba(PixFmt::Nv12, "format=nv12", 10);
+    run_pipe(
+        64 * 48 * 4,
+        |s, h, dst| s.read_frame_rgba(h, dst, 1000),
+        |dst| assert!(dst.chunks_exact(4).all(|px| px[3] == 0xff)),
+    );
 }
 
 #[test]
-fn rgb24_pipe_rgba_end_to_end() {
-    run_pipe_rgba(PixFmt::Rgb24, "format=rgb24", 10);
+fn nv12_pipe_i420_end_to_end() {
+    run_pipe(
+        convert::nv12_frame_size(64, 48),
+        |s, h, dst| s.read_frame_i420(h, dst),
+        |_| {},
+    );
 }
 
 #[test]
@@ -159,34 +110,26 @@ fn kill_unblocks_reader() {
     };
     // Infinite source: the reader would block forever unless kill() unblocks it
     let (w, h) = (64u32, 48u32);
-    let args: Vec<String> = [
-        &ffmpeg,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-f",
-        "lavfi",
-        "-i",
-        &format!("testsrc=size={w}x{h}:rate=5"),
-        "-vf",
-        "format=nv12",
-        "-f",
-        "rawvideo",
-        "-",
-    ]
-    .iter()
-    .map(|s| s.to_string())
-    .collect();
+    let args: Vec<String> = test_args(&ffmpeg, w, h, 5)
+        .into_iter()
+        .map(|a| {
+            if a.starts_with("testsrc=") {
+                format!("testsrc=size={w}x{h}:rate=5")
+            } else {
+                a
+            }
+        })
+        .collect();
 
     let sessions = std::sync::Arc::new(Sessions::new());
-    let handle = sessions.open(&args, w, h, PixFmt::Nv12);
+    let handle = sessions.open(&args, w, h);
     assert_ne!(handle, 0);
 
     let s2 = std::sync::Arc::clone(&sessions);
     let reader = std::thread::spawn(move || {
-        let mut dst = vec![0u8; (w * h * 3) as usize];
+        let mut dst = vec![0u8; (w * h * 4) as usize];
         loop {
-            if s2.read_frame(handle, &mut dst, 1000) != READ_OK {
+            if s2.read_frame_rgba(handle, &mut dst, 1000) != READ_OK {
                 break;
             }
         }

@@ -2,7 +2,6 @@ package com.dreamdisplays.media.player.pipeline
 
 import com.dreamdisplays.api.media.audio.AudioDspStage
 import com.dreamdisplays.media.player.MediaPlayer
-import com.dreamdisplays.media.player.pipeline.AudioSink.Companion.PCM_RING_MAX_BYTES
 import com.dreamdisplays.media.player.util.MediaBufferEffects
 import com.dreamdisplays.media.player.util.MediaUtil
 import com.dreamdisplays.media.player.util.daemon
@@ -36,7 +35,6 @@ internal class AudioSink(private val debugLabel: String) {
         private const val PACE_RECOVER_CHUNKS = 400
         private const val OPEN_RETRIES = 3
         private const val RETRY_DELAY_MS = 200L
-        private const val PCM_RING_MAX_BYTES = SAMPLE_RATE * BYTES_PER_FRAME * 30
         private const val CATCHUP_MIN_NANOS = 40_000_000L
         private const val CATCHUP_MAX_PASSES = 4
         private const val MAX_RESYNC_NANOS = 5_000_000_000L
@@ -65,7 +63,6 @@ internal class AudioSink(private val debugLabel: String) {
     private class LineSession(
         @JvmField val epoch: Int,
         @JvmField val originKnown: Boolean,
-        @JvmField val preludeFrames: Long,
         @Volatile @JvmField var contentStartNanos: Long,
     ) {
 
@@ -77,11 +74,6 @@ internal class AudioSink(private val debugLabel: String) {
         @Volatile
         @JvmField
         var pcmFlowing = false
-
-        /** False while a bridge is still playing its cached prelude; see [AudioSink.onBridgeHandoff]. */
-        @Volatile
-        @JvmField
-        var exposeLiveClock = preludeFrames == 0L
     }
 
     /**
@@ -118,23 +110,12 @@ internal class AudioSink(private val debugLabel: String) {
     fun sampleClock(): ClockSample {
         val s = current ?: return ClockSample.NONE
         val ln = s.line ?: return ClockSample.NONE
-        if (!s.exposeLiveClock || !s.pcmFlowing) return ClockSample.NONE
-        val live = ln.longFramePosition - s.preludeFrames
-        if (live < 0L) return ClockSample.NONE
-        return ClockSample(s.contentStartNanos + framesToNanos(live), s.epoch, s.originKnown)
+        if (!s.pcmFlowing) return ClockSample.NONE
+        return ClockSample(s.contentStartNanos + framesToNanos(ln.longFramePosition), s.epoch, s.originKnown)
     }
 
     @Volatile
-    private var liveGate: CountDownLatch? = null
-
-    @Volatile
-    private var liveProc: Process? = null
-
-    @Volatile
     private var parked: AtomicBoolean? = null
-
-    @Volatile
-    private var liveStderrBuf: StringBuilder? = null
 
     /** Installs the session park flag (see [parked]); set once by the owning session manager. */
     fun setParkFlag(flag: AtomicBoolean?) {
@@ -168,12 +149,11 @@ internal class AudioSink(private val debugLabel: String) {
         logger.debug("$debugLabel [audio] re-synced by skipping ${bytesToNanos(skipped) / 1_000_000} ms of PCM.")
     }
 
-    private fun beginSession(contentStartNanos: Long, originKnown: Boolean, preludeFrames: Long = 0L): LineSession {
+    private fun beginSession(contentStartNanos: Long, originKnown: Boolean): LineSession {
         val session = synchronized(sessionLock) {
-            LineSession(++epochCounter, originKnown, preludeFrames, contentStartNanos).also { current = it }
+            LineSession(++epochCounter, originKnown, contentStartNanos).also { current = it }
         }
         pendingResyncNanos.set(0L) // A skip owed by the previous line means nothing to a fresh one
-        clearRing()
         dspStage?.reset()
         return session
     }
@@ -195,64 +175,6 @@ internal class AudioSink(private val debugLabel: String) {
         }
     }
 
-    private val pcmRing = ArrayDeque<ByteArray>()
-    private var pcmRingBytes = 0
-
-    private fun ringPush(chunk: ByteArray, len: Int) {
-        if (len <= 0) return
-        val copy = chunk.copyOf(len)
-        synchronized(pcmRing) {
-            pcmRing.addLast(copy)
-            pcmRingBytes += len
-            while (pcmRingBytes > PCM_RING_MAX_BYTES && pcmRing.size > 1) {
-                pcmRingBytes -= pcmRing.removeFirst().size
-            }
-        }
-    }
-
-    private fun clearRing() {
-        synchronized(pcmRing) {
-            pcmRing.clear()
-            pcmRingBytes = 0
-        }
-    }
-
-    /**
-     * Returns up to the most-recent [maxBytes] of audible cached PCM (oldest-to-newest), or empty when
-     * none. PCM still queued in the line (decoded but not yet played) is excluded so the snapshot ends at
-     * the heard position — keeping the cached audio aligned with the cached video when replayed.
-     */
-    fun snapshotPcm(maxBytes: Int): ByteArray {
-        if (maxBytes <= 0) return ByteArray(0)
-        val unplayed = current?.line?.let { (it.bufferSize - it.available()).coerceAtLeast(0) } ?: 0
-        synchronized(pcmRing) {
-            // Round both bounds down to a whole stereo 16-bit frame so the slice never starts mid-sample
-            // (unplayed comes from the line's byte counters and need not be frame-aligned).
-            val end = ((pcmRingBytes - unplayed).coerceAtLeast(0) / BYTES_PER_FRAME) * BYTES_PER_FRAME
-            val take = (end.coerceAtMost(maxBytes) / BYTES_PER_FRAME) * BYTES_PER_FRAME
-            if (take <= 0) return ByteArray(0)
-            val start = end - take
-            val out = ByteArray(take)
-            var idx = 0      // running byte offset of the current chunk's start
-            var written = 0
-            for (c in pcmRing) {
-                val cStart = idx
-                val cEnd = idx + c.size
-                if (cEnd > start && cStart < end) {
-                    val from = maxOf(start, cStart) - cStart
-                    val to = minOf(end, cEnd) - cStart
-                    System.arraycopy(c, from, out, written, to - from)
-                    written += to - from
-                }
-                idx = cEnd
-                if (idx >= end) break
-            }
-            // 4-byte (stereo 16-bit) frame alignment so playback never splits a sample.
-            val misalign = written % BYTES_PER_FRAME
-            return if (misalign == 0 && written == out.size) out else out.copyOfRange(misalign, written)
-        }
-    }
-
     /**
      * Starts the audio reading / writing loop. session's master clock (see [ClockSample]). (live HLS), so
      * [contentStartNanos] is the anchor for the session's timeline.
@@ -267,7 +189,6 @@ internal class AudioSink(private val debugLabel: String) {
         onUnexpectedEnd: (String) -> Unit = {},
         catchUp: CatchUp? = null,
     ): Thread {
-        liveGate = null
         val session = beginSession(contentStartNanos, originKnown)
         val stderrBuf = drainStderr(proc, stopFlag)
         return daemon(
@@ -403,49 +324,8 @@ internal class AudioSink(private val debugLabel: String) {
         return buffered > 0
     }
 
-    /**
-     * Starts a reappearance bridge on a single line: plays the cached [prelude] immediately, then — on the same
-     * line — waits for the live `FFmpeg` process to be supplied via [provideLiveInput] and continues pumping it.
-     */
-    fun startBridge(
-        prelude: ByteArray,
-        liveEdgeNanos: Long,
-        terminated: AtomicBoolean,
-        stopFlag: AtomicBoolean,
-        onUnexpectedEnd: (String) -> Unit = {},
-    ): Thread {
-        liveProc = null
-        liveGate = CountDownLatch(1)
-        val session = beginSession(
-            contentStartNanos = liveEdgeNanos,
-            originKnown = true,
-            preludeFrames = (prelude.size / BYTES_PER_FRAME).toLong(),
-        )
-        return daemon(
-            { runBridge(session, prelude, terminated, stopFlag, onUnexpectedEnd) },
-            "MediaPlayer-audio-bridge"
-        ).also { it.start() }
-    }
-
-    /** Supplies the live `FFmpeg` audio process to an in-flight bridge session (see [startBridge]). */
-    fun provideLiveInput(proc: Process, stopFlag: AtomicBoolean) {
-        liveStderrBuf = drainStderr(proc, stopFlag)
-        liveProc = proc
-        liveGate?.countDown()
-    }
-
-    /**
-     * Marks the replay -> live handoff: the playback clock has just been re-anchored to the live edge, so
-     * the master clock may now report the (live-relative) line clock. Called from the first-live-frame
-     * callback, in lock-step with `PlaybackClock.rebaseTo`.
-     */
-    fun onBridgeHandoff() {
-        current?.exposeLiveClock = true
-    }
-
     /** Flushes and closes the audio line immediately, retiring the clock. Safe to call from any thread. */
     fun stop() {
-        liveGate?.countDown() // Release a bridge thread still waiting for its live input
         val s = synchronized(sessionLock) { current.also { current = null } } ?: return
         val ln = s.line ?: return
         s.line = null
@@ -522,105 +402,9 @@ internal class AudioSink(private val debugLabel: String) {
         }
     }
 
-    /**
-     * Runs a reappearance bridge on one line (see [startBridge]): opens the line, plays the cached
-     * [prelude], then continues with the live PCM on the same line once it is attached. The prelude is
-     * not ring-cached (it is already-played audio); only the live PCM feeds the rolling ring. Fires
-     * [onUnexpectedEnd] once the live PCM pump is reached and then ends on its own (see [run]).
-     */
-    private fun runBridge(
-        session: LineSession, prelude: ByteArray, terminated: AtomicBoolean, stopFlag: AtomicBoolean,
-        onUnexpectedEnd: (String) -> Unit,
-    ) {
-        var ln: SourceDataLine? = null
-        var pumped = false
-        var stderrBuf: StringBuilder? = null
-
-        runCatching {
-            val fmt = pcmFormat()
-            val info = DataLine.Info(SourceDataLine::class.java, fmt)
-            if (!AudioSystem.isLineSupported(info)) {
-                logger.warn("$debugLabel PCM line not supported (bridge).")
-                return@runCatching
-            }
-            ln = openLine(info, fmt) ?: run {
-                logger.warn("$debugLabel [audio] bridge line failed to open.")
-                return@runCatching
-            }
-            if (terminated.get() || stopFlag.get()) return@runCatching
-            if (!publishLine(session, ln)) {
-                logger.debug("$debugLabel [audio] bridge superseded before it started; abandoning it.")
-                return@runCatching
-            }
-            ln.start()
-            val cachedSec = prelude.size / (SAMPLE_RATE * BYTES_PER_FRAME).toDouble()
-            logger.debug("$debugLabel [audio] bridge line started; playing ${"%.2f".format(cachedSec)} s cached prelude.")
-
-            // 1. Cached prelude — paced naturally by the line (not ring-cached: already-played audio)
-            writePrelude(ln, prelude, terminated, stopFlag)
-
-            // 2. Continue with the live PCM on the SAME line: sample-continuous, no flush, no second line
-            val proc = awaitLiveInput(terminated, stopFlag) ?: run {
-                logger.debug("$debugLabel [audio] bridge ended before live input attached.")
-                return@runCatching
-            }
-
-            // provideLiveInput sets liveStderrBuf before liveProc, both before opening the gate this
-            // just passed, so it is already populated for this bridge's live process here.
-            stderrBuf = liveStderrBuf
-            logger.debug("$debugLabel [audio] bridge handing off cached -> live on one line.")
-            proc.inputStream.use { input -> pumpLive(session, input, ln, terminated, stopFlag) }
-            pumped = true
-        }.onFailure { e ->
-            if (!terminated.get() && !stopFlag.get()) {
-                logger.warn("$debugLabel Bridge pipeline: ${e.message}.")
-            }
-        }
-
-        ln?.let {
-            retireSession(session, it)
-            runCatching { it.flush() }
-            runCatching { it.stop() }
-            runCatching { it.close() }
-        }
-
-        if (pumped && !terminated.get() && !stopFlag.get()) {
-            onUnexpectedEnd(stderrBuf?.let { buf -> synchronized(buf) { buf.toString() } } ?: "")
-        }
-    }
-
     private fun pcmFormat() = AudioFormat(
         AudioFormat.Encoding.PCM_SIGNED, SAMPLE_RATE.toFloat(), 16, 2, 4, SAMPLE_RATE.toFloat(), false,
     )
-
-    private fun writePrelude(
-        ln: SourceDataLine,
-        prelude: ByteArray,
-        terminated: AtomicBoolean,
-        stopFlag: AtomicBoolean
-    ) {
-        val chunk = ByteArray(CHUNK_BYTES)
-        var off = 0
-        while (off < prelude.size && !terminated.get() && !stopFlag.get()) {
-            val n = minOf(CHUNK_BYTES, prelude.size - off)
-            System.arraycopy(prelude, off, chunk, 0, n)
-            dspStage?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
-            writeFully(ln, chunk, n, terminated, stopFlag)
-            off += n
-        }
-    }
-
-    private fun awaitLiveInput(terminated: AtomicBoolean, stopFlag: AtomicBoolean): Process? {
-        val gate = liveGate ?: return null
-        while (!terminated.get() && !stopFlag.get()) {
-            try {
-                if (gate.await(20L, TimeUnit.MILLISECONDS)) return liveProc
-            } catch (_: InterruptedException) {
-                Thread.currentThread().interrupt(); return null
-            }
-        }
-        return null
-    }
 
     private fun skipCatchUp(
         input: InputStream, catchUp: CatchUp, terminated: AtomicBoolean, stopFlag: AtomicBoolean,
@@ -683,9 +467,7 @@ internal class AudioSink(private val debugLabel: String) {
                 logger.debug("$debugLabel [audio] first PCM chunk received ($n bytes)."); firstChunk = false
                 session.pcmFlowing = true
             }
-            val owned = owns(session)
-            if (owned) ringPush(chunk, n) // Cache raw PCM (pre-volume) for the reappearance audio bridge
-            val dsp = if (owned) dspStage else null
+            val dsp = if (owns(session)) dspStage else null
             dsp?.process(chunk, n, currentVolume) ?: MediaBufferEffects.applyVolumeS16LE(chunk, n, currentVolume)
             paceLiveWrite(ln, chunk, n, terminated, stopFlag)
         }

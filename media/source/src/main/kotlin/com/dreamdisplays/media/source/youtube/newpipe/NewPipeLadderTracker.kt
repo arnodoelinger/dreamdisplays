@@ -9,9 +9,6 @@ import kotlinx.atomicfu.atomic
  * measured rather than assumed.
  */
 object NewPipeLadderTracker {
-    private val OVERLAP_FALLBACK_ENABLED: Boolean =
-        System.getProperty("dreamdisplays.resolve.overlapFallback", "true").toBoolean()
-
     private const val MIN_LADDER_SAMPLES = 4
     private const val OVERLAP_MISS_PERCENT = 34
     private const val LADDER_DECAY_AT = 64
@@ -20,7 +17,6 @@ object NewPipeLadderTracker {
 
     /** Whether to start `yt-dlp` fallback alongside extraction instead of after. */
     fun shouldOverlapFallback(): Boolean {
-        if (!OVERLAP_FALLBACK_ENABLED) return false
         val hits = ladderHits.value
         val misses = ladderMisses.value
         val samples = hits + misses

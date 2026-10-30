@@ -3,35 +3,25 @@ package com.dreamdisplays.media.source.vimeo
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
+import com.dreamdisplays.media.source.platform.PlatformHttp
+import com.dreamdisplays.media.source.platform.PlatformPlayback
 import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.util.*
-import com.dreamdisplays.util.json.DreamJson
 import com.dreamdisplays.util.net.DreamHttpClient
 import kotlinx.serialization.json.JsonObject
-import org.slf4j.LoggerFactory
-
-/** A resolved Vimeo video: its playable [streams], [metadata], length, and seekability. */
-data class VimeoPlayback(
-    val streams: List<MediaStream>,
-    val metadata: PlatformVideoMetadata,
-    val durationSec: Long?,
-    val isSeekable: Boolean,
-)
 
 /**
  * Resolves Vimeo videos through the public player config endpoint — the same JSON Vimeo's own embedded player fetches,
  * so no API key or auth is needed.
  */
 object VimeoApi {
-    private val logger = LoggerFactory.getLogger(javaClass)
-
     private val HEADERS = DreamHttpClient.headersOf(
-        "User-Agent" to "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
+        "User-Agent" to PlatformHttp.BROWSER_USER_AGENT,
         "Referer" to "https://vimeo.com/",
     )
 
     /** Fetches and parses the player config for [source], or null when it is unavailable. */
-    fun resolve(source: MediaSource.Vimeo): VimeoPlayback? {
+    fun resolve(source: MediaSource.Vimeo): PlatformPlayback? {
         val config = fetchConfig(source.videoId, source.hash) ?: return null
         val request = config.obj("request")
         val files = request?.obj("files")
@@ -79,10 +69,9 @@ object VimeoApi {
             isLive = video?.optBoolean("live_event") == true,
         )
 
-        return VimeoPlayback(
+        return PlatformPlayback(
             streams = streams,
             metadata = metadata,
-            durationSec = durationSec,
             // Any on-demand Vimeo video seeks (progressive by byte range, HLS by the decoder); only a
             // live event cannot.
             isSeekable = metadata.isLive.not(),
@@ -92,19 +81,8 @@ object VimeoApi {
     /** Metadata-only lookup for the cache: the same config call, without building streams. */
     fun metadata(source: MediaSource.Vimeo): PlatformVideoMetadata? = resolve(source)?.metadata
 
-    private fun fetchConfig(videoId: String, hash: String?): JsonObject? {
-        val url = buildString {
-            append("https://player.vimeo.com/video/").append(videoId).append("/config")
-            if (hash != null) append("?h=").append(hash)
-        }
-        return runCatching {
-            val body = DreamHttpClient.readText(
-                url,
-                DreamHttpClient.RequestOptions(headers = HEADERS, connectTimeoutMs = 8_000, readTimeoutMs = 8_000),
-            )
-            DreamJson.compact.parseToJsonElement(body).asJsonObjectOrNull()
-        }.onFailure { logger.debug("Vimeo config fetch failed for {}: {}", videoId, it.message) }.getOrNull()
-    }
+    private fun fetchConfig(videoId: String, hash: String?): JsonObject? =
+        PlatformHttp.getJson("https://player.vimeo.com/video/$videoId/config" + hash?.let { "?h=$it" }.orEmpty(), HEADERS)
 
     private fun bestThumbnail(video: JsonObject?): String? {
         val thumbs = video?.obj("thumbs")

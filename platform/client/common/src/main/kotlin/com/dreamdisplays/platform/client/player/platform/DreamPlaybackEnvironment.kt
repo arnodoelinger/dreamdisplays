@@ -6,11 +6,8 @@ import com.dreamdisplays.api.media.source.MediaResolverRegistry
 import com.dreamdisplays.api.media.stream.StreamSelector
 import com.dreamdisplays.core.runtime.get
 import com.dreamdisplays.media.player.MediaPlayer
-import com.dreamdisplays.media.source.bilibili.BilibiliResolver
 import com.dreamdisplays.media.source.direct.DirectStreamResolver
-import com.dreamdisplays.media.source.kick.KickResolver
-import com.dreamdisplays.media.source.twitch.TwitchResolver
-import com.dreamdisplays.media.source.vimeo.VimeoResolver
+import com.dreamdisplays.media.source.platform.Platforms
 import com.dreamdisplays.media.source.youtube.NewPipeResolver
 import com.dreamdisplays.media.source.youtube.YtDlp
 import com.dreamdisplays.platform.client.core.DreamServices
@@ -43,10 +40,7 @@ object DreamPlaybackEnvironment : PlaybackEnvironment {
     override val cacheInvalidator: CacheInvalidator = CacheInvalidator { url ->
         NewPipeResolver.invalidate(url)
         YtDlp.invalidateCache(url)
-        TwitchResolver.invalidate(url)
-        VimeoResolver.invalidate(url)
-        KickResolver.invalidate(url)
-        BilibiliResolver.invalidate(url)
+        Platforms.invalidate(url)
         DirectStreamResolver.invalidate(url)
     }
 

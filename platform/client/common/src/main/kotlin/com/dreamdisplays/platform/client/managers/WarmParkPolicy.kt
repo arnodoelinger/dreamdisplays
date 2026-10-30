@@ -3,7 +3,6 @@ package com.dreamdisplays.platform.client.managers
 import com.dreamdisplays.platform.client.capabilities.ClientMemoryProbe
 import com.dreamdisplays.platform.client.displays.DisplayScreen
 import com.dreamdisplays.platform.client.managers.WarmParkPolicy.MAX_AUTO_WARM_LIMIT
-import com.dreamdisplays.platform.client.managers.WarmParkPolicy.replayOnly
 import kotlin.math.max
 
 /** Adaptive budget for displays kept fully warm versus compressed into replay snapshots. */
@@ -14,30 +13,17 @@ object WarmParkPolicy {
     private const val DEFAULT_DEMOTE_MS = 15_000L
     private const val DEFAULT_TTL_MS = 60_000L
     private const val DEFAULT_REPLAY_CACHE_BYTES = 512L * MIB
-    private const val DEFAULT_REPLAY_ONLY = false
     private const val ESTIMATED_FULL_WARM_RAM_BYTES = 96L * MIB
     private const val ESTIMATED_FULL_WARM_VRAM_BYTES = 8L * MIB
 
-    private val configuredMax: Int? =
-        System.getProperty("dreamdisplays.warmPark.max")?.toIntOrNull()?.coerceAtLeast(0)
-
-    private val replayOnly: Boolean =
-        System.getProperty("dreamdisplays.warmPark.replayOnly")?.toBooleanStrictOrNull() ?: DEFAULT_REPLAY_ONLY
-
-    /** Maximum number of displays kept fully warm at once (0 when [replayOnly]). */
-    val maxFullWarmDisplays: Int by lazy {
-        if (replayOnly) 0 else configuredMax ?: autoWarmLimit()
-    }
+    /** Maximum number of displays kept fully warm at once. */
+    val maxFullWarmDisplays: Int by lazy { autoWarmLimit() }
 
     /** Delay before a parked display is demoted to a replay snapshot, in nanoseconds. */
-    val demoteAfterNanos: Long =
-        (System.getProperty("dreamdisplays.warmPark.demoteMs")?.toLongOrNull()?.coerceAtLeast(0L)
-            ?: DEFAULT_DEMOTE_MS) * 1_000_000L
+    const val demoteAfterNanos: Long = DEFAULT_DEMOTE_MS * 1_000_000L
 
     /** Time a dormant display may sit parked before teardown, in nanoseconds. */
-    val ttlNanos: Long =
-        (System.getProperty("dreamdisplays.warmPark.ttlMs")?.toLongOrNull()?.coerceAtLeast(0L)
-            ?: DEFAULT_TTL_MS) * 1_000_000L
+    const val ttlNanos: Long = DEFAULT_TTL_MS * 1_000_000L
 
     /** Total RAM budget for warm displays, scaled from system RAM (~5%). */
     val ramBudgetBytes: Long by lazy {

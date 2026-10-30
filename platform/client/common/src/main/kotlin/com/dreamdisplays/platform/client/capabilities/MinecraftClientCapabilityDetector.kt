@@ -50,12 +50,10 @@ object MinecraftClientCapabilityDetector : ClientCapabilityDetector {
             textureUploadPath = safeString(TextureUploadPath.UNKNOWN.wire) { RenderBackendCompat.textureUploadPath().wire },
             hwAccelBackend = hwAccel.name.lowercase(),
             nativeBackendAvailable = nativeAvailable,
-            nativeRgbaFramesEnabled = nativeAvailable && safeBool { NativeMedia.rgbaFramesEnabled },
-            nativeYuvGpuEnabled = nativeAvailable && safeBool { NativeMedia.yuvGpuEnabled },
+            nativeRgbaFramesEnabled = nativeAvailable,
+            nativeYuvGpuEnabled = nativeAvailable,
             lavAvailable = lavAvailable,
-            lavInProcessEnabled = lavAvailable && safeBool { NativeMedia.lavInProcessEnabled },
-            lavSurfaceInteropAvailable = lavAvailable && safeBool { NativeMedia.lavSurfaceInteropAvailable },
-            lavZeroCopyEnabled = lavAvailable && safeBool { NativeMedia.lavZeroCopyEnabled },
+            lavInProcessEnabled = lavAvailable,
             nativeUnavailableReason = when {
                 nativeAvailable -> ""
                 !probed -> PROBING

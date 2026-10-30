@@ -385,7 +385,7 @@ class DisplayScreen(
      */
     private fun nextSizeLodHeight(distance: Double): Int {
         // A fullscreen broadcast's synthetic display has no meaningful world position to size by
-        if (!SIZE_LOD_ENABLED || virtual) return 0
+        if (virtual) return 0
         val started = videoStarted
         if (started && paused) return sizeLodHeight
         val live = started && isLive
@@ -1070,15 +1070,12 @@ class DisplayScreen(
         val position = currentTimeNanos
         val started = System.nanoTime()
         val snapshot = mp.captureReplaySnapshot() ?: return
-        val audioPcm = mp.captureReplayAudio()
-        val prepared = mp.capturePreparedMedia()
-        DisplayReplayCache.put(uuid, url, position, snapshot, audioPcm, prepared)
+        DisplayReplayCache.put(uuid, url, position, snapshot, mp.capturePreparedMedia())
         val elapsedMs = (System.nanoTime() - started) / 1_000_000.0
         logger.debug(
-            "{} captured replay snapshot bytes={} audioPcm={}B at {} ms in {} ms.",
+            "{} captured replay snapshot bytes={} at {} ms in {} ms.",
             uuid,
             snapshot.size,
-            audioPcm?.size ?: 0,
             "%.1f".format(position / 1_000_000.0),
             "%.1f".format(elapsedMs)
         )
@@ -1314,9 +1311,6 @@ class DisplayScreen(
         private val QUALITY_LADDER = intArrayOf(2160, 1440, 1080, 720, 480, 360, 240, 144)
         private val DISTANCE_STEP_THRESHOLDS = floatArrayOf(0.66f, 0.75f)
         private const val DISTANCE_STEP_HYSTERESIS = 0.05f
-
-        private val SIZE_LOD_ENABLED: Boolean =
-            System.getProperty("dreamdisplays.lod.size")?.toBooleanStrictOrNull() ?: true
 
         private const val SIZE_LOD_OVERSAMPLE = 1.5
         private const val SIZE_LOD_MIN_HEIGHT = 360

@@ -1,4 +1,4 @@
-@file:Suppress("Since15", "ArrayInDataClass")
+@file:Suppress("Since15")
 
 package com.dreamdisplays.media.player.nativebridge
 
@@ -8,64 +8,58 @@ import java.io.File
 import java.lang.foreign.*
 import java.lang.invoke.MethodHandle
 import java.nio.ByteBuffer
+import java.util.concurrent.ConcurrentHashMap
 
 /**
- * Java FFM bridge to optional `dreamdisplays_native` Rust library (`FFmpeg`, NV12 -> RGB, brightness).
+ * `Java` FFM bridge to the bundled `Rust` libraries: `dreamdisplays_native` (`FFmpeg` process pipe, NV12 -> RGBA)
+ * and `dreamdisplays_lav` (in-process libav decode).
  */
 object NativeMedia {
     private val logger = LoggerFactory.getLogger(javaClass)
-    private const val ABI_VERSION = 1
-    private const val LAV_ABI_VERSION = 5
+    private const val ABI_VERSION = 2
+    private const val LAV_ABI_VERSION = 6
 
     const val READ_OK = 0
     const val READ_EOF = 1
     const val READ_INTERRUPTED = 2
     const val READ_PREVIEW = 3
-    const val READ_UNSUPPORTED = -4
     const val LAV_NO_PTS_NANOS = Long.MIN_VALUE
 
     private const val LIB_BASE_NAME = "dreamdisplays_native"
     private const val LAV_BASE_NAME = "dreamdisplays_lav"
-    private const val LAV_SURFACE_ABI_VERSION = 1
-    private const val LAV_SURFACE_DESC_BYTES = 80L
     private const val CACHE_ROOT = "./dreamdisplays/native"
     private const val STDERR_CAP = 128L * 1024L
 
-    const val LAV_SURFACE_FORMAT_NV12_8 = 1
-    const val GL_TEXTURE_RECTANGLE = 0x84F5
+    private val LONG = ValueLayout.JAVA_LONG
+    private val INT = ValueLayout.JAVA_INT
+    private val ADDR = ValueLayout.ADDRESS
 
-    /** When true (default) the native pipe carries NV12 instead of RGB24, halving pipe traffic. */
-    val nv12Enabled: Boolean = System.getProperty("dreamdisplays.native.nv12", "true").toBoolean()
+    private lateinit var videoOpenHandle: MethodHandle
+    private lateinit var videoReadFrameRgbaHandle: MethodHandle
+    private lateinit var videoReadFrameI420Handle: MethodHandle
+    private lateinit var i420ToRgbaHandle: MethodHandle
+    private lateinit var videoStderrHandle: MethodHandle
+    private lateinit var videoExitCodeHandle: MethodHandle
+    private lateinit var videoKillHandle: MethodHandle
+    private lateinit var videoCloseHandle: MethodHandle
+    private lateinit var lavOpenHandle: MethodHandle
+    private lateinit var lavOpenReplayHandle: MethodHandle
+    private lateinit var lavReadFramePtsHandle: MethodHandle
+    private lateinit var lavSeekHandle: MethodHandle
+    private lateinit var lavErrorHandle: MethodHandle
+    private lateinit var lavKillHandle: MethodHandle
+    private lateinit var lavCloseHandle: MethodHandle
+    private lateinit var lavEnableCacheHandle: MethodHandle
+    private lateinit var lavRingSnapshotAtHandle: MethodHandle
 
-    private var abiVersion: MethodHandle? = null
-    private var videoOpen: MethodHandle? = null
-    private var videoReadFrame: MethodHandle? = null
-    private var videoReadFrameRgbaHandle: MethodHandle? = null
-    private var videoReadFrameI420Handle: MethodHandle? = null
-    private var i420ToRgbaHandle: MethodHandle? = null
-    private var lavOpenHandle: MethodHandle? = null
-    private var lavOpenReplayHandle: MethodHandle? = null
-    private var lavReadFrameHandle: MethodHandle? = null
-    private var lavReadFramePtsHandle: MethodHandle? = null
-    private var lavSeekHandle: MethodHandle? = null
-    private var lavErrorHandle: MethodHandle? = null
-    private var lavKillHandle: MethodHandle? = null
-    private var lavCloseHandle: MethodHandle? = null
-    private var lavEnableCacheHandle: MethodHandle? = null
-    private var lavRingSnapshotHandle: MethodHandle? = null
-    private var lavRingSnapshotAtHandle: MethodHandle? = null
-    private var lavReadSurfaceHandle: MethodHandle? = null
-    private var lavBindSurfacePlaneGlHandle: MethodHandle? = null
-    private var lavReleaseSurfaceHandle: MethodHandle? = null
-    private var videoStderr: MethodHandle? = null
-    private var videoExitCode: MethodHandle? = null
-    private var videoKill: MethodHandle? = null
-    private var videoClose: MethodHandle? = null
     private val nativeProbe = lazy { runCatching { init() }.getOrDefault(false) }
     private val lavProbe = lazy { isAvailable && runCatching { initLav() }.getOrDefault(false) }
 
-    /** True once the library has been located, loaded, bound, and ABI-checked. */
+    /** True once the native library has been located, loaded, bound, and ABI-checked. */
     val isAvailable: Boolean by nativeProbe
+
+    /** True once the in-process libav library has been located, loaded, and bound. */
+    val lavAvailable: Boolean by lavProbe
 
     /** Machine-readable cause of unavailability (empty when available). */
     @Volatile
@@ -75,328 +69,167 @@ object NativeMedia {
     @Volatile
     var lavUnavailableReason: String = ""; private set
 
-    /** Uses native RGBA output so the render thread can upload directly into RGBA8 textures. */
-    val rgbaFramesEnabled: Boolean
-        get() = isAvailable
-                && System.getProperty("dreamdisplays.native.rgba", "true").toBoolean()
-                && videoReadFrameRgbaHandle != null
-
-    /** Keeps frames as raw I420 planes to GPU (YUV -> RGB in shader). */
-    val yuvGpuEnabled: Boolean
-        get() = isAvailable
-                && nv12Enabled
-                && System.getProperty("dreamdisplays.native.yuvgpu", "true").toBoolean()
-                && videoReadFrameI420Handle != null
-                && i420ToRgbaHandle != null
-
-    /** In-process decode (libavformat / libavcodec in `dreamdisplays_lav`). */
-    val lavInProcessEnabled: Boolean
-        get() = yuvGpuEnabled
-                && System.getProperty("dreamdisplays.native.libav", "true").toBoolean()
-                && lavAvailable
-
-    /** True when LAV surface ABI is present and enabled (zero-copy hardware-surface). */
-    val lavZeroCopyEnabled: Boolean
-        get() = lavInProcessEnabled
-                && lavSurfaceInteropAvailable
-                && System.getProperty("dreamdisplays.native.libav.zeroCopy", "false").toBoolean()
-
-    /** True once the optional `dreamdisplays_lav` library has been located, loaded, and bound. */
-    val lavAvailable: Boolean by lavProbe
-
     /**
      * True once both library probes have finished, so reading the flags can no longer block. The first probe loads
      * native libraries and may download `FFmpeg`, so the game thread must check this instead of touching the flags.
      */
     val probesFinished: Boolean get() = nativeProbe.isInitialized() && lavProbe.isInitialized()
 
-    /** True when `dreamdisplays_lav` exports the additive hardware-surface ABI. */
-    val lavSurfaceInteropAvailable: Boolean
-        get() = lavAvailable
-                && lavReadSurfaceHandle != null
-                && lavBindSurfacePlaneGlHandle != null
-                && lavReleaseSurfaceHandle != null
-
-    /** True when the LAV packet-cache and replay ABI is available. */
-    val lavReplayCacheAvailable: Boolean
-        get() = lavAvailable
-                && lavOpenReplayHandle != null
-                && lavEnableCacheHandle != null
-                && lavRingSnapshotAtHandle != null
-
-    data class LavSurfaceDescriptor(
-        val handle: Long,
-        val platform: Int,
-        val format: Int,
-        val width: Int,
-        val height: Int,
-        val planeCount: Int,
-        val textureTarget: Int,
-        val planeWidth: IntArray,
-        val planeHeight: IntArray,
-    )
-
     data class LavFrameReadResult(val code: Int, val ptsNanos: Long)
 
-    data class LavSurfaceReadResult(val code: Int, val descriptor: LavSurfaceDescriptor?)
-
-    private class PtsScratch {
-        val arena: Arena = Arena.ofShared()
-        val segment: MemorySegment = arena.allocate(ValueLayout.JAVA_LONG)
-        val surfaceDesc: MemorySegment by lazy { arena.allocate(LAV_SURFACE_DESC_BYTES) }
-    }
-
-    private val ptsScratches = java.util.concurrent.ConcurrentHashMap<Long, PtsScratch>()
+    private val ptsSlots = ConcurrentHashMap<Long, MemorySegment>()
 
     /** Touches [isAvailable] and [lavAvailable] on a background thread to keep first playback latency low. */
     fun prewarmAsync() {
         Thread({ isAvailable; lavAvailable }, "NativeMedia-prewarm").apply { isDaemon = true }.start()
     }
 
-    /** Spawns `FFmpeg` session in native library (returns opaque handle, or 0 on failure). */
-    fun videoOpen(args: List<String>, w: Int, h: Int, nv12: Boolean): Long {
-        val blob = buildString { args.forEach { append(it); append('\u0000') } }.toByteArray(Charsets.UTF_8)
-        Arena.ofConfined().use { arena ->
-            val seg = arena.allocate(blob.size.toLong())
-            MemorySegment.copy(MemorySegment.ofArray(blob), 0L, seg, 0L, blob.size.toLong())
-            return videoOpen!!.invoke(seg, blob.size.toLong(), w, h, if (nv12) 1 else 0) as Long
-        }
+    /** Spawns an `FFmpeg` session writing raw NV12 frames (returns opaque handle, or 0 on failure). */
+    fun videoOpen(args: List<String>, w: Int, h: Int): Long = withBytes(args.joinToString("") { "$it\u0000" }) { seg, n ->
+        videoOpenHandle.invoke(seg, n, w, h) as Long
     }
 
-    /** Blocking read of next frame as RGB24 with brightness ([READ_OK], [READ_EOF], or error). */
-    fun videoReadFrame(handle: Long, dst: ByteBuffer, frameBytes: Int, brightnessMilli: Int): Int =
-        videoReadFrame!!.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), brightnessMilli) as Int
-
-    /** Blocking read of next frame as RGBA32 with brightness (when [rgbaFramesEnabled]). */
+    /** Blocking read of the next frame as RGBA32 with brightness ([READ_OK], [READ_EOF], or error). */
     fun videoReadFrameRgba(handle: Long, dst: ByteBuffer, frameBytes: Int, brightnessMilli: Int): Int =
-        videoReadFrameRgbaHandle!!.invoke(
-            handle,
-            MemorySegment.ofBuffer(dst),
-            frameBytes.toLong(),
-            brightnessMilli
-        ) as Int
+        videoReadFrameRgbaHandle.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), brightnessMilli) as Int
 
-    /** Blocking read of next frame as raw I420 planes (when yuvGpuEnabled) */
+    /** Blocking read of the next frame as raw I420 planes. */
     fun videoReadFrameI420(handle: Long, dst: ByteBuffer, frameBytes: Int): Int =
-        videoReadFrameI420Handle!!.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong()) as Int
+        videoReadFrameI420Handle.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong()) as Int
 
-    /** Converts I420 frame to RGBA32 (both direct buffers, for popout in GPU-YUV mode). */
+    /** Converts an I420 frame to RGBA32 (both direct buffers, for the popout in GPU-YUV mode). */
     fun i420ToRgba(src: ByteBuffer, srcBytes: Int, dst: ByteBuffer, w: Int, h: Int): Int =
-        i420ToRgbaHandle!!.invoke(
+        i420ToRgbaHandle.invoke(
             MemorySegment.ofBuffer(src), srcBytes.toLong(),
             MemorySegment.ofBuffer(dst), dst.capacity().toLong(), w, h,
         ) as Int
 
-    /** Opens in-process decode session (returns opaque handle, or 0 on failure) */
-    fun lavOpen(url: String, w: Int, h: Int, startMicros: Long, hwAccelCode: Int): Long {
-        val bytes = url.toByteArray(Charsets.UTF_8)
-        Arena.ofConfined().use { arena ->
-            val seg = arena.allocate(bytes.size.toLong())
-            MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
-            return lavOpenHandle!!.invoke(seg, bytes.size.toLong(), w, h, startMicros, hwAccelCode) as Long
-        }
+    /** @return the `FFmpeg` stderr captured so far for [handle] (capped at 128 KiB). */
+    fun videoStderr(handle: Long): String = readString(videoStderrHandle, handle)
+
+    /** Waits up to [waitMillis] for `FFmpeg` to exit; returns the exit code or -1 (force-killing it on timeout). */
+    fun videoExitCode(handle: Long, waitMillis: Int): Int = videoExitCodeHandle.invoke(handle, waitMillis) as Int
+
+    /** Kills the `FFmpeg` process, unblocking a reader stuck in a frame read. */
+    fun videoKill(handle: Long) {
+        videoKillHandle.invoke(handle)
+    }
+
+    /** Frees the native session. Must not race a frame read on the same handle. */
+    fun videoClose(handle: Long) {
+        videoCloseHandle.invoke(handle)
+    }
+
+    /** Opens an in-process decode session (returns opaque handle, or 0 on failure). */
+    fun lavOpen(url: String, w: Int, h: Int, startMicros: Long, hwAccelCode: Int): Long = withBytes(url) { seg, n ->
+        lavOpenHandle.invoke(seg, n, w, h, startMicros, hwAccelCode) as Long
     }
 
     /** Opens a native replay decode session from a serialized packet-ring [blob]. */
     fun lavOpenReplay(blob: ByteArray, w: Int, h: Int, resumeNanos: Long): Long {
-        val openReplay = lavOpenReplayHandle ?: return 0L
         if (blob.isEmpty()) return 0L
-        Arena.ofConfined().use { arena ->
-            val seg = arena.allocate(blob.size.toLong())
-            MemorySegment.copy(MemorySegment.ofArray(blob), 0L, seg, 0L, blob.size.toLong())
-            return openReplay.invoke(seg, blob.size.toLong(), w, h, resumeNanos) as Long
-        }
+        return withBytes(blob) { seg, n -> lavOpenReplayHandle.invoke(seg, n, w, h, resumeNanos) as Long }
     }
 
     /** Enables the native rolling packet cache for a live LAV [handle]. */
-    fun lavEnableCache(handle: Long, windowMs: Long, maxBytes: Long): Boolean {
-        val enable = lavEnableCacheHandle ?: return false
-        return !(windowMs <= 0 || maxBytes <= 0) && (enable.invoke(
-            handle,
-            windowMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(),
-            maxBytes
-        ) as Int) == READ_OK
-    }
+    fun lavEnableCache(handle: Long, windowMs: Long, maxBytes: Long): Boolean =
+        windowMs > 0 && maxBytes > 0 &&
+                lavEnableCacheHandle.invoke(handle, windowMs.coerceAtMost(Int.MAX_VALUE.toLong()).toInt(), maxBytes) as Int == READ_OK
 
-    /** Captures the live LAV packet-ring snapshot for [handle], or null when no data is ready. */
+    /** Captures the live LAV packet-ring snapshot for [handle] from [positionNanos], or null when no data is ready. */
     fun lavRingSnapshot(handle: Long, positionNanos: Long): ByteArray? {
-        val snapshot = lavRingSnapshotAtHandle ?: return null
-        var size = snapshot.invoke(handle, positionNanos, MemorySegment.NULL, 0L) as Int
-        if (size <= 0) return null
+        var size = lavRingSnapshotAtHandle.invoke(handle, positionNanos, MemorySegment.NULL, 0L) as Int
         repeat(3) {
+            if (size <= 0) return null
             Arena.ofConfined().use { arena ->
                 val seg = arena.allocate(size.toLong())
-                val written = snapshot.invoke(handle, positionNanos, seg, size.toLong()) as Int
-                if (written <= 0) return null
-                if (written <= size) {
-                    val out = ByteArray(written)
-                    MemorySegment.copy(seg, 0L, MemorySegment.ofArray(out), 0L, written.toLong())
-                    return out
-                }
+                val written = lavRingSnapshotAtHandle.invoke(handle, positionNanos, seg, size.toLong()) as Int
+                if (written in 1..size) return seg.asSlice(0, written.toLong()).toArray(ValueLayout.JAVA_BYTE)
                 size = written
             }
         }
         return null
     }
 
-    /** Blocking in-process decode of the next frame into [dst] as raw I420 planes. */
-    fun lavReadFrameI420(handle: Long, dst: ByteBuffer, frameBytes: Int): Int =
-        lavReadFrameHandle!!.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong()) as Int
-
-    /** Blocking in-process decode of the next I420 frame plus its normalized PTS, when exported. */
+    /** Blocking in-process decode of the next I420 frame plus its normalized PTS. */
     fun lavReadFrameI420WithPts(handle: Long, dst: ByteBuffer, frameBytes: Int): LavFrameReadResult {
-        val readWithPts = lavReadFramePtsHandle
-            ?: return LavFrameReadResult(lavReadFrameI420(handle, dst, frameBytes), LAV_NO_PTS_NANOS)
-        val pts = ptsScratches.getOrPut(handle) { PtsScratch() }.segment
-        pts.set(ValueLayout.JAVA_LONG, 0L, LAV_NO_PTS_NANOS)
-        val rc = readWithPts.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), pts) as Int
-        return LavFrameReadResult(rc, pts.get(ValueLayout.JAVA_LONG, 0L))
+        val pts = ptsSlots.computeIfAbsent(handle) { Arena.ofAuto().allocate(LONG) }
+        pts.set(LONG, 0L, LAV_NO_PTS_NANOS)
+        val rc = lavReadFramePtsHandle.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), pts) as Int
+        return LavFrameReadResult(rc, pts.get(LONG, 0L))
     }
 
     /** Seeks a live in-process libav session in place. */
-    fun lavSeek(handle: Long, targetMicros: Long): Boolean {
-        val seek = lavSeekHandle ?: return false
-        return (seek.invoke(handle, targetMicros.coerceAtLeast(0L)) as Int) == READ_OK
-    }
-
-    /**
-     * Blocking in-process decode of the next frame as a retained hardware surface.
-     *
-     * On success, the descriptor's [LavSurfaceDescriptor.handle] must be released via
-     * [lavReleaseSurface]. Plane import must run on the render thread with the GL context current.
-     */
-    fun lavReadSurface(handle: Long): LavSurfaceReadResult {
-        val readSurface = lavReadSurfaceHandle ?: return LavSurfaceReadResult(READ_UNSUPPORTED, null)
-        val seg = ptsScratches.getOrPut(handle) { PtsScratch() }.surfaceDesc
-        val rc = readSurface.invoke(handle, seg) as Int
-        return LavSurfaceReadResult(
-            rc,
-            if (rc == READ_OK) readLavSurfaceDescriptor(seg) else null,
-        )
-    }
-
-    /** Imports one retained surface plane into an existing OpenGL texture object. */
-    fun lavBindSurfacePlaneGl(surfaceHandle: Long, plane: Int, textureId: Int): Int =
-        lavBindSurfacePlaneGlHandle?.invoke(surfaceHandle, plane, textureId) as? Int ?: READ_UNSUPPORTED
-
-    /** Releases a retained hardware surface returned by [lavReadSurface]. */
-    fun lavReleaseSurface(surfaceHandle: Long) {
-        lavReleaseSurfaceHandle?.invoke(surfaceHandle)
-    }
+    fun lavSeek(handle: Long, targetMicros: Long): Boolean =
+        lavSeekHandle.invoke(handle, targetMicros.coerceAtLeast(0L)) as Int == READ_OK
 
     /** Returns the in-process session's last error description, or an empty string. */
-    fun lavError(handle: Long): String {
-        Arena.ofConfined().use { arena ->
-            val seg = arena.allocate(STDERR_CAP)
-            val n = lavErrorHandle!!.invoke(handle, seg, STDERR_CAP) as Int
-            if (n <= 0) return ""
-            val bytes = ByteArray(n)
-            MemorySegment.copy(seg, 0L, MemorySegment.ofArray(bytes), 0L, n.toLong())
-            return String(bytes, Charsets.UTF_8)
-        }
-    }
+    fun lavError(handle: Long): String = readString(lavErrorHandle, handle)
 
-    /** Interrupts the in-process session, unblocking a reader stuck in [lavReadFrameI420]. */
+    /** Interrupts the in-process session, unblocking a reader stuck in a frame read. */
     fun lavKill(handle: Long) {
-        lavKillHandle!!.invoke(handle)
+        lavKillHandle.invoke(handle)
     }
 
-    /** Frees the in-process session. Must not race a [lavReadFrameI420] on the same handle. */
+    /** Frees the in-process session. Must not race a frame read on the same handle. */
     fun lavClose(handle: Long) {
-        ptsScratches.remove(handle)?.arena?.close()
-        lavCloseHandle!!.invoke(handle)
+        ptsSlots.remove(handle)
+        lavCloseHandle.invoke(handle)
     }
 
-    /** Returns the FFmpeg stderr captured so far for [handle] (capped at 128 KiB). */
-    fun videoStderr(handle: Long): String {
+    private inline fun <T> withBytes(text: String, block: (MemorySegment, Long) -> T): T =
+        withBytes(text.toByteArray(Charsets.UTF_8), block)
+
+    private inline fun <T> withBytes(bytes: ByteArray, block: (MemorySegment, Long) -> T): T =
         Arena.ofConfined().use { arena ->
-            val seg = arena.allocate(STDERR_CAP)
-            val n = videoStderr!!.invoke(handle, seg, STDERR_CAP) as Int
-            if (n <= 0) return ""
-            val bytes = ByteArray(n)
-            MemorySegment.copy(seg, 0L, MemorySegment.ofArray(bytes), 0L, n.toLong())
-            return String(bytes, Charsets.UTF_8)
+            val seg = arena.allocate(bytes.size.toLong())
+            MemorySegment.copy(MemorySegment.ofArray(bytes), 0L, seg, 0L, bytes.size.toLong())
+            block(seg, bytes.size.toLong())
         }
+
+    private fun readString(handle: MethodHandle, session: Long): String = Arena.ofConfined().use { arena ->
+        val seg = arena.allocate(STDERR_CAP)
+        val n = handle.invoke(session, seg, STDERR_CAP) as Int
+        if (n <= 0) "" else String(seg.asSlice(0, n.toLong()).toArray(ValueLayout.JAVA_BYTE), Charsets.UTF_8)
     }
 
-    /** Waits up to [waitMillis] for FFmpeg to exit; returns the exit code or -1 (force-killing it on timeout). */
-    fun videoExitCode(handle: Long, waitMillis: Int): Int =
-        videoExitCode!!.invoke(handle, waitMillis) as Int
+    private class Binder(lib: File) {
+        private val linker = Linker.nativeLinker()
 
-    /** Kills the FFmpeg process, unblocking a reader stuck in [videoReadFrame]. */
-    fun videoKill(handle: Long) {
-        videoKill!!.invoke(handle)
-    }
+        private val lookup = SymbolLookup.libraryLookup(lib.toPath(), Arena.global())
 
-    /** Frees the native session. Must not race a [videoReadFrame] on the same handle. */
-    fun videoClose(handle: Long) {
-        videoClose!!.invoke(handle)
+        fun bind(name: String, desc: FunctionDescriptor): MethodHandle =
+            linker.downcallHandle(lookup.find(name).orElseThrow { IllegalStateException("Symbol $name missing") }, desc)
     }
 
     private fun init(): Boolean {
-        if (!System.getProperty("dreamdisplays.native", "true").toBoolean()) {
-            logger.info("Native pipeline disabled via -Ddreamdisplays.native=false.")
-            unavailableReason = "disabled_by_config"
-            return false
-        }
         if (Runtime.version().feature() < 21) {
-            logger.warn(
-                "Native pipeline requires Java 21+ (running ${
-                    Runtime.version().feature()
-                }); using JVM pipeline."
-            )
+            logger.warn("Native pipeline requires Java 21+ (running ${Runtime.version().feature()}); using JVM pipeline.")
             unavailableReason = "java_too_old"
             return false
         }
-        val lib = locateLibrary() ?: run {
+        val lib = locateLibrary(LIB_BASE_NAME) ?: run {
             logger.warn("Native library not found; using JVM pipeline.")
             unavailableReason = "library_not_found"
             return false
         }
         return try {
-            val linker = Linker.nativeLinker()
-            // Global arena: the library stays loaded for the lifetime of the process.
-            val lookup = SymbolLookup.libraryLookup(lib.toPath(), Arena.global())
-
-            fun bind(name: String, desc: FunctionDescriptor): MethodHandle =
-                linker.downcallHandle(
-                    lookup.find(name).orElseThrow { IllegalStateException("Symbol $name missing") },
-                    desc,
-                )
-
-            fun bindOptional(name: String, desc: FunctionDescriptor): MethodHandle? =
-                lookup.find(name).map { linker.downcallHandle(it, desc) }.orElse(null)
-
-            val long = ValueLayout.JAVA_LONG
-            val int = ValueLayout.JAVA_INT
-            val addr = ValueLayout.ADDRESS
-
-            abiVersion = bind("dd_abi_version", FunctionDescriptor.of(int))
-            videoOpen = bind("dd_video_open", FunctionDescriptor.of(long, addr, long, int, int, int))
-            videoReadFrame = bind("dd_video_read_frame", FunctionDescriptor.of(int, long, addr, long, int))
-            videoReadFrameRgbaHandle =
-                bindOptional("dd_video_read_frame_rgba", FunctionDescriptor.of(int, long, addr, long, int))
-            videoReadFrameI420Handle =
-                bindOptional("dd_video_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
-            i420ToRgbaHandle =
-                bindOptional("dd_i420_to_rgba", FunctionDescriptor.of(int, addr, long, addr, long, int, int))
-            videoStderr = bind("dd_video_stderr", FunctionDescriptor.of(int, long, addr, long))
-            videoExitCode = bind("dd_video_exit_code", FunctionDescriptor.of(int, long, int))
-            videoKill = bind("dd_video_kill", FunctionDescriptor.ofVoid(long))
-            videoClose = bind("dd_video_close", FunctionDescriptor.ofVoid(long))
-
-            val abi = abiVersion!!.invoke() as Int
+            val b = Binder(lib)
+            val abi = b.bind("dd_abi_version", FunctionDescriptor.of(INT)).invoke() as Int
             if (abi != ABI_VERSION) {
                 logger.warn("Native library ABI mismatch: found $abi, expected $ABI_VERSION; using JVM pipeline.")
                 unavailableReason = "abi_mismatch"
                 return false
             }
-            val rgba = System.getProperty("dreamdisplays.native.rgba", "true").toBoolean()
-                    && videoReadFrameRgbaHandle != null
-            val yuvGpu = nv12Enabled
-                    && System.getProperty("dreamdisplays.native.yuvgpu", "true").toBoolean()
-                    && videoReadFrameI420Handle != null && i420ToRgbaHandle != null
-            logger.info("Native media pipeline active: $lib (nv12=$nv12Enabled, rgba=$rgba, yuvGpu=$yuvGpu).")
+            videoOpenHandle = b.bind("dd_video_open", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT))
+            videoReadFrameRgbaHandle = b.bind("dd_video_read_frame_rgba", FunctionDescriptor.of(INT, LONG, ADDR, LONG, INT))
+            videoReadFrameI420Handle = b.bind("dd_video_read_frame_i420", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
+            i420ToRgbaHandle = b.bind("dd_i420_to_rgba", FunctionDescriptor.of(INT, ADDR, LONG, ADDR, LONG, INT, INT))
+            videoStderrHandle = b.bind("dd_video_stderr", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
+            videoExitCodeHandle = b.bind("dd_video_exit_code", FunctionDescriptor.of(INT, LONG, INT))
+            videoKillHandle = b.bind("dd_video_kill", FunctionDescriptor.ofVoid(LONG))
+            videoCloseHandle = b.bind("dd_video_close", FunctionDescriptor.ofVoid(LONG))
+            logger.info("Native media pipeline active: $lib.")
             true
         } catch (t: Throwable) {
             // UnsupportedOperationException on Java 21 preview gates, UnsatisfiedLinkError, etc.
@@ -413,60 +246,28 @@ object NativeMedia {
             return false
         }
         return try {
-            val linker = Linker.nativeLinker()
             LavFfmpeg.ensure(lib.parentFile)
             preloadLavDependencies(lib.parentFile)
-            val lookup = SymbolLookup.libraryLookup(lib.toPath(), Arena.global())
-
-            fun bind(name: String, desc: FunctionDescriptor): MethodHandle =
-                linker.downcallHandle(
-                    lookup.find(name).orElseThrow { IllegalStateException("Symbol $name missing") },
-                    desc,
-                )
-
-            fun bindOptional(name: String, desc: FunctionDescriptor): MethodHandle? =
-                lookup.find(name).map { linker.downcallHandle(it, desc) }.orElse(null)
-
-            val long = ValueLayout.JAVA_LONG
-            val int = ValueLayout.JAVA_INT
-            val addr = ValueLayout.ADDRESS
-
-            val abi = bind("dd_lav_abi_version", FunctionDescriptor.of(int)).invoke() as Int
+            val b = Binder(lib)
+            val abi = b.bind("dd_lav_abi_version", FunctionDescriptor.of(INT)).invoke() as Int
             if (abi != LAV_ABI_VERSION) {
                 logger.warn("In-process libav library ABI mismatch: found $abi, expected $LAV_ABI_VERSION.")
                 lavUnavailableReason = "abi_mismatch"
                 return false
             }
-            lavOpenHandle = bind("dd_lav_open", FunctionDescriptor.of(long, addr, long, int, int, long, int))
-            lavOpenReplayHandle = bind("dd_lav_open_replay", FunctionDescriptor.of(long, addr, long, int, int, long))
-            lavReadFrameHandle = bind("dd_lav_read_frame_i420", FunctionDescriptor.of(int, long, addr, long))
-            lavReadFramePtsHandle =
-                bindOptional("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(int, long, addr, long, addr))
-            lavSeekHandle = bind("dd_lav_seek", FunctionDescriptor.of(int, long, long))
-            lavErrorHandle = bind("dd_lav_error", FunctionDescriptor.of(int, long, addr, long))
-            lavKillHandle = bind("dd_lav_kill", FunctionDescriptor.ofVoid(long))
-            lavCloseHandle = bind("dd_lav_close", FunctionDescriptor.ofVoid(long))
-            lavEnableCacheHandle = bind("dd_lav_enable_cache", FunctionDescriptor.of(int, long, int, long))
-            lavRingSnapshotHandle = bind("dd_lav_ring_snapshot", FunctionDescriptor.of(int, long, addr, long))
-            lavRingSnapshotAtHandle =
-                bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(int, long, long, addr, long))
-            val surfaceAbi = bindOptional("dd_lav_surface_abi_version", FunctionDescriptor.of(int))
-            if (surfaceAbi != null && surfaceAbi.invoke() as Int == LAV_SURFACE_ABI_VERSION) {
-                lavReadSurfaceHandle = bindOptional("dd_lav_read_surface", FunctionDescriptor.of(int, long, addr))
-                lavBindSurfacePlaneGlHandle =
-                    bindOptional("dd_lav_bind_surface_plane_gl", FunctionDescriptor.of(int, long, int, int))
-                lavReleaseSurfaceHandle = bindOptional("dd_lav_release_surface", FunctionDescriptor.ofVoid(long))
-            }
-            val surfaceInterop = lavReadSurfaceHandle != null
-                    && lavBindSurfacePlaneGlHandle != null
-                    && lavReleaseSurfaceHandle != null
-            val replayCache = lavOpenReplayHandle != null
-                    && lavEnableCacheHandle != null
-                    && lavRingSnapshotAtHandle != null
-            logger.info("In-process libav backend available: $lib (surfaceInterop=$surfaceInterop, replayCache=$replayCache).")
+            lavOpenHandle = b.bind("dd_lav_open", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT, LONG, INT))
+            lavOpenReplayHandle = b.bind("dd_lav_open_replay", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT, LONG))
+            lavReadFramePtsHandle = b.bind("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(INT, LONG, ADDR, LONG, ADDR))
+            lavSeekHandle = b.bind("dd_lav_seek", FunctionDescriptor.of(INT, LONG, LONG))
+            lavErrorHandle = b.bind("dd_lav_error", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
+            lavKillHandle = b.bind("dd_lav_kill", FunctionDescriptor.ofVoid(LONG))
+            lavCloseHandle = b.bind("dd_lav_close", FunctionDescriptor.ofVoid(LONG))
+            lavEnableCacheHandle = b.bind("dd_lav_enable_cache", FunctionDescriptor.of(INT, LONG, INT, LONG))
+            lavRingSnapshotAtHandle = b.bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(INT, LONG, LONG, ADDR, LONG))
+            logger.info("In-process libav backend available: $lib.")
             true
         } catch (t: Throwable) {
-            // Typically UnsatisfiedLinkError when the system FFmpeg dylibs are missing.
+            // Typically UnsatisfiedLinkError when the FFmpeg shared libraries are missing.
             logger.warn("In-process libav backend unavailable (${t.javaClass.simpleName}: ${t.message}).")
             lavUnavailableReason = "error_${t.javaClass.simpleName}"
             false
@@ -474,123 +275,55 @@ object NativeMedia {
     }
 
     private fun preloadLavDependencies(dir: File?) {
-        if (dir == null || !dir.isDirectory) return
-        val libraries =
-            dir.listFiles()?.filter { it.isFile && isSharedLibrary(it.name) && !isDreamDisplaysLibrary(it.name) }
-                ?: return
-        if (libraries.isEmpty()) return
-        val pending = libraries
-            .sortedWith(compareBy<File> { sharedLibraryLoadOrder(it.name) }.thenBy { it.name })
-            .toMutableList()
-
+        val pending = dir?.listFiles()
+            ?.filter { it.isFile && isFfmpegSharedLibrary(it.name) }
+            ?.sortedWith(compareBy<File> { loadOrder(it.name) }.thenBy { it.name })
+            ?.toMutableList() ?: return
         repeat(3) {
-            if (pending.isEmpty()) return
-            val iterator = pending.iterator()
-            while (iterator.hasNext()) {
-                val lib = iterator.next()
-                if (runCatching { SymbolLookup.libraryLookup(lib.toPath(), Arena.global()) }.isSuccess) {
-                    iterator.remove()
-                }
-            }
+            pending.removeAll { runCatching { SymbolLookup.libraryLookup(it.toPath(), Arena.global()) }.isSuccess }
         }
-
-        pending.forEach { lib ->
-            logger.debug("Could not preload LAV dependency ${lib.name}.")
-        }
+        pending.forEach { logger.debug("Could not preload LAV dependency ${it.name}.") }
     }
 
-    private fun isSharedLibrary(name: String): Boolean {
+    private fun isFfmpegSharedLibrary(name: String): Boolean {
         val lower = name.lowercase()
-        return lower.endsWith(".dll") || lower.endsWith(".dylib") || lower.contains(".so")
+        val shared = lower.endsWith(".dll") || lower.endsWith(".dylib") || lower.contains(".so")
+        return shared && "dreamdisplays_" !in lower
     }
 
-    private fun isDreamDisplaysLibrary(name: String): Boolean {
+    private fun loadOrder(name: String): Int {
         val lower = name.lowercase()
-        return lower.contains("dreamdisplays_native") || lower.contains("dreamdisplays_lav")
+        val index = FFMPEG_LOAD_ORDER.indexOfFirst { it in lower }
+        return if (index < 0) 0 else 100 + index
     }
 
-    private fun sharedLibraryLoadOrder(name: String): Int {
-        val ffmpegOrder = ffmpegSharedLibraryOrder(name)
-        return if (ffmpegOrder == Int.MAX_VALUE) 0 else 100 + ffmpegOrder
-    }
-
-    private fun ffmpegSharedLibraryOrder(name: String): Int {
-        val lower = name.lowercase()
-        return FFMPEG_SHARED_LIBRARY_ORDER.entries.firstOrNull { lower.contains(it.key) }?.value ?: Int.MAX_VALUE
-    }
-
-    private fun readLavSurfaceDescriptor(seg: MemorySegment): LavSurfaceDescriptor {
-        val planeWidth = IntArray(4)
-        val planeHeight = IntArray(4)
-        for (i in 0 until 4) {
-            planeWidth[i] = seg.get(ValueLayout.JAVA_INT, 32L + i * 4L)
-            planeHeight[i] = seg.get(ValueLayout.JAVA_INT, 48L + i * 4L)
-        }
-        return LavSurfaceDescriptor(
-            handle = seg.get(ValueLayout.JAVA_LONG, 0L),
-            platform = seg.get(ValueLayout.JAVA_INT, 8L),
-            format = seg.get(ValueLayout.JAVA_INT, 12L),
-            width = seg.get(ValueLayout.JAVA_INT, 16L),
-            height = seg.get(ValueLayout.JAVA_INT, 20L),
-            planeCount = seg.get(ValueLayout.JAVA_INT, 24L),
-            textureTarget = seg.get(ValueLayout.JAVA_INT, 28L),
-            planeWidth = planeWidth,
-            planeHeight = planeHeight,
-        )
-    }
-
-    private fun locateLibrary(baseName: String = LIB_BASE_NAME): File? {
-        val explicitPathProperty = when (baseName) {
-            LIB_BASE_NAME -> "dreamdisplays.native.path"
-            LAV_BASE_NAME -> "dreamdisplays.native.lav.path"
-            else -> null
-        }
-        explicitPathProperty?.let { property ->
-            System.getProperty(property)?.let { p ->
-                val f = File(p)
-                if (f.isFile) return f
-                logger.warn("$property=$p does not exist.")
-            }
-        }
-
+    private fun locateLibrary(baseName: String): File? {
         val libName = System.mapLibraryName(baseName)
         val cached = File("$CACHE_ROOT/${platformKey()}/$libName")
-
-        val resource = "/dreamdisplays-natives/${platformKey()}/$libName"
-        javaClass.getResourceAsStream(resource)?.use { input ->
-            val bytes = input.readBytes()
-            if (cached.isFile && cached.length() == bytes.size.toLong()
-                && runCatching { cached.readBytes().contentEquals(bytes) }.getOrDefault(false)
-            ) {
-                return cached
-            }
-            val parent = cached.parentFile
-            if (parent != null && !parent.exists() && !parent.mkdirs()) return null
-            val tmp = File(parent, "$libName.tmp")
-            tmp.writeBytes(bytes)
-            if (!tmp.renameTo(cached)) {
-                tmp.delete()
-                return null
-            }
+        val bytes = javaClass.getResourceAsStream("/dreamdisplays-natives/${platformKey()}/$libName")?.use { it.readBytes() }
+            ?: return cached.takeIf { it.isFile && it.length() > 0 }
+        if (cached.isFile && cached.length() == bytes.size.toLong() && runCatching { cached.readBytes().contentEquals(bytes) }.getOrDefault(false)) {
             return cached
         }
-        if (cached.isFile && cached.length() > 0) return cached
-        return null
+        val parent = cached.parentFile
+        if (!parent.exists() && !parent.mkdirs()) return null
+        val tmp = File(parent, "$libName.tmp")
+        tmp.writeBytes(bytes)
+        if (!tmp.renameTo(cached)) {
+            tmp.delete()
+            return null
+        }
+        return cached
     }
 
-    private fun platformKey(): String = when {
-        OsInfo.isWindows -> if (OsInfo.isArm) "windows-aarch64" else "windows-x64"
-        OsInfo.isMac -> if (OsInfo.isArm) "macos-aarch64" else "macos-x64"
-        else -> if (OsInfo.isArm) "linux-aarch64" else "linux-x64"
+    private fun platformKey(): String {
+        val os = when {
+            OsInfo.isWindows -> "windows"
+            OsInfo.isMac -> "macos"
+            else -> "linux"
+        }
+        return "$os-${if (OsInfo.isArm) "aarch64" else "x64"}"
     }
 
-    private val FFMPEG_SHARED_LIBRARY_ORDER = linkedMapOf(
-        "avutil" to 0,
-        "swresample" to 1,
-        "swscale" to 2,
-        "avcodec" to 3,
-        "avformat" to 4,
-        "avfilter" to 5,
-        "avdevice" to 6,
-    )
+    private val FFMPEG_LOAD_ORDER = ["avutil", "swresample", "swscale", "avcodec", "avformat", "avfilter", "avdevice"]
 }

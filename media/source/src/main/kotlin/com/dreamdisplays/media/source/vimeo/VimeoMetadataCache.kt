@@ -6,33 +6,11 @@ import com.dreamdisplays.media.source.platform.PlatformVideoMetadata
 import com.dreamdisplays.media.source.platform.YtDlpMetadataFallback
 
 /** Metadata cache for Vimeo videos, so the menu can show a real title / uploader / thumbnail for a pasted Vimeo link. */
-object VimeoMetadataCache {
-    private val cache = PlatformMetadataCache(
-        name = "Vimeo",
-        liveTtlSeconds = 60,
-        staticTtlMinutes = 30,
-        fetch = { key -> sourceFor(key).let { VimeoApi.metadata(it) ?: YtDlpMetadataFallback.fetch(it.url) } },
-    )
-
+object VimeoMetadataCache : PlatformMetadataCache<MediaSource.Vimeo, PlatformVideoMetadata>("Vimeo", PlatformVideoMetadata::isLive) {
     /** The cache key for [source]: `<videoId>` or `<videoId>/<hash>` for an unlisted video. */
-    fun cacheKey(source: MediaSource.Vimeo): String =
+    override fun cacheKey(source: MediaSource.Vimeo): String =
         if (source.hash != null) "${source.videoId}/${source.hash}" else source.videoId
 
-    /** Returns cached metadata for [key], or null when not yet fetched. */
-    fun get(key: String): PlatformVideoMetadata? = cache.get(key)
-
-    /** Seeds [metadata] for [source] (used by [VimeoResolver] after it fetches the config). */
-    fun put(source: MediaSource.Vimeo, metadata: PlatformVideoMetadata) = cache.put(cacheKey(source), metadata)
-
-    /** Warms the cache for [source] in the background. */
-    fun requestAsync(source: MediaSource.Vimeo) = cache.requestAsync(cacheKey(source))
-
-    /** Fetches metadata for [source] now (blocking); for background search threads. */
-    fun resolveBlocking(source: MediaSource.Vimeo): PlatformVideoMetadata? = cache.resolveBlocking(cacheKey(source))
-
-    private fun sourceFor(key: String): MediaSource.Vimeo {
-        val videoId = key.substringBefore('/')
-        val hash = key.substringAfter('/', "").takeIf { it.isNotEmpty() }
-        return MediaSource.Vimeo(url = "https://vimeo.com/$videoId", videoId = videoId, hash = hash)
-    }
+    override fun fetch(source: MediaSource.Vimeo): PlatformVideoMetadata? =
+        VimeoApi.metadata(source) ?: YtDlpMetadataFallback.fetch(source.url)
 }

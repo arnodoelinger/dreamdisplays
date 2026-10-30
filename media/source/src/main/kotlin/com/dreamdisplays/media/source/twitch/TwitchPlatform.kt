@@ -2,62 +2,24 @@ package com.dreamdisplays.media.source.twitch
 
 import com.dreamdisplays.api.media.model.DreamMediaException
 import com.dreamdisplays.api.media.source.MediaMetadata
-import com.dreamdisplays.api.media.source.MediaResolverService
 import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
-import com.dreamdisplays.media.source.platform.LiveAwareResolvedMediaCache
+import com.dreamdisplays.media.source.platform.Platform
 import com.dreamdisplays.media.source.youtube.YtDlpResolver
 import com.dreamdisplays.util.net.DreamHttpClient
-import org.slf4j.LoggerFactory
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-/**
- * In-process Twitch stream resolver: one GQL round trip for the playback access token (plus metadata), then a direct
- * usher request for the stream URLs, no `yt-dlp` subprocess.
- */
-object TwitchResolver : MediaResolverService {
-    private val logger = LoggerFactory.getLogger(javaClass)
-
-    override val priority: Int = 10
-
-    private val cache = LiveAwareResolvedMediaCache(maxSize = 100, liveTtlSeconds = 25, staticTtlMinutes = 30)
-
-    override fun canResolve(source: MediaSource): Boolean = source is MediaSource.Twitch
-
-    override fun prefetch(source: MediaSource): Boolean {
-        val twitch = source as? MediaSource.Twitch ?: return false
-        return runCatching { resolveCached(twitch) }.isSuccess
-    }
-
-    override fun resolve(source: MediaSource): ResolvedMedia {
-        val twitch = source as? MediaSource.Twitch
-            ?: throw UnsupportedOperationException("$source is not a Twitch source.")
-        return resolveCached(twitch)
-    }
-
-    /**
-     * Drops the cached resolution for [url] when it is a Twitch source. Wired into the player's
-     * stall-recovery cache invalidation so a dead playlist URL is re-minted instead of re-served.
-     */
-    fun invalidate(url: String) {
-        val twitch = MediaSource.from(url) as? MediaSource.Twitch ?: return
-        TwitchMetadataCache.cacheKey(twitch)?.let(cache::invalidate)
-    }
-
-    private fun resolveCached(source: MediaSource.Twitch): ResolvedMedia {
-        val key = TwitchMetadataCache.cacheKey(source)
-            ?: throw DreamMediaException.NotFound("Unrecognized Twitch URL shape: ${source.url}.")
-        cache.get(key)?.let { return it }
-        val resolved = when {
-            source.channel != null -> resolveLive(source, source.channel!!)
-            source.videoId != null -> resolveVod(source, source.videoId!!)
-            else -> resolveClip(source, source.clipSlug!!)
-        }
-        cache.put(key, resolved)
-        return resolved
+/** In-process Twitch stream resolver. */
+object TwitchPlatform : Platform<MediaSource.Twitch, TwitchMetadata>(
+    "Twitch", MediaSource.Twitch::class.java, TwitchMetadataCache, maxCached = 100,
+) {
+    override fun resolveUncached(source: MediaSource.Twitch): ResolvedMedia = when {
+        source.channel != null -> resolveLive(source, source.channel!!)
+        source.videoId != null -> resolveVod(source, source.videoId!!)
+        else -> resolveClip(source, source.clipSlug!!)
     }
 
     private fun resolveLive(source: MediaSource.Twitch, login: String): ResolvedMedia {
@@ -132,7 +94,6 @@ object TwitchResolver : MediaResolverService {
     private fun TwitchHls.Rendition.toMediaStream(): MediaStream = MediaStream(
         url = url,
         type = if (isAudioOnly) MediaStreamType.AUDIO else MediaStreamType.VIDEO_AUDIO,
-        // The video codec leads the CODECS list; the selector only needs a family hint
         codec = codecs?.substringBefore(','),
         width = width,
         height = height,
