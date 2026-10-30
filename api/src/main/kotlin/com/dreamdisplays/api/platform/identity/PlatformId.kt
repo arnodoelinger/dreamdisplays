@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.platform.identity
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOf
 
@@ -9,7 +8,6 @@ import com.dreamdisplays.api.util.wireEnumValueOf
  *
  * @since 1.8.x
  */
-@Unstable
 enum class PlatformId(override val wire: String) : WireEnum {
     /** `Fabric` mod loader. */
     FABRIC("fabric"),

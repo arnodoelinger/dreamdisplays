@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.display.model.settings
 
-import com.dreamdisplays.api.Unstable
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,7 +7,6 @@ import kotlinx.serialization.Serializable
  *
  * @since 1.0.x
  */
-@Unstable
 @Serializable
 data class ClientDisplaySettings(
     /** Volume in the range [0.0, 1.0]. */

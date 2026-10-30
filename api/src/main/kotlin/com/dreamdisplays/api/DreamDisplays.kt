@@ -26,7 +26,6 @@ import com.dreamdisplays.api.addon.AddonLifecycle
  *
  * @since 1.10.x
  */
-@Unstable
 object DreamDisplays {
     private val backend: ApiBackend
         get() = ApiHolder.current

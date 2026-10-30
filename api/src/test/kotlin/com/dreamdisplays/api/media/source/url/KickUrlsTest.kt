@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.media.source.url
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.KickUrls
 import com.dreamdisplays.api.media.source.MediaPlatform
 import com.dreamdisplays.api.media.source.MediaSource

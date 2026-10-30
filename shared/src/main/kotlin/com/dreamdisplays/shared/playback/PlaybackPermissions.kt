@@ -1,11 +1,9 @@
 package com.dreamdisplays.shared.playback
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.playback.model.PlaybackMode
 import com.dreamdisplays.api.playback.model.PlaybackMode.*
 
 /** The single source of truth for who may do what in each [PlaybackMode]. */
-@Unstable
 object PlaybackPermissions {
     private fun isEditor(c: PlaybackContext): Boolean = c.isOwner || c.isAdmin || !c.isLocked
 

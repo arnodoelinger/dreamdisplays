@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.media.stream
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * One selectable subtitle / caption track exposed by a resolver, e.g. a YouTube caption track.
  *
  * @since 1.10.x
  */
-@Unstable
 data class SubtitleTrack(
     /** Direct URL to the subtitle file (WebVTT). */
     val url: String,

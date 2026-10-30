@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,7 +8,7 @@ import kotlinx.serialization.Serializable
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 @Serializable
 data class CustomVideoRecord(
     /** The normalized, playable URL. */

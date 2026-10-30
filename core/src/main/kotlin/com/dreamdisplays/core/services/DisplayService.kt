@@ -1,14 +1,12 @@
 package com.dreamdisplays.core.services
 
 import com.dreamdisplays.api.playback.model.DisplayAccess
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.settings.DisplaySettings
 
 /** Public display registry and command surface; forwards mutations to the authoritative side. */
-@Unstable
 interface DisplayService {
     /** @return the latest known display snapshot for [id], or `null` when absent. */
     fun getDisplay(id: DisplayId): DisplayInfo?

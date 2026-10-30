@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.media.search
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.MediaPlatform
 import com.dreamdisplays.api.media.source.YouTubeUrls
 
@@ -9,7 +8,6 @@ import com.dreamdisplays.api.media.source.YouTubeUrls
  *
  * @since 1.6.x
  */
-@Unstable
 data class MediaSearchResult(
     /** Result ID. */
     val id: String,

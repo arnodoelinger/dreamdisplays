@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.watchparty
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.playback.model.WatchPartySessionState
 
 /**
@@ -9,7 +8,6 @@ import com.dreamdisplays.api.playback.model.WatchPartySessionState
  *
  * @since 1.8.x
  */
-@Unstable
 data class WatchPartySession(
     /** Short server-assigned ID, stable for the lifetime of this session. */
     val sessionId: String,

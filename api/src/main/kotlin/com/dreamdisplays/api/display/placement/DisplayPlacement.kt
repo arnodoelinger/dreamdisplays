@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.display.placement
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import com.dreamdisplays.api.display.model.property.DisplayId
 
 /**
@@ -8,7 +8,7 @@ import com.dreamdisplays.api.display.model.property.DisplayId
  *
  * @since 1.10.x
  */
-@Unstable
+@Experimental
 data class Vec3(val x: Double, val y: Double, val z: Double)
 
 /**
@@ -16,7 +16,7 @@ data class Vec3(val x: Double, val y: Double, val z: Double)
  *
  * @since 1.10.x
  */
-@Unstable
+@Experimental
 class PlacementTransform @JvmOverloads constructor(
     val anchorX: Int, val anchorY: Int, val anchorZ: Int,
     val originX: Double, val originY: Double, val originZ: Double,
@@ -58,7 +58,7 @@ class PlacementTransform @JvmOverloads constructor(
  *
  * @since 1.10.x
  */
-@Unstable
+@Experimental
 fun interface DisplayPlacement {
     /**
      * The transform at [partialTick] (0..1 between game ticks).
@@ -72,9 +72,9 @@ fun interface DisplayPlacement {
  * Supplies placements. Asked for every display, often (every frame), so look the display up in a map and answer `null`
  * when it is not yours.
  *
- * @since 1.10.2
+ * @since 1.10.x
  */
-@Unstable
+@Experimental
 fun interface DisplayPlacementProvider {
     /** The placement of [displayId], or `null` when the display sits at its stored coordinates. */
     fun placementOf(displayId: DisplayId): DisplayPlacement?
@@ -83,9 +83,9 @@ fun interface DisplayPlacementProvider {
 /**
  * Where [DisplayPlacementProvider]s are registered.
  *
- * @since 1.10.2
+ * @since 1.10.x
  */
-@Unstable
+@Experimental
 interface DisplayPlacements {
     /** Registers [provider]; close the handle (or end the session that owns it) to remove it. */
     fun register(provider: DisplayPlacementProvider): AutoCloseable

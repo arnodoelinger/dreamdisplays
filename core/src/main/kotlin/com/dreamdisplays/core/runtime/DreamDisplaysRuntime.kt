@@ -1,9 +1,6 @@
 package com.dreamdisplays.core.runtime
 
-import com.dreamdisplays.api.Unstable
-
 /** `Dream Displays`' assembler. */
-@Unstable
 interface DreamDisplaysRuntime : AutoCloseable {
     /** Registry of services shared by all modules. */
     val services: ServiceRegistry

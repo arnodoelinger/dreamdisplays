@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.platform.capability
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Minimal structured logger contract used by modules that must not depend on a concrete backend.
  *
  * @since 1.8.x
  */
-@Unstable
 interface PlatformLogger {
     /** Logs an informational message. */
     fun info(message: String)

@@ -27,7 +27,6 @@ import java.util.function.Consumer
  *
  * @since 1.0.x
  */
-@Unstable
 interface Display {
     /** Persistent ID of this display. */
     val id: DisplayId

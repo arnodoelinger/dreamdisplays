@@ -1,11 +1,9 @@
 package com.dreamdisplays.shared.capability
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOfOrNull
 
 /** Server capabilities advertised during negotiation; string tokens stay centralized in this enum. */
-@Unstable
 enum class ServerFeature(override val wire: String) : WireEnum {
     /** Server supports selecting playback modes. */
     MODES("modes"),
@@ -35,5 +33,4 @@ enum class ServerFeature(override val wire: String) : WireEnum {
 }
 
 /** Converts feature enums to their wire tokens. */
-@Unstable
 fun Iterable<ServerFeature>.toWire(): List<String> = map { it.wire }

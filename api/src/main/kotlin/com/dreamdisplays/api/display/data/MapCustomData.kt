@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.display.data
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * A read-only [DisplayCustomData] over a map; what the client hands out.
  *
  * @since 1.10.x
  */
-@Unstable
 class MapCustomData(private val source: () -> Map<String, ByteArray>) : DisplayCustomData {
     override val keys: Set<String> get() = source().keys
     override fun get(key: String): ByteArray? = source()[key]?.copyOf()

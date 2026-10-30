@@ -4,7 +4,9 @@ import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.api.display.model.property.DisplayId
 
 /**
- * Owner of subscriptions. Everything started through a session ends when the session is closed:
+ * Owner of subscriptions. Everything started through a session ends when the session is closed.
+ *
+ * Example:
  * ```
  * DreamDisplays.session("my-addon") {
  *     val screen = display(id) ?: return@session
@@ -14,7 +16,6 @@ import com.dreamdisplays.api.display.model.property.DisplayId
  *
  * @since 1.10.x
  */
-@Unstable
 interface Session : AutoCloseable {
     /** Name shown in diagnostics. */
     val name: String

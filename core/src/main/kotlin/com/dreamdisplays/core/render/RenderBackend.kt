@@ -1,11 +1,9 @@
 package com.dreamdisplays.core.render
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOf
 
 /** Render backend. */
-@Unstable
 enum class RenderBackend(override val wire: String) : WireEnum {
     /** OpenGL renderer. */
     OPENGL("opengl"),

@@ -1,7 +1,5 @@
 package com.dreamdisplays.api.addon
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Marks a class as a `Dream Displays` addon.
  *
@@ -23,7 +21,6 @@ import com.dreamdisplays.api.Unstable
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.CLASS)
 annotation class Addon(

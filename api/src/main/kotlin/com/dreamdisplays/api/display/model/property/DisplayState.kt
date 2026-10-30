@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.display.model.property
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.model.DreamMediaException
 
 /**
@@ -8,7 +7,6 @@ import com.dreamdisplays.api.media.model.DreamMediaException
  *
  * @since 1.8.x
  */
-@Unstable
 sealed interface DisplayState {
     /** The display is currently idle. */
     data object Idle : DisplayState

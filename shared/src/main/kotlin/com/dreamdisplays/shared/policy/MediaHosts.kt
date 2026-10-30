@@ -1,6 +1,5 @@
 package com.dreamdisplays.shared.policy
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.MediaPlatform
 import java.net.URI
 import java.util.*
@@ -12,7 +11,6 @@ import java.util.*
  * The distinction drives how a request is made rather than whether it is made: a host nobody
  * vouched for gets no identifying headers, tighter limits, and has to prove it really serves media.
  */
-@Unstable
 object MediaHosts {
     private val PLATFORM_DOMAINS: List<Pair<MediaPlatform, List<String>>> = [
         MediaPlatform.YOUTUBE to [

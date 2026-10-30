@@ -1,8 +1,5 @@
-@file:OptIn(Unstable::class)
-
 package com.dreamdisplays.api.media.source.url
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.CustomMediaKind
 import com.dreamdisplays.api.media.source.CustomMediaUrls
 import com.dreamdisplays.api.media.source.MediaSource

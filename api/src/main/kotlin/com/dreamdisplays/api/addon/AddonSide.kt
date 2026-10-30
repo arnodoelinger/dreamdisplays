@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.addon
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Where an addon runs.
  *
  * @since 1.10.x
  */
-@Unstable
 enum class AddonSide {
     /** In the game client (`Fabric` / `NeoForge`). */
     CLIENT,

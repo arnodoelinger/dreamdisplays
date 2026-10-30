@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import java.util.*
 
 /**
@@ -8,7 +8,6 @@ import java.util.*
  *
  * @since 1.8.x
  */
-@Unstable
 sealed interface MediaSource {
     /** Generic remote URL, passed through to the resolver pipeline. */
     data class Remote(val url: String) : MediaSource

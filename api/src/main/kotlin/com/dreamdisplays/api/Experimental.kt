@@ -1,14 +1,12 @@
 package com.dreamdisplays.api
 
 /**
- * Marks an API as unstable; may change or be removed without major version bump.
- *
- * Planned for removal in 1.11.0.
+ * Marks an API as experimental; may change or be removed without major version bump.
  *
  * @since 1.8.x
  */
 @RequiresOptIn(
-    message = "Dream Displays API is unstable. Please use with caution and aware of potential breaking changes.",
+    message = "This is experimental Dream Displays API. Please use it with caution.",
     level = RequiresOptIn.Level.WARNING,
 )
 @Retention(AnnotationRetention.BINARY)
@@ -20,4 +18,4 @@ package com.dreamdisplays.api
     AnnotationTarget.TYPEALIAS,
 )
 
-annotation class Unstable
+annotation class Experimental

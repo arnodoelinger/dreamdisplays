@@ -6,7 +6,6 @@ package com.dreamdisplays.api
  *
  * @since 1.10.x
  */
-@Unstable
 interface DisplayBudget {
     /** Most displays that may play at the same time; 0 means no limit. */
     var maxActive: Int

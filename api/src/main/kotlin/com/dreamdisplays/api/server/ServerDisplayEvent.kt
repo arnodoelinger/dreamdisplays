@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.server
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Things that happen to displays on the server.
  *
  * @since 1.10.x
  */
-@Unstable
 sealed interface ServerDisplayEvent {
     /** The display the event is about. */
     val display: ServerDisplay

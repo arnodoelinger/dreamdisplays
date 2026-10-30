@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.display.model.property
 
-import com.dreamdisplays.api.Unstable
 import java.util.*
 
 /**
@@ -8,7 +7,6 @@ import java.util.*
  *
  * @since 1.0.x
  */
-@Unstable
 data class DisplayId(val uuid: UUID) {
     override fun toString(): String = uuid.toString()
 

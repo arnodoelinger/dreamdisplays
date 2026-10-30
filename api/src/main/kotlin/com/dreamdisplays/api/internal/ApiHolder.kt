@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.internal
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Holds the live [ApiBackend]. Written by `Dream Displays` itself.
  *
  * @since 1.10.x
  */
-@Unstable
 object ApiHolder {
     private val waiting = ArrayList<(ApiBackend) -> Unit>()
 

@@ -1,13 +1,13 @@
 package com.dreamdisplays.api.media.audio
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 
 /**
  * World-space listener pose (position + forward / up basis) for azimuth and directivity.
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 data class ListenerPose(
     val x: Double,
     val y: Double,

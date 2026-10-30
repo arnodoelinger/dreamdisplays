@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.SubtitleTrack
 
@@ -9,7 +9,7 @@ import com.dreamdisplays.api.media.stream.SubtitleTrack
  *
  * @since 1.8.x
  */
-@Unstable
+@Experimental
 data class ResolvedMedia(
     /** All playable streams returned by the resolver. */
     val streams: List<MediaStream>,

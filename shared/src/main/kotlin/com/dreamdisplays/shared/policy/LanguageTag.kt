@@ -1,10 +1,8 @@
 package com.dreamdisplays.shared.policy
 
-import com.dreamdisplays.api.Unstable
 import java.util.*
 
 /** A client-supplied language tag after trust-boundary cleanup. */
-@Unstable
 data class LanguageTag(val value: String) {
     init {
         require(value.none { it.isWhitespace() || it.isISOControl() }) {

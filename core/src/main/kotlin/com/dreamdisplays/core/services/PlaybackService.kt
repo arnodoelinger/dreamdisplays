@@ -1,6 +1,5 @@
 package com.dreamdisplays.core.services
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.property.DisplayState
 import com.dreamdisplays.api.playback.model.PlaybackMode
@@ -10,7 +9,6 @@ import com.dreamdisplays.api.media.model.VideoQuality
  * Public playback command surface for displays. Calls are requests: server-authoritative modes
  * validate permissions before broadcasting new state, while local mode updates the client session.
  */
-@Unstable
 interface PlaybackService {
     /** Plays the video for [displayId]. */
     fun play(displayId: DisplayId)

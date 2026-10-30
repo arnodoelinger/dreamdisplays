@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.media.stream
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.util.WireEnum
 import com.dreamdisplays.api.util.wireEnumValueOf
 
@@ -9,7 +8,6 @@ import com.dreamdisplays.api.util.wireEnumValueOf
  *
  * @since 1.8.x
  */
-@Unstable
 enum class SupportedCodec(override val wire: String, private vararg val prefixes: String) : WireEnum {
     /** H.264 / AVC video. */
     H264("h264", "avc", "h264"),

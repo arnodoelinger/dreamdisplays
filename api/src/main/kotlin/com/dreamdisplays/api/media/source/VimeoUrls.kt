@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import java.util.*
 
 /**
@@ -8,7 +8,7 @@ import java.util.*
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 object VimeoUrls {
     private val SKIP_SEGMENTS = setOf(
         "video",

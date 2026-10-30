@@ -1,13 +1,13 @@
 package com.dreamdisplays.api.media.audio
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 
 /**
  * World-space planar sound source (rectangle with center, axes, and normal); one block = one meter.
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 data class SourcePlane(
     val centerX: Double,
     val centerY: Double,

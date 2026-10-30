@@ -1,14 +1,11 @@
 package com.dreamdisplays.shared.geometry
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * How a block relates to the configured display base (`black_concrete`, its slab, its stairs, etc.).
  *
  * Air is allowed inside a conforming selection so a staircase can include the empty space beside
  * the steps. Anything else that is not the base block or its slab / stair variant rejects the selection.
  */
-@Unstable
 enum class SurfaceRole {
     /** The base block itself, a full cube. */
     FULL,
@@ -31,7 +28,6 @@ enum class SurfaceRole {
  *
  * IDs may be registry names (`minecraft:black_concrete_stairs`) or enum names (`BLACK_CONCRETE_STAIRS`).
  */
-@Unstable
 class DisplaySurface(baseId: String, shapedIds: Collection<String>) {
     private val base = normalizeBlockId(baseId)
     private val shaped = shapedIds.mapTo(HashSet(), ::normalizeBlockId)
@@ -55,7 +51,6 @@ class DisplaySurface(baseId: String, shapedIds: Collection<String>) {
 }
 
 /** Lower-cases a registry or enum id and strips the default `minecraft:` namespace. */
-@Unstable
 fun normalizeBlockId(raw: String): String =
     raw.trim().lowercase().removePrefix("minecraft:")
 
@@ -67,7 +62,6 @@ fun normalizeBlockId(raw: String): String =
  *
  * [flat] selections are a solid rectangle of the base block, the original screen shape.
  */
-@Unstable
 data class SurfaceCensus(
     val full: Int = 0,
     val shaped: Int = 0,

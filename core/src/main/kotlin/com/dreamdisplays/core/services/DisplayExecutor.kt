@@ -1,7 +1,6 @@
 package com.dreamdisplays.core.services
 
 import com.dreamdisplays.api.playback.model.DisplayAccess
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.settings.DisplaySettings
@@ -9,7 +8,6 @@ import com.dreamdisplays.api.media.model.VideoQuality
 import com.dreamdisplays.api.playback.model.PlaybackMode
 
 /** Dispatcher for display commands. */
-@Unstable
 interface DisplayExecutor {
     /** Updates the display settings for [id]. */
     fun updateSettings(id: DisplayId, settings: DisplaySettings): DisplayInfo? = null

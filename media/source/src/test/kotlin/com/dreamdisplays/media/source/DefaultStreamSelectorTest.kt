@@ -1,6 +1,5 @@
 package com.dreamdisplays.media.source
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.stream.MediaStream
 import com.dreamdisplays.api.media.stream.MediaStreamType
 import com.dreamdisplays.api.media.stream.StreamPreferences

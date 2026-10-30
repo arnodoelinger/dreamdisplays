@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.watchparty
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayId
 
 /**
@@ -8,7 +7,6 @@ import com.dreamdisplays.api.display.model.property.DisplayId
  *
  * @since 1.8.x
  */
-@Unstable
 interface WatchPartyService {
     /**
      * Requests a watch party on [displayId] with [url] (or the display's current video when `null`),

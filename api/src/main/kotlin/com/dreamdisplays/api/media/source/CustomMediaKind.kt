@@ -1,13 +1,13 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 
 /**
  * Syntactic classification of a custom URL (by extension/host); probe-validated by resolver.
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 enum class CustomMediaKind {
     /** A plain media file (`.mp4`, `.webm`, `.mkv`, ...) the player can open and byte-range seek. */
     PROGRESSIVE,

@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Metadata resolved for a media item. Fields are nullable because providers expose different facts.
  *
  * @since 1.8.x
  */
-@Unstable
 data class MediaMetadata(
     /** Human-readable title, if known. */
     val title: String?,

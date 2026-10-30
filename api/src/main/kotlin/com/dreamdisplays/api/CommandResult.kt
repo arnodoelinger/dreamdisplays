@@ -3,11 +3,8 @@ package com.dreamdisplays.api
 /**
  * Outcome of a command sent to a [Display].
  *
- * [OK] means the request was accepted. Server-authoritative requests can still be rejected later.
- *
  * @since 1.10.x
  */
-@Unstable
 enum class CommandResult {
     /** The request was accepted. */
     OK,

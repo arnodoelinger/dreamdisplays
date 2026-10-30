@@ -1,7 +1,6 @@
 package com.dreamdisplays.api.server
 
 import com.dreamdisplays.api.CommandResult
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.data.MutableDisplayCustomData
 import com.dreamdisplays.api.display.model.property.DisplayFacing
 import com.dreamdisplays.api.playback.model.DisplayAccess
@@ -15,7 +14,6 @@ import java.util.UUID
  *
  * @since 1.10.x
  */
-@Unstable
 interface ServerDisplay {
     /** Persistent ID. */
     val id: UUID

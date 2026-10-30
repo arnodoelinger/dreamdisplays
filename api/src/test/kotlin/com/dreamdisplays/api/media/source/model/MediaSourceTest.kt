@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.media.source.model
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.CustomMediaKind
 import com.dreamdisplays.api.media.source.MediaSource
 import kotlin.test.Test

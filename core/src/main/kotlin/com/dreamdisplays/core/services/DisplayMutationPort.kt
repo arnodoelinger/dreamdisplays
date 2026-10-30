@@ -1,12 +1,10 @@
 package com.dreamdisplays.core.services
 
 import com.dreamdisplays.api.playback.model.DisplayAccess
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.settings.DisplaySettings
 
 /** Display mutation port. */
-@Unstable
 interface DisplayMutationPort {
     /** Updates the display settings for [id]. */
     fun updateSettings(id: DisplayId, settings: DisplaySettings)

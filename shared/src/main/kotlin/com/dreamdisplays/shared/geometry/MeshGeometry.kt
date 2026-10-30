@@ -1,6 +1,5 @@
 package com.dreamdisplays.shared.geometry
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayFacing
 import kotlin.math.abs
 import kotlin.math.floor
@@ -24,7 +23,6 @@ private val TANGENTS = arrayOf(intArrayOf(T, N), intArrayOf(S, N), intArrayOf(S,
  * One box of a block outline, in that block's local coordinates (a full cube is `0..1` on every axis).
  * Stairs and slabs are a union of these boxes.
  */
-@Unstable
 data class ShapeBox(
     val minX: Double,
     val minY: Double,
@@ -41,7 +39,6 @@ data class ShapeBox(
 }
 
 /** A block inside the display volume and the boxes that make up its outline. */
-@Unstable
 data class ShapedBlock(
     val x: Int,
     val y: Int,
@@ -55,7 +52,6 @@ data class ShapedBlock(
  * [ox], [oy], [oz] is where the corner moves per unit of lift off the blocks. On a fold it is the sum of both
  * faces' normals, so lifted faces still meet on the edge instead of sinking into each other and eating the picture.
  */
-@Unstable
 data class ConformVertex(
     val x: Float,
     val y: Float,
@@ -71,7 +67,6 @@ data class ConformVertex(
  * A screen quad hugging one face of the display surface. [nx], [ny], [nz] point outward; the vertices
  * are wound so that normal faces the viewer of that face.
  */
-@Unstable
 data class ConformQuad(
     val v0: ConformVertex,
     val v1: ConformVertex,
@@ -98,7 +93,6 @@ data class ConformQuad(
  * How many blocks the volume extends on each world axis. Width runs across the screen, height runs
  * along it, and depth runs into the blocks, away from the clicked face.
  */
-@Unstable
 fun blockSpans(width: Int, height: Int, depth: Int, facing: DisplayFacing): Triple<Int, Int, Int> = when (facing) {
     DisplayFacing.NORTH, DisplayFacing.SOUTH -> Triple(width, height, depth)
     DisplayFacing.EAST, DisplayFacing.WEST -> Triple(depth, height, width)
@@ -111,7 +105,6 @@ fun blockSpans(width: Int, height: Int, depth: Int, facing: DisplayFacing): Trip
  * Every face the viewer can see from the front gets picture: fronts, risers, treads, side walls of a step,
  * the ceiling of a pocket. Faces on the rim of the volume are the screen's edge and stay bare, same as a flat screen.
  */
-@Unstable
 fun buildConformingMesh(
     blocks: List<ShapedBlock>,
     width: Int,
@@ -140,7 +133,6 @@ fun buildConformingMesh(
  * Cuts [quad] to the video-UV rectangle and returns the pieces. UVs stay in video space; callers
  * that sample a different texture remap them. Pieces with more than four corners are fanned.
  */
-@Unstable
 fun clipToUvRect(quad: ConformQuad, minU: Float, minV: Float, maxU: Float, maxV: Float): List<ConformQuad> {
     if (maxU - minU <= EPS_F || maxV - minV <= EPS_F) return []
     var poly = quad.vertices

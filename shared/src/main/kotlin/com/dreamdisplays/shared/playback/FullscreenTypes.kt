@@ -1,6 +1,5 @@
 package com.dreamdisplays.shared.playback
 
-import com.dreamdisplays.api.Unstable
 import kotlinx.serialization.Serializable
 
 /**
@@ -8,7 +7,6 @@ import kotlinx.serialization.Serializable
  *
  * Travels on the wire as its [ordinal] int ([wire] / [fromWire]); ordinals are append-only.
  */
-@Unstable
 @Serializable
 enum class FullscreenMode {
     /** Video letterboxed inside small margins; the game stays visible around the edges. */
@@ -33,7 +31,6 @@ enum class FullscreenMode {
  *
  * Travels on the wire as its [ordinal] int; ordinals are append-only.
  */
-@Unstable
 enum class FullscreenAckAction {
     /** The overlay was shown to the player. */
     SHOWN,

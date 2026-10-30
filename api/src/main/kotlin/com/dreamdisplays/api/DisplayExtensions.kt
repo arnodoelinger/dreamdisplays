@@ -18,7 +18,6 @@ import java.util.function.Consumer
  *
  * @since 1.10.x
  */
-@Unstable
 inline fun Display.lifecycle(crossinline block: DisplayLifecycle.() -> Unit): AutoCloseable =
     events.lifecycle { it.block() }
 
@@ -32,6 +31,5 @@ inline fun Display.lifecycle(crossinline block: DisplayLifecycle.() -> Unit): Au
  *
  * @since 1.10.x
  */
-@Unstable
 inline fun <reified T : DisplayEvent> Events.on(crossinline action: (T) -> Unit): AutoCloseable =
     on(T::class.java, Consumer { action(it) })

@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.media.model
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Classifies the reason a media operation failed.
  *
  * @since 1.8.x
  */
-@Unstable
 enum class MediaFailureKind {
     /** Remote resource could not be reached (DNS failure, TCP reset, HTTP error). */
     NETWORK,

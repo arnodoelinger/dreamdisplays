@@ -1,11 +1,9 @@
 package com.dreamdisplays.shared.policy
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.search.YouTubeVideoId
 import com.dreamdisplays.api.media.source.MediaHttpUrl
 
 /** Trust-boundary policy for client-supplied media URLs. */
-@Unstable
 object MediaUrlPolicy {
     const val MAX_URL_LENGTH: Int = 2048
     const val MAX_LANG_LENGTH: Int = 16

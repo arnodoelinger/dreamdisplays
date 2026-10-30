@@ -1,7 +1,6 @@
 package com.dreamdisplays.api.display.event
 
 import com.dreamdisplays.api.DisplayLifecycle
-import com.dreamdisplays.api.Unstable
 import java.util.function.Consumer
 
 /**
@@ -18,7 +17,6 @@ import java.util.function.Consumer
  *
  * @since 1.10.x
  */
-@Unstable
 interface Events {
     /**
      * Calls [listener] for every event of [type] (or a subtype) in this scope.
@@ -33,7 +31,6 @@ interface Events {
  *
  * @since 1.10.x
  */
-@Unstable
 interface DisplayEvents : Events {
     /**
      * Describes how to react to this display's playback life in one block;

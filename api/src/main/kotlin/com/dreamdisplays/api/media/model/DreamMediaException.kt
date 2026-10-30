@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.media.model
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Typed exception hierarchy for media failures; every subclass carries [kind] and [isFatal].
  *
  * @since 1.8.x
  */
-@Unstable
 sealed class DreamMediaException(
     message: String,
     cause: Throwable? = null,

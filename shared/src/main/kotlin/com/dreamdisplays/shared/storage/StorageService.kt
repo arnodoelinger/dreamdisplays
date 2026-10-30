@@ -1,10 +1,8 @@
 package com.dreamdisplays.shared.storage
 
-import com.dreamdisplays.api.Unstable
 import java.util.*
 
 /** In-memory registry of server-authoritative display snapshots, keyed by server ID. */
-@Unstable
 interface StorageService {
     /** Replaces the registry for [serverId] with [displays] and marks it as the current server. */
     fun load(serverId: String, displays: Map<UUID, DisplayData> = emptyMap())

@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.display.geometry
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayFacing
 import kotlin.math.max
 import kotlin.math.min
@@ -15,7 +14,6 @@ import kotlin.math.sqrt
  *
  * @since 1.10.x
  */
-@Unstable
 object DisplayGeometry {
     private inline fun <T> withBounds(
         minX: Int, minY: Int, minZ: Int, width: Int, height: Int, facing: DisplayFacing, depth: Int,

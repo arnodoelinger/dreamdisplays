@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.server
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.CommandResult
 import java.util.UUID
 import java.util.function.Consumer
@@ -23,7 +22,6 @@ import java.util.function.Consumer
  *
  * @since 1.10.x
  */
-@Unstable
 sealed class DisplayVeto {
     /** The player who asked, or `null` when the request came from an addon or the API. */
     abstract val actor: UUID?
@@ -69,7 +67,6 @@ sealed class DisplayVeto {
  *
  * @since 1.10.x
  */
-@Unstable
 interface DisplayVetoes {
     /**
      * Calls [listener] before every request of [type] (or a subtype).
@@ -84,6 +81,5 @@ interface DisplayVetoes {
  *
  * @since 1.10.x
  */
-@Unstable
 inline fun <reified T : DisplayVeto> DisplayVetoes.on(crossinline action: (T) -> Unit): AutoCloseable =
     on(T::class.java, Consumer { action(it) })

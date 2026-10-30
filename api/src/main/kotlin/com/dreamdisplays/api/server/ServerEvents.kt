@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.server
 
-import com.dreamdisplays.api.Unstable
 import java.util.function.Consumer
 
 /**
@@ -13,7 +12,6 @@ import java.util.function.Consumer
  *
  * @since 1.10.x
  */
-@Unstable
 interface ServerEvents {
     /**
      * Calls [listener] for every event of [type] (or a subtype).
@@ -28,6 +26,5 @@ interface ServerEvents {
  *
  * @since 1.10.x
  */
-@Unstable
 inline fun <reified T : ServerDisplayEvent> ServerEvents.on(crossinline action: (T) -> Unit): AutoCloseable =
     on(T::class.java, Consumer { action(it) })

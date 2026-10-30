@@ -72,7 +72,6 @@ tasks.withType<JavaCompile>().configureEach {
 
 tasks.withType<KotlinCompile>().configureEach {
     compilerOptions.jvmTarget.set(JvmTarget.fromTarget(bytecodeTarget.toString()))
-    compilerOptions.optIn.add("com.dreamdisplays.api.Unstable")
     compilerOptions.freeCompilerArgs.add("-Xcollection-literals")
     if (bytecodeTarget < toolchainVersion && project.path != ":media:player") {
         compilerOptions.freeCompilerArgs.add("-Xjdk-release=$bytecodeTarget")

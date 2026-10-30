@@ -1,7 +1,6 @@
 package com.dreamdisplays.core.services
 
 import com.dreamdisplays.api.playback.model.DisplayAccess
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
@@ -14,7 +13,6 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 
 /** Default implementation of [DisplaySystem]. */
-@Unstable
 class DefaultDisplaySystem(
     private val commands: DisplayExecutor = DisplayExecutor.Noop,
 ) : DisplaySystem {

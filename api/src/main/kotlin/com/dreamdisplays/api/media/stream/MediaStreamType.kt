@@ -1,14 +1,11 @@
 package com.dreamdisplays.api.media.stream
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * What a [MediaStream] carries. Drives track selection: a video-only and an audio-only stream are
  * paired for playback, while a muxed [VIDEO_AUDIO] stream stands alone.
  *
  * @since 1.6.x
  */
-@Unstable
 enum class MediaStreamType {
     /** Video track only (no audio). */
     VIDEO,

@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.platform.identity
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.platform.capability.PlatformLogger
 import com.dreamdisplays.api.platform.capability.PlatformPaths
 import com.dreamdisplays.api.platform.capability.PlatformScheduler
@@ -10,7 +9,6 @@ import com.dreamdisplays.api.platform.capability.PlatformScheduler
  *
  * @since 1.8.x
  */
-@Unstable
 interface Platform {
     /** Stable platform id, e.g. `fabric`, `neoforge`, or `paper`. */
     val id: String

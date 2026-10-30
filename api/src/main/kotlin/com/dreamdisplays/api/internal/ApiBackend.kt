@@ -6,7 +6,6 @@ import com.dreamdisplays.api.Displays
 import com.dreamdisplays.api.display.event.Events
 import com.dreamdisplays.api.display.placement.DisplayPlacements
 import com.dreamdisplays.api.Session
-import com.dreamdisplays.api.Unstable
 
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.media.search.MediaSearchService
@@ -20,7 +19,6 @@ import com.dreamdisplays.api.watchparty.WatchPartyService
  *
  * @since 1.10.x
  */
-@Unstable
 interface ApiBackend {
     /** Registers and enables an addon. */
     fun registerAddon(addon: Any)

@@ -1,14 +1,11 @@
 package com.dreamdisplays.api.addon
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Optional lifecycle hooks for an addon. An addon works without it when it only needs annotated
  * handlers.
  *
  * @since 1.10.x
  */
-@Unstable
 interface AddonLifecycle {
     /** Called when the addon is enabled. Everything started through [context] ends on [onDisable]. */
     fun onEnable(context: AddonContext) {}
@@ -36,7 +33,6 @@ interface DreamDisplaysAddon : AddonLifecycle
  *
  * @since 1.10.x
  */
-@Unstable
 interface AddonContext {
     /** The addon ID. */
     val id: String

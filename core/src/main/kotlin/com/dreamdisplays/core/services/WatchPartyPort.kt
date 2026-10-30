@@ -1,11 +1,9 @@
 package com.dreamdisplays.core.services
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.watchparty.WatchPartySession
 
 /** Watch party port. */
-@Unstable
 interface WatchPartyPort {
     /** Starts a watch party session for [displayId]. */
     fun start(displayId: DisplayId, url: String?): Boolean

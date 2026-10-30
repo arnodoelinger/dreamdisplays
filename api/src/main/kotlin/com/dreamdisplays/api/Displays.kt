@@ -19,7 +19,6 @@ import java.util.function.Predicate
  *
  * @since 1.10.x
  */
-@Unstable
 interface Displays : Iterable<Display> {
     /** Number of displays in this view right now. */
     val size: Int

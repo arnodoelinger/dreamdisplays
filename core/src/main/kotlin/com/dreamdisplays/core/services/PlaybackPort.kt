@@ -1,13 +1,11 @@
 package com.dreamdisplays.core.services
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayId
 import com.dreamdisplays.api.display.model.property.DisplayState
 import com.dreamdisplays.api.playback.model.PlaybackMode
 import com.dreamdisplays.api.media.model.VideoQuality
 
 /** Playback port. */
-@Unstable
 interface PlaybackPort {
     /** Plays the display with the given [displayId]. */
     fun play(displayId: DisplayId)

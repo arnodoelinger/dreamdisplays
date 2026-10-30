@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.media.player
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.model.FramePixelFormat
 import java.nio.ByteBuffer
 
@@ -9,7 +8,6 @@ import java.nio.ByteBuffer
  *
  * @since 1.8.x
  */
-@Unstable
 interface FrameUploader {
     /** True when uploads should proceed (e.g. the game window is not minimized). */
     fun canUpload(): Boolean
@@ -25,7 +23,6 @@ interface FrameUploader {
 }
 
 /** Creates a fresh [FrameUploader] for one decode channel. */
-@Unstable
 fun interface FrameUploaderFactory {
     fun create(): FrameUploader
 }

@@ -1,6 +1,6 @@
 package com.dreamdisplays.api.media.source
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
@@ -11,7 +11,7 @@ import java.util.*
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 object CustomMediaUrls {
     private val VIDEO_EXTENSIONS = setOf(
         "mp4",

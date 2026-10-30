@@ -1,6 +1,5 @@
 package com.dreamdisplays.core.services
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.event.DisplayEvent
 import com.dreamdisplays.api.display.model.DisplayInfo
 import com.dreamdisplays.api.display.model.property.DisplayId
@@ -8,7 +7,6 @@ import com.dreamdisplays.api.display.model.property.DisplayId
 /**
  * Display system.
  */
-@Unstable
 interface DisplaySystem :
     DisplayLookup,
     DisplayMutationPort,

@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.server
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.internal.ServerBackend
 import com.dreamdisplays.api.internal.ServerHolder
 import java.util.UUID
@@ -18,7 +17,6 @@ import java.util.function.Consumer
  *
  * @since 1.10.x
  */
-@Unstable
 object DreamDisplaysServer {
     private val backend: ServerBackend
         get() = ServerHolder.current

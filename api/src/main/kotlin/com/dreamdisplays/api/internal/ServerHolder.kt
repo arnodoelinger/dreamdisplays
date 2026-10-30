@@ -1,13 +1,10 @@
 package com.dreamdisplays.api.internal
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Holds the live [ServerBackend]. Written by the server plugin itself.
  *
  * @since 1.10.x
  */
-@Unstable
 object ServerHolder {
     private val waiting = ArrayList<(ServerBackend) -> Unit>()
 

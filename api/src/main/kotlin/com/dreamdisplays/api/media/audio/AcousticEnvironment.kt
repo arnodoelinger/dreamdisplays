@@ -1,13 +1,13 @@
 package com.dreamdisplays.api.media.audio
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 
 /**
  * Acoustic space between source and listener; engine-agnostic, normalized for DSP mapping.
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 data class AcousticEnvironment(
     /** Direct-path blockage: 0 = clear line of sight, 1 = fully walled off (max muffling + drop). */
     val occlusion: Float,

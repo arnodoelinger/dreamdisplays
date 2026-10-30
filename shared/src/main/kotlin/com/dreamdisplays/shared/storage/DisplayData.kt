@@ -1,13 +1,11 @@
 package com.dreamdisplays.shared.storage
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.display.model.property.DisplayFacing
 import com.dreamdisplays.api.playback.model.PlaybackMode
 import kotlinx.serialization.Serializable
 import java.util.*
 
 /** Full persisted snapshot of a display; holds all state needed to recreate it. */
-@Unstable
 @Serializable
 data class DisplayData(
     @Serializable(with = StringSerializer::class)

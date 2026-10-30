@@ -1,6 +1,5 @@
 package com.dreamdisplays.api.platform.capability
 
-import com.dreamdisplays.api.Unstable
 import java.nio.file.Path
 
 /**
@@ -8,7 +7,6 @@ import java.nio.file.Path
  *
  * @since 1.8.x
  */
-@Unstable
 interface PlatformPaths {
     /** User-editable configuration directory. */
     val configDir: Path

@@ -1,7 +1,5 @@
 package com.dreamdisplays.api.addon
 
-import com.dreamdisplays.api.Unstable
-
 /**
  * Client: called for every display that exists and every one that appears later.
  *
@@ -9,7 +7,6 @@ import com.dreamdisplays.api.Unstable
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
@@ -22,7 +19,6 @@ annotation class OnDisplay
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
@@ -35,7 +31,6 @@ annotation class OnPlaying
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
@@ -48,7 +43,6 @@ annotation class OnFailed
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
@@ -61,7 +55,6 @@ annotation class OnDisplayCreated
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented
@@ -74,7 +67,6 @@ annotation class OnDisplayRemoved
  *
  * @since 1.10.x
  */
-@Unstable
 @Retention(AnnotationRetention.RUNTIME)
 @Target(AnnotationTarget.FUNCTION)
 @MustBeDocumented

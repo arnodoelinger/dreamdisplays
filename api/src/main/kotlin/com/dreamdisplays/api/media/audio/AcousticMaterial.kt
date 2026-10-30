@@ -1,13 +1,13 @@
 package com.dreamdisplays.api.media.audio
 
-import com.dreamdisplays.api.Unstable
+import com.dreamdisplays.api.Experimental
 
 /**
  * Acoustic coefficients per block material; [reflectivity] and [occlusion].
  *
  * @since 1.9.x
  */
-@Unstable
+@Experimental
 data class AcousticMaterial(
     /** Reflected-energy factor: 0 = fully absorbent, ~1.5 = hard reflective (stone / metal). */
     val reflectivity: Float,

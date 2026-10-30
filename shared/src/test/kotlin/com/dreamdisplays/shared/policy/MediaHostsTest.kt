@@ -1,8 +1,5 @@
-@file:OptIn(Unstable::class)
-
 package com.dreamdisplays.shared.policy
 
-import com.dreamdisplays.api.Unstable
 import com.dreamdisplays.api.media.source.MediaPlatform
 import kotlin.test.Test
 import kotlin.test.assertEquals

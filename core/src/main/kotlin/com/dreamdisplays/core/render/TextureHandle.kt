@@ -1,9 +1,6 @@
 package com.dreamdisplays.core.render
 
-import com.dreamdisplays.api.Unstable
-
 /** Opaque integer texture id owned by the platform renderer. */
-@Unstable
 data class TextureHandle(val id: Int) {
     /** True when [id] points at a platform-owned texture. */
     val isValid: Boolean get() = id > 0
