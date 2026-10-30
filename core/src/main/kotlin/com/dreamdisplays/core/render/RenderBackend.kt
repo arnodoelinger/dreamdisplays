@@ -5,14 +5,14 @@ import com.dreamdisplays.api.util.wireEnumValueOf
 
 /** Render backend. */
 enum class RenderBackend(override val wire: String) : WireEnum {
-    /** OpenGL renderer. */
+    /** `OpenGL` renderer. */
     OPENGL("opengl"),
 
-    /** Vulkan renderer. */
+    /** `Vulkan` renderer. */
     VULKAN("vulkan"),
 
     /**
-     * Vulkan renderer replacement provided by VulkanMod.
+     * `Vulkan` renderer replacement provided by `VulkanMod`.
      *
      * @see <a href="https://modrinth.com/mod/vulkanmod">VulkanMod</a>
      */
@@ -25,7 +25,6 @@ enum class RenderBackend(override val wire: String) : WireEnum {
     UNKNOWN("unknown");
 
     companion object {
-        /** Returns the enum value corresponding to the given wire value, or [UNKNOWN] if not found. */
         fun fromWire(raw: String?): RenderBackend = wireEnumValueOf(raw, UNKNOWN, entries)
     }
 }
