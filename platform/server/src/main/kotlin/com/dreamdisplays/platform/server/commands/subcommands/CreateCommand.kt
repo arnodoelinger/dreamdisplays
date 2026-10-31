@@ -127,6 +127,10 @@ class CreateCommand : SubCommand {
         val region = RegionUtil.calculateRegion(pos1, pos2)
         val face = sel.getFace()
         val (width, height, depth) = region.screenExtents(abs(face.modX), abs(face.modY), abs(face.modZ))
+        if (isOversized(width, height, depth, PaperServer.config.settings.maxWidth, PaperServer.config.settings.maxHeight)) {
+            sendError("structureTooLarge", arrayOf(PaperServer.config.settings.maxWidth, PaperServer.config.settings.maxHeight))
+            return null
+        }
         val surface = PaperSurfaces.of(PaperServer.config.settings.baseMaterial)
         val world = pos1.world
         val census = if (world == null) {
@@ -264,6 +268,12 @@ object VanillaCreateCommand {
 
         val facing = sel.facing
         val (width, height, depth) = region.screenExtents(abs(facing.stepX), abs(facing.stepY), abs(facing.stepZ))
+        val maxWidth = VanillaServerState.config.settings.maxWidth
+        val maxHeight = VanillaServerState.config.settings.maxHeight
+        if (isOversized(width, height, depth, maxWidth, maxHeight)) {
+            sendError("structureTooLarge", arrayOf(maxWidth, maxHeight))
+            return null
+        }
         val surface = VanillaSurfaces.of(VanillaServerState.config.settings.baseMaterialId)
         var census = SurfaceCensus()
         for (x in region.minX..region.maxX) {
@@ -298,6 +308,9 @@ object VanillaCreateCommand {
         return sel
     }
 }
+
+private fun isOversized(width: Int, height: Int, depth: Int, maxWidth: Int, maxHeight: Int): Boolean =
+    width > maxWidth || height > maxHeight || depth > maxOf(maxWidth, maxHeight)
 
 private fun validateRegion(
     minY: Int,

@@ -5,6 +5,7 @@ import com.dreamdisplays.platform.server.PaperServer.Companion.config
 import com.dreamdisplays.platform.server.VanillaServerState
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
+import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.meta.Scheduler
 import com.dreamdisplays.platform.server.playback.FullscreenBroadcastManager
 import com.dreamdisplays.platform.server.playback.WatchPartyManager
@@ -73,6 +74,7 @@ class PlayerListener : Listener {
         V2PlayerTracker.clear(event.player.uniqueId)
         WatchPartyManager.onPlayerQuit(event.player.uniqueId)
         FullscreenBroadcastManager.onPlayerQuit(event.player.uniqueId)
+        SelectionManager.resetSelection(event.player.uniqueId)
         DisplayManager.forgetNearbyPlayer(event.player.uniqueId)
         Scheduler.untrackPlayer(event.player)
     }
@@ -117,6 +119,7 @@ object VanillaPlayerListener {
         V2PlayerTracker.clear(playerId)
         WatchPartyManager.onPlayerQuit(playerId)
         FullscreenBroadcastManager.onPlayerQuit(playerId)
+        SelectionManager.resetSelection(playerId)
     }
 }
 

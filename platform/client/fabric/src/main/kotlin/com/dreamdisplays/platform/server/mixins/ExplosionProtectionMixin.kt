@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable
 import net.minecraft.world.level.Level
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo*/
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -28,7 +27,7 @@ open class ExplosionProtectionMixin {
     open fun dd_filterExplodedBlocks(cir: CallbackInfoReturnable<MutableList<BlockPos>>) {
         val worldKey = RegionUtil.getLevelKey(level())
         cir.returnValue.removeIf { pos ->
-            DisplayManager.isContains(worldKey, pos) != null || SelectionManager.isLocationSelected(pos, worldKey)
+            DisplayManager.isContains(worldKey, pos) != null
         }
     }
 }
@@ -47,7 +46,7 @@ open class ExplosionProtectionMixin {
         val serverLevel = level as? ServerLevel ?: return
         val worldKey = RegionUtil.getLevelKey(serverLevel)
         getToBlow().removeIf { pos ->
-            DisplayManager.isContains(worldKey, pos) != null || SelectionManager.isLocationSelected(pos, worldKey)
+            DisplayManager.isContains(worldKey, pos) != null
         }
     }
 }*/

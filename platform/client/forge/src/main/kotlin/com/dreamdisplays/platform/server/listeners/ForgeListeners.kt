@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.listeners
 
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -58,7 +57,7 @@ object ForgeProtectionListener {
         if (!structure.resolve()) return
         val worldKey = RegionUtil.getLevelKey(level)
         val isProtected = { pos: BlockPos ->
-            DisplayManager.isContains(worldKey, pos) != null || SelectionManager.isLocationSelected(pos, worldKey)
+            DisplayManager.isContains(worldKey, pos) != null
         }
         if (structure.toPush.any(isProtected) || structure.toDestroy.any(isProtected)) event.isCanceled = true
     }

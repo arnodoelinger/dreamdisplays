@@ -9,7 +9,6 @@ import net.neoforged.neoforge.event.level.block.BreakBlockEvent as NeoForgeBreak
 //?}
 import com.dreamdisplays.platform.server.managers.DisplayManager
 import com.dreamdisplays.platform.server.managers.PlayerManager
-import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.ServerMessage
 import com.dreamdisplays.platform.server.utils.sendTo
 import com.dreamdisplays.platform.server.utils.RegionUtil
@@ -113,7 +112,7 @@ class ProtectionListener : Listener {
     }
 
     private fun isLocationProtected(loc: Location): Boolean =
-        DisplayManager.isContains(loc) != null || SelectionManager.isLocationSelected(loc)
+        DisplayManager.isContains(loc) != null
 }
 
 /**
@@ -124,8 +123,7 @@ class ProtectionListener : Listener {
 object VanillaProtectionListener {
     /** Returns true if the break at [pos] in [worldKey] should be cancelled; warns [player] if known. */
     fun handleBreak(worldKey: String, pos: BlockPos, player: ServerPlayer?): Boolean {
-        val isProtected = DisplayManager.isContains(worldKey, pos) != null ||
-                SelectionManager.isLocationSelected(pos, worldKey)
+        val isProtected = DisplayManager.isContains(worldKey, pos) != null
 
         if (isProtected && player != null && PlayerManager.getVersion(player.uuid) == null) {
             ServerMessage.DISPLAY_BLOCK_BREAK.sendTo(player)
@@ -136,7 +134,7 @@ object VanillaProtectionListener {
     /** Removes every protected position in [worldKey] from an explosion's destruction list. */
     fun filterExplosionBlocks(worldKey: String, positions: MutableList<BlockPos>) {
         positions.removeIf { pos ->
-            DisplayManager.isContains(worldKey, pos) != null || SelectionManager.isLocationSelected(pos, worldKey)
+            DisplayManager.isContains(worldKey, pos) != null
         }
     }
 }

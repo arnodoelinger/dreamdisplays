@@ -1,7 +1,6 @@
 package com.dreamdisplays.platform.server.mixins
 
 import com.dreamdisplays.platform.server.managers.DisplayManager
-import com.dreamdisplays.platform.server.managers.SelectionManager
 import com.dreamdisplays.platform.server.utils.RegionUtil
 import net.minecraft.core.BlockPos
 import net.minecraft.server.level.ServerLevel
@@ -32,7 +31,7 @@ open class PistonProtectionMixin {
         val serverLevel = level as? ServerLevel ?: return
         val worldKey = RegionUtil.getLevelKey(serverLevel)
         val isProtected = { pos: BlockPos ->
-            DisplayManager.isContains(worldKey, pos) != null || SelectionManager.isLocationSelected(pos, worldKey)
+            DisplayManager.isContains(worldKey, pos) != null
         }
         if (getToPush().any(isProtected) || getToDestroy().any(isProtected)) {
             cir.returnValue = false
