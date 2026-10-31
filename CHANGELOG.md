@@ -1,3 +1,24 @@
+# 1.10.8 Release
+
+## Highlights
+
+- Improved selection logic
+- Marked API as stable
+
+## Server
+
+## Client
+
+### Improvements
+
+- Marked API as stable
+
+## Server
+
+### Improvements
+
+- Improved selection logic
+
 # 1.10.7 Release
 
 ## Highlights
