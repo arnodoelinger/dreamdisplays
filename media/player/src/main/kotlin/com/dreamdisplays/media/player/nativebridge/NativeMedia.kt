@@ -30,10 +30,6 @@ object NativeMedia {
     private const val CACHE_ROOT = "./dreamdisplays/native"
     private const val STDERR_CAP = 128L * 1024L
 
-    private val LONG by lazy { ValueLayout.JAVA_LONG }
-    private val INT by lazy { ValueLayout.JAVA_INT }
-    private val ADDR by lazy { ValueLayout.ADDRESS }
-
     private lateinit var videoOpenHandle: MethodHandle
     private lateinit var videoReadFrameRgbaHandle: MethodHandle
     private lateinit var videoReadFrameI420Handle: MethodHandle
@@ -153,10 +149,10 @@ object NativeMedia {
 
     /** Blocking in-process decode of the next I420 frame plus its normalized PTS. */
     fun lavReadFrameI420WithPts(handle: Long, dst: ByteBuffer, frameBytes: Int): LavFrameReadResult {
-        val pts = ptsSlots.computeIfAbsent(handle) { Arena.ofAuto().allocate(LONG) }
-        pts.set(LONG, 0L, LAV_NO_PTS_NANOS)
+        val pts = ptsSlots.computeIfAbsent(handle) { Arena.ofAuto().allocate(Ffm.LONG) }
+        pts.set(Ffm.LONG, 0L, LAV_NO_PTS_NANOS)
         val rc = lavReadFramePtsHandle.invoke(handle, MemorySegment.ofBuffer(dst), frameBytes.toLong(), pts) as Int
-        return LavFrameReadResult(rc, pts.get(LONG, 0L))
+        return LavFrameReadResult(rc, pts.get(Ffm.LONG, 0L))
     }
 
     /** Seeks a live in-process libav session in place. */
@@ -215,20 +211,20 @@ object NativeMedia {
         }
         return try {
             val b = Binder(lib)
-            val abi = b.bind("dd_abi_version", FunctionDescriptor.of(INT)).invoke() as Int
+            val abi = b.bind("dd_abi_version", FunctionDescriptor.of(Ffm.INT)).invoke() as Int
             if (abi != ABI_VERSION) {
                 logger.warn("Native library ABI mismatch: found $abi, expected $ABI_VERSION; using JVM pipeline.")
                 unavailableReason = "abi_mismatch"
                 return false
             }
-            videoOpenHandle = b.bind("dd_video_open", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT))
-            videoReadFrameRgbaHandle = b.bind("dd_video_read_frame_rgba", FunctionDescriptor.of(INT, LONG, ADDR, LONG, INT))
-            videoReadFrameI420Handle = b.bind("dd_video_read_frame_i420", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
-            i420ToRgbaHandle = b.bind("dd_i420_to_rgba", FunctionDescriptor.of(INT, ADDR, LONG, ADDR, LONG, INT, INT))
-            videoStderrHandle = b.bind("dd_video_stderr", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
-            videoExitCodeHandle = b.bind("dd_video_exit_code", FunctionDescriptor.of(INT, LONG, INT))
-            videoKillHandle = b.bind("dd_video_kill", FunctionDescriptor.ofVoid(LONG))
-            videoCloseHandle = b.bind("dd_video_close", FunctionDescriptor.ofVoid(LONG))
+            videoOpenHandle = b.bind("dd_video_open", FunctionDescriptor.of(Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.INT, Ffm.INT))
+            videoReadFrameRgbaHandle = b.bind("dd_video_read_frame_rgba", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.INT))
+            videoReadFrameI420Handle = b.bind("dd_video_read_frame_i420", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.ADDR, Ffm.LONG))
+            i420ToRgbaHandle = b.bind("dd_i420_to_rgba", FunctionDescriptor.of(Ffm.INT, Ffm.ADDR, Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.INT, Ffm.INT))
+            videoStderrHandle = b.bind("dd_video_stderr", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.ADDR, Ffm.LONG))
+            videoExitCodeHandle = b.bind("dd_video_exit_code", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.INT))
+            videoKillHandle = b.bind("dd_video_kill", FunctionDescriptor.ofVoid(Ffm.LONG))
+            videoCloseHandle = b.bind("dd_video_close", FunctionDescriptor.ofVoid(Ffm.LONG))
             logger.info("Native media pipeline active: $lib.")
             true
         } catch (t: Throwable) {
@@ -249,21 +245,21 @@ object NativeMedia {
             LavFfmpeg.ensure(lib.parentFile)
             preloadLavDependencies(lib.parentFile)
             val b = Binder(lib)
-            val abi = b.bind("dd_lav_abi_version", FunctionDescriptor.of(INT)).invoke() as Int
+            val abi = b.bind("dd_lav_abi_version", FunctionDescriptor.of(Ffm.INT)).invoke() as Int
             if (abi != LAV_ABI_VERSION) {
                 logger.warn("In-process libav library ABI mismatch: found $abi, expected $LAV_ABI_VERSION.")
                 lavUnavailableReason = "abi_mismatch"
                 return false
             }
-            lavOpenHandle = b.bind("dd_lav_open", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT, LONG, INT))
-            lavOpenReplayHandle = b.bind("dd_lav_open_replay", FunctionDescriptor.of(LONG, ADDR, LONG, INT, INT, LONG))
-            lavReadFramePtsHandle = b.bind("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(INT, LONG, ADDR, LONG, ADDR))
-            lavSeekHandle = b.bind("dd_lav_seek", FunctionDescriptor.of(INT, LONG, LONG))
-            lavErrorHandle = b.bind("dd_lav_error", FunctionDescriptor.of(INT, LONG, ADDR, LONG))
-            lavKillHandle = b.bind("dd_lav_kill", FunctionDescriptor.ofVoid(LONG))
-            lavCloseHandle = b.bind("dd_lav_close", FunctionDescriptor.ofVoid(LONG))
-            lavEnableCacheHandle = b.bind("dd_lav_enable_cache", FunctionDescriptor.of(INT, LONG, INT, LONG))
-            lavRingSnapshotAtHandle = b.bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(INT, LONG, LONG, ADDR, LONG))
+            lavOpenHandle = b.bind("dd_lav_open", FunctionDescriptor.of(Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.INT, Ffm.INT, Ffm.LONG, Ffm.INT))
+            lavOpenReplayHandle = b.bind("dd_lav_open_replay", FunctionDescriptor.of(Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.INT, Ffm.INT, Ffm.LONG))
+            lavReadFramePtsHandle = b.bind("dd_lav_read_frame_i420_pts", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.ADDR, Ffm.LONG, Ffm.ADDR))
+            lavSeekHandle = b.bind("dd_lav_seek", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.LONG))
+            lavErrorHandle = b.bind("dd_lav_error", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.ADDR, Ffm.LONG))
+            lavKillHandle = b.bind("dd_lav_kill", FunctionDescriptor.ofVoid(Ffm.LONG))
+            lavCloseHandle = b.bind("dd_lav_close", FunctionDescriptor.ofVoid(Ffm.LONG))
+            lavEnableCacheHandle = b.bind("dd_lav_enable_cache", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.INT, Ffm.LONG))
+            lavRingSnapshotAtHandle = b.bind("dd_lav_ring_snapshot_at", FunctionDescriptor.of(Ffm.INT, Ffm.LONG, Ffm.LONG, Ffm.ADDR, Ffm.LONG))
             logger.info("In-process libav backend available: $lib.")
             true
         } catch (t: Throwable) {
@@ -326,4 +322,10 @@ object NativeMedia {
     }
 
     private val FFMPEG_LOAD_ORDER = ["avutil", "swresample", "swscale", "avcodec", "avformat", "avfilter", "avdevice"]
+}
+
+private object Ffm {
+    val LONG = ValueLayout.JAVA_LONG
+    val INT = ValueLayout.JAVA_INT
+    val ADDR = ValueLayout.ADDRESS
 }
