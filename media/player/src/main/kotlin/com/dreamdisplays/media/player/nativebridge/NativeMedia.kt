@@ -30,9 +30,9 @@ object NativeMedia {
     private const val CACHE_ROOT = "./dreamdisplays/native"
     private const val STDERR_CAP = 128L * 1024L
 
-    private val LONG = ValueLayout.JAVA_LONG
-    private val INT = ValueLayout.JAVA_INT
-    private val ADDR = ValueLayout.ADDRESS
+    private val LONG by lazy { ValueLayout.JAVA_LONG }
+    private val INT by lazy { ValueLayout.JAVA_INT }
+    private val ADDR by lazy { ValueLayout.ADDRESS }
 
     private lateinit var videoOpenHandle: MethodHandle
     private lateinit var videoReadFrameRgbaHandle: MethodHandle
