@@ -23,7 +23,7 @@ jobs:
 
   github-prerelease:
     name: Publish GitHub pre-release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: build
     permissions:
       contents: write
@@ -108,7 +108,7 @@ jobs:
 
   publish-core-loaders:
     name: Publish BungeeCord / Velocity / Paper
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [ build, publish ]
     permissions:
       contents: write
@@ -280,7 +280,7 @@ jobs:
 
   prepare-loader-matrix:
     name: Filter NeoForge / Fabric matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: build
     outputs:
       tasks: ${{ steps.filter.outputs.tasks }}
@@ -304,7 +304,7 @@ jobs:
 
   publish:
     name: Publish ${{ matrix.task.kind }} ${{ matrix.task.mc }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [ build, prepare-loader-matrix ]
     strategy:
       fail-fast: false
@@ -524,7 +524,7 @@ jobs:
 
   discord-announce:
     name: Announce release on Discord
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
     needs: [ build, publish-core-loaders, publish ]
     if: (needs.build.outputs.is_release == 'true' || needs.build.outputs.is_preview == 'true') && needs.build.outputs.is_marketplace_publishable == 'true'
     permissions:
