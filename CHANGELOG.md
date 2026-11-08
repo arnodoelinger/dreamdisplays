@@ -1,3 +1,24 @@
+# 1.10.9 Release
+
+## Highlights
+
+- Fixed crashes on `Fabric` and `Forge` for 1.18.2, 1.19.4, and 1.20.1 versions
+
+## Client
+
+### Improvements
+
+- Updated `Gradle` dependency to 9.9.0 and workflow runners
+
+### Fixes
+
+- Fixed `NoClassDefFoundError: java/lang/foreign/ValueLayout` error on `Fabric` and `Forge` for 1.18.2, 1.19.4, and
+  1.20.1 versions wich caused the game to crash on startup
+
+## Server
+
+No changes.
+
 # 1.10.8 Release
 
 ## Highlights
