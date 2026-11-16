@@ -20,6 +20,7 @@ object MediaResolverModule : DreamDisplaysModule {
         ResolverConfig.provider = object : ResolverConfig.Provider {
             override val ytdlpProxy: String get() = ClientStateManager.config.ytdlpProxy
             override val ytdlpCookieSource get() = ClientStateManager.config.ytdlpCookieSource
+            override val ytdlpJsRuntime: String get() = ClientStateManager.config.ytdlpJsRuntime
         }
 
         val resolverChain = DefaultMediaResolverRegistry().apply {

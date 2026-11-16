@@ -2,6 +2,7 @@ package com.dreamdisplays.media.source.youtube.process
 
 import com.dreamdisplays.media.runtime.system.Processes
 import com.dreamdisplays.media.source.youtube.binary.YtDlpBinary
+import com.dreamdisplays.media.source.youtube.binary.YtDlpJsRuntime
 import com.dreamdisplays.media.source.youtube.binary.YtDlpOutputParser
 import com.dreamdisplays.media.source.youtube.cookie.YtCookieManager
 import com.dreamdisplays.media.source.youtube.model.YtStream
@@ -125,6 +126,7 @@ class YtDlpClientRace(private val cookies: YtCookieManager) {
     private fun runClientFetch(videoUrl: String, client: String?, onStarted: (Process) -> Unit): List<YtStream> {
         val cmd = ArrayList<String>()
         cmd.addAll(YtDlpBinary.resolveCommand())
+        cmd.addAll(YtDlpJsRuntime.args())
         val tempCookies = cookies.appendArgs(cmd)
 
         val hasCookieArg = cmd.any { it == "--cookies" || it == "--cookies-from-browser" }
