@@ -36,7 +36,7 @@ object YtDlpBinary {
     private const val DOWNLOAD_BASE = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/"
     private const val ZIPAPP_ASSET = "yt-dlp"
     private const val ZIPAPP_NAME = "yt-dlp.pyz"
-    private const val MIN_PYTHON_MINOR = 9
+    private const val MIN_PYTHON_MINOR = 10
 
     private val PYTHON_CANDIDATES: Array<String> =
         if (OsInfo.isWindows) arrayOf("python", "python3", "py")
@@ -51,8 +51,6 @@ object YtDlpBinary {
     @Volatile
     private var resolvedCommand: List<String>? = null
 
-    @Volatile
-    private var pythonProbe: String? = null
     private val zipappUpdateChecked = atomic(false)
 
     /**
@@ -106,23 +104,27 @@ object YtDlpBinary {
         System.getProperty("dreamdisplays.ytdlp")?.ifEmpty { null } ?: System.getenv("DREAMDISPLAYS_YTDLP")?.ifEmpty { null }
 
     private fun zipappCommand(): List<String>? {
-        val python = usablePython() ?: return null
-        val pyz = provisionZipapp() ?: return null
+        val pythons = PYTHON_CANDIDATES.filter(::pythonVersionOk)
+        val pyz = pythons.takeIf { it.isNotEmpty() }?.let { provisionZipapp() }
+        val python = pyz?.let { zipapp -> pythons.firstOrNull { runsZipapp(it, zipapp) } }
+        if (python == null || pyz == null) {
+            if (pythons.isNotEmpty()) logger.info("No installed Python can run yt-dlp.pyz; using the standalone yt-dlp binary.")
+            return null
+        }
         logger.info("yt-dlp fast path active: {} {}.", python, pyz.fileName)
         return [python, pyz.toString()]
     }
 
-    private fun usablePython(): String? {
-        pythonProbe?.let { return it.ifEmpty { null } }
-        for (candidate in PYTHON_CANDIDATES) {
-            if (pythonVersionOk(candidate)) {
-                pythonProbe = candidate
-                return candidate
-            }
+    private fun runsZipapp(python: String, pyz: Path): Boolean = runCatching {
+        val p = ProcessBuilder(python, pyz.toString(), "--version").redirectErrorStream(true).start()
+        runCatching { p.outputStream.close() }
+        Processes.drainAsync(p.inputStream)
+        if (!p.waitFor(20, TimeUnit.SECONDS)) {
+            Processes.destroyTree(p)
+            return false
         }
-        pythonProbe = ""
-        return null
-    }
+        (p.exitValue() == 0).also { ok -> if (!ok) logger.info("{} cannot run yt-dlp.pyz; trying the next Python.", python) }
+    }.getOrDefault(false)
 
     private fun pythonVersionOk(exe: String): Boolean {
         return runCatching {
