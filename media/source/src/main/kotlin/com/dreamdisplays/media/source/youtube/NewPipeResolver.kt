@@ -78,7 +78,7 @@ object NewPipeResolver : MediaResolverService {
             throw IllegalStateException("NewPipe returned no quality ladder (heights=$heights); deferring to yt-dlp")
         }
         return ResolvedMedia(
-            streams = resolved.streams.map { it.toMediaStream() },
+            streams = YtStreams.preferDirect(resolved.streams).map { it.toMediaStream() },
             metadata = MediaMetadata(
                 title = resolved.title,
                 uploader = resolved.uploader,

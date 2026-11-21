@@ -5,6 +5,7 @@ import com.dreamdisplays.api.media.source.MediaSource
 import com.dreamdisplays.api.media.source.ResolvedMedia
 import com.dreamdisplays.api.media.source.MediaResolverService
 import com.dreamdisplays.api.media.source.MediaResolverRegistry
+import com.dreamdisplays.media.source.youtube.model.YtStreams
 
 /**
  * Subprocess-backed [MediaResolverService] wrapping the [YtDlp] orchestrator. This is the slow, robust
@@ -39,7 +40,7 @@ object YtDlpResolver : MediaResolverService {
             durationMs = durationNanos.takeIf { it > 0L }?.div(1_000_000L),
         )
         return ResolvedMedia(
-            streams = streams.map { it.toMediaStream() },
+            streams = YtStreams.preferDirect(streams).map { it.toMediaStream() },
             metadata = metadata,
             isLive = isLive,
             isSeekable = streams.any { it.isSeekable },

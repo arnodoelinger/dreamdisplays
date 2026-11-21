@@ -28,5 +28,11 @@ internal object YtStreams {
 
     fun hasAudio(streams: List<YtStream>): Boolean = streams.any { it.hasAudio() }
 
+    fun preferDirect(streams: List<YtStream>): List<YtStream> {
+        if (streams.any { it.isLive }) return streams
+        val direct = streams.filterNot { it.protocol?.contains("m3u8") == true }
+        return if (direct.any { it.hasVideo() } && hasAudio(direct)) direct else streams
+    }
+
     fun usable(streams: List<YtStream>): Boolean = streams.isNotEmpty() && hasAudio(streams)
 }
