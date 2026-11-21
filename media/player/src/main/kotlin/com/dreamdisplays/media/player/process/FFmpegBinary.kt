@@ -40,6 +40,7 @@ object FFmpegBinary {
             runCatching {
                 val path = getPath()
                 if (path != null) FFmpegCapabilities.hasFilter(path, "scale_vt")
+                HwAccelBackend.detectDefault()
             }.onFailure { e -> logger.warn("Prewarm failed", e) }
         }, "FFmpeg-prewarm").start()
     }
