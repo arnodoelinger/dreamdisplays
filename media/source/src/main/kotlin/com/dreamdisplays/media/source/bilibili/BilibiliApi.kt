@@ -137,6 +137,7 @@ object BilibiliApi {
             put("qn", "80")
             put("fnval", "4048")
             put("fourk", "1")
+            put("try_look", "1")
         }
         val playurlRoot = PlatformHttp.getJson("https://api.bilibili.com/x/player/playurl?${signedQuery(playurlParams)}", HEADERS)
         val streams = buildStreams(playurlRoot?.obj("data"))
