@@ -20,7 +20,9 @@ repositories {
     maven(rootProject.layout.projectDirectory.dir(".gradle/loom-cache/remapped_mods")) {
         name = "fabricLoomRemappedMods"
     }
-    maven("https://thedarkcolour.github.io/KotlinForForge/")
+    maven("https://thedarkcolour.github.io/KotlinForForge/") {
+        content { includeGroup("thedarkcolour") }
+    }
     maven("https://maven.enginehub.org/repo/")
     maven("https://prmaven.neoforged.net/NeoForge/pr3403")
     maven("https://api.modrinth.com/maven") {
